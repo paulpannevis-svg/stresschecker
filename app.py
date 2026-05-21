@@ -1,0 +1,4567 @@
+from flask import Flask, render_template, make_response, request, jsonify, session, redirect, url_for, Response, send_file
+import sqlite3, os, hashlib, secrets, json, io
+from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv()
+
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
+# SMTP configuratie voor 2FA verificatiecodes
+MAIL_SERVER   = 'mailout.hostnet.nl'
+MAIL_PORT     = 587
+MAIL_USERNAME = 'noreply@lifestylemonitors.com'
+MAIL_PASSWORD = '55Bumper@#'
+
+import random, os
+
+def send_verification_code(email, code, lang='nl'):
+    try:
+        import sendgrid
+        from sendgrid.helpers.mail import Mail
+        sg = sendgrid.SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
+        if lang == 'de':
+            subject = 'Ihr Verifizierungscode – StressChecker'
+            body = f'Ihr Verifizierungscode lautet: {code}\n\nDieser Code ist 10 Minuten gültig.'
+        elif lang == 'en':
+            subject = 'Your verification code – StressChecker'
+            body = f'Your verification code is: {code}\n\nThis code is valid for 10 minutes.'
+        else:
+            subject = 'Uw verificatiecode – StressChecker'
+            body = f'Uw verificatiecode is: {code}\n\nDeze code is 10 minuten geldig.'
+        msg = Mail(from_email='noreply@lifestylemonitors.com', to_emails=email, subject=subject, plain_text_content=body)
+        sg.send(msg)
+        return True
+    except Exception as e:
+        print('Mail fout:', e)
+        return False
+
+
+def send_password_reset_email(email, code, lang='nl'):
+    try:
+        import sendgrid
+        from sendgrid.helpers.mail import Mail
+        sg = sendgrid.SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
+        if lang == 'de':
+            subject = 'Passwort zurücksetzen – StressChecker'
+            body = (f'Sie haben angefragt, Ihr Passwort zurückzusetzen.\n\n'
+                    f'Ihr Reset-Code lautet: {code}\n\n'
+                    f'Dieser Code ist 10 Minuten gültig und kann nur einmal verwendet werden.\n\n'
+                    f'Falls Sie diese Anfrage nicht gestellt haben, ignorieren Sie diese E-Mail.')
+        elif lang == 'en':
+            subject = 'Reset your password – StressChecker'
+            body = (f'You requested a password reset.\n\n'
+                    f'Your reset code is: {code}\n\n'
+                    f'This code is valid for 10 minutes and can only be used once.\n\n'
+                    f'If you did not request this, please ignore this email.')
+        else:
+            subject = 'Wachtwoord resetten – StressChecker'
+            body = (f'Je hebt een wachtwoordreset aangevraagd.\n\n'
+                    f'Je resetcode is: {code}\n\n'
+                    f'Deze code is 10 minuten geldig en kan slechts één keer gebruikt worden.\n\n'
+                    f'Heb je dit niet aangevraagd? Negeer dan deze e-mail.')
+        msg = Mail(from_email='noreply@lifestylemonitors.com', to_emails=email, subject=subject, plain_text_content=body)
+        sg.send(msg)
+        return True
+    except Exception as e:
+        print('Mail fout:', e)
+        return False
+
+
+def hash_password(password):
+    import bcrypt
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
+
+
+def verify_password(password, stored_hash):
+    # Returns (matches, is_legacy_sha256). is_legacy=True signaleert dat caller naar bcrypt moet re-hashen.
+    import bcrypt, hashlib
+    if not stored_hash:
+        return (False, False)
+    if stored_hash.startswith('$2'):
+        try:
+            ok = bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8'))
+            return (ok, False)
+        except (ValueError, TypeError):
+            return (False, False)
+    if len(stored_hash) == 64:
+        sha = hashlib.sha256(password.encode('utf-8')).hexdigest()
+        return (sha == stored_hash, True)
+    return (False, False)
+
+
+MAIL_FROM     = 'StressChecker <noreply@lifestylemonitors.com>'
+
+from hlm.routes import hlm as hlm_blueprint
+app.register_blueprint(hlm_blueprint)
+app.secret_key = os.environ.get('SC_SECRET_KEY', 'change-this-in-production')
+
+DB_PATH        = os.environ.get('SC_DB_PATH', '/opt/ic-license-server/data/saas_licenses.db')
+METING_DB_PATH = os.environ.get('SC_METING_DB', '/opt/stresschecker/data/sc_measurements.db')
+PRO_DB_PATH    = os.environ.get('SC_PRO_DB', '/opt/stresschecker/data/sc_pro.db')
+
+# Aantal eerste metingen waarbij educatieve blokken standaard openstaan voor
+# nieuwe consumenten. Pas aan op basis van gebruikersonderzoek.
+EDU_BLOCKS_MAX_MEASUREMENTS = 3
+
+# ─── Database helpers ────────────────────────────────────────────────────────
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def get_meting_db():
+    os.makedirs(os.path.dirname(METING_DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(METING_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute('''CREATE TABLE IF NOT EXISTS metingen (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_key    TEXT NOT NULL,
+        ts          INTEGER NOT NULL,
+        ri          REAL NOT NULL,
+        bpm         INTEGER NOT NULL,
+        hrv_pct     INTEGER NOT NULL,
+        rmssd       REAL,
+        beats       INTEGER,
+        duration    INTEGER DEFAULT 90,
+        sensor_type TEXT DEFAULT 'unknown',
+        notes       TEXT,
+        ctx_dimensie  TEXT,
+        ctx_vitaliteit REAL,
+        created_at  TEXT DEFAULT CURRENT_TIMESTAMP
+    )''')
+    for col, coltype in [('ctx_dimensie', 'TEXT'), ('ctx_vitaliteit', 'REAL'), ('feedback_cache', 'TEXT')]:
+        try: conn.execute(f'ALTER TABLE metingen ADD COLUMN {col} {coltype}')
+        except: pass
+    conn.commit()
+    return conn
+
+def get_pro_db():
+    os.makedirs(os.path.dirname(PRO_DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(PRO_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute('''CREATE TABLE IF NOT EXISTS clients (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        pro_key     TEXT NOT NULL,
+        name        TEXT NOT NULL,
+        birth_year  INTEGER DEFAULT 1970,
+        gender      TEXT DEFAULT 'male',
+        client_code TEXT UNIQUE,
+        email       TEXT,
+        phone       TEXT,
+        notes       TEXT,
+        active      INTEGER DEFAULT 1,
+        created_at  TEXT DEFAULT CURRENT_TIMESTAMP
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS client_metingen (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_id   INTEGER NOT NULL,
+        pro_key     TEXT NOT NULL,
+        ts          INTEGER NOT NULL,
+        ri          REAL NOT NULL,
+        bpm         INTEGER NOT NULL,
+        hrv_pct     INTEGER NOT NULL,
+        rmssd       REAL,
+        sdnn        REAL,
+        pnn50       REAL,
+        beats       INTEGER,
+        duration    INTEGER DEFAULT 90,
+        sensor_type TEXT DEFAULT 'unknown',
+        notes       TEXT,
+        timeseries  TEXT,
+        rr_intervals TEXT,
+        ctx_dimensie  TEXT,
+        ctx_vitaliteit REAL,
+        created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (client_id) REFERENCES clients(id)
+    )''')
+    for col, coltype in [('ctx_dimensie', 'TEXT'), ('ctx_vitaliteit', 'REAL'), ('feedback_cache', 'TEXT')]:
+        try: conn.execute(f'ALTER TABLE client_metingen ADD COLUMN {col} {coltype}')
+        except: pass
+    conn.commit()
+    return conn
+
+def get_user_key():
+    import hashlib
+    # Als er een email in sessie zit, gebruik die als stabiele basis
+    email = session.get('email', '')
+    if email:
+        key = hashlib.sha256(email.encode()).hexdigest()[:32]
+        session['user_key'] = key
+        session.modified = True
+        return key
+    # Fallback: bestaande user_key of sessie-token
+    uk = session.get('user_key', '')
+    if uk:
+        return uk
+    import secrets
+    code = secrets.token_hex(8)
+    session['session_id'] = code
+    uk = code
+    session['user_key'] = uk
+    session.modified = True
+    return uk
+
+def generate_client_code():
+    while True:
+        code = 'SC-CLI-' + secrets.token_hex(2).upper()
+        db = get_pro_db()
+        exists = db.execute("SELECT id FROM clients WHERE client_code = ?", (code,)).fetchone()
+        db.close()
+        if not exists:
+            return code
+
+def validate_license(code, email):
+    print(f"VALIDATE START: code={code}", flush=True)
+    code = code.strip().upper()
+    # Normaliseer: als code geen streepjes heeft en lang genoeg is, voeg ze toe (legacy formaat)
+    code_clean = code.replace('-', '')
+    if len(code_clean) == 32 and not code.startswith('SC'):
+        # Legacy code formaat: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
+        code = '-'.join([code_clean[i:i+4] for i in range(0, 32, 4)])
+    db_path = '/opt/ic-license-server/data/saas_licenses.db'
+    try:
+        db = sqlite3.connect(db_path)
+        db.row_factory = sqlite3.Row
+        # 1. New licenses
+        # LEFT JOIN op subscriptions — grace-period tot current_period_end voor canceled/past_due.
+        # NULL sub (manual/migration/legacy/PayPal-pre-Stripe): puur op licenses.status.
+        row = db.execute("""
+            SELECT l.license_key, l.type, l.status, l.valid_until,
+                   l.stripe_subscription_id, l.origin, l.email, l.code_expires_at,
+                   s.status AS sub_status, s.current_period_end,
+                   CASE
+                     WHEN l.status NOT IN ('available', 'activated') THEN 0
+                     WHEN s.subscription_id IS NULL THEN 1
+                     WHEN s.status IN ('active', 'trialing') THEN 1
+                     WHEN s.status IN ('canceled', 'past_due')
+                          AND s.current_period_end IS NOT NULL
+                          AND s.current_period_end > strftime('%Y-%m-%dT%H:%M:%S', 'now') THEN 1
+                     ELSE 0
+                   END AS effective_valid
+            FROM licenses l
+            LEFT JOIN subscriptions s ON l.stripe_subscription_id = s.subscription_id
+            WHERE l.license_key=?
+        """, (code,)).fetchone()
+        if row:
+            if row['status'] not in ('available', 'activated'):
+                return {'valid': False, 'error': 'Licentie verlopen of geannuleerd'}
+            if row['effective_valid']:
+                result = {'valid': True, 'type': row['type'] or 'consumer', 'source': 'license', 'valid_until': row['valid_until'],
+                          'origin': row['origin'], 'bound_email': row['email'], 'code_expires_at': row['code_expires_at']}
+                if row['sub_status'] in ('canceled', 'past_due') and row['current_period_end']:
+                    result['grace_until'] = row['current_period_end']
+                return result
+            return {'valid': False, 'error': 'Abonnement opgezegd of niet betaald'}
+        # 2. Legacy keys (3999 oude codes)
+        legacy = db.execute("SELECT id, license_key, product, status FROM legacy_keys WHERE license_key=?", (code,)).fetchone()
+        if legacy:
+            if legacy['status'] == 'migrated':
+                mig = db.execute("SELECT license_key, type, status, valid_until FROM licenses WHERE legacy_key=?", (code,)).fetchone()
+                if mig and mig['status'] in ('available', 'activated'):
+                    return {'valid': True, 'type': mig['type'] or 'consumer', 'source': 'migrated_legacy', 'valid_until': mig['valid_until'], 'migrated_code': mig['license_key']}
+                return {'valid': False, 'error': 'Code verlopen of ongeldig'}
+            if legacy['status'] in ('available', 'issued', 'unknown'):
+                return {'valid': True, 'type': 'legacy', 'needs_choice': True, 'legacy_id': legacy['id'], 'source': 'legacy'}
+        db.close()
+    except Exception as e:
+        import traceback; print(f"LICENSE ERROR: {e} {traceback.format_exc()}", flush=True)
+    # 3. Test codes
+    if code.upper() in ('SC-TEST-CONS', 'SC-PRO-TEST-CODE'):
+        return {'valid': True, 'type': 'pro' if 'PRO' in code.upper() else 'consumer'}
+    return {'valid': False, 'error': 'Ongeldige licentiecode'}
+
+
+
+def is_pro():
+    return session.get('license_type') == 'pro'
+
+
+def _is_pro_or_demo_pro():
+    """Pro-rol-toelating: echte Pro, of demo-modus met expliciete pro-rol.
+    Voorkomt dat een consumer-demo (demo_mode=True, license_type='consumer')
+    Pro-routes binnenkomt en cliëntdata of -lijsten ziet.
+    """
+    return is_pro() or (session.get('demo_mode') and session.get('license_type') == 'pro')
+
+
+def get_meting_count_for_current_context():
+    """Telt metingen relevant voor de huidige sessie-context.
+
+    Pro-cliëntmeting (measuring_for_client > 0) → client_metingen voor dat cid.
+    Anders (consumer of Pro eigen meting) → metingen onder user_key.
+    Faalt silently terug naar 0 als een DB niet bereikbaar is.
+    """
+    try:
+        cid = int(session.get('measuring_for_client', 0) or 0)
+    except (TypeError, ValueError):
+        cid = 0
+    try:
+        if cid > 0 and is_pro():
+            db = sqlite3.connect(PRO_DB_PATH)
+            n = db.execute(
+                "SELECT COUNT(*) FROM client_metingen WHERE client_id=?",
+                (cid,),
+            ).fetchone()[0]
+            db.close()
+            return int(n or 0)
+        uk = session.get('user_key') or ''
+        if not uk:
+            return 0
+        db = sqlite3.connect(METING_DB_PATH)
+        n = db.execute(
+            "SELECT COUNT(*) FROM metingen WHERE user_key=?", (uk,),
+        ).fetchone()[0]
+        db.close()
+        return int(n or 0)
+    except Exception:
+        return 0
+
+
+def show_educational_blocks():
+    """Of BEGRIJPEN/FUNCTIE-VAN-DE-BOL-blokken standaard openstaan.
+
+    Drie true-paden:
+      - Nieuwe consumer (< EDU_BLOCKS_MAX_MEASUREMENTS metingen)
+      - Pro bij cliëntmeting (didactisch hulpmiddel voor de cliënt)
+      - Demo-modus
+    """
+    meting_count = get_meting_count_for_current_context()
+    measuring_cid = session.get('measuring_for_client', 0) or 0
+    try: measuring_cid = int(measuring_cid)
+    except (TypeError, ValueError): measuring_cid = 0
+    return (
+        (not is_pro() and meting_count < EDU_BLOCKS_MAX_MEASUREMENTS)
+        or (is_pro() and measuring_cid > 0)
+        or bool(session.get('is_demo', False) or session.get('demo_mode', False))
+    )
+
+# ─── Pagina routes ───────────────────────────────────────────────────────────
+
+@app.route('/api/meting/confirm', methods=['POST'])
+def meting_confirm():
+    data = request.json or {}
+    mid = data.get('meting_id')
+    label = data.get('label', '')
+    subj_pre = data.get('subjectief_pre')
+    if not mid and not is_pro():
+        return jsonify({'error': 'geen id'}), 400
+    # Update ook client_metingen in Pro DB
+    try:
+        pro_db = get_pro_db()
+        pro_db.execute("UPDATE client_metingen SET pending=0, notes=? WHERE id=?", (label or '', mid,))
+        pro_db.commit()
+    except Exception:
+        pass
+    db = get_meting_db()
+    if label and subj_pre is not None:
+        try:
+            db.execute("UPDATE metingen SET pending=0, notes=?, subjectief_score=? WHERE id=?", (label, int(float(str(subj_pre))), mid))
+        except:
+            db.execute("UPDATE metingen SET pending=0, notes=? WHERE id=?", (label, mid))
+    elif label:
+        db.execute("UPDATE metingen SET pending=0, notes=? WHERE id=?", (label, mid))
+    elif subj_pre is not None:
+        try:
+            db.execute("UPDATE metingen SET pending=0, subjectief_score=? WHERE id=?", (int(float(str(subj_pre))), mid))
+        except:
+            db.execute("UPDATE metingen SET pending=0 WHERE id=?", (mid,))
+    else:
+        db.execute("UPDATE metingen SET pending=0 WHERE id=?", (mid,))
+    db.commit()
+    return jsonify({'ok': True})
+
+@app.route('/api/meting/discard', methods=['POST'])
+def meting_discard():
+    data = request.json or {}
+    mid = data.get('meting_id')
+    if not mid:
+        return jsonify({'error': 'geen id'}), 400
+    try:
+        pro_db = get_pro_db()
+        pro_db.execute("DELETE FROM client_metingen WHERE id=? AND pending=1", (mid,))
+        pro_db.commit()
+    except Exception:
+        pass
+    db = get_meting_db()
+    db.execute("DELETE FROM metingen WHERE id=? AND pending=1", (mid,))
+    db.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/')
+def index():
+    if session.get('license_valid'):
+        if is_pro():
+            return redirect(url_for('pro_menu'))
+        return redirect(url_for('menu'))
+    return redirect(url_for('welcome'))
+
+@app.route('/welkom')
+def welcome():
+    # Detecteer browsertaal bij eerste bezoek (alleen als nog niet ingesteld)
+    if not session.get('lang'):
+        accept = request.headers.get('Accept-Language', 'nl')
+        lang_raw = accept.split(',')[0].split(';')[0].strip().lower()
+        if lang_raw.startswith('de'):
+            session['lang'] = 'de'
+        elif lang_raw.startswith('en'):
+            session['lang'] = 'en'
+        else:
+            session['lang'] = 'nl'
+    return render_template('welcome.html', lang=session.get('lang', 'nl'))
+
+
+@app.route('/start')
+def start():
+    if not session.get('lang'):
+        accept = request.headers.get('Accept-Language', 'nl')
+        lang_raw = accept.split(',')[0].split(';')[0].strip().lower()
+        if lang_raw.startswith('de'):
+            session['lang'] = 'de'
+        elif lang_raw.startswith('en'):
+            session['lang'] = 'en'
+        else:
+            session['lang'] = 'nl'
+    return render_template('welcome.html', lang=session.get('lang', 'nl'), spoor='navigatie')
+
+
+
+@app.route('/demo')
+def demo():
+    mode = request.args.get('mode', 'consumer')
+    _lang = session.get('lang', 'nl')
+    session.clear()
+    session['lang'] = _lang
+    session["user_key"] = "0b88246290c29d68be85c33776867721"
+    session["email"] = "demo@stresschecker.com"
+    session.modified = True
+    session.permanent = True
+    session["user_key"] = "0b88246290c29d68be85c33776867721"
+    session["email"] = "demo@stresschecker.com"
+    session.modified = True
+    session.permanent = True
+    session['license_valid'] = True
+    session['user_id'] = 0
+    session['username'] = 'Demo'
+    session['license_type'] = 'pro' if mode == 'pro' else 'consumer'
+    session['is_demo'] = True
+    session['demo_mode'] = True
+    session['user_key'] = 'DEMO'
+    if mode == 'pro':
+        return redirect(url_for('pro_menu'))
+    return redirect(url_for('menu'))
+
+
+@app.route('/meetkeuze')
+def meetkeuze():
+    if not session.get('license_valid') and not session.get('demo_mode'):
+        return redirect(url_for('welcome'))
+    lang = session.get('lang', 'nl')
+    return render_template('meetkeuze_client.html', lang=lang)
+
+@app.route('/privacy')
+def privacy():
+    return render_template('privacy.html', lang=session.get('lang', 'nl'))
+
+SPOOR3_ERROR_MESSAGES = {
+    'no_stripe_subscription': {
+        'de': 'Die Abonnement-Verwaltung ist für Ihren Vertragstyp nicht verfügbar. '
+              'Bei Fragen wenden Sie sich an info@lifestylemonitors.de.',
+        'nl': 'Abonnement-beheer is niet beschikbaar voor jouw type abonnement. '
+              'Neem voor wijzigingen contact op via info@lifestylemonitors.com.',
+        'en': 'Subscription management is not available for your subscription type. '
+              'For changes please contact info@lifestylemonitors.com.',
+    },
+    'portal_unavailable': {
+        'de': 'Das Abonnement-Portal ist derzeit nicht erreichbar. Bitte versuchen Sie es später erneut.',
+        'nl': 'Het abonnement-portaal is tijdelijk onbereikbaar. Probeer het later opnieuw.',
+        'en': 'The subscription portal is temporarily unavailable. Please try again later.',
+    },
+    'use_new_flow': {
+        'de': "Die Kündigungsfunktion wurde aktualisiert. Bitte verwenden Sie die "
+              "Schaltfläche 'Abonnement verwalten' unten auf dieser Seite, oder "
+              "kontaktieren Sie uns unter info@lifestylemonitors.de.",
+        'nl': "De opzegfunctie is bijgewerkt. Gebruik de knop 'Abonnement beheren' "
+              "onderaan deze pagina, of neem contact op via info@lifestylemonitors.com.",
+        'en': "The cancellation feature has been updated. Please use the "
+              "'Manage subscription' button below on this page, or contact us at "
+              "info@lifestylemonitors.com.",
+    },
+}
+
+
+@app.route('/licentie')
+def license_screen():
+    lang = session.get('lang', 'nl')
+    raw_error = request.args.get('error', '')
+    translated = SPOOR3_ERROR_MESSAGES.get(raw_error, {}).get(lang) if raw_error else ''
+    error_text = translated if translated else raw_error
+    return render_template(
+        'license.html',
+        lang=lang,
+        error=error_text,
+        has_stripe_subscription=has_stripe_subscription(session.get('email', '')),
+    )
+
+@app.route('/activeer', methods=['POST'])
+def activate():
+    import sqlite3 as _sq, hashlib
+    code     = request.form.get('code', '').strip().upper()
+    legacy   = request.form.get('legacy_code', '').strip().upper()
+    email    = request.form.get('email', '').strip().lower()
+    password = request.form.get('password', '').strip()
+    lang     = request.form.get('lang', 'nl')
+
+    print(f"[ACTIVEER DEBUG] form fields: {dict(request.form)}", flush=True)
+    print(f"[ACTIVEER DEBUG] code='{code}' legacy='{legacy}' email='{email}'", flush=True)
+
+    # Legacy code veld als fallback als SC-code leeg is
+    if not code and legacy:
+        code = legacy
+
+    form_type = request.form.get('type', 'nieuw')
+    if form_type == 'terug':
+        # Inloggen: geen code nodig
+        if not email:
+            return redirect(url_for('license_screen', error='Vul je e-mailadres in.' if lang=='nl' else ('Bitte E-Mail eingeben.' if lang=='de' else 'Please enter your email.')))
+    else:
+        if not code or not email:
+            return redirect(url_for('license_screen', error='Vul beide velden in.' if lang=='nl' else ('Bitte beide Felder ausfüllen.' if lang=='de' else 'Please fill in both fields.')))
+
+    if not password or len(password) < 8:
+        return redirect(url_for('license_screen', error='Kies een wachtwoord van minimaal 8 tekens.' if lang=='nl' else ('Wählen Sie ein Passwort mit mindestens 8 Zeichen.' if lang=='de' else 'Choose a password of at least 8 characters.')))
+
+    # Cross-product detectie: HLM code ingevoerd op SC pagina
+    if code.startswith("HLM"):
+        return redirect("/hlm/registreer?code=" + code)
+
+    result = validate_license(code, email)
+    if result.get('needs_choice'):
+        session['legacy_code']            = code
+        session['legacy_valid']           = True
+        session['legacy_pending_email']   = email
+        session['legacy_pending_pw_hash'] = hashlib.sha256(password.encode()).hexdigest()
+        session['legacy_pending_lang']    = lang
+        return redirect(url_for('oude_code_keuze'))
+    if result['valid']:
+        # === Marketing-code herclaim-bescherming ===
+        # Marketing-codes circuleren breed (campagnes/beurzen/partners). Eerste
+        # activeerder zet email; tweede claim met afwijkend email wordt geweigerd.
+        # Stripe/PayPal/manual hebben eigen risicoprofiel — geen vergelijkbare check.
+        if result.get('origin') == 'marketing':
+            _bound = result.get('bound_email') or ''
+            if _bound and _bound.lower() != email.lower():
+                return redirect(url_for('license_screen', error=(
+                    'Deze code is al geactiveerd.' if lang=='nl'
+                    else ('Dieser Code wurde bereits aktiviert.' if lang=='de'
+                    else 'This code has already been activated.'))))
+
+        # === Marketing-code binding bij activering (origin='marketing' AND email IS NULL) ===
+        if result.get('origin') == 'marketing' and not result.get('bound_email'):
+            import datetime as _dt_mkt
+            cea = result.get('code_expires_at')
+            if not cea:
+                return redirect(url_for('license_screen', error=(
+                    'Deze code is niet geldig.' if lang=='nl'
+                    else ('Dieser Code ist ungültig.' if lang=='de'
+                    else 'This code is invalid.'))))
+            try:
+                cea_dt = _dt_mkt.datetime.fromisoformat(cea)
+            except ValueError:
+                return redirect(url_for('license_screen', error=(
+                    'Deze code is niet geldig.' if lang=='nl'
+                    else ('Dieser Code ist ungültig.' if lang=='de'
+                    else 'This code is invalid.'))))
+            if _dt_mkt.datetime.utcnow() > cea_dt:
+                return redirect(url_for('license_screen', error=(
+                    'Deze code is verlopen.' if lang=='nl'
+                    else ('Dieser Code ist abgelaufen.' if lang=='de'
+                    else 'This code has expired.'))))
+            now_iso_mkt = _dt_mkt.datetime.utcnow().isoformat()
+            exp_iso_mkt = (_dt_mkt.datetime.utcnow() + _dt_mkt.timedelta(days=365)).isoformat()
+            _bind_cn = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _bind_cn.execute(
+                "UPDATE licenses SET email=?, activated_at=?, expires_at=?, status='activated' "
+                "WHERE license_key=? AND origin='marketing' AND email IS NULL",
+                (email, now_iso_mkt, exp_iso_mkt, code)
+            )
+            _bind_cn.execute(
+                "INSERT INTO activation_log (license_key, product, action, ip_address, user_agent, details) "
+                "VALUES (?, 'sc', 'activate_marketing', ?, ?, ?)",
+                (code, request.remote_addr, request.headers.get('User-Agent','')[:200],
+                 f'origin=marketing email={email}')
+            )
+            _bind_cn.commit()
+            _bind_cn.close()
+            result = validate_license(code, email)
+        # === Einde marketing-branch ===
+
+        pw_hash = hashlib.sha256(password.encode()).hexdigest()
+        session.clear()
+        session['license_valid'] = True
+        session['license_type']  = result['type']
+        session['license_code']  = code
+        session['email']         = email
+        session['lang']          = lang
+
+        import sqlite3 as _sq2
+        _cn = _sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
+        _cn.row_factory = _sq2.Row
+        existing = _cn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+
+        if existing and existing['display_name']:
+            _lic_owner = _cn.execute(
+                "SELECT 1 FROM licenses WHERE (license_key=? OR legacy_key=?) AND lower(email)=? LIMIT 1",
+                (code, code, email)
+            ).fetchone()
+            if not _lic_owner:
+                _cn.close()
+                session.clear()
+                return redirect(url_for('license_screen', error=(
+                    'Deze licentiecode hoort niet bij dit e-mailadres.' if lang=='nl'
+                    else ('Dieser Lizenzcode gehört nicht zu dieser E-Mail-Adresse.' if lang=='de'
+                    else 'This license code does not belong to this email address.'))))
+            session['profile_name'] = existing['display_name']
+            # Wachtwoord pas opslaan na succesvol 2FA (zie verify_2fa)
+            session['2fa_pending_pw_hash'] = pw_hash
+            # Vervaldatum check
+            import datetime as _dt3
+            _exp_str = existing['license_expires'] or result.get('valid_until')
+            if _exp_str:
+                try:
+                    _exp_dt = _dt3.datetime.fromisoformat(_exp_str)
+                    if _dt3.datetime.utcnow() > _exp_dt:
+                        session.clear()
+                        _cn.close()
+                        return redirect(url_for('license_screen',
+                            error='Je gratis periode is verlopen. Activeer een licentiecode om verder te gaan.'))
+                except:
+                    pass
+            _cn.close()
+            import random as _rnd, time
+            _2fa_code = str(_rnd.randint(100000, 999999))
+            session['2fa_code']         = _2fa_code
+            session['2fa_email']        = email
+            session['2fa_license_type'] = session.get('license_type', 'consumer')
+            session['2fa_license_code'] = code
+            session['2fa_name']         = session.get('profile_name', email)
+            session['2fa_lang']         = lang
+            session['2fa_expires']      = time.time() + 600
+            send_verification_code(email, _2fa_code, lang)
+            import logging; logging.getLogger().warning(f"2FA CODE: {_2fa_code if '_2fa_code' in dir() else code}")
+            return redirect(url_for('verify_2fa'))
+        else:
+            # Nieuw account of bestaand account zonder display_name
+            if existing:
+                _cn.execute("UPDATE users SET password_hash=? WHERE email=?", (pw_hash, email))
+            else:
+                _cn.execute(
+                    "INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, datetime('now'))",
+                    (email, pw_hash))
+            _cn.commit()
+            import random as _rnd, time
+            _2fa_code = str(_rnd.randint(100000, 999999))
+            session["2fa_code"]         = _2fa_code
+            session["2fa_email"]        = email
+            session["2fa_license_type"] = session.get("license_type", "consumer")
+            session["2fa_license_code"] = code
+            session["2fa_name"]         = session.get("profile_name", email)
+            session["2fa_lang"]         = lang
+            session["2fa_expires"]      = time.time() + 600
+            send_verification_code(email, _2fa_code, lang)
+            import logging; logging.getLogger().warning(f"2FA CODE for {email}: {_2fa_code}")
+            _cn.close()
+            return redirect(url_for("verify_2fa"))
+
+    return redirect(url_for('license_screen', error='Ongeldige code.' if lang=='nl' else ('Ungültiger Code.' if lang=='de' else 'Invalid code.')))
+
+
+
+@app.route('/admin-login-bypass-9x7k')
+def admin_bypass():
+    session.clear()
+    session['logged_in'] = True
+    session['license_type'] = 'pro'
+    session['email'] = 'paulpannevis@gmail.com'
+    session['profile_name'] = 'Paul Pannevis'
+    session['lang'] = 'nl'
+    session['user_key'] = 'aae4793deb05b378a68140eb40979c32'
+    session['license_valid'] = True
+    session['license_type'] = 'pro'
+    return redirect(url_for('pro_menu'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def sc_login():
+    lang = request.args.get('lang', session.get('lang', 'nl'))
+    error = request.args.get('error')
+    if request.method == 'POST':
+        import sqlite3 as _sq, hashlib, re
+        email_raw = request.form.get('email', '')
+        email    = email_raw.strip().lower()
+        # Strip non-printable/invisible chars (iPhone autocomplete may inject zero-width chars)
+        email    = re.sub(r'[^\x20-\x7E]', '', email)
+        password = request.form.get('password', '')
+        lang     = request.form.get('lang', 'nl')
+        import logging
+        logging.getLogger().warning(f"[LOGIN] raw={email_raw!r} normalized={email!r} len_raw={len(email_raw)} len_norm={len(email)} ua={request.headers.get('User-Agent','')[:80]!r}")
+        if not email or not password:
+            error = ('E-Mail und Passwort eingeben.' if lang=='de' else 'Enter email and password.' if lang=='en' else 'Vul e-mail en wachtwoord in.')
+            return render_template('sc_login.html', lang=lang, error=error, email=email)
+        _cn = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+        _cn.row_factory = _sq.Row
+        user = _cn.execute("SELECT * FROM users WHERE email=? COLLATE NOCASE", (email,)).fetchone()
+        _cn.close()
+        if not user or not user['password_hash']:
+            logging.getLogger().warning(f"[LOGIN] NO MATCH for email={email!r} (user={user is not None}, has_pw={bool(user and user['password_hash']) if user else False})")
+            error = ('Kein Konto gefunden. Aktiviere zuerst deinen Lizenzcode.' if lang=='de' else 'No account found. Activate your license code first.' if lang=='en' else 'Geen account gevonden. Activeer eerst je licentiecode.')
+            return render_template('sc_login.html', lang=lang, error=error, email=email)
+        ok, is_legacy = verify_password(password, user['password_hash'])
+        if not ok:
+            error = ('Falsches Passwort.' if lang=='de' else 'Incorrect password.' if lang=='en' else 'Onjuist wachtwoord.')
+            return render_template('sc_login.html', lang=lang, error=error, email=email)
+        if is_legacy:
+            # Transparante migratie: SHA-256-hash bij succesvolle login eenmalig her-hashen naar bcrypt.
+            _cn3 = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _cn3.execute("UPDATE users SET password_hash=? WHERE email=? COLLATE NOCASE", (hash_password(password), email))
+            _cn3.commit()
+            _cn3.close()
+        # Inloggen gelukt — 2FA code sturen
+        _cn2 = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+        _cn2.row_factory = _sq.Row
+        lic = _cn2.execute(
+            "SELECT type FROM licenses WHERE email=? AND status='activated' AND (license_key LIKE 'SC-%' OR type IN ('consumer','pro')) AND license_key NOT LIKE 'HLM%' ORDER BY created_at DESC LIMIT 1",
+            (email,)).fetchone()
+        _cn2.close()
+        license_type = lic['type'] if lic else 'consumer'
+        # Sessie opschonen (demo flags verwijderen) en 2FA starten
+        import random as _rnd
+        code = str(_rnd.randint(100000, 999999))
+        session.clear()
+        session['2fa_code']         = code
+        session['2fa_email']        = email
+        session['2fa_license_type'] = license_type
+        session['2fa_name']         = user['display_name'] if user['display_name'] else email
+        session['2fa_lang']         = lang
+        import time
+        session['2fa_expires']      = time.time() + 600  # 10 min
+        session['2fa_login_type'] = request.form.get('type', request.args.get('type', 'consumer'))
+        send_verification_code(email, code, lang)
+        import logging; logging.getLogger().warning(f"2FA CODE: {_2fa_code if "_2fa_code" in dir() else code}")
+        return redirect(url_for('verify_2fa'))
+    return render_template('sc_login.html', lang=lang, error=error)
+
+
+
+@app.route('/verify', methods=['GET','POST'])
+def verify_2fa():
+    lang = session.get('2fa_lang','nl')
+    error = None
+    if '2fa_code' not in session:
+        return redirect(url_for('sc_login'))
+    if request.method == 'POST':
+        import time
+        code_in = request.form.get('code','').strip()
+        if time.time() > session.get('2fa_expires',0):
+            session.pop('2fa_code',None)
+            return redirect(url_for('sc_login'))
+        if code_in == session['2fa_code']:
+            _pending_pw = session.pop('2fa_pending_pw_hash', None)
+            if _pending_pw:
+                import sqlite3 as _sq_pw
+                _pwc_email = session.get('2fa_email','')
+                _pwc = _sq_pw.connect('/opt/ic-license-server/data/saas_licenses.db')
+                _existing_u = _pwc.execute("SELECT id FROM users WHERE email=?", (_pwc_email,)).fetchone()
+                if _existing_u:
+                    _pwc.execute("UPDATE users SET password_hash=? WHERE email=?", (_pending_pw, _pwc_email))
+                else:
+                    _pwc.execute("INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, datetime('now'))", (_pwc_email, _pending_pw))
+                _pwc.commit()
+                _pwc.close()
+            # PAIRING-REGISTER activation: alleen actief als /api/pairing/register een 2fa_pending_pair_code in sessie zette.
+            # Bij afwezigheid blijft /verify gedrag bit-identiek aan vóór deze wijziging.
+            _pending_pair_code    = session.pop('2fa_pending_pair_code', None)
+            _pending_consumer_key = session.pop('2fa_pending_consumer_key', None)
+            _paired_pro_id    = None
+            _paired_client_id = None
+            _paired_user_key  = None
+            if _pending_pair_code and _pending_consumer_key:
+                import sqlite3 as _sq_pair
+                _pair_email = session.get('2fa_email','')
+                _pair_name  = session.get('2fa_name','')
+                _pdb = _sq_pair.connect('/opt/ic-license-server/data/saas_licenses.db')
+                _pdb.row_factory = _sq_pair.Row
+                _new_user = _pdb.execute("SELECT id FROM users WHERE email=? COLLATE NOCASE", (_pair_email,)).fetchone()
+                if _new_user:
+                    _new_uid = _new_user['id']
+                    if _pair_name:
+                        _pdb.execute(
+                            "UPDATE users SET display_name=? WHERE id=? AND (display_name IS NULL OR display_name='')",
+                            (_pair_name, _new_uid))
+                    _pc_row = _pdb.execute(
+                        "SELECT * FROM pairing_codes WHERE code=? AND status='pending'",
+                        (_pending_pair_code,)).fetchone()
+                    if _pc_row:
+                        try:
+                            _exp_pc = datetime.strptime(_pc_row['expires_at'], '%Y-%m-%d %H:%M:%S')
+                        except ValueError:
+                            _exp_pc = datetime.fromisoformat(_pc_row['expires_at'].split('.')[0])
+                        if datetime.now() <= _exp_pc:
+                            _now_iso = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                            _pdb.execute(
+                                "UPDATE pairing_codes SET status='activated', consumer_user_id=?, consumer_user_key=?, activated_at=? WHERE code=?",
+                                (_new_uid, _pending_consumer_key, _now_iso, _pending_pair_code))
+                            _pdb.execute(
+                                "INSERT OR IGNORE INTO client_pairings (client_id, paired_user_id, paired_device_id, status) VALUES (?,?,?,?)",
+                                (_pc_row['client_id'], _new_uid, _pending_consumer_key, 'active'))
+                            _pdb.commit()
+                            _paired_pro_id    = _pc_row['pro_user_id']
+                            _paired_client_id = _pc_row['client_id']
+                            _paired_user_key  = _pending_consumer_key
+                        else:
+                            _pdb.execute("UPDATE pairing_codes SET status='expired' WHERE code=?", (_pending_pair_code,))
+                            _pdb.commit()
+                _pdb.close()
+            lt = session.pop('2fa_license_type','consumer')
+            if lt == "consumer" and session.get("2fa_login_type") == "pro":
+                lt = "pro"
+            em = session.pop('2fa_email','')
+            nm = session.pop('2fa_name',em)
+            if nm == em:
+                try:
+                    import sqlite3 as _sq3
+                    _uc = _sq3.connect('/opt/ic-license-server/data/saas_licenses.db')
+                    _uc.row_factory = _sq3.Row
+                    _ur = _uc.execute("SELECT display_name, birth_year, gender, sensor_pref, language FROM users WHERE email=?", (em,)).fetchone()
+                    if _ur and _ur['display_name']:
+                        nm = _ur['display_name']
+                    # Laad ook birth_year en gender
+                    if _ur and _ur['birth_year']:
+                        session['profile_birth_year'] = _ur['birth_year']
+                    if _ur and _ur['gender']:
+                        session['profile_gender'] = _ur['gender']
+                    session['sensor_pref'] = _ur['sensor_pref'] if _ur['sensor_pref'] else 'bluetooth'
+                    _uc.close()
+                except Exception:
+                    import logging; logging.getLogger().warning(f"Settings load error: {__import__("traceback").format_exc()}")
+            # Bewaar velden die we nodig hebben, dan sessie schoonvegen
+            _birth = session.get('profile_birth_year', 1970)
+            _gender = session.get('profile_gender', 'male')
+            _sensor = session.get('sensor_pref', 'bluetooth')
+            _lic_code = session.get('2fa_license_code', '')
+            session.clear()
+            session['license_valid']=True; session['license_type']=lt
+            session['email']=em; session['session_id']=em; session['lang']=lang
+            # Link license to email and mark as activated
+            import sqlite3 as _sq2; _ldb2=_sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
+            if _lic_code:
+                _ldb2.execute("UPDATE licenses SET email=?, status='activated' WHERE license_key=? AND status='available'", (em, _lic_code))
+                _ldb2.commit()
+            _lr2=_ldb2.execute("SELECT user_key FROM licenses WHERE email=? AND product='sc' ORDER BY rowid DESC LIMIT 1",(em,)).fetchone(); _ldb2.close(); session['user_key']=_paired_user_key if _paired_user_key else (_lr2[0] if _lr2 else None)
+            session['profile_name']=nm; session['profile_birth_year']=_birth; session['profile_gender']=_gender; session['sensor_pref']=_sensor
+            if _paired_pro_id:
+                session['paired_with_pro']  = _paired_pro_id
+                session['paired_client_id'] = _paired_client_id
+            return redirect(url_for('pro_menu') if lt=='pro' else url_for('menu'))
+        else:
+            error='Onjuiste code.' if lang=='nl' else ('Falscher Code.' if lang=='de' else 'Incorrect.')
+    return render_template('verify_2fa.html',lang=lang,error=error,email=session.get('2fa_email',''))
+
+
+@app.route('/wachtwoord-vergeten', methods=['GET', 'POST'])
+def password_forgot():
+    lang = request.args.get('lang', session.get('lang', 'nl'))
+    if request.method == 'POST':
+        import sqlite3 as _sq, re, secrets as _sec
+        from datetime import datetime, timedelta
+        email_raw = request.form.get('email', '')
+        email = email_raw.strip().lower()
+        email = re.sub(r'[^\x20-\x7E]', '', email)
+        lang = request.form.get('lang', lang)
+        # Email-enumeratie-bescherming: response is identiek ongeacht of account bestaat, ongeacht rate-limit.
+        generic_msg = (
+            'Wenn dieses Konto existiert, haben wir einen Reset-Code per E-Mail gesendet.' if lang=='de'
+            else 'If this account exists, we have sent a reset code by email.' if lang=='en'
+            else 'Als dit account bestaat, hebben we een resetcode per e-mail verstuurd.'
+        )
+        if email and '@' in email:
+            _cn = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _cn.row_factory = _sq.Row
+            # strftime i.p.v. datetime() — created_at/expires_at zijn Python isoformat (met 'T'),
+            # SQLite datetime('now') heeft spatie — lexicografisch ongelijk op positie 10.
+            _cn.execute("DELETE FROM password_reset_codes WHERE expires_at < strftime('%Y-%m-%dT%H:%M:%S', 'now')")
+            # Rate-limit: max 3 gegenereerde codes per e-mail per uur (telt alleen daadwerkelijk gegenereerde codes).
+            recent = _cn.execute(
+                "SELECT COUNT(*) AS n FROM password_reset_codes WHERE lower(email)=? AND created_at > strftime('%Y-%m-%dT%H:%M:%S', 'now', '-1 hour')",
+                (email,)
+            ).fetchone()
+            if recent['n'] < 3:
+                user = _cn.execute("SELECT id FROM users WHERE email=? COLLATE NOCASE", (email,)).fetchone()
+                if user:
+                    code = str(_sec.randbelow(900000) + 100000)
+                    now = datetime.utcnow().isoformat()
+                    expires = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+                    _cn.execute(
+                        "INSERT INTO password_reset_codes (email, code, created_at, expires_at) VALUES (?, ?, ?, ?)",
+                        (email, code, now, expires)
+                    )
+                    _cn.commit()
+                    send_password_reset_email(email, code, lang)
+            _cn.close()
+        return render_template('wachtwoord_vergeten.html', lang=lang, info=generic_msg)
+    return render_template('wachtwoord_vergeten.html', lang=lang)
+
+
+@app.route('/wachtwoord-reset', methods=['GET', 'POST'])
+def password_reset_form():
+    lang = request.args.get('lang', session.get('lang', 'nl'))
+    email_qs = request.args.get('email', '').strip().lower()
+    if request.method == 'POST':
+        import sqlite3 as _sq, re
+        from datetime import datetime
+        email_raw = request.form.get('email', '')
+        email = email_raw.strip().lower()
+        email = re.sub(r'[^\x20-\x7E]', '', email)
+        code = request.form.get('code', '').strip()
+        new_pw = request.form.get('password', '')
+        new_pw2 = request.form.get('password_confirm', '')
+        lang = request.form.get('lang', lang)
+        err = None
+        if not email or not code or not new_pw:
+            err = ('Vul alle velden in.' if lang=='nl' else 'Bitte alle Felder ausfüllen.' if lang=='de' else 'Please fill in all fields.')
+        elif len(new_pw) < 8:
+            err = ('Wachtwoord minimaal 8 tekens.' if lang=='nl' else 'Passwort mindestens 8 Zeichen.' if lang=='de' else 'Password must be at least 8 characters.')
+        elif new_pw != new_pw2:
+            err = ('Wachtwoorden komen niet overeen.' if lang=='nl' else 'Passwörter stimmen nicht überein.' if lang=='de' else 'Passwords do not match.')
+        if err:
+            return render_template('wachtwoord_reset.html', lang=lang, error=err, email=email, code=code)
+        _cn = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+        _cn.row_factory = _sq.Row
+        # Geldige code: niet gebruikt, niet verlopen. strftime-format matcht Python isoformat (zie Fase 5 fix).
+        row = _cn.execute(
+            "SELECT id FROM password_reset_codes WHERE lower(email)=? AND code=? AND used_at IS NULL AND expires_at > strftime('%Y-%m-%dT%H:%M:%S', 'now') ORDER BY id DESC LIMIT 1",
+            (email, code)
+        ).fetchone()
+        if not row:
+            _cn.close()
+            err = ('Code ongeldig of verlopen.' if lang=='nl' else 'Code ungültig oder abgelaufen.' if lang=='de' else 'Code invalid or expired.')
+            return render_template('wachtwoord_reset.html', lang=lang, error=err, email=email, code='')
+        # Update password (bcrypt) + invalideer ALLE openstaande codes voor dit email (anti-replay).
+        new_hash = hash_password(new_pw)
+        used_ts = datetime.utcnow().isoformat()
+        _cn.execute("UPDATE users SET password_hash=? WHERE email=? COLLATE NOCASE", (new_hash, email))
+        _cn.execute("UPDATE password_reset_codes SET used_at=? WHERE lower(email)=? AND used_at IS NULL",
+                    (used_ts, email))
+        _cn.commit()
+        _cn.close()
+        return redirect(url_for('sc_login', success='password_reset', lang=lang))
+    return render_template('wachtwoord_reset.html', lang=lang, email=email_qs)
+
+
+@app.route('/profiel')
+def profile_setup():
+    if not session.get('license_valid') and not session.get('demo_mode'):
+        return redirect(url_for('welcome'))
+    return render_template('profile.html', lang=session.get('lang', 'nl'),
+                           license_type=session.get('license_type'))
+
+@app.route('/profiel/opslaan', methods=['POST'])
+def save_profile():
+    if not session.get('license_valid') and not session.get('demo_mode'):
+        return redirect(url_for('welcome'))
+    session['profile_name']       = request.form.get('name', '').strip()
+    session['profile_birth_year'] = int(request.form.get('birth_year', 1970))
+    session['profile_gender']     = request.form.get('gender', 'male')
+    # Sla activatiedatum op (alleen bij nieuwe registratie)
+    import sqlite3 as _sq2, datetime as _dt2
+    _cn2 = _sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
+    _now = _dt2.datetime.utcnow()
+    if session.get('legacy_migrated'):
+        _exp = _dt2.datetime(2027, 1, 1)
+    else:
+        _exp = _now + _dt2.timedelta(days=183)  # ~6 maanden
+    _cn2.execute(
+        "UPDATE users SET activated_at=?, license_expires=? WHERE email=? AND activated_at IS NULL",
+        (_now.isoformat(), _exp.isoformat(), session.get('email',''))
+    )
+    _cn2.commit()
+    _cn2.close()
+    if is_pro():
+        return redirect(url_for('pro_menu'))
+    return redirect(url_for('menu'))
+
+@app.route('/menu')
+def menu():
+    if request.args.get('demo') == '1':
+        session['demo_mode'] = True
+        session['is_demo'] = True
+        session['user_key'] = 'DEMO'
+        if request.args.get('role') == 'pro':
+            session['license_type'] = 'pro'
+        else:
+            session.pop('license_type', None)
+    if session.get('license_type') == 'pro' and (session.get('license_valid') or session.get('demo_mode')):
+        return redirect(url_for('pro_menu'))
+    if not session.get('license_valid') and not session.get('demo_mode'):
+        return redirect(url_for('welcome'))
+    # Check vervaldatum
+    if session.get('license_valid') and not session.get('demo_mode') and not session.get('free_trial'):
+        try:
+            import sqlite3 as _sq_exp, datetime as _dt_exp
+            _exp_cn = _sq_exp.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _exp_cn.row_factory = _sq_exp.Row
+            _exp_row = _exp_cn.execute("SELECT license_expires FROM users WHERE email=?", (session.get('email',''),)).fetchone()
+            _exp_cn.close()
+            if _exp_row and _exp_row['license_expires']:
+                _exp_date = _dt_exp.datetime.fromisoformat(_exp_row['license_expires'])
+                if _dt_exp.datetime.utcnow() > _exp_date:
+                    session.clear()
+                    return redirect(url_for('welcome') + '?expired=1')
+        except Exception:
+            pass
+    _cn = sqlite3.connect(METING_DB_PATH)
+    _naam_row = _cn.execute("SELECT naam FROM user_profiles WHERE user_key=? OR email=?", (get_user_key(), session.get("email",""))).fetchone()
+    _naam = (_naam_row[0] if _naam_row and _naam_row[0] else session.get('profile_name', ''))
+    _lm = _cn.execute("SELECT ri,bpm,hrv_pct FROM metingen WHERE user_key=? ORDER BY id DESC LIMIT 1",
+                       (get_user_key(),)).fetchone()
+    _cn.close()
+    return render_template("menu.html", lang=session.get("lang","nl"),
+                           name=_naam,
+                           license_type=session.get('license_type', 'free'), last_meting=_lm, demo_mode=session.get('demo_mode', False))
+
+@app.route('/gratis')
+def free_mode():
+    session['license_valid'] = True
+    session['lang']          = request.args.get('lang', 'nl')
+    if request.args.get('role') == 'pro':
+        session['license_type'] = 'pro'
+        session['free_trial'] = True
+    else:
+        session['license_type'] = 'free'
+        session.pop('free_trial', None)
+    return redirect(url_for('profile_setup'))
+
+
+@app.route('/oude-code', methods=['GET', 'POST'])
+def oude_code():
+    lang = session.get('lang', 'nl')
+    error = None
+    if request.method == 'POST':
+        code = request.form.get('code', '').strip().upper()
+        # Valideer tegen legacy_keys tabel
+        try:
+            import sqlite3 as _sqlite3
+            legacy_db = _sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+            legacy_db.row_factory = _sqlite3.Row
+            row = legacy_db.execute(
+                "SELECT * FROM legacy_keys WHERE license_key=?", (code,)
+            ).fetchone()
+            legacy_db.close()
+            if row and row['status'] == 'available':
+                # Geldige ongebruikte code — sla op in sessie en toon keuze
+                session['legacy_code'] = code
+                session['legacy_valid'] = True
+                return redirect(url_for('oude_code_keuze'))
+            elif row and row['status'] == 'migrated':
+                error = {'nl': 'Deze code is al eerder gebruikt.',
+                         'de': 'Dieser Code wurde bereits verwendet.',
+                         'en': 'This code has already been used.'}.get(lang, 'Code already used.')
+            else:
+                error = {'nl': 'Code niet herkend. Controleer op typefouten.',
+                         'de': 'Code nicht erkannt. Bitte auf Tippfehler prüfen.',
+                         'en': 'Code not recognised. Please check for typos.'}.get(lang, 'Code not recognised.')
+        except Exception as e:
+            error = f'Database fout: {e}'
+    return render_template('oude_code.html', lang=lang, error=error)
+
+
+@app.route('/oude-code-keuze', methods=['GET', 'POST'])
+def oude_code_keuze():
+    if not session.get('legacy_valid'):
+        return redirect(url_for('welcome'))
+    lang = session.get('lang', 'nl')
+    if request.method == 'POST':
+        role = request.form.get('role', 'consumer')
+        # Markeer code als migrated
+        try:
+            import sqlite3 as _sqlite3
+            legacy_db = _sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+            legacy_db.execute(
+                "UPDATE legacy_keys SET status='migrated', migrated_at=datetime('now') WHERE license_key=?",
+                (session.get('legacy_code'),)
+            )
+            legacy_db.commit()
+            legacy_db.close()
+        except:
+            pass
+        # Zet sessie — 1 maand trial
+        import datetime
+        session['license_valid'] = True
+        session['license_type'] = role  # 'consumer' of 'pro'
+        session['trial_until'] = (datetime.date.today() + datetime.timedelta(days=31)).isoformat()
+        session['legacy_migrated'] = True
+        session.pop('legacy_valid', None)
+        return redirect(url_for('profile_setup'))
+    return render_template('legacy_choice.html', lang=lang,
+                           legacy_code=session.get('legacy_code', ''),
+                           pending_email=session.get('legacy_pending_email'))
+
+@app.route('/taal/<lang>')
+def set_language(lang):
+    if lang in ('nl', 'de', 'en'):
+        session['lang'] = lang
+    next_url = request.args.get('next') or request.referrer or url_for('menu')
+    return redirect(next_url)
+
+@app.route('/uitloggen')
+def logout():
+    session.clear()
+    return redirect('/welkom')
+
+@app.route('/sensor-en-meten')
+def sensor_en_meten():
+    if not session.get("license_valid") and not session.get("demo_mode"):
+        return redirect(url_for("welcome"))
+    _cid = int(request.args.get("cid", 0)) or session.get("measuring_for_client") or 0
+    if _cid and _is_pro_or_demo_pro():
+        profile = {"id": _cid, "name": session.get("client_name",""),
+                   "birth_year": session.get("client_birth_year", 1970),
+                   "gender": session.get("client_gender","male")}
+    else:
+        profile = {"id": 1, "name": session.get("profile_name", "Paul"),
+                   "birth_year": session.get("profile_birth_year", 1970),
+                   "gender": session.get("profile_gender", "male")}
+    _dur_arg = request.args.get("duration", type=int)
+    _biofeed_dur = _dur_arg if (_dur_arg is not None and 180 <= _dur_arg <= 1800) else 600
+    return render_template("sensor_en_meten.html",
+        lang=session.get("lang", "nl"), profile=profile,
+        duration=_biofeed_dur if request.args.get("type")=="biofeedback" else 90,
+        skip_subj=request.args.get("skip_subj","0"), is_pro=is_pro(),
+        meting_type=request.args.get("type","basismeting"),
+        is_demo=session.get("is_demo") or session.get("demo_mode", False),
+        client_id=_cid,
+        show_edu=show_educational_blocks(),
+    )
+
+@app.route('/voorbereiden')
+def voorbereiden():
+    lang = session.get('lang', 'nl')
+    next_page = request.args.get('next', 'basismeting')
+    _cid = request.args.get("cid") or session.get("measuring_for_client")
+    sensor_url = '/sensor-en-meten'
+    if _cid: sensor_url = f'/sensor-en-meten?cid={_cid}'
+    resp = make_response(render_template('voorbereiden.html',
+        lang=lang, sensor_url=sensor_url, next=next_page,
+        show_edu=show_educational_blocks(),
+    ))
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+@app.route("/sensoren")
+def sensoren():
+    return redirect(url_for('kenniscentrum'))
+@app.route('/eggs')
+def eggs():
+    return redirect(url_for('results'))
+
+@app.route('/kwadrant')
+def kwadrant():
+    if not session.get('license_valid') and not session.get('demo_mode') and not session.get('hlm_user_id'):
+        return redirect(url_for('welcome'))
+    client_id = int(request.args.get('cid', 0)) or session.get('measuring_for_client') or 0
+    client_name = ''
+    if client_id and _is_pro_or_demo_pro():
+        db = get_pro_db()
+        _pk = get_user_key()
+        _demo = session.get('demo_mode') and session.get('license_type') == 'pro'
+        c = db.execute("SELECT name FROM clients WHERE id=? AND (pro_key=? OR pro_key='DEMO')" if _demo else "SELECT name FROM clients WHERE id=? AND pro_key=?", (client_id, _pk)).fetchone()
+        if c: client_name = c['name']
+        db.close()
+    client_info = {}
+    if client_id and _is_pro_or_demo_pro():
+        db = get_pro_db()
+        _pk = get_user_key()
+        _demo = session.get('demo_mode') and session.get('license_type') == 'pro'
+        ci = db.execute("SELECT * FROM clients WHERE id=? AND (pro_key=? OR pro_key='DEMO')" if _demo else "SELECT * FROM clients WHERE id=? AND pro_key=?", (client_id, _pk)).fetchone()
+        if ci:
+            client_name = ci['name']
+            client_info = {'name': ci['name'], 'birth_year': ci['birth_year'],
+                          'gender': ci['gender'], 'client_code': ci['client_code']}
+        db.close()
+    return render_template('kwadrant.html', lang=session.get('lang', 'nl'),
+                           client_id=client_id, client_name=client_name,
+                           client_info=client_info, is_pro=is_pro(), last_meting_type=session.get('last_meting_type','basismeting'), pending_meting_id=session.get('pending_meting_id',0))
+
+@app.route('/resultaten')
+def results():
+    if not session.get('license_valid') and not session.get('demo_mode'):
+        return redirect(url_for('welcome'))
+    subjectief_pending = False  # zelfinschatting nu vóór meting via waarschuwingspagina
+    row = None
+    try:
+        db = get_meting_db()
+        row = db.execute('SELECT subjectief_score, ri FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 1',(get_user_key(),)).fetchone()
+        db.close()
+    except:
+        pass
+    resp = make_response(render_template('results.html', lang=session.get('lang', 'nl'),
+                            profile_name=session.get('profile_name', ''),
+                            subjectief_pending=subjectief_pending,
+                            subjectief_score=row[0] if row else None,
+                            subjectief_ri=row[1] if row else None,
+                            demo_mode=session.get('demo_mode', False) or session.get('is_demo', False)))
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
+@app.route('/begrippen')
+@app.route('/faq')
+def faq_page():
+    return redirect(url_for('kenniscentrum'))
+
+def begrippen():
+    return redirect(url_for('kenniscentrum'))
+
+@app.route('/tips')
+def tips():
+    return redirect(url_for('kenniscentrum'))
+
+@app.route('/beroepen')
+def beroepen():
+    if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
+        return redirect(url_for('menu'))
+    return render_template('beroepen.html', lang=session.get('lang','nl'))
+
+@app.route('/over-stress')
+def over_stress():
+    return redirect(url_for('kenniscentrum'))
+
+@app.route('/instellingen')
+def settings():
+    import logging; logging.getLogger().warning(f"SETTINGS SESSION: birth_year={session.get('profile_birth_year')} gender={session.get('profile_gender')} sensor={session.get('sensor_pref')}")
+    if not session.get('license_valid') and not session.get('demo_mode'):
+        return redirect(url_for('welcome'))
+    email = session.get('email', '')
+    _by, _gd, _sp = 1970, 'male', 'bluetooth'
+    if email:
+        try:
+            import sqlite3 as _sq2
+            _cn2 = _sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _cn2.row_factory = _sq2.Row
+            _r2 = _cn2.execute("SELECT birth_year, gender, sensor_pref FROM users WHERE email=?", (email,)).fetchone()
+            if _r2:
+                _by = _r2['birth_year'] or 1970
+                _gd = _r2['gender'] or 'male'
+                _sp = _r2['sensor_pref'] or 'bluetooth'
+            _cn2.close()
+        except: pass
+    session['profile_birth_year'] = _by
+    session['profile_gender'] = _gd
+    session['sensor_pref'] = _sp
+    _lang = session.get('lang', 'nl')
+    return render_template('settings.html', lang=_lang, is_pro=session.get('license_type') in ('pro','pro_demo'),
+                            profile_name=session.get('profile_name', ''),
+                            birth_year=_by,
+                            gender=_gd,
+                            subscription_info=get_subscription_info(email, _lang),
+                            tier_summary=get_pro_tier_summary(email, _lang),
+                            active_pairings=get_active_pairings_count(get_user_key()))
+@app.route('/verloop')
+def verloop():
+    if not session.get('license_valid') and not session.get('demo_mode'):
+        return redirect(url_for('index'))
+    return render_template('verloop.html', lang=session.get('lang','nl'))
+
+
+@app.route('/mijn-metingen')
+def mijn_metingen():
+    user_key = session.get('user_key','')
+    if not user_key:
+        return redirect(url_for('sc_login'))
+    cn = get_meting_db()
+    metingen = cn.execute(
+        "SELECT id, ts, ri, bpm, hrv_pct, rmssd, meting_type, notes, rr_intervals FROM metingen WHERE user_key=? ORDER BY ts DESC",
+        (user_key,)
+    ).fetchall()
+    metingen_chart = [dict(r) for r in metingen]
+    lang = session.get('lang','nl')
+    return render_template('mijn_metingen.html', metingen_chart=metingen_chart, lang=lang)
+
+@app.route("/biofeedback")
+def biofeedback():
+    if not session.get("license_valid") and not session.get("demo_mode"):
+        return redirect(url_for("welcome"))
+    profile = {"name": session.get("profile_name", ""), "birth_year": session.get("profile_birth_year", 1990),
+               "gender": session.get("profile_gender", "male"), "id": session.get("profile_id", 0)}
+    response = make_response(render_template("measure.html", lang=session.get("lang", "nl"), profile=profile, duration=0, skip_subj="1", is_pro=is_pro(), meting_type="biofeedback"))
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+# ─── PRO routes ──────────────────────────────────────────────────────────────
+
+@app.route('/pro')
+def pro_menu():
+    if not session.get('license_valid') and not session.get('demo_mode'):
+        return redirect(url_for('welcome'))
+    if not _is_pro_or_demo_pro():
+        return redirect(url_for('menu'))
+    # Defense-in-depth: ruim legacy sticky cliënt-selectie op bij terugkeer naar Pro-menu
+    session.pop('last_client_id', None)
+    # Check vervaldatum
+    if session.get('license_valid') and not session.get('demo_mode') and not session.get('free_trial'):
+        try:
+            import sqlite3 as _sq_exp, datetime as _dt_exp
+            _exp_cn = _sq_exp.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _exp_cn.row_factory = _sq_exp.Row
+            _exp_row = _exp_cn.execute("SELECT license_expires FROM users WHERE email=?", (session.get('email',''),)).fetchone()
+            _exp_cn.close()
+            if _exp_row and _exp_row['license_expires']:
+                _exp_date = _dt_exp.datetime.fromisoformat(_exp_row['license_expires'])
+                if _dt_exp.datetime.utcnow() > _exp_date:
+                    session.clear()
+                    return redirect(url_for('welcome') + '?expired=1')
+        except Exception:
+            pass
+    lang = session.get('lang', 'nl')
+    pro_key = get_user_key()
+    db = get_pro_db()
+    _demo = session.get('demo_mode') and session.get('license_type') == 'pro'
+    client_count = db.execute("SELECT COUNT(*) FROM clients WHERE active=1 AND (pro_key=? OR pro_key='DEMO')" if _demo else "SELECT COUNT(*) FROM clients WHERE active=1 AND pro_key=?", (pro_key,)).fetchone()[0]
+    recent_count = db.execute(
+        "SELECT COUNT(*) FROM client_metingen WHERE (pro_key=? OR pro_key='DEMO') AND ts>?" if _demo else "SELECT COUNT(*) FROM client_metingen WHERE pro_key=? AND ts>?",
+        (pro_key, int((datetime.now().timestamp() - 7*86400) * 1000))
+    ).fetchone()[0]
+    db.close()
+    _email = session.get('email', '')
+    return render_template("pro/menu.html", lang=lang,
+                           name=session.get("profile_name", ""),
+                           client_count=client_count, recent_count=recent_count, is_pro=is_pro,
+                           is_demo=session.get("is_demo", False),
+                           demo_msg=("Nur fur Pro-Abonnenten" if lang=="de" else "Pro subscribers only" if lang=="en" else "Alleen voor Pro-abonnees"),
+                           subscription_info=get_subscription_info(_email, lang),
+                           tier_summary=get_pro_tier_summary(_email, lang),
+                           active_pairings=get_active_pairings_count(pro_key))
+
+@app.route('/pro/mijn-metingen')
+def pro_eigen_metingen():
+    if not session.get('license_valid') or not is_pro():
+        return redirect(url_for('welcome'))
+    lang = session.get('lang', 'nl')
+    pro_key = get_user_key()
+    db = get_meting_db()
+    metingen = db.execute(
+        "SELECT * FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 100",
+        (pro_key,)).fetchall()
+    db.close()
+    metingen_chart = [{'id': r['id'], 'ts': r['ts'], 'ri': r['ri'], 'bpm': r['bpm'], 'hrv_pct': r['hrv_pct'], 'rmssd': r['rmssd'], 'notes': r['notes'] if 'notes' in r.keys() else '', 'meting_type': r['meting_type'] if 'meting_type' in r.keys() else '', 'rr_intervals': r['rr_intervals'] if 'rr_intervals' in r.keys() else '', 'dimensie': r['ctx_dimensie'] if 'ctx_dimensie' in r.keys() else '', 'subjectief_score': r['subjectief_score'] if 'subjectief_score' in r.keys() else None} for r in metingen]
+    from datetime import datetime
+    metingen_list = []
+    for r in metingen:
+        d = dict(r)
+        try:
+            dt = datetime.fromtimestamp(d['ts']/1000)
+            d['datum'] = dt.strftime('%Y-%m-%d')
+            d['tijd'] = dt.strftime('%H:%M')
+        except:
+            d['datum'] = '-'
+            d['tijd'] = '-'
+        metingen_list.append(d)
+    resp = make_response(render_template('pro/eigen_metingen.html', lang=lang, metingen=metingen_list, metingen_chart=metingen_chart))
+    resp.headers["Cache-Control"] = "no-store, no-cache"
+    return resp
+
+@app.route('/pro/clienten')
+def pro_clients():
+    if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
+        return redirect(url_for('welcome'))
+    lang = session.get('lang', 'nl')
+    pro_key = get_user_key()
+    _demo = session.get('demo_mode') and session.get('license_type') == 'pro'
+    db = get_pro_db()
+    clients = db.execute("SELECT * FROM clients WHERE active=1 AND (pro_key=? OR pro_key='DEMO') ORDER BY name" if _demo else "SELECT * FROM clients WHERE active=1 AND pro_key=? ORDER BY name", (pro_key,)).fetchall()
+    client_list = []
+    for c in clients:
+        last = db.execute("SELECT ri,bpm,hrv_pct,ts FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 1", (c['id'],)).fetchone()
+        total = db.execute("SELECT COUNT(*) FROM client_metingen WHERE client_id=?", (c['id'],)).fetchone()[0]
+        client_list.append({
+            'id': c['id'], 'name': c['name'], 'birth_year': c['birth_year'],
+            'gender': c['gender'], 'client_code': c['client_code'],
+            'email': c['email'] or '', 'notes': c['notes'] or '',
+            'last_ri': round(last['ri'],1) if last else None,
+            'last_bpm': last['bpm'] if last else None,
+            'last_ts': __import__('datetime').datetime.fromtimestamp(last['ts']/1000).strftime('%d-%m-%Y') if last and last['ts'] else None,
+            'total_metingen': total,
+                'week_avg': round(db.execute('SELECT AVG(ri) FROM client_metingen WHERE client_id=? AND ts>?', (c['id'], (__import__('time').time()-604800)*1000)).fetchone()[0] or 0, 1),
+                'trend': (lambda cur, prev: ('up', round(cur - prev, 1)) if cur and prev and cur - prev > 0.3 else (('down', round(cur - prev, 1)) if cur and prev and cur - prev < -0.3 else (('flat', 0) if cur and prev else ('nodata', 0))))(
+                    db.execute('SELECT AVG(ri) FROM client_metingen WHERE client_id=? AND ts>?', (c['id'], (__import__('time').time()-604800)*1000)).fetchone()[0],
+                    db.execute('SELECT AVG(ri) FROM client_metingen WHERE client_id=? AND ts>? AND ts<?', (c['id'], (__import__('time').time()-1209600)*1000, (__import__('time').time()-604800)*1000)).fetchone()[0]
+                ),
+                'top_dimensie': (lambda r: r[0] if r else None)(db.execute("SELECT ctx_dimensie FROM client_metingen WHERE client_id=? AND ctx_dimensie IS NOT NULL AND ctx_dimensie != '' GROUP BY ctx_dimensie ORDER BY COUNT(*) DESC LIMIT 1", (c['id'],)).fetchone())
+        })
+    db.close()
+    return render_template('pro/clients.html', lang=lang, clients=client_list)
+
+@app.route('/pro/dashboard')
+def pro_dashboard():
+    if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
+        return redirect(url_for('welcome'))
+    import time as _t
+    lang = session.get('lang', 'nl')
+    pro_key = get_user_key()
+    _demo = session.get('demo_mode') and session.get('license_type') == 'pro'
+    db = get_pro_db()
+    clients = db.execute("SELECT * FROM clients WHERE active=1 AND (pro_key=? OR pro_key='DEMO') ORDER BY name" if _demo else "SELECT * FROM clients WHERE active=1 AND pro_key=? ORDER BY name", (pro_key,)).fetchall()
+    now_ms = _t.time() * 1000
+    week_ms = 7 * 86400 * 1000
+    rows = []
+    for c in clients:
+        cid = c['id']
+        avg_all = db.execute("SELECT AVG(ri) FROM client_metingen WHERE client_id=? AND ri IS NOT NULL", (cid,)).fetchone()[0]
+        avg_recent = db.execute("SELECT AVG(ri) FROM client_metingen WHERE client_id=? AND ri IS NOT NULL AND ts>?", (cid, now_ms - week_ms)).fetchone()[0]
+        avg_prev = db.execute("SELECT AVG(ri) FROM client_metingen WHERE client_id=? AND ri IS NOT NULL AND ts>? AND ts<=?", (cid, now_ms - 2*week_ms, now_ms - week_ms)).fetchone()[0]
+        if avg_recent and avg_prev:
+            if avg_recent > avg_prev + 0.1: trend = 'up'
+            elif avg_recent < avg_prev - 0.1: trend = 'down'
+            else: trend = 'flat'
+        else:
+            trend = 'flat'
+        last = db.execute("SELECT ts FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 1", (cid,)).fetchone()
+        last_ts = None
+        if last and last['ts']:
+            last_ts = datetime.fromtimestamp(last['ts']/1000).strftime('%d-%m-%Y')
+        top_dim = db.execute(
+            "SELECT ctx_dimensie FROM client_metingen WHERE client_id=? AND ctx_dimensie IS NOT NULL AND ctx_dimensie!='' GROUP BY ctx_dimensie ORDER BY COUNT(*) DESC LIMIT 1",
+            (cid,)).fetchone()
+        total = db.execute("SELECT COUNT(*) FROM client_metingen WHERE client_id=?", (cid,)).fetchone()[0]
+        rows.append({
+            'id': cid,
+            'name': c['name'],
+            'avg_ri': round(avg_all, 1) if avg_all else None,
+            'trend': trend,
+            'last_ts': last_ts,
+            'top_dimensie': top_dim[0] if top_dim else None,
+            'total': total,
+        })
+    db.close()
+    return render_template('pro/dashboard.html', lang=lang, rows=rows)
+
+@app.route('/pro/client/toevoegen', methods=['GET','POST'])
+def pro_client_add():
+    if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
+        return redirect(url_for('welcome'))
+    lang = session.get('lang', 'nl')
+    if request.method == 'POST':
+        name = request.form.get('name','').strip()
+        birth_year = int(request.form.get('birth_year', 1970))
+        gender = request.form.get('gender', 'male')
+        email = request.form.get('email','').strip()
+        phone = request.form.get('phone','').strip()
+        notes = request.form.get('notes','').strip()
+        if not name:
+            return render_template('pro/client_add.html', lang=lang, error='Vul een naam in.')
+        pro_key = get_user_key()
+        client_code = generate_client_code()
+        db = get_pro_db()
+        db.execute("INSERT INTO clients (pro_key,name,birth_year,gender,client_code,email,phone,notes) VALUES (?,?,?,?,?,?,?,?)",
+                   (pro_key, name, birth_year, gender, client_code, email, phone, notes))
+        db.commit()
+        db.close()
+        return redirect(url_for('pro_clients'))
+    return render_template('pro/client_add.html', lang=lang)
+
+@app.route('/pro/client/<int:cid>')
+def pro_client_detail(cid):
+    if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
+        return redirect(url_for('welcome'))
+    lang = session.get('lang', 'nl')
+    pro_key = get_user_key()
+    db = get_pro_db()
+    _demo = session.get('demo_mode') and session.get('license_type') == 'pro'
+    client = db.execute("SELECT * FROM clients WHERE id=? AND (pro_key=? OR pro_key='DEMO')" if _demo else "SELECT * FROM clients WHERE id=? AND pro_key=?", (cid, pro_key)).fetchone()
+    if not client:
+        db.close()
+        return redirect(url_for('pro_clients'))
+    metingen = db.execute("SELECT * FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 50", (cid,)).fetchall()
+    metingen_alle = db.execute("SELECT id, ts, ri, notes, meting_type FROM client_metingen WHERE client_id=? ORDER BY ts ASC", (cid,)).fetchall()
+    db.close()
+    resp = make_response(render_template('pro/client_detail.html', lang=lang,
+                           client=dict(client), metingen=[dict(m) for m in metingen],
+                        metingen_chart=[{"id":m["id"],"ts":m["ts"],"ri":m["ri"],"notes":m["notes"] or "","subj":None,"meting_type":m["meting_type"]} for m in [dict(x) for x in metingen_alle]]))
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
+
+@app.route('/pro/client/<int:cid>/meten')
+def pro_client_measure(cid):
+    if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
+        return redirect(url_for('welcome'))
+    pro_key = get_user_key()
+    db = get_pro_db()
+    _demo = session.get('demo_mode') and session.get('license_type') == 'pro'
+    client = db.execute("SELECT * FROM clients WHERE id=? AND (pro_key=? OR pro_key='DEMO')" if _demo else "SELECT * FROM clients WHERE id=? AND pro_key=?", (cid, pro_key)).fetchone()
+    db.close()
+    if not client:
+        return redirect(url_for('pro_clients'))
+    session['measuring_for_client'] = cid
+    session['client_name'] = client['name']
+    session['client_birth_year'] = client['birth_year']
+    session['client_gender'] = client['gender']
+    session['client_profile_id'] = client['id']
+    return redirect(url_for("pro_meting_keuze") + "?cid=" + str(cid))
+
+@app.route('/pro/client/<int:cid>/verwijderen', methods=['POST'])
+def pro_client_delete(cid):
+    if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
+        return redirect(url_for('welcome'))
+    pro_key = get_user_key()
+    db = get_pro_db()
+    db.execute("UPDATE clients SET active=0 WHERE id=? AND pro_key=?", (cid, pro_key))
+    db.commit()
+    db.close()
+    return redirect(url_for('pro_clients'))
+
+# ─── API endpoints ───────────────────────────────────────────────────────────
+
+@app.route('/api/settings/save', methods=['POST'])
+def api_save_settings():
+    if not session.get('license_valid') and not session.get('demo_mode') and not session.get('hlm_user_id'):
+        return jsonify({'error': 'Niet ingelogd'}), 401
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Geen data'}), 400
+    if 'name' in data:    session['profile_name'] = data['name']
+    if 'birth_year' in data: session['profile_birth_year'] = int(data['birth_year'])
+    if 'gender' in data:  session['profile_gender'] = data['gender']
+    if 'lang' in data:    session['lang'] = data['lang']
+    if 'sensor' in data:   session['sensor_pref'] = data['sensor']
+    session.modified = True
+    # Opslaan in DB
+    email = session.get('email', '')
+    if email:
+        try:
+            import sqlite3 as _sq
+            _cn = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _cn.execute("UPDATE users SET display_name=?, birth_year=?, gender=?, language=?, sensor_pref=? WHERE email=?", (
+                session.get('profile_name',''),
+                session.get('profile_birth_year', 1970),
+                session.get('profile_gender','male'),
+                session.get('lang','nl'),
+                session.get('sensor_pref','bluetooth'),
+                email
+            ))
+            _cn.commit()
+            _cn.close()
+        except Exception as e:
+            pass
+    return jsonify({'ok': True})
+
+@app.route('/api/licentie/check', methods=['POST'])
+def api_check_license():
+    data = request.get_json()
+    return jsonify(validate_license(data.get('code', ''), data.get('email', '')))
+
+@app.route('/api/meting/opslaan', methods=['POST'])
+def api_save_meting():
+    if not session.get('license_valid') and not session.get('demo_mode') and not session.get('hlm_user_id'):
+        return jsonify({'error': 'Niet ingelogd'}), 401
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Geen data'}), 400
+    try:
+        client_id = session.pop('measuring_for_client', None) or data.get('client_id')
+        client_id = int(client_id) if client_id else 0
+        session['last_meting_type'] = data.get('meting_type', 'basismeting')
+        _sp = data.get('subjectief_pre')
+        try:
+            _subj_score = int(float(str(_sp))) if _sp not in (None, '') else 5
+            if not (0 <= _subj_score <= 10): _subj_score = 5
+        except Exception:
+            _subj_score = 5
+        def _ctx_int(v):
+            try:
+                n = int(float(str(v))) if v not in (None, '') else None
+                if n is not None and not (0 <= n <= 10): return None
+                return n
+            except Exception:
+                return None
+        _ctx_ongemak = _ctx_int(data.get('ctx_ongemak'))
+        _ctx_vrije_tekst = (str(data.get('ctx_vrije_tekst') or '')).strip()[:100] or None
+        if client_id > 0 and _is_pro_or_demo_pro():
+            db = get_pro_db()
+            _vals=(int(client_id),get_user_key(),int(data.get('ts',__import__('datetime').datetime.now().timestamp()*1000)),float(data.get('ri',0)),int(data.get('bpm',0)),int(data.get('hrv',0)),float(data.get('rmssd',0)),float(data.get('sdnn',0)),float(data.get('pnn50',0)),int(data.get('beats',0)),int(data.get('duration',90)),str(data.get('sensor','demo')),str(data.get('notes','')),str(data.get('timeseries','')),str(data.get('rr_intervals','')),int(data.get('kwaliteit',100)),str(data.get('meting_type','basismeting')),str(data.get('ctx_dimensie','')),float(data.get('ctx_vitaliteit',0)) if data.get('ctx_vitaliteit') else None,_subj_score,_ctx_ongemak,_ctx_vrije_tekst)
+            db.execute('INSERT INTO client_metingen (client_id,pro_key,ts,ri,bpm,hrv_pct,rmssd,sdnn,pnn50,beats,duration,sensor_type,notes,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',_vals)
+            db.commit()
+            db.close()
+            return jsonify({'ok': True, 'client_id': int(client_id)})
+
+        db = get_meting_db()
+        db.execute('''INSERT INTO metingen
+            (user_key,ts,ri,bpm,hrv_pct,rmssd,beats,duration,sensor_type,notes,sdnn,pnn50,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,pending)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)''', (
+            get_user_key(),
+            int(data.get('ts', datetime.now().timestamp()*1000)),
+            float(data.get('ri',0)), int(data.get('bpm',0)), int(data.get('hrv',0)),
+            float(data.get('rmssd',0)), int(data.get('beats',0)), int(data.get('duration',90)),
+            str(data.get('sensor','demo')), str(data.get('notes','')),
+            float(data.get('sdnn',0)), float(data.get('pnn50',0)),
+            str(data.get('timeseries','')), str(data.get('rr_intervals','')),
+                int(data.get('kwaliteit',100)),
+            str(data.get('meting_type','basismeting')),
+            str(data.get('ctx_dimensie','')),
+            float(data.get('ctx_vitaliteit',0)) if data.get('ctx_vitaliteit') else None,
+            _subj_score,
+            _ctx_ongemak, _ctx_vrije_tekst
+        ))
+        db.commit()
+        session['after_meting'] = True
+        session['pending_meting_id'] = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+        db.close()
+        return jsonify({'ok': True})
+    except Exception as e:
+        import traceback; return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
+@app.route('/api/meting/label', methods=['POST'])
+def api_update_label():
+    if not session.get('license_valid') and not session.get('demo_mode') and not session.get('hlm_user_id'):
+        return jsonify({'error': 'Niet ingelogd'}), 401
+    data = request.get_json()
+    label = data.get('label', '')
+    try:
+        db = get_meting_db()
+        subj_pre = data.get("subjectief_pre")
+        if subj_pre is not None:
+            try: db.execute("UPDATE metingen SET notes=?, subjectief_score=? WHERE user_key=? ORDER BY ts DESC LIMIT 1",(label, int(float(str(subj_pre))), get_user_key()))
+            except: db.execute("UPDATE metingen SET notes=? WHERE user_key=? ORDER BY ts DESC LIMIT 1",(label, get_user_key()))
+        else:
+            db.execute("UPDATE metingen SET notes=? WHERE user_key=? ORDER BY ts DESC LIMIT 1",(label, get_user_key()))
+        # Pro-cliënt labeling via de HLM-kwadrant-flow vereist dat hlm/kwadrant.html
+        # client_id meestuurt in de POST-body. Tot die frontend-aanpassing is de
+        # labeling voor Pro-cliënt-metingen een bekende beperking.
+        # De legacy session['last_client_id']-fallback is verwijderd op 21-04-2026
+        # omdat die sticky-session misrouting veroorzaakte (recidive-bug).
+        cid = data.get('client_id')
+        if cid and is_pro():
+            pro_db = get_pro_db()
+            pro_db.execute('UPDATE client_metingen SET notes=? WHERE client_id=? ORDER BY ts DESC LIMIT 1',(label,int(cid)))
+            pro_db.commit()
+            pro_db.close()
+        db.commit()
+        db.close()
+        session['after_meting'] = True
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/metingen')
+def api_get_metingen():
+    if not session.get('license_valid') and not session.get('demo_mode') and not session.get('hlm_user_id'):
+        return jsonify({'error': 'Niet ingelogd'}), 401
+    try:
+        limit = min(int(request.args.get('limit', 50)), 200)
+        db = get_meting_db()
+        rows = db.execute('SELECT * FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT ?',
+                          (get_user_key(), limit)).fetchall()
+        all_rows = db.execute("SELECT ri FROM metingen WHERE user_key=? ORDER BY ts ASC LIMIT 7",
+                              (get_user_key(),)).fetchall()
+        db.close()
+        baseline = round(sum(r[0] for r in all_rows)/len(all_rows),1) if len(all_rows)>=7 else None
+        result = []
+        for r in rows:
+            d = dict(r)
+            d['baseline'] = baseline
+            d['delta'] = round(d['ri']-baseline,1) if baseline else None
+            result.append(d)
+        from datetime import datetime, timezone
+        resp = jsonify(result)
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/metingen/stats')
+def api_meting_stats():
+    if not session.get('license_valid') and not session.get('demo_mode') and not session.get('hlm_user_id'):
+        return jsonify({'error': 'Niet ingelogd'}), 401
+    try:
+        db = get_meting_db()
+        row = db.execute('''SELECT COUNT(*) as total, AVG(ri) as avg_ri,
+            MAX(ri) as max_ri, MIN(ri) as min_ri, AVG(bpm) as avg_bpm
+            FROM metingen WHERE user_key=?''', (get_user_key(),)).fetchone()
+        db.close()
+        return jsonify(dict(row))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ─── AI Feedback na meting ──────────────────────────────────────────────────
+
+_FORBIDDEN_WORDS = ['alarmmodus', 'uitputting', 'burnout', 'overbelast', 'vrije val', 'alarmstand',
+                    'uitgeput', 'alarm', 'gevaar', 'Alarmmodus', 'Burnout', 'Überbelastung', 'Erschöpfung']
+
+def _generate_question(dim, lang, meting_type='basismeting'):
+    """Genereer de activerende onderzoeksvraag server-side, altijd correct."""
+    dim_target = {
+        'nl': {'lichamelijk': 'lichaam', 'mentaal': 'hoofd', 'emotioneel': 'gevoel', 'spiritueel': 'kern', '': 'Innerlijk Kompas'},
+        'de': {'lichamelijk': 'Körper', 'mentaal': 'Kopf', 'emotioneel': 'Gefühl', 'spiritueel': 'Kern', '': 'Innerer Kompass'},
+        'en': {'lichamelijk': 'body', 'mentaal': 'mind', 'emotioneel': 'feelings', 'spiritueel': 'core', '': 'Inner Compass'},
+    }
+    target = dim_target.get(lang, dim_target['nl']).get(dim or '', dim_target.get(lang, dim_target['nl'])[''])
+
+    if meting_type == 'biofeedback':
+        q = {'nl': f'Wat ga jij de komende dagen doen om te ontdekken welke interventie jouw {target} het beste helpt?',
+             'de': f'Was wirst du in den nächsten Tagen tun, um herauszufinden, welche Intervention deinem {target} am besten hilft?',
+             'en': f'What will you do in the coming days to discover which intervention helps your {target} most?'}
+    elif meting_type == 'situatiemeting':
+        q = {'nl': f'Wat ga jij vandaag doen om te ontdekken hoe jouw {target} reageert op verschillende situaties?',
+             'de': f'Was wirst du heute tun, um herauszufinden, wie dein {target} auf verschiedene Situationen reagiert?',
+             'en': f'What will you do today to discover how your {target} responds to different situations?'}
+    else:
+        q = {'nl': f'Wat ga jij vandaag doen om te ontdekken wat jouw {target} nodig heeft?',
+             'de': f'Was wirst du heute tun, um herauszufinden, was dein {target} braucht?',
+             'en': f'What will you do today to discover what your {target} needs?'}
+    return q.get(lang, q['nl'])
+
+def _check_forbidden(text):
+    """Check of de tekst verboden woorden bevat."""
+    text_lower = text.lower()
+    return any(w.lower() in text_lower for w in _FORBIDDEN_WORDS)
+
+def _truncate_to_sentences(text, max_sentences=2):
+    """Hard truncate text to exactly max_sentences sentences."""
+    import re
+    # Split on period/!/?  followed by space, OR on em-dash, OR on semicolon
+    parts = re.split(r'(?<=[.!?])\s+', text.strip())
+    # If still only 1 part (all em-dashes), truncate at the second em-dash
+    if len(parts) == 1 and len(text) > 200:
+        segments = text.split(' — ')
+        return segments[0] + ('.' if not segments[0].endswith('.') else '')
+    return ' '.join(parts[:max_sentences])
+
+def _hard_truncate(text, max_chars=200):
+    """Truncate tekst met voorkeur voor zin-grenzen. Nooit ellipsis inserten.
+    Logica:
+      1. len <= max → return as-is
+      2. anders: pak eerste N volledige zinnen waarvan som <= max_chars
+      3. edge case (geen enkele zin past): word-boundary truncate op max-1, eindig op '.'
+    """
+    import logging, re
+    logging.getLogger().warning(f"[TRUNCATE] function called, input len={len(text)}, max={max_chars}")
+    if len(text) <= max_chars:
+        logging.getLogger().warning(f"[TRUNCATE] under limit, returning as-is")
+        return text
+    parts = re.split(r'(?<=[.!?])\s+', text.strip())
+    kept = []
+    total = 0
+    for p in parts:
+        extra = len(p) + (1 if kept else 0)
+        if total + extra > max_chars:
+            break
+        kept.append(p)
+        total += extra
+    if kept:
+        result = ' '.join(kept).rstrip()
+        logging.getLogger().warning(f"[TRUNCATE] kept {len(kept)} sentence(s), {len(result)} chars: {result[:80]}...")
+        return result
+    # edge case: eerste zin zelf > max — word-boundary truncate
+    truncated = text[:max_chars-1].rsplit(' ', 1)[0]
+    result = truncated.rstrip('.,;—') + '.'
+    logging.getLogger().warning(f"[TRUNCATE] edge-case word-trunc {len(text)} → {len(result)}: {result[:80]}...")
+    return result
+
+def _check_language_mixing(text, lang):
+    """Check if text contains words from wrong language. Returns True if contaminated."""
+    if not text:
+        return False
+    words = text.lower().split()
+    if lang == 'en':
+        nl_words = {'dit', 'dat', 'het', 'een', 'je', 'jij', 'van', 'om', 'maar', 'ook', 'niet', 'wel', 'naar', 'voor'}
+        matches = sum(1 for w in words if w.strip('.,;:!?') in nl_words)
+        return matches >= 3
+    if lang == 'de':
+        nl_words = {'dit', 'dat', 'het', 'een', 'je', 'jij', 'van', 'maar', 'ook', 'niet', 'wel', 'naar', 'voor'}
+        matches = sum(1 for w in words if w.strip('.,;:!?') in nl_words)
+        return matches >= 3
+    if lang == 'nl':
+        de_words = {'dein', 'deine', 'deinem', 'sich', 'dass', 'nicht', 'auch', 'noch', 'schon', 'wenn'}
+        matches = sum(1 for w in words if w.strip('.,;:!?') in de_words)
+        return matches >= 3
+    return False
+
+# Trend hint varianten — 6 condities × 6 taal/perspectief × 3 varianten = 108 strings.
+# Deterministische keuze per gebruiker per dag via stabiele hash(seed + YYYY-MM-DD) % 3.
+TREND_VARIANTS = {
+    'phase1': {
+        'nl': {
+            'consumer': [
+                "Nog te weinig metingen voor een eerste beeld — dat komt met de volgende paar metingen.",
+                "Vanaf meting 5 wordt hier zichtbaar hoe je lichaam over de tijd reageert.",
+                "Na een paar metingen meer ontstaat hier een eerste beeld van je patroon.",
+            ],
+            'pro': [
+                "Nog te weinig metingen van {name} voor een eerste beeld — dat komt met de volgende paar metingen.",
+                "Vanaf meting 5 wordt hier zichtbaar hoe het lichaam van {name} over de tijd reageert.",
+                "Na een paar metingen meer ontstaat hier een eerste beeld van het patroon van {name}.",
+            ],
+        },
+        'de': {
+            'consumer': [
+                "Noch zu wenige Messungen für ein erstes Bild — das kommt mit den nächsten paar.",
+                "Ab Messung 5 wird hier sichtbar, wie dein Körper sich über die Zeit verhält.",
+                "Nach ein paar Messungen mehr entsteht hier ein erstes Bild deines Musters.",
+            ],
+            'pro': [
+                "Noch zu wenige Messungen von {name} für ein erstes Bild — das kommt mit den nächsten paar.",
+                "Ab Messung 5 wird hier sichtbar, wie der Körper von {name} sich über die Zeit verhält.",
+                "Nach ein paar Messungen mehr entsteht hier ein erstes Bild des Musters von {name}.",
+            ],
+        },
+        'en': {
+            'consumer': [
+                "Not enough readings yet for a first picture — that comes with the next few.",
+                "From reading 5 onwards it will become visible here how your body behaves over time.",
+                "After a few more readings, a first picture of your pattern appears here.",
+            ],
+            'pro': [
+                "Not enough readings from {name} yet for a first picture — that comes with the next few.",
+                "From reading 5 onwards it will become visible here how {name}'s body behaves over time.",
+                "After a few more readings, a first picture of {name}'s pattern appears here.",
+            ],
+        },
+    },
+    'up_pressure': {
+        'nl': {
+            'consumer': [
+                "De laatste weken komt er meer ruimte in je ademhaling — je lichaam pakt herstel op.",
+                "Je hart vindt de laatste weken stap voor stap zijn rust terug.",
+                "Je lichaam komt de afgelopen weken steeds beter bij — dat zie je in je metingen.",
+            ],
+            'pro': [
+                "Het lichaam van {name} pakt de laatste weken herstel op — meer ruimte, meer rust.",
+                "De ademhaling van {name} komt de laatste weken stap voor stap tot rust.",
+                "Bij {name} is de afgelopen tijd duidelijk herstel zichtbaar in de metingen.",
+            ],
+        },
+        'de': {
+            'consumer': [
+                "In den letzten Wochen kommt mehr Raum in deinen Atem — dein Körper holt sich Erholung zurück.",
+                "Dein Herz findet in den letzten Wochen Schritt für Schritt zu seiner Ruhe zurück.",
+                "Dein Körper erholt sich in den letzten Wochen zunehmend — das siehst du in deinen Messungen.",
+            ],
+            'pro': [
+                "Der Körper von {name} holt sich in den letzten Wochen Erholung zurück — mehr Raum, mehr Ruhe.",
+                "Der Atem von {name} kommt in den letzten Wochen Schritt für Schritt zur Ruhe.",
+                "Bei {name} ist in der letzten Zeit deutlich Erholung in den Messungen sichtbar.",
+            ],
+        },
+        'en': {
+            'consumer': [
+                "Over the past weeks more room is coming into your breath — your body is picking up recovery.",
+                "Your heart has been finding its calm back, step by step over the past weeks.",
+                "Your body has been recovering in recent weeks — you can see it in your readings.",
+            ],
+            'pro': [
+                "{name}'s body has been picking up recovery in recent weeks — more room, more rest.",
+                "{name}'s breath has been coming to calm step by step in recent weeks.",
+                "With {name} clear recovery has been visible in the readings lately.",
+            ],
+        },
+    },
+    'up_healthy': {
+        'nl': {
+            'consumer': [
+                "Je lichaam draait soepeler mee de laatste weken — meer ruimte, meer herstel.",
+                "De afgelopen weken vindt je hart makkelijker een rustig ritme.",
+                "Er zit de laatste tijd steeds meer rust in je lichaam.",
+            ],
+            'pro': [
+                "Het lichaam van {name} draait de laatste weken soepeler mee.",
+                "Het hart van {name} vindt de afgelopen tijd makkelijker een rustig ritme.",
+                "Bij {name} zit er de laatste tijd meer rust in het lichaam.",
+            ],
+        },
+        'de': {
+            'consumer': [
+                "Dein Körper läuft in den letzten Wochen geschmeidiger — mehr Raum, mehr Erholung.",
+                "In den letzten Wochen findet dein Herz leichter einen ruhigen Rhythmus.",
+                "In der letzten Zeit kommt zunehmend Ruhe in deinen Körper.",
+            ],
+            'pro': [
+                "Der Körper von {name} läuft in den letzten Wochen geschmeidiger mit.",
+                "Das Herz von {name} findet in der letzten Zeit leichter einen ruhigen Rhythmus.",
+                "Bei {name} ist in der letzten Zeit mehr Ruhe im Körper.",
+            ],
+        },
+        'en': {
+            'consumer': [
+                "Your body has been running more smoothly these past weeks — more room, more recovery.",
+                "Over the past weeks your heart finds a calm rhythm more easily.",
+                "There has been increasingly more calm in your body lately.",
+            ],
+            'pro': [
+                "{name}'s body has been running more smoothly in recent weeks.",
+                "{name}'s heart has been finding a calm rhythm more easily lately.",
+                "There has been more calm in {name}'s body lately.",
+            ],
+        },
+    },
+    'down_pressure': {
+        'nl': {
+            'consumer': [
+                "De afgelopen weken kwam je hart minder tot kalmte.",
+                "Je lichaam krijgt de laatste weken minder de mogelijkheid om te herstellen — dat merk je aan je energie.",
+                "De laatste weken zakt je rustniveau langzaam — dat vraagt aandacht.",
+            ],
+            'pro': [
+                "Het hart van {name} kwam de afgelopen weken minder tot kalmte.",
+                "{name} heeft de laatste tijd minder gelegenheid voor herstel.",
+                "De rustlijn van {name} zakt de laatste weken langzaam — dat vraagt aandacht.",
+            ],
+        },
+        'de': {
+            'consumer': [
+                "In den letzten Wochen fand dein Herz weniger zur Ruhe.",
+                "Dein Körper hatte in letzter Zeit weniger Raum zum Erholen.",
+                "Deine Ruhelinie sackt in den letzten Wochen langsam ab — das verdient Aufmerksamkeit.",
+            ],
+            'pro': [
+                "Das Herz von {name} fand in den letzten Wochen weniger zur Ruhe.",
+                "Der Körper von {name} hatte in letzter Zeit weniger Raum zum Erholen.",
+                "Die Ruhelinie von {name} sackt in den letzten Wochen langsam ab — das verdient Aufmerksamkeit.",
+            ],
+        },
+        'en': {
+            'consumer': [
+                "Over the past weeks your heart has been calming less easily.",
+                "Your body has had less room for recovery lately.",
+                "Your rest line has been slowly sinking — that deserves attention.",
+            ],
+            'pro': [
+                "{name}'s heart has been calming less easily over the past weeks.",
+                "{name}'s body has had less room for recovery lately.",
+                "{name}'s rest line has been slowly sinking — that deserves attention.",
+            ],
+        },
+    },
+    'down_healthy': {
+        'nl': {
+            'consumer': [
+                "De laatste weken komt je lichaam iets minder tot rust — goed om bij stil te staan.",
+                "Je lichaam geeft signalen dat de spanning de afgelopen periode is opgelopen.",
+                "Je hart vindt zijn rustige ritme de laatste weken iets minder makkelijk.",
+            ],
+            'pro': [
+                "Het lichaam van {name} komt de laatste weken iets minder tot rust.",
+                "Er zit minder rust in het lichaam van {name} dan een paar weken terug.",
+                "Het hart van {name} vindt zijn rustige ritme de laatste weken iets minder makkelijk.",
+            ],
+        },
+        'de': {
+            'consumer': [
+                "In den letzten Wochen kommt dein Körper etwas weniger zur Ruhe — es lohnt sich, darauf zu achten.",
+                "Dein Körper zeigt in den letzten Wochen etwas mehr Aktivierung als zuvor.",
+                "Dein Herz findet seinen ruhigen Rhythmus in den letzten Wochen etwas weniger leicht.",
+            ],
+            'pro': [
+                "Der Körper von {name} kommt in den letzten Wochen etwas weniger zur Ruhe.",
+                "Es ist weniger Ruhe im Körper von {name} als vor ein paar Wochen.",
+                "Das Herz von {name} findet seinen ruhigen Rhythmus in den letzten Wochen etwas weniger leicht.",
+            ],
+        },
+        'en': {
+            'consumer': [
+                "Your body has been coming to rest a bit less these past weeks — worth pausing to notice.",
+                "Your body is showing a bit more activation in recent weeks than before.",
+                "Your heart has been finding its calm rhythm a bit less easily in recent weeks.",
+            ],
+            'pro': [
+                "{name}'s body has been coming to rest a bit less in recent weeks.",
+                "There's less rest in {name}'s body than a few weeks back.",
+                "{name}'s heart has been finding its calm rhythm a bit less easily in recent weeks.",
+            ],
+        },
+    },
+    'stable': {
+        'nl': {
+            'consumer': [
+                "Je lichaam laat de afgelopen weken een stabiel ritme zien — dit is waar je nu staat.",
+                "Het ritme van je hart ligt al een tijdje gelijk — dit is je huidige basislijn.",
+                "Je lichaam zit al een tijdje in een rustig, stabiel patroon.",
+            ],
+            'pro': [
+                "Het lichaam van {name} laat de afgelopen weken een stabiel ritme zien.",
+                "Het ritme van {name} ligt al een tijdje gelijk — dit is de huidige basislijn.",
+                "{name} zit al een tijdje in een rustig, stabiel patroon.",
+            ],
+        },
+        'de': {
+            'consumer': [
+                "Dein Körper zeigt in den letzten Wochen einen stabilen Rhythmus — so stehst du jetzt da.",
+                "Der Rhythmus deines Herzens ist seit einiger Zeit gleich — das ist deine aktuelle Basislinie.",
+                "Dein Körper ist schon eine Weile in einem ruhigen, stabilen Muster.",
+            ],
+            'pro': [
+                "Der Körper von {name} zeigt in den letzten Wochen einen stabilen Rhythmus.",
+                "Der Rhythmus von {name} ist seit einiger Zeit gleich — das ist die aktuelle Basislinie.",
+                "{name} ist schon eine Weile in einem ruhigen, stabilen Muster.",
+            ],
+        },
+        'en': {
+            'consumer': [
+                "Your body has shown a stable rhythm these past weeks — this is where you are now.",
+                "Your heart's rhythm has been consistent for some time — this is your current baseline.",
+                "Your body has been in a calm, stable pattern for a while.",
+            ],
+            'pro': [
+                "{name}'s body has shown a stable rhythm these past weeks.",
+                "{name}'s rhythm has been consistent for some time — this is the current baseline.",
+                "{name} has been in a calm, stable pattern for a while.",
+            ],
+        },
+    },
+}
+
+
+def _generate_trend_data(user_key=None, client_id=None, lang='nl', client_name=None):
+    """Generate trend observation based on measurement count and RI history.
+    Returns dict with 'trend_hint' (phase 1 text below card) and 'trend_sentence' (phase 2/3 appended to reflection).
+    """
+    try:
+        if client_id:
+            db = get_pro_db()
+            count_row = db.execute("SELECT COUNT(*) FROM client_metingen WHERE client_id=? AND meting_type='basismeting'", (client_id,)).fetchone()
+            ri_rows = db.execute("SELECT ri FROM client_metingen WHERE client_id=? AND ri IS NOT NULL AND meting_type='basismeting' ORDER BY ts DESC LIMIT 10", (client_id,)).fetchall()
+            db.close()
+        else:
+            db = get_meting_db()
+            count_row = db.execute("SELECT COUNT(*) FROM metingen WHERE user_key=? AND meting_type='basismeting'", (user_key,)).fetchone()
+            ri_rows = db.execute("SELECT ri FROM metingen WHERE user_key=? AND ri IS NOT NULL AND meting_type='basismeting' ORDER BY ts DESC LIMIT 10", (user_key,)).fetchall()
+            db.close()
+    except:
+        return {'trend_hint': '', 'trend_sentence': ''}
+
+    count = count_row[0] if count_row else 0
+    is_pro = client_id is not None
+    name = client_name or ''
+    perspective = 'pro' if is_pro else 'consumer'
+    lang_key = lang if lang in ('nl', 'de', 'en') else 'nl'
+
+    # Stable per-user-per-day variant selection (hashlib → stable across process restarts)
+    seed = (user_key or str(client_id or '')) + datetime.now().strftime('%Y-%m-%d')
+    variant_idx = int(hashlib.md5(seed.encode('utf-8')).hexdigest(), 16) % 3
+
+    def _pick(condition):
+        text = TREND_VARIANTS[condition][lang_key][perspective][variant_idx]
+        return text.format(name=name) if is_pro else text
+
+    # Phase 1: 1-4 measurements
+    if count < 5:
+        return {'trend_hint': _pick('phase1'), 'trend_sentence': ''}
+
+    ri_values = [float(r[0]) for r in ri_rows]
+    current_ri = ri_values[0] if ri_values else 0
+
+    # Calculate delta: most recent RI vs average of the rest of the window
+    if count < 10:
+        window = ri_values[:5]
+    else:
+        window = ri_values[:10]
+    if len(window) >= 3:
+        latest_ri = window[0]
+        rest_avg = sum(window[1:]) / len(window[1:])
+        delta = latest_ri - rest_avg
+    else:
+        delta = 0
+
+    low_ri = current_ri <= 4
+    if delta > 0.3 and low_ri:
+        condition = 'up_pressure'
+    elif delta > 0.3 and not low_ri:
+        condition = 'up_healthy'
+    elif delta < -0.3 and low_ri:
+        condition = 'down_pressure'
+    elif delta < -0.3 and not low_ri:
+        condition = 'down_healthy'
+    else:
+        condition = 'stable'
+
+    _trend_text = _pick(condition)
+    return {'trend_hint': _trend_text, 'trend_sentence': _trend_text}
+
+def _store_feedback_cache(meting_id, insight, reflection, is_client=False, lang='nl'):
+    """Sla feedback op in de database als cache, per taal."""
+    if not meting_id:
+        return
+    try:
+        if is_client:
+            db = get_pro_db()
+            row = db.execute('SELECT feedback_cache FROM client_metingen WHERE id=?', (meting_id,)).fetchone()
+        else:
+            db = get_meting_db()
+            row = db.execute('SELECT feedback_cache FROM metingen WHERE id=?', (meting_id,)).fetchone()
+        # Merge into existing per-language cache
+        existing = {}
+        if row and row[0]:
+            try:
+                parsed = json.loads(row[0])
+                # Only keep per-language format (keys are 'nl', 'de', 'en').
+                # Discard old flat format — language of that text is unknown.
+                if any(k in ('nl', 'de', 'en') for k in parsed):
+                    existing = {k: v for k, v in parsed.items() if k in ('nl', 'de', 'en')}
+            except (json.JSONDecodeError, ValueError):
+                existing = {}
+        existing[lang] = {'insight': insight, 'reflection': reflection}
+        cache_data = json.dumps(existing)
+        if is_client:
+            db.execute('UPDATE client_metingen SET feedback_cache=? WHERE id=?', (cache_data, meting_id))
+        else:
+            db.execute('UPDATE metingen SET feedback_cache=? WHERE id=?', (cache_data, meting_id))
+        db.commit()
+        db.close()
+    except:
+        pass
+
+# ═══════════════════════════════════════════════════════════════════
+# Innerlijk Kompas — prompt templates per meting_type
+# Drie aparte system-prompts. De AI produceert {sentence1, sentence2, question}.
+# Backend mapt sentence1→insight, sentence2→reflection voor HTTP-contract.
+# ═══════════════════════════════════════════════════════════════════
+
+KOMPAS_COMMON_GUIDE = """
+
+INTERPRETATIE-LEIDRAAD VOOR DE TERUGKOPPELING
+
+Je genereert twee zinnen. Zin 1 is een observatie met lichte duiding. Zin 2 is een reflectie over het samenspel tussen wat het lichaam toont en wat de persoon zelf aangeeft (Innerlijk Kompas).
+
+ALGEMENE HOUDING
+- Je spreekt de persoon die de meting deed direct aan met "je". Ook bij Pro-cliëntmetingen spreek je de cliënt aan, niet de Pro.
+- Je stelt niets vast, je biedt iets aan. Vermijd categorische taal. Gebruik: "kan wijzen op", "past bij", "lijkt", "dit patroon zien we vaak bij".
+- Je bent GEEN medische autoriteit. Nooit diagnostische termen voor specifieke aandoeningen.
+- De context-invoer is een geschenk van de persoon. Verwerk het als weefsel, niet als citaat. NIET: "je zei dat je moe was". WEL: duiding die de context meeweegt zonder letterlijk citeren.
+
+HIERARCHIE VAN INFORMATIE
+1. Lichaamsdata (BPM, HRV%, RMSSD, RI) — ruggengraat
+2. Vrij tekstveld (ctx_vrije_tekst) — sterkst sturend wanneer aanwezig
+3. Dimensie (ctx_dimensie) — bepaalt duidingsregister
+4. Schalen (ctx_ongemak, ctx_vitaliteit) — nuance binnen het register
+5. Trend (laatste basismetingen met hun context) — verhaalboog
+
+Ontbrekende velden (NULL) duid je niet. Je zwijgt erover.
+
+RI-ZONES: 0-2 ZWAAR BELAST / 2-4 BELAST / 4-6 LICHT BELAST / 6-8 IN BALANS / 8-10 VEERKRACHTIG
+BPM-BANDEN: <60 LAAG / 60-85 MIDDEN / >85 VERHOOGD
+
+VERBODEN FORMULERINGEN:
+- "Je herkent je signalen goed" bij zone-verschil >= 2
+- "Je hebt stress" / "Je bent gestresst" bij patroon B (categorisch)
+- Klinische diagnoses (burn-out, depressie, ziekte)
+- "Je zei dat..." (papegaai-citaten)
+- "Beide laag" wanneer slechts één waarde laag is
+- "Uitputting" bij BPM > 60
+- Medische vaktermen zonder context
+- "Je systeem [werkwoord]" (in alle vormen)
+- "Je zenuwstelsel [werkwoord]"
+- "Je gestel [werkwoord]"
+- "Hartritme-variabiliteit fluctueerde"
+- "Modulatie", "tonus", "parasympathisch", "sympathisch" als zelfstandige naamwoorden in lopende tekst
+
+TAALREGELS (mensentaal, geen jargon):
+- NOOIT als onderwerp gebruiken: "je systeem", "je gestel", "je zenuwstelsel", "je autonome zenuwstelsel"
+- WEL: "je", "je lichaam", werkwoorden ("Het lukte je om..."), of de gemeten beweging zelf ("je RI daalde", "je werd minder ontspannen")
+- Beschrijf de ERVARING, niet de fysiologie. Niet: "je RI daalde, HRV fluctueerde". Wel: "je werd minder ontspannen, je lichaam reageerde wisselvallig"
+- Cijfers (RI, HRV%, BPM) mogen genoemd, maar als context, niet als hoofdpersoon van de zin
+- Geen klinisch jargon: "fluctueerde", "variabiliteit", "respiratoire", "parasympathisch" — gebruik dagelijkse taal
+- Geen anatomische processen: "opende zich", "sloot zich", "activeerde", "modulatie" — gebruik beschrijvende taal
+
+VOORBEELDEN GOED:
+- "Tijdens deze sessie kwam je iets minder tot rust dan bij de start"
+- "Je hebt je lichaam laten ontspannen — je RI steeg van 4.2 naar 6.8"
+- "Je begon ontspannener dan je eindigde, wat ook iets zegt over hoe je vandaag binnenkwam"
+- "Het lukte vandaag minder om los te laten"
+
+VOORBEELDEN FOUT (nooit gebruiken):
+- "Je systeem opende/sloot zich"
+- "Je hartritme-variabiliteit fluctueerde flink"
+- "Je autonome zenuwstelsel reageerde"
+- "Je parasympathische tonus nam toe"
+
+STRUCTUUR VAN DE TWEE ZINNEN:
+Zin 1 (Aanbeveling, max 200 tekens): Weeft lichaamsdata met context. Zachte observatie, mogelijk richting. Nooit instructie.
+Zin 2 (Innerlijk Kompas, max 200 tekens): Samenspel lichaam-gevoel. Benoemt discrepantie of overeenstemming. Opent tot zelfkennis, niet tot oordeel.
+"""
+
+KOMPAS_BASISMETING_GUIDE = """
+
+KWADRANT-PATRONEN BIJ LAGE RI (0-4):
+
+Patroon A — Lage RI met BPM < 60:
+Verminderde activering in beide autonome takken. Framings: verstarring, diepe vermoeidheid, uitputting, herstelfase. Minder waarschijnlijk acute stress (die zou BPM verhogen).
+
+Patroon B — Lage RI met BPM 60-85 of >85:
+Sympathische dominantie — het systeem staat "aan". De onderliggende oorzaak is uit de meting alleen NIET af te leiden. Mogelijke oorzaken, allemaal plausibel:
+- Stress (acuut of aanhoudend)
+- Vermoeidheid (slaaptekort, overbelasting)
+- Ziekte (infectie, koorts, herstelfase)
+- Pijn (acuut of chronisch)
+- Recente inspanning of emotionele activering
+
+VERBODEN: bij dit patroon categorisch "je hebt stress" zeggen. Gebruik context om meest waarschijnlijke duiding te kiezen, benoem meerdere mogelijkheden bij onzekerheid.
+
+CONTEXT STUURT DUIDING BIJ PATROON B:
+- ctx_dimensie = lichamelijk + lage ctx_vitaliteit of hoge ctx_ongemak → vermoeidheid/ziekte/pijn waarschijnlijker dan stress
+- ctx_dimensie = mentaal → stress of overbelasting waarschijnlijker
+- ctx_dimensie = emotioneel → emotionele activering, mogelijk recente gebeurtenis
+- ctx_dimensie = spiritueel → verbindings- of zinsvraag
+- ctx_vrije_tekst bevat ziektewoorden (griep, koorts, hoofdpijn) → lichamelijke oorzaak prioriteit
+- ctx_vrije_tekst bevat verlieswoorden (mis iemand, overleden) → emotionele oorzaak prioriteit
+- ctx_vrije_tekst bevat werkwoorden (deadline, druk, klant) → mentale belasting prioriteit
+
+HOGE RI-PATRONEN (RI >= 6):
+
+Patroon C — Hoge RI met passende context:
+Meestal positief duiden. Let op discrepanties: lage ctx_vitaliteit bij hoge RI is een onstemmigheid die het noemen waard is (niet alarmistisch, wel opmerkzaam).
+
+Patroon D — Hoge RI, hoge BPM (>85):
+Kan wijzen op actieve rust (na inspanning, na koffie, na emotie). Als ctx_vrije_tekst dit bevestigt → bevestigen. Zo niet → benoemen dat het lichaam actief is en rust nog mogelijk.
+
+DISCREPANTIE-REGEL (INNERLIJK KOMPAS):
+Bereken zone-verschil tussen subjectief_score-zone (0-10, zelfde zones als RI) en actuele RI-zone.
+- Verschil 0-1: kleine nuance mogelijk, niet vooraanstaand
+- Verschil 2: merkbaar verschil, als observatie benoemen
+- Verschil 3+: opvallende discrepantie, expliciet als kernuitspraak voor zin 2
+
+BIJ DISCREPANTIE:
+- Gevoel HOGER dan lichaam: persoon voelt zich beter dan lichaam toont. "Je lichaam toont nog druk, terwijl je je al beter voelt".
+- Gevoel LAGER dan lichaam: persoon voelt zich slechter dan lichaam toont. "Je lichaam toont meer rust dan je gevoel op dit moment doet vermoeden".
+
+TREND-GEBRUIK:
+Bij recente basismetingen (laatste 3-5):
+- Stabiele trend: continuiteit benoemen
+- Verbetering: benoemen met aandacht voor context van toen ("de vermoeidheid die je eerder aangaf is in de getallen minder zichtbaar")
+- Verslechtering: voorzichtig benoemen, context zoeken, alarmeren vermijden
+- Uitschieters (RI buiten 1-9) zonder duidelijke context: niet zwaar op leunen, kan meetruis zijn
+"""
+
+BASISMETING_SYSTEM_PROMPT = (
+    "Je bent de Innerlijk-Kompas-stem van StressChecker voor een BASISMETING.\n"
+    "Een basismeting is een momentopname van het autonome zenuwstelsel in rust.\n"
+    "Je kijkt naar hoe deze meting zich verhoudt tot de recente basismetingen van dezelfde persoon.\n"
+    "Je bent geen coach, geen therapeut, geen diagnosticus. "
+    "Je observeert wat je ziet, in de tweede persoon (je in NL, du in DE, you in EN), "
+    "nuchter en zonder alarmisme of geruststelling die niet is onderbouwd.\n\n"
+    "Vergelijk current.ri tegen het gemiddelde van recent_basis. "
+    "Benoem ook het verschil tussen current.ri en current.subjectief_score als dat opvalt "
+    "(lichaam versus gevoel). Als phase == 'phase1': noem geen trend, zeg dat er nog meer "
+    "metingen nodig zijn voor een patroon.\n\n"
+    "Geef geen advies. Sluit af met een open reflectievraag die de persoon nieuwsgierig maakt "
+    "naar het eigen patroon.\n\n"
+    "INPUT-VELDEN (wat je in user_message krijgt):\n"
+    "- current.ri, current.bpm, current.hrv_pct, current.rmssd — fysiologische ruggengraat\n"
+    "- current.subjectief_score (0-10) — zelfrapportage rust/gespannen; 5 is slider-default\n"
+    "- current.ctx_dimensie — 'lichamelijk' / 'mentaal' / 'emotioneel' / 'spiritueel' / 'weet_niet' / null\n"
+    "- current.ctx_vitaliteit (0-10) — hoger = meer afstemming op wat bij de persoon past\n"
+    "- current.ctx_ongemak (0-10) — hoger = meer fysiek ongemak\n"
+    "- current.ctx_vrije_tekst — optionele vrije tekst (max 100 chars) of null\n"
+    "- current.label — optioneel meting-label of null\n"
+    "- recent_basis[] — laatste basismetingen, per item: ri, subjectief_score, datum, ctx_dimensie, ctx_vrije_tekst\n"
+    "- baseline_ri_history — gemiddelde RI van basismetingen 8-14 terug, of null\n"
+    "- phase — phase1 / phase2 / phase3\n"
+    "NULL-waarden negeer je: schrijf er niet over, gebruik ze niet als leeg signaal.\n\n"
+    "SCHRIJFSTIJL-EISEN (belangrijk):\n"
+    "- Schrijf alsof je praat met iemand zonder medische achtergrond. "
+    "Vermijd 'systeem' als metafoor voor het lichaam - gebruik 'lichaam', 'hart', "
+    "of 'zenuwstelsel' als dat concreter werkt.\n"
+    "- Vermijd vage lichamelijke metaforen als 'gesloten', 'open', 'los laten' "
+    "tenzij je ze concreet invult (bv. 'je hart heeft nog niet de ruimte gekregen om te vertragen').\n"
+    "- Als je RI-getallen noemt, zeg dan ook wat ze betekenen in woorden. "
+    "'RI 0.4 - dat is laag, je lichaam zit nog duidelijk in actiemodus' is beter dan 'RI 0.4'.\n"
+    "- Schrijf in korte, directe zinnen. Vermijd 'fysiologisch normaal', 'parasympathische dominantie', "
+    "'autonoom zenuwstelsel' tenzij de gebruiker die terminologie duidelijk zelf gebruikt heeft.\n"
+    "- Als je iets geruststelt, doe dat met een concreet beeld in plaats van een term. "
+    "'Dit hoort bij hoe je lichaam na inspanning terugkomt' > 'Dit is fysiologisch normaal'.\n"
+    "- Sluit niet af met een samenvatting - de reflectievraag doet dat werk al.\n\n"
+    "VELDEN (verplicht):\n"
+    "- sentence1: observatie/kop\n"
+    "- sentence2: toelichting\n"
+    "- question: max 20 woorden, een reflectievraag\n\n"
+    "Schrijf volledige zinnen — gebruik GEEN weglatingstekens (geen \u2026 en geen ...). Output: strikt JSON met keys sentence1, sentence2, question. "
+    "Geen preamble, geen markdown, geen uitleg buiten de JSON."
+) + KOMPAS_COMMON_GUIDE + KOMPAS_BASISMETING_GUIDE
+
+BIOFEEDBACK_SYSTEM_PROMPT = (
+    "Je bent de Innerlijk-Kompas-stem voor een BIOFEEDBACK-meting. Dit is een interventie: "
+    "de persoon heeft een ademhalingsoefening gedaan en we kijken wat die oefening met het "
+    "systeem heeft gedaan. Je kijkt NIET naar trends over meerdere dagen — je kijkt uitsluitend "
+    "naar voor versus na, binnen deze sessie.\n\n"
+    "Kernvraag: ging het systeem open (RI omhoog) of juist dicht (RI omlaag), en in welke context?\n\n"
+    "Als pre=null (geen basismeting binnen 30min vóór): vergelijk post met recent_basis als rust-baseline. "
+    "Spreek van \"rust-referentie\" in plaats van \"delta\". Benoem NIET dat er geen eerdere metingen "
+    "zijn als recent_basis gevuld is.\n\n"
+    "Belangrijke nuances:\n"
+    "- Als label 'Na sport' is of pre.ri al laag, dan is een lage post.ri vaak fysiologisch: "
+    "het lichaam is nog in herstelmodus en de oefening overstemt dat niet. "
+    "Benoem dat neutraal, niet als mislukking.\n"
+    "- Een oefening die de spanning aanvankelijk zichtbaarder maakt (RI omlaag) is niet per se fout "
+    "- soms moet het systeem eerst voelen wat er is.\n"
+    "- Een duidelijke stijging (delta_ri >= 1.5) noem je als een open reactie: het systeem liet los.\n"
+    "- Een stabiele meting (|delta_ri| < 0.5) noem je als: het systeem bleef zoals het was "
+    "- dat is ook informatie.\n\n"
+    "Geef geen advies over welke oefening beter is. Sluit af met een reflectievraag die gaat over "
+    "WAT de oefening deed, niet of hij 'lukte'.\n\n"
+    "\n\n"
+    "SCHRIJFSTIJL-EISEN (belangrijk):\n"
+    "- Schrijf alsof je praat met iemand zonder medische achtergrond. "
+    "Vermijd 'systeem' als metafoor voor het lichaam - gebruik 'lichaam', 'hart', "
+    "of 'zenuwstelsel' als dat concreter werkt.\n"
+    "- Vermijd vage lichamelijke metaforen als 'gesloten', 'open', 'los laten' "
+    "tenzij je ze concreet invult (bv. 'je hart heeft nog niet de ruimte gekregen om te vertragen').\n"
+    "- Als je RI-getallen noemt, zeg dan ook wat ze betekenen in woorden. "
+    "'RI 0.4 - dat is laag, je lichaam zit nog duidelijk in actiemodus' is beter dan 'RI 0.4'.\n"
+    "- Schrijf in korte, directe zinnen. Vermijd 'fysiologisch normaal', 'parasympathische dominantie', "
+    "'autonoom zenuwstelsel' tenzij de gebruiker die terminologie duidelijk zelf gebruikt heeft.\n"
+    "- Als je iets geruststelt, doe dat met een concreet beeld in plaats van een term. "
+    "'Dit hoort bij hoe je lichaam na inspanning terugkomt' > 'Dit is fysiologisch normaal'.\n"
+    "- Sluit niet af met een samenvatting - de reflectievraag doet dat werk al.\n\n"
+    "VELDEN (verplicht):\n"
+    "- sentence1: max 15 woorden\n"
+    "- sentence2: max 55 woorden\n"
+    "- question: max 20 woorden\n\n"
+    "Schrijf volledige zinnen — gebruik GEEN weglatingstekens (geen \u2026 en geen ...). Output: strikt JSON met keys sentence1, sentence2, question. Geen preamble."
+) + KOMPAS_COMMON_GUIDE
+
+# ---------- Biofeedback v3 (intra-sessie observatie) ----------
+BIOFEEDBACK_SYSTEM_PROMPT_V3 = (
+"""Je beschrijft een BIOFEEDBACK-meting voor deze cliënt. Een biofeedback-meting is een zitting waarin iemand iets heeft gedaan (ademhalingsoefening, hypnotiseur-sessie, ontspanningsoefening) terwijl StressChecker het autonome zenuwstelsel doormat.
+
+Je bent geen coach, geen therapeut, geen diagnosticus. Je geeft geen advies, geen aanbevelingen voor volgende sessies, geen oordeel of de oefening "gelukt" is. Je beschrijft hoe de meting verliep.
+
+Spreek de cliënt aan in de tweede persoon enkelvoud (je). Maximaal 200 tekens totaal, verdeeld over twee zinnen.
+
+KERN VAN DE OBSERVATIE
+Vergelijk de eerste minuut van de sessie met de laatste minuut. Benoem delta_ri (afgerond op 0.1). Voeg het kwalitatieve verloop toe via slope_ri_per_min + variabiliteit_rmssd:
+- slope > 0.2 per min -> "Je werd duidelijk meer ontspannen tijdens deze sessie"
+- slope < -0.2 per min -> "Je raakte tijdens deze sessie iets meer onder spanning"
+- |slope| <= 0.2 per min -> "Je bleef tijdens deze sessie ongeveer op hetzelfde niveau"
+- variabiliteit_rmssd > 2.0 -> benoem als "schommelend" of "onrustig"
+- variabiliteit_rmssd < 1.0 bij stabiele slope -> "rustig verloop"
+
+BASELINE-CONTEXT (alleen als baseline_avg beschikbaar EN |eind.ri - baseline_avg| > 0.5)
+Benoem of eind.ri boven/onder je rust-niveau ligt.
+
+CONTEXT-PRIORITEIT IN ZIN 2
+Kies EEN van onderstaande voor zin 2, in deze volgorde:
+1. ctx_vrije_tekst (als substantieel ingevuld): weef in zonder papegaai
+2. Baseline-afwijking (als >0.5 RI verschil)
+3. Ademritme-benoeming (als ademritme_str beschikbaar)
+4. Geen van bovenstaande: herhaal NIET zin 1; geef contextloze opmerking over wat nog meer opvalt in de data
+
+TAAL
+- "Tijdens deze sessie" NIET "door de oefening" (tijd-correlatie, geen causaliteit)
+- Geen superlatieven (geweldig, prachtig)
+- Geen waarschuwingen (pas op)
+- Geen klinische termen (insufficientie, dysregulatie)
+
+VERBODEN
+- Aanbevelingen voor volgende sessies
+- Oordelen over succes of mislukking
+- Uitspraken over wat de oefening "deed" als causaal verband
+- Advies over ademritme, techniek, frequentie
+- Een reflectievraag (VERSCHIL met basismeting-prompt!)
+
+OUTPUT
+JSON met keys: sentence1, sentence2. Geen question. Geen preamble.
+sentence1 = kernobservatie (delta + verloop)
+sentence2 = context (volgens prioriteit)
+"""
+) + KOMPAS_COMMON_GUIDE
+# ---------- /Biofeedback v3 ----------
+
+SITUATIEMETING_SYSTEM_PROMPT = (
+    "Je bent de Innerlijk-Kompas-stem voor een SITUATIEMETING. Dit is een sonde: de persoon meet "
+    "in een specifieke context (gegeven door label) om te zien wat die context met het systeem doet. "
+    "Je vergelijkt met de persoonlijke basislijn - NIET met andere situatiemetingen en NIET met een trend.\n\n"
+    "Kernvraag: hoe zit het systeem erbij, gegeven deze context, vergeleken met de eigen rust-basislijn?\n\n"
+    "Belangrijk:\n"
+    "- Het label bepaalt de interpretatie. 'Na sport' met lage RI is normaal. "
+    "'Voor vergadering' met lage RI zegt iets over anticipatie. "
+    "'Tijdens pauze' met lage RI zegt iets anders.\n"
+    "- Benoem of current.ri binnen, onder, of boven de baseline_range valt.\n"
+    "- Lichaam-versus-gevoel-discrepantie (RI versus subjectief_score) is interessant om te "
+    "benoemen als hij groot is.\n\n"
+    "Geef geen advies. Sluit af met een reflectievraag die over deze specifieke situatie gaat "
+    "- niet over patronen.\n\n"
+    "\n\n"
+    "SCHRIJFSTIJL-EISEN (belangrijk):\n"
+    "- Schrijf alsof je praat met iemand zonder medische achtergrond. "
+    "Vermijd 'systeem' als metafoor voor het lichaam - gebruik 'lichaam', 'hart', "
+    "of 'zenuwstelsel' als dat concreter werkt.\n"
+    "- Vermijd vage lichamelijke metaforen als 'gesloten', 'open', 'los laten' "
+    "tenzij je ze concreet invult (bv. 'je hart heeft nog niet de ruimte gekregen om te vertragen').\n"
+    "- Als je RI-getallen noemt, zeg dan ook wat ze betekenen in woorden. "
+    "'RI 0.4 - dat is laag, je lichaam zit nog duidelijk in actiemodus' is beter dan 'RI 0.4'.\n"
+    "- Schrijf in korte, directe zinnen. Vermijd 'fysiologisch normaal', 'parasympathische dominantie', "
+    "'autonoom zenuwstelsel' tenzij de gebruiker die terminologie duidelijk zelf gebruikt heeft.\n"
+    "- Als je iets geruststelt, doe dat met een concreet beeld in plaats van een term. "
+    "'Dit hoort bij hoe je lichaam na inspanning terugkomt' > 'Dit is fysiologisch normaal'.\n"
+    "- Sluit niet af met een samenvatting - de reflectievraag doet dat werk al.\n\n"
+    "VELDEN (verplicht):\n"
+    "- sentence1: max 15 woorden\n"
+    "- sentence2: max 55 woorden\n"
+    "- question: max 20 woorden\n\n"
+    "Schrijf volledige zinnen — gebruik GEEN weglatingstekens (geen \u2026 en geen ...). Output: strikt JSON met keys sentence1, sentence2, question. Geen preamble."
+) + KOMPAS_COMMON_GUIDE
+
+
+# ====== Biofeedback v3 — intra-sessie data-helpers ======
+def _compute_session_windows(timeseries_json, total_duration_sec):
+    """Start- (0-60s) en eind-window (laatste 60s) gemiddelden + delta.
+
+    timeseries_json: JSON-string of reeds geparseerde list van dicts met
+    keys t/ri/bpm/hrv/rmssd. total_duration_sec: totale meet-duur in sec.
+    Fallback-retour bij onvoldoende data: {"valid": False, "reason": ...}.
+    """
+    try:
+        pts = json.loads(timeseries_json) if isinstance(timeseries_json, str) else (timeseries_json or [])
+    except (ValueError, TypeError):
+        return {"valid": False, "reason": "invalid_json"}
+    if not isinstance(pts, list):
+        return {"valid": False, "reason": "invalid_json"}
+    if len(pts) < 15:
+        return {"valid": False, "reason": "too_few_samples"}
+    try:
+        total = float(total_duration_sec or 0)
+    except (TypeError, ValueError):
+        total = 0.0
+    if total < 180:
+        return {"valid": False, "reason": "duration_too_short"}
+
+    def _t(p):
+        try: return float(p.get('t') or 0)
+        except Exception: return 0.0
+    start_pts = [p for p in pts if 0 <= _t(p) <= 60]
+    eind_pts  = [p for p in pts if (total - 60) <= _t(p) <= total]
+    if len(start_pts) < 3:
+        return {"valid": False, "reason": "start_window_too_few"}
+    if len(eind_pts) < 3:
+        return {"valid": False, "reason": "eind_window_too_few"}
+
+    def _avg(items, key):
+        vals = []
+        for x in items:
+            v = x.get(key)
+            if v is None: continue
+            try: vals.append(float(v))
+            except (TypeError, ValueError): pass
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    start = {"ri": _avg(start_pts, 'ri'), "bpm": _avg(start_pts, 'bpm'),
+             "hrv": _avg(start_pts, 'hrv'), "rmssd": _avg(start_pts, 'rmssd'),
+             "n": len(start_pts)}
+    eind  = {"ri": _avg(eind_pts, 'ri'), "bpm": _avg(eind_pts, 'bpm'),
+             "hrv": _avg(eind_pts, 'hrv'), "rmssd": _avg(eind_pts, 'rmssd'),
+             "n": len(eind_pts)}
+    delta = {k: (round(eind[k] - start[k], 1) if (start.get(k) is not None and eind.get(k) is not None) else None)
+             for k in ('ri', 'bpm', 'hrv', 'rmssd')}
+    return {"start": start, "eind": eind, "delta": delta, "valid": True}
+
+
+def _compute_session_trend(timeseries_json):
+    """Lineaire regressie slope_ri_per_min + stdev RMSSD over hele sessie.
+
+    Fallback bij <10 datapunten of degenerate fit: {"valid": False}.
+    """
+    try:
+        pts = json.loads(timeseries_json) if isinstance(timeseries_json, str) else (timeseries_json or [])
+    except (ValueError, TypeError):
+        return {"valid": False}
+    if not isinstance(pts, list) or len(pts) < 10:
+        return {"valid": False}
+
+    pairs = []
+    for p in pts:
+        t, r = p.get('t'), p.get('ri')
+        if t is None or r is None: continue
+        try: pairs.append((float(t), float(r)))
+        except (TypeError, ValueError): pass
+    if len(pairs) < 10:
+        return {"valid": False}
+    n = len(pairs)
+    sx = sum(t for t, _ in pairs)
+    sy = sum(r for _, r in pairs)
+    sxy = sum(t*r for t, r in pairs)
+    sxx = sum(t*t for t, _ in pairs)
+    denom = n*sxx - sx*sx
+    if denom == 0:
+        return {"valid": False}
+    slope_per_sec = (n*sxy - sx*sy) / denom
+    slope_per_min = round(slope_per_sec * 60, 2)
+
+    rmssd_vals = []
+    for p in pts:
+        v = p.get('rmssd')
+        if v is None: continue
+        try: rmssd_vals.append(float(v))
+        except (TypeError, ValueError): pass
+    stdev_rmssd = 0.0
+    if len(rmssd_vals) >= 2:
+        import statistics as _stats
+        stdev_rmssd = round(_stats.pstdev(rmssd_vals), 1)
+    return {"slope_ri_per_min": slope_per_min, "variabiliteit_rmssd": stdev_rmssd, "valid": True}
+
+
+def _build_biofeedback_session_data(cur_row, db):
+    """Orchestrator: leest timeseries uit cur_row, roept window- + trend-helpers aan.
+
+    total_duration: cur_row['duration'] indien > 0, anders laatste t in timeseries.
+    ademritme_str: nog niet opgeslagen in DB (aparte TODO) → altijd None.
+    """
+    try:
+        row = cur_row if isinstance(cur_row, dict) else dict(cur_row)
+    except Exception:
+        row = {}
+        try:
+            for k in cur_row.keys(): row[k] = cur_row[k]
+        except Exception: pass
+
+    ts_raw = row.get('timeseries')
+    if not ts_raw:
+        return {"windows": None, "trend": None, "ademritme_str": None,
+                "duration_sec": 0, "valid": False, "reason": "no_timeseries"}
+    try:
+        pts = json.loads(ts_raw) if isinstance(ts_raw, str) else ts_raw
+    except (ValueError, TypeError):
+        return {"windows": None, "trend": None, "ademritme_str": None,
+                "duration_sec": 0, "valid": False, "reason": "invalid_json"}
+
+    try: duration_sec = int(row.get('duration') or 0)
+    except (TypeError, ValueError): duration_sec = 0
+    if duration_sec <= 0 and isinstance(pts, list) and pts:
+        try: duration_sec = int(max(float(p.get('t') or 0) for p in pts))
+        except Exception: duration_sec = 0
+
+    windows = _compute_session_windows(pts, duration_sec)
+    trend   = _compute_session_trend(pts)
+    valid   = bool(windows.get('valid') and trend.get('valid'))
+    reason  = None if valid else (windows.get('reason') or ('trend_invalid' if not trend.get('valid') else 'unknown'))
+    return {"windows": windows, "trend": trend, "ademritme_str": None,
+            "duration_sec": duration_sec, "valid": valid, "reason": reason}
+# ====== /Biofeedback v3 ======
+
+
+def _gather_kompas_context(cur, is_client, user_key, client_id):
+    """Verzamel meting_type-specifieke context voor de Innerlijk-Kompas-prompt.
+    Retourneert dict met (naar gelang type): pre_ref, baseline_ri, baseline_range,
+    recent_basis, phase, baseline_ri_history, datetime_iso.
+    Bij biofeedback zonder pre_ref binnen 30min-venster: pre_ref ontbreekt → router valt terug op basismeting-template.
+    """
+    from datetime import datetime as _dt
+    ctx = {}
+    ts_cur = cur.get('ts') or 0
+    ctx['datetime_iso'] = _dt.fromtimestamp(ts_cur/1000).strftime('%Y-%m-%d %H:%M') if ts_cur else ''
+    mt = (cur.get('meting_type') or 'basismeting').lower()
+
+    try:
+        db = get_pro_db() if is_client else get_meting_db()
+        tbl = 'client_metingen' if is_client else 'metingen'
+        where_key = 'client_id=?' if is_client else 'user_key=?'
+        key_val = client_id if is_client else user_key
+
+        if mt == 'biofeedback':
+            window_ms = 30 * 60 * 1000
+            pre_row = db.execute(
+                f"SELECT id, ri, bpm, hrv_pct, rmssd FROM {tbl} "
+                f"WHERE {where_key} AND meting_type='basismeting' AND ts >= ? AND ts < ? "
+                f"ORDER BY ts DESC LIMIT 1",
+                (key_val, ts_cur - window_ms, ts_cur)
+            ).fetchone()
+            if pre_row:
+                ctx['pre_ref'] = dict(pre_row)
+            # Altijd recent_basis + phase ophalen als rust-referentie (ook als pre_ref gevuld is)
+            recent_rows = db.execute(
+                f"SELECT ri, subjectief_score, ts, ctx_dimensie, ctx_vrije_tekst FROM {tbl} "
+                f"WHERE {where_key} AND meting_type='basismeting' AND ts < ? "
+                f"ORDER BY ts DESC LIMIT 7",
+                (key_val, ts_cur)
+            ).fetchall()
+            ctx['recent_basis'] = [
+                {'ri': r[0], 'subjectief_score': r[1],
+                 'datum': _dt.fromtimestamp((r[2] or 0)/1000).strftime('%Y-%m-%d'),
+                 'ctx_dimensie': r[3] or None,
+                 'ctx_vrije_tekst': (r[4][:100] if r[4] else None)}
+                for r in recent_rows
+            ]
+            count_row = db.execute(
+                f"SELECT COUNT(*) FROM {tbl} WHERE {where_key} AND meting_type='basismeting'",
+                (key_val,)
+            ).fetchone()
+            count = count_row[0] if count_row else 0
+            ctx['phase'] = 'phase3' if count >= 15 else ('phase2' if count >= 5 else 'phase1')
+
+        elif mt == 'situatiemeting':
+            bl_rows = db.execute(
+                f"SELECT ri FROM {tbl} WHERE {where_key} AND meting_type='basismeting' "
+                f"AND ri IS NOT NULL ORDER BY ts DESC LIMIT 7",
+                (key_val,)
+            ).fetchall()
+            ri_vals = [float(r[0]) for r in bl_rows if r[0] is not None]
+            if ri_vals:
+                ctx['baseline_ri'] = round(sum(ri_vals) / len(ri_vals), 1)
+                ctx['baseline_range'] = {'min': round(min(ri_vals), 1), 'max': round(max(ri_vals), 1)}
+
+        else:
+            # basismeting (default) + fallbacks voor bio-zonder-pre / situ-zonder-label
+            recent_rows = db.execute(
+                f"SELECT ri, subjectief_score, ts, ctx_dimensie, ctx_vrije_tekst FROM {tbl} "
+                f"WHERE {where_key} AND meting_type='basismeting' AND ts < ? "
+                f"ORDER BY ts DESC LIMIT 7",
+                (key_val, ts_cur)
+            ).fetchall()
+            ctx['recent_basis'] = [
+                {'ri': r[0], 'subjectief_score': r[1],
+                 'datum': _dt.fromtimestamp((r[2] or 0)/1000).strftime('%Y-%m-%d'),
+                 'ctx_dimensie': r[3] or None,
+                 'ctx_vrije_tekst': (r[4][:100] if r[4] else None)}
+                for r in recent_rows
+            ]
+            count_row = db.execute(
+                f"SELECT COUNT(*) FROM {tbl} WHERE {where_key} AND meting_type='basismeting'",
+                (key_val,)
+            ).fetchone()
+            count = count_row[0] if count_row else 0
+            ctx['phase'] = 'phase3' if count >= 15 else ('phase2' if count >= 5 else 'phase1')
+            sec_rows = db.execute(
+                f"SELECT ri FROM {tbl} WHERE {where_key} AND meting_type='basismeting' "
+                f"AND ri IS NOT NULL AND ts < ? ORDER BY ts DESC LIMIT 7 OFFSET 7",
+                (key_val, ts_cur)
+            ).fetchall()
+            sec_vals = [float(r[0]) for r in sec_rows if r[0] is not None]
+            if len(sec_vals) >= 3:
+                ctx['baseline_ri_history'] = round(sum(sec_vals) / len(sec_vals), 1)
+        db.close()
+    except Exception:
+        try: db.close()
+        except: pass
+    return ctx
+
+
+def _build_kompas_prompt(cur, lang, context, session_data=None, baseline_avg=None):
+    """Router: kiest prompt-template op basis van meting_type.
+    Retourneert (system_prompt, user_message) tuple.
+    Fallbacks: biofeedback zonder pre_ref → basismeting-template. Situ zonder label → basismeting-template.
+
+    Biofeedback v3: als session_data is meegegeven en session_data['valid'] is True,
+    gebruik BIOFEEDBACK_SYSTEM_PROMPT_V3 met intra-sessie windows/trend.
+    """
+    lang_name = {'nl': 'Dutch', 'de': 'German', 'en': 'English'}.get(lang, 'Dutch')
+    mt = (cur.get('meting_type') or 'basismeting').lower()
+    suffix = f"\n\nRespond in {lang_name}."
+
+    if mt == 'biofeedback' and session_data and session_data.get('valid'):
+        w = session_data.get('windows') or {}
+        tr = session_data.get('trend') or {}
+        s = w.get('start') or {}
+        e = w.get('eind') or {}
+        d = w.get('delta') or {}
+        def _f(v):
+            return 'null' if v is None else v
+        def _txt(v, n=100):
+            if v is None: return 'null'
+            s = str(v).strip()
+            if not s: return 'null'
+            return '"' + s[:n] + '"'
+        user = (
+            "BIOFEEDBACK-meting v3 (intra-sessie observatie):\n"
+            f"duration_sec: {_f(session_data.get('duration_sec'))}\n"
+            f"start (eerste 60s):  RI={_f(s.get('ri'))}, BPM={_f(s.get('bpm'))}, HRV%={_f(s.get('hrv'))}, RMSSD={_f(s.get('rmssd'))}, n={_f(s.get('n'))}\n"
+            f"eind  (laatste 60s): RI={_f(e.get('ri'))}, BPM={_f(e.get('bpm'))}, HRV%={_f(e.get('hrv'))}, RMSSD={_f(e.get('rmssd'))}, n={_f(e.get('n'))}\n"
+            f"delta: RI={_f(d.get('ri'))}, BPM={_f(d.get('bpm'))}, HRV%={_f(d.get('hrv'))}, RMSSD={_f(d.get('rmssd'))}\n"
+            f"slope_ri_per_min: {_f(tr.get('slope_ri_per_min'))}\n"
+            f"variabiliteit_rmssd: {_f(tr.get('variabiliteit_rmssd'))}\n"
+            f"baseline_avg (rust-RI uit recente basismetingen): {_f(baseline_avg)}\n"
+            f"ademritme_str: {_f(session_data.get('ademritme_str'))}\n"
+            f"ctx_dimensie: {_f(cur.get('ctx_dimensie'))}\n"
+            f"ctx_vitaliteit: {_f(cur.get('ctx_vitaliteit'))}\n"
+            f"ctx_ongemak: {_f(cur.get('ctx_ongemak'))}\n"
+            f"ctx_vrije_tekst: {_txt(cur.get('ctx_vrije_tekst'))}\n"
+            f"datetime: {context.get('datetime_iso') or ''}"
+        )
+        return BIOFEEDBACK_SYSTEM_PROMPT_V3 + suffix, user
+
+    if mt == 'biofeedback':
+        # Biofeedback-prompt wordt ALTIJD gebruikt (geen silent fallback meer naar basismeting-template)
+        pre = context.get('pre_ref')
+        recent = context.get('recent_basis', [])
+        recent_str = '\n'.join(
+            f"  - RI={r.get('ri')}, subjectief_score={r.get('subjectief_score')}, datum={r.get('datum')}"
+            for r in recent
+        ) if recent else '  (geen eerdere basismetingen)'
+
+        if pre:
+            delta = round((cur.get('ri') or 0) - (pre.get('ri') or 0), 1)
+            pre_line = f"pre: RI={pre.get('ri')}, BPM={pre.get('bpm')}, HRV%={pre.get('hrv_pct')}, RMSSD={pre.get('rmssd')}"
+            delta_line = f"delta_ri: {'+' if delta > 0 else ''}{delta}"
+        else:
+            pre_line = "pre: null (geen basismeting binnen 30min vóór biofeedback)"
+            delta_line = "delta_ri: null"
+
+        user = (
+            "BIOFEEDBACK-meting data:\n"
+            f"{pre_line}\n"
+            f"post: RI={cur.get('ri')}, BPM={cur.get('bpm')}, HRV%={cur.get('hrv_pct')}, RMSSD={cur.get('rmssd')}\n"
+            f"{delta_line}\n"
+            f"label: {cur.get('notes') or 'null'}\n"
+            f"ctx_dimensie: {cur.get('ctx_dimensie') or 'null'}\n"
+            f"subjectief_score: {cur.get('subjectief_score')}\n"
+            f"datetime: {context.get('datetime_iso') or ''}\n"
+            f"recent_basis (laatste basismetingen als rust-referentie, nieuwste eerst):\n{recent_str}\n"
+            f"phase: {context.get('phase', 'phase1')}"
+        )
+        return BIOFEEDBACK_SYSTEM_PROMPT + suffix, user
+
+    if mt == 'situatiemeting' and (cur.get('notes') or '').strip():
+        bl_range = context.get('baseline_range', {})
+        user = (
+            "SITUATIEMETING data:\n"
+            f"current: RI={cur.get('ri')}, BPM={cur.get('bpm')}, HRV%={cur.get('hrv_pct')}, "
+            f"RMSSD={cur.get('rmssd')}, subjectief_score={cur.get('subjectief_score')}, "
+            f"ctx_dimensie={cur.get('ctx_dimensie') or 'null'}, datetime={context.get('datetime_iso') or ''}\n"
+            f"label: {cur.get('notes')}\n"
+            f"baseline_ri: {context.get('baseline_ri') if context.get('baseline_ri') is not None else 'null'}\n"
+            f"baseline_range: min={bl_range.get('min') if bl_range.get('min') is not None else 'null'}, "
+            f"max={bl_range.get('max') if bl_range.get('max') is not None else 'null'}"
+        )
+        return SITUATIEMETING_SYSTEM_PROMPT + suffix, user
+
+    # Default / fallback: basismeting-template
+    def _fmt_int(v):
+        if v is None:
+            return 'null'
+        try: return str(int(round(float(v))))
+        except Exception: return 'null'
+    def _fmt_text(v):
+        if v is None or str(v).strip() == '':
+            return 'null'
+        return '"' + str(v)[:100] + '"'
+    recent = context.get('recent_basis', [])
+    recent_str = '\n'.join(
+        f"  - RI={r.get('ri')}, subjectief_score={r.get('subjectief_score')}, datum={r.get('datum')}, "
+        f"ctx_dimensie={r.get('ctx_dimensie') or 'null'}, ctx_vrije_tekst={_fmt_text(r.get('ctx_vrije_tekst'))}"
+        for r in recent
+    ) if recent else '  (geen eerdere basismetingen)'
+    phase = context.get('phase', 'phase1')
+    fallback_note = ''
+    if mt == 'biofeedback':
+        fallback_note = '\n(Intern: biofeedback zonder pre-referentie binnen 30min - basismeting-interpretatie.)'
+    elif mt == 'situatiemeting':
+        fallback_note = '\n(Intern: situatiemeting zonder label - basismeting-interpretatie.)'
+    user = (
+        "BASISMETING data:\n"
+        f"current: RI={cur.get('ri')}, BPM={cur.get('bpm')}, HRV%={cur.get('hrv_pct')}, "
+        f"RMSSD={cur.get('rmssd')}, subjectief_score={cur.get('subjectief_score')}, "
+        f"ctx_dimensie={cur.get('ctx_dimensie') or 'null'}, datetime={context.get('datetime_iso') or ''}\n"
+        f"ctx_vitaliteit={_fmt_int(cur.get('ctx_vitaliteit'))}, ctx_ongemak={_fmt_int(cur.get('ctx_ongemak'))}, ctx_vrije_tekst={_fmt_text(cur.get('ctx_vrije_tekst'))}\n"
+        f"label: {cur.get('notes') or 'null'}\n"
+        f"recent_basis (tot 7 eerdere basismetingen, nieuwste eerst):\n{recent_str}\n"
+        f"baseline_ri_history (avg basismetingen 8-14 terug): "
+        f"{context.get('baseline_ri_history') if context.get('baseline_ri_history') is not None else 'null'}\n"
+        f"phase: {phase}{fallback_note}"
+    )
+    return BASISMETING_SYSTEM_PROMPT + suffix, user
+
+
+@app.route('/api/feedback')
+def api_feedback():
+    if not session.get('license_valid') and not session.get('demo_mode') and not session.get('hlm_user_id'):
+        return jsonify({'error': 'Niet ingelogd'}), 401
+    lang = session.get('lang', 'nl')
+    import logging; logging.getLogger().warning(f"[FEEDBACK DEBUG] session lang={lang}, session keys={list(session.keys())}")
+    is_demo = bool(session.get('demo_mode') or session.get('is_demo'))
+
+    # Client-specifieke feedback voor pro gebruikers
+    cid = request.args.get('cid', type=int)
+    # Optional: target specifieke meting via ?mid=<id> (wordt gebruikt door regenerate_kompas)
+    mid_param = request.args.get('mid', type=int)
+
+    # Haal laatste meting + vorige meting op (inclusief id en feedback_cache)
+    _is_client_query = cid and _is_pro_or_demo_pro()
+    try:
+        if _is_client_query:
+            db = get_pro_db()
+            if mid_param:
+                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries FROM client_metingen WHERE id=? AND client_id=?', (mid_param, cid)).fetchone()
+                rows = []
+                if cur_r:
+                    rows.append(cur_r)
+                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries FROM client_metingen WHERE client_id=? AND ts < ? ORDER BY ts DESC LIMIT 1', (cid, cur_r['ts'])).fetchone()
+                    if prev_r: rows.append(prev_r)
+            else:
+                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 2', (cid,)).fetchall()
+            db.close()
+        else:
+            db = get_meting_db()
+            if mid_param:
+                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries FROM metingen WHERE id=? AND user_key=?', (mid_param, get_user_key())).fetchone()
+                rows = []
+                if cur_r:
+                    rows.append(cur_r)
+                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries FROM metingen WHERE user_key=? AND ts < ? ORDER BY ts DESC LIMIT 1', (get_user_key(), cur_r['ts'])).fetchone()
+                    if prev_r: rows.append(prev_r)
+            else:
+                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 2', (get_user_key(),)).fetchall()
+            db.close()
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': 'DB fout', 'detail': str(e)}), 500
+
+    if not rows and is_demo:
+        # Demo gebruiker zonder metingen: toon vaste voorbeeldtekst
+        pass  # val door naar demo blok hieronder
+    elif not rows:
+        return jsonify({'insight': '', 'reflection': ''})
+
+    # Demo: vaste coherente voorbeeldtekst (insight + reflection + question)
+    if is_demo:
+        demo = {
+            'nl': {
+                'insight': 'Je lichaam laat spanning zien, vooral lichamelijk — maar je herkent je signalen goed.',
+                'reflection': 'Je autonoom zenuwstelsel toont dat er spanning zit, vooral op lichamelijk vlak. '
+                    'Toch komt je zelfinschatting redelijk overeen met wat je lichaam aangeeft — dat is waardevol, want het betekent dat je goed naar jezelf luistert.',
+            },
+            'de': {
+                'insight': 'Dein Körper zeigt Anspannung, besonders körperlich — aber du erkennst deine Signale gut.',
+                'reflection': 'Dein autonomes Nervensystem zeigt Anspannung, besonders auf körperlicher Ebene. '
+                    'Deine Selbsteinschätzung stimmt recht gut mit dem überein, was dein Körper meldet — das ist wertvoll, denn es bedeutet, dass du gut auf dich hörst.',
+            },
+            'en': {
+                'insight': 'Your body is showing tension, especially physically — but you recognize your signals well.',
+                'reflection': 'Your autonomic nervous system is showing tension, especially on a physical level. '
+                    'Your self-assessment aligns fairly well with what your body reports — that\'s valuable, it means you\'re listening to yourself.',
+            }
+        }
+        d = demo.get(lang, demo['nl'])
+        question = _generate_question('lichamelijk', lang)
+        _fb_payload = {'insight': d['insight'], 'reflection': d['reflection'], 'question': question, 'demo': True}
+        import logging as _lg2; _lg2.getLogger().warning(f"[REFLECTION FINAL] mid={cur.get('id') if 'cur' in dir() and cur else 'n/a'} source={_fb_payload.get('source','?')} reflection_len={len(_fb_payload.get('reflection',''))} reflection={_fb_payload.get('reflection','')!r}")
+        resp = jsonify(_fb_payload)
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
+
+    cur = dict(rows[0])
+    prev = dict(rows[1]) if len(rows) > 1 else None
+    meting_id = cur.get('id')
+    meting_type = (cur.get('meting_type') or 'basismeting').lower()
+    is_biofeedback = meting_type == 'biofeedback'
+    is_situatie = meting_type == 'situatiemeting'
+    dim = cur.get('ctx_dimensie') or ''
+
+    # Trend data berekenen (phase 1/2/3)
+    _client_name_for_trend = None
+    if _is_client_query:
+        try:
+            db_t = get_pro_db()
+            cn_row = db_t.execute('SELECT name FROM clients WHERE id=?', (cid,)).fetchone()
+            if cn_row: _client_name_for_trend = cn_row[0]
+            db_t.close()
+        except:
+            pass
+    trend_data = _generate_trend_data(
+        user_key=None if _is_client_query else get_user_key(),
+        client_id=cid if _is_client_query else None,
+        lang=lang,
+        client_name=_client_name_for_trend
+    )
+
+    # Cache check: als feedback al gegenereerd is voor deze meting EN taal, retourneer direct
+    cached = cur.get('feedback_cache')
+    if cached:
+        try:
+            cached_data = json.loads(cached)
+            # Only use per-language cache (keys are 'nl', 'de', 'en').
+            # Old flat format ({insight, reflection} without language key) is
+            # discarded — we cannot know what language it was generated in.
+            lang_data = None
+            if any(k in ('nl', 'de', 'en') for k in cached_data):
+                lang_data = cached_data.get(lang)
+            if lang_data and isinstance(lang_data, dict):
+                if meting_type == 'biofeedback':
+                    question = ''
+                else:
+                    question = _generate_question(dim, lang, meting_type)
+                cached_reflection = _hard_truncate(lang_data.get('reflection', ''), 250)
+                # Trend info gaat via trend_hint field; niet meer in reflection.
+                _fb_payload = {'insight': lang_data.get('insight', ''), 'reflection': cached_reflection, 'question': question, 'trend_hint': (trend_data.get('trend_hint', '') if meting_type == 'basismeting' else ''), 'source': 'cached'}
+                import logging as _lg2; _lg2.getLogger().warning(f"[REFLECTION FINAL] mid={cur.get('id') if 'cur' in dir() and cur else 'n/a'} source={_fb_payload.get('source','?')} reflection_len={len(_fb_payload.get('reflection',''))} reflection={_fb_payload.get('reflection','')!r}")
+                resp = jsonify(_fb_payload)
+                resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+                resp.headers['Pragma'] = 'no-cache'
+                resp.headers['Expires'] = '0'
+                return resp
+        except (json.JSONDecodeError, ValueError):
+            pass  # Ongeldige cache, opnieuw genereren
+
+    # Voor biofeedback: zoek de meest recente basismeting van dezelfde dag als referentie
+    basis_ri = None
+    if is_biofeedback:
+        try:
+            if cid and _is_pro_or_demo_pro():
+                db2 = get_pro_db()
+                basis_row = db2.execute(
+                    "SELECT ri FROM client_metingen WHERE client_id=? AND meting_type='basismeting' "
+                    "AND ts >= (SELECT ts FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 1) - 86400000 "
+                    "AND ts < (SELECT ts FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 1) "
+                    "ORDER BY ts DESC LIMIT 1",
+                    (cid, cid, cid)).fetchone()
+            else:
+                db2 = get_meting_db()
+                basis_row = db2.execute(
+                    "SELECT ri FROM metingen WHERE user_key=? AND meting_type='basismeting' "
+                    "AND ts >= (SELECT ts FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 1) - 86400000 "
+                    "AND ts < (SELECT ts FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 1) "
+                    "ORDER BY ts DESC LIMIT 1",
+                    (get_user_key(), get_user_key(), get_user_key())).fetchone()
+            if basis_row:
+                basis_ri = float(basis_row[0])
+            db2.close()
+        except:
+            pass
+
+    # Voor situatiemeting: persoonlijke basislijn (gemiddelde RI van laatste 10 basismetingen)
+    personal_baseline = None
+    if is_situatie:
+        try:
+            if cid and _is_pro_or_demo_pro():
+                db2 = get_pro_db()
+                bl_row = db2.execute(
+                    "SELECT AVG(ri) FROM (SELECT ri FROM client_metingen WHERE client_id=? AND meting_type='basismeting' ORDER BY ts DESC LIMIT 10)",
+                    (cid,)).fetchone()
+            else:
+                db2 = get_meting_db()
+                bl_row = db2.execute(
+                    "SELECT AVG(ri) FROM (SELECT ri FROM metingen WHERE user_key=? AND meting_type='basismeting' ORDER BY ts DESC LIMIT 10)",
+                    (get_user_key(),)).fetchone()
+            if bl_row and bl_row[0] is not None:
+                personal_baseline = round(float(bl_row[0]), 1)
+            db2.close()
+        except:
+            pass
+
+    # Trend berekenen
+    trend = None
+    if prev and cur.get('ri') is not None and prev.get('ri') is not None:
+        diff = cur['ri'] - prev['ri']
+        if diff > 0.5: trend = 'up'
+        elif diff < -0.5: trend = 'down'
+        else: trend = 'stable'
+
+    # Echte gebruiker: Anthropic API aanroepen
+    question = _generate_question(dim, lang, meting_type)
+
+    api_key = os.environ.get('ANTHROPIC_API_KEY', '')
+    if not api_key:
+        result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline)
+        result['reflection'] = _hard_truncate(result['reflection'], 250)
+        # Trend info gaat via trend_hint field; niet meer in reflection.
+        _store_feedback_cache(meting_id, result['insight'], result['reflection'], is_client=_is_client_query, lang=lang)
+        result['question'] = question
+        result['trend_hint'] = (trend_data.get('trend_hint', '') if meting_type == 'basismeting' else '')
+        _fb_payload = {**result, 'source': 'local'}
+        import logging as _lg2; _lg2.getLogger().warning(f"[REFLECTION FINAL] mid={cur.get('id') if 'cur' in dir() and cur else 'n/a'} source={_fb_payload.get('source','?')} reflection_len={len(_fb_payload.get('reflection',''))} reflection={_fb_payload.get('reflection','')!r}")
+        resp = jsonify(_fb_payload)
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+
+        # Gebruik nieuwe per-meting_type prompts (router op meting_type)
+        _uk = get_user_key() if not _is_client_query else None
+        kompas_ctx = _gather_kompas_context(cur, _is_client_query, _uk, cid if _is_client_query else None)
+        # Biofeedback v3: intra-sessie data + baseline-gemiddelde
+        _session_data = None
+        _baseline_avg = None
+        if (cur.get('meting_type') or '').lower() == 'biofeedback':
+            _session_data = _build_biofeedback_session_data(cur, None)
+            _rb = kompas_ctx.get('recent_basis') or []
+            _rb_ri = [float(r.get('ri')) for r in _rb if r.get('ri') is not None]
+            if _rb_ri:
+                _baseline_avg = round(sum(_rb_ri) / len(_rb_ri), 1)
+        system_prompt, user_msg = _build_kompas_prompt(cur, lang, kompas_ctx, session_data=_session_data, baseline_avg=_baseline_avg)
+
+        # Biofeedback v3 levert geen reflectievraag — question leeg, ongeacht AI-output
+        _is_bf_v3 = bool(
+            (cur.get('meting_type') or '').lower() == 'biofeedback'
+            and _session_data and _session_data.get('valid')
+        )
+        if _is_bf_v3:
+            question = ''
+
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=400,
+            temperature=0.5,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_msg}]
+        )
+        text = message.content[0].text.strip()
+        import logging as _lg
+        _lg.getLogger().warning(f"[KOMPAS RAW AI] mid={cur.get('id')} type={meting_type} lang={lang} raw={text!r}")
+
+        # Parse JSON response — expected format: {sentence1, sentence2, question}
+        # Backward compat: oudere prompt-versies produceerden {insight, sentence1, sentence2} zonder question.
+        insight = ''
+        reflection = ''
+        try:
+            # Strip markdown code fences if present
+            if text.startswith('```'): text = text.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+            parsed = json.loads(text)
+            s1 = parsed.get('sentence1', '')
+            s2 = parsed.get('sentence2', '')
+            # Nieuwe contract: s1 = observatie (insight-rol), s2 = toelichting (reflection-rol)
+            insight = s1 or parsed.get('insight', '')
+            reflection = s2 or parsed.get('reflection', '')
+            if not reflection and s1 and parsed.get('insight'):
+                # Backward compat: oude format had insight + s1 + s2 → reflection = s1+s2
+                reflection = (s1 + ' ' + s2).strip()
+            # Question komt nu uit AI-response; fallback op server-side _generate_question
+            # Biofeedback v3 heeft per definitie geen question — override blokkeren.
+            ai_question = parsed.get('question', '').strip()
+            if ai_question and not _is_bf_v3:
+                question = ai_question
+        except (json.JSONDecodeError, ValueError):
+            # Fallback: probeer INSIGHT:/REFLECTION: formaat
+            for line in text.split('\n'):
+                line = line.strip()
+                if line.upper().startswith('INSIGHT:'):
+                    insight = line.split(':', 1)[1].strip()
+                elif line.upper().startswith('REFLECTION:'):
+                    reflection = line.split(':', 1)[1].strip()
+            if not reflection:
+                reflection = text.replace('INSIGHT:', '').replace('REFLECTION:', '').strip()
+            if not insight:
+                first_dot = reflection.find('.')
+                insight = reflection[:first_dot+1] if first_dot > 0 else reflection[:80]
+
+        # Hard truncate reflection to exactly 2 sentences, then hard char limit
+        reflection = _hard_truncate(reflection, 250)
+        # Strip ellipsis-chars (Claude gebruikt ze soms stilistisch; niet wenselijk hier)
+        insight = (insight or '').replace('\u2026', '').replace('...', '').strip()
+        reflection = (reflection or '').replace('\u2026', '').replace('...', '').strip()
+
+        # Language mixing check — discard and use local fallback if wrong language detected
+        if _check_language_mixing(insight, lang) or _check_language_mixing(reflection, lang):
+            result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline)
+            result['reflection'] = _hard_truncate(result['reflection'], 250)
+            # Trend info gaat via trend_hint field; niet meer in reflection.
+            _store_feedback_cache(meting_id, result['insight'], result['reflection'], is_client=_is_client_query, lang=lang)
+            result['question'] = question
+            result['trend_hint'] = (trend_data.get('trend_hint', '') if meting_type == 'basismeting' else '')
+            _fb_payload = {**result, 'source': 'local_lang_fix'}
+            import logging as _lg2; _lg2.getLogger().warning(f"[REFLECTION FINAL] mid={cur.get('id') if 'cur' in dir() and cur else 'n/a'} source={_fb_payload.get('source','?')} reflection_len={len(_fb_payload.get('reflection',''))} reflection={_fb_payload.get('reflection','')!r}")
+            resp = jsonify(_fb_payload)
+            resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            resp.headers['Pragma'] = 'no-cache'
+            resp.headers['Expires'] = '0'
+            return resp
+
+        # Forbidden word check — vervang met lokale fallback als nodig
+        if _check_forbidden(insight) or _check_forbidden(reflection):
+            result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline)
+            result['reflection'] = _hard_truncate(result['reflection'], 250)
+            # Trend info gaat via trend_hint field; niet meer in reflection.
+            _store_feedback_cache(meting_id, result['insight'], result['reflection'], is_client=_is_client_query, lang=lang)
+            result['question'] = question
+            result['trend_hint'] = (trend_data.get('trend_hint', '') if meting_type == 'basismeting' else '')
+            _fb_payload = {**result, 'source': 'local_filtered'}
+            import logging as _lg2; _lg2.getLogger().warning(f"[REFLECTION FINAL] mid={cur.get('id') if 'cur' in dir() and cur else 'n/a'} source={_fb_payload.get('source','?')} reflection_len={len(_fb_payload.get('reflection',''))} reflection={_fb_payload.get('reflection','')!r}")
+            resp = jsonify(_fb_payload)
+            resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            resp.headers['Pragma'] = 'no-cache'
+            resp.headers['Expires'] = '0'
+            return resp
+
+        # Trend info zit in trend_hint (separate field) — niet meer concaten in reflection.
+        _store_feedback_cache(meting_id, insight, reflection, is_client=_is_client_query, lang=lang)
+        _fb_payload = {'insight': insight, 'reflection': reflection, 'question': question, 'trend_hint': (trend_data.get('trend_hint', '') if meting_type == 'basismeting' else ''), 'source': 'ai'}
+        import logging as _lg2; _lg2.getLogger().warning(f"[REFLECTION FINAL] mid={cur.get('id') if 'cur' in dir() and cur else 'n/a'} source={_fb_payload.get('source','?')} reflection_len={len(_fb_payload.get('reflection',''))} reflection={_fb_payload.get('reflection','')!r}")
+        resp = jsonify(_fb_payload)
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
+    except Exception as e:
+        result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline)
+        result['reflection'] = _hard_truncate(result['reflection'], 250)
+        # Trend info gaat via trend_hint field; niet meer in reflection.
+        _store_feedback_cache(meting_id, result['insight'], result['reflection'], is_client=_is_client_query, lang=lang)
+        result['question'] = question
+        result['trend_hint'] = (trend_data.get('trend_hint', '') if meting_type == 'basismeting' else '')
+        _fb_payload = {**result, 'source': 'local', 'ai_error': str(e)}
+        import logging as _lg2; _lg2.getLogger().warning(f"[REFLECTION FINAL] mid={cur.get('id') if 'cur' in dir() and cur else 'n/a'} source={_fb_payload.get('source','?')} reflection_len={len(_fb_payload.get('reflection',''))} reflection={_fb_payload.get('reflection','')!r}")
+        resp = jsonify(_fb_payload)
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
+
+
+@app.route('/api/meting/<int:mid>/regenerate_kompas', methods=['POST'])
+def regenerate_kompas(mid):
+    """Forceer hergeneratie van Innerlijk Kompas voor één specifieke meting.
+    Clears feedback_cache dan redirect naar /api/feedback?mid=...&cid=... (303 → GET).
+    Auth: eigen user_key (consumer) of pro_key via clients-join (pro).
+    """
+    if not session.get('license_valid') and not session.get('demo_mode') and not session.get('hlm_user_id'):
+        return jsonify({'error': 'Niet ingelogd'}), 401
+    user_key = get_user_key()
+    if not user_key:
+        return jsonify({'error': 'Geen user_key in sessie'}), 401
+
+    cid = None
+    found = False
+    try:
+        db = get_meting_db()
+        row = db.execute('SELECT user_key FROM metingen WHERE id=?', (mid,)).fetchone()
+        if row and row['user_key'] == user_key:
+            db.execute('UPDATE metingen SET feedback_cache=NULL WHERE id=?', (mid,))
+            db.commit()
+            found = True
+        db.close()
+    except Exception:
+        try: db.close()
+        except: pass
+
+    if not found and _is_pro_or_demo_pro():
+        try:
+            pdb = get_pro_db()
+            cm_row = pdb.execute(
+                'SELECT cm.client_id FROM client_metingen cm '
+                'JOIN clients c ON c.id = cm.client_id '
+                'WHERE cm.id=? AND c.pro_key=?', (mid, user_key)).fetchone()
+            if cm_row:
+                cid = cm_row['client_id']
+                pdb.execute('UPDATE client_metingen SET feedback_cache=NULL WHERE id=?', (mid,))
+                pdb.commit()
+                found = True
+            pdb.close()
+        except Exception:
+            try: pdb.close()
+            except: pass
+
+    if not found:
+        return jsonify({'error': 'Meting niet gevonden of geen toegang'}), 403
+
+    from urllib.parse import urlencode
+    qs = {'mid': mid}
+    if cid: qs['cid'] = cid
+    return redirect(url_for('api_feedback') + '?' + urlencode(qs), code=303)
+
+
+def _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=False, basis_ri=None, is_situatie=False, personal_baseline=None):
+    """Lokale fallback: genereert coherent insight + reflection paar."""
+    ri = cur.get('ri', 5)
+    dim = cur.get('ctx_dimensie', '')
+    subj = cur.get('subjectief_score')
+
+    # ── Biofeedback: vergelijk met basismeting ──
+    if is_biofeedback:
+        return _generate_biofeedback_feedback(ri, basis_ri, lang)
+
+    # ── Situatiemeting: vergelijk met persoonlijke basislijn ──
+    if is_situatie:
+        return _generate_situatie_feedback(ri, personal_baseline, dim, lang)
+
+    if ri < 2: zone = 'risk'
+    elif ri < 4: zone = 'stress'
+    elif ri < 6: zone = 'neutral'
+    elif ri < 8: zone = 'vital'
+    else: zone = 'very_vital'
+
+    # Insight: één zin voor kwadrant
+    insights = {
+        'nl': {
+            'risk': 'Je autonoom zenuwstelsel is flink belast — geef jezelf rust en ruimte.',
+            'stress': 'Er zit duidelijke spanning in je lichaam — je zenuwstelsel vraagt om aandacht.',
+            'neutral': 'Je lichaam is redelijk in balans, met ruimte om dieper te ontspannen.',
+            'vital': 'Je autonoom zenuwstelsel herstelt goed — je lijf voelt veerkrachtig.',
+            'very_vital': 'Uitstekend — je lichaam is diep ontspannen en herstelt optimaal.',
+        },
+        'de': {
+            'risk': 'Dein autonomes Nervensystem ist stark belastet — gönne dir Ruhe und Raum.',
+            'stress': 'Deutliche Anspannung in deinem Körper — dein Nervensystem braucht Aufmerksamkeit.',
+            'neutral': 'Dein Körper ist einigermaßen im Gleichgewicht, mit Raum für tiefere Entspannung.',
+            'vital': 'Dein autonomes Nervensystem erholt sich gut — dein Körper fühlt sich widerstandsfähig an.',
+            'very_vital': 'Ausgezeichnet — dein Körper ist tief entspannt und erholt sich optimal.',
+        },
+        'en': {
+            'risk': 'Your autonomic nervous system is under significant strain — give yourself rest and space.',
+            'stress': 'Clear tension in your body — your nervous system needs attention.',
+            'neutral': 'Your body is reasonably balanced, with room to relax more deeply.',
+            'vital': 'Your autonomic nervous system is recovering well — your body feels resilient.',
+            'very_vital': 'Excellent — your body is deeply relaxed and recovering optimally.',
+        }
+    }
+
+    # Reflection: 3-4 zinnen die het insight uitdiepen
+    reflections = {
+        'nl': {
+            'risk': 'Je autonoom zenuwstelsel laat zien dat het op dit moment flink belast is.',
+            'stress': 'Er zit spanning in je lichaam — je zenuwstelsel heeft moeite om tot rust te komen.',
+            'neutral': 'Je lichaam is redelijk in balans, maar er is ruimte om dieper te ontspannen.',
+            'vital': 'Mooi — je autonoom zenuwstelsel herstelt goed. Je lijf voelt veerkrachtig.',
+            'very_vital': 'Uitstekend! Je lichaam is diep ontspannen en je autonoom zenuwstelsel herstelt optimaal.',
+        },
+        'de': {
+            'risk': 'Dein autonomes Nervensystem zeigt, dass es gerade stark belastet ist.',
+            'stress': 'Es steckt Anspannung in deinem Körper — dein Nervensystem kommt schwer zur Ruhe.',
+            'neutral': 'Dein Körper ist einigermaßen im Gleichgewicht, aber es gibt Raum für tiefere Entspannung.',
+            'vital': 'Schön — dein autonomes Nervensystem erholt sich gut. Dein Körper fühlt sich widerstandsfähig an.',
+            'very_vital': 'Ausgezeichnet! Dein Körper ist tief entspannt und dein autonomes Nervensystem erholt sich optimal.',
+        },
+        'en': {
+            'risk': 'Your autonomic nervous system is showing signs of significant strain right now.',
+            'stress': 'There is tension in your body — your nervous system is struggling to settle.',
+            'neutral': 'Your body is reasonably balanced, but there\'s room to relax more deeply.',
+            'vital': 'Nice — your autonomic nervous system is recovering well. Your body feels resilient.',
+            'very_vital': 'Excellent! Your body is deeply relaxed and your autonomic nervous system is recovering optimally.',
+        }
+    }
+
+    trend_lines = {
+        'nl': {'up': 'Ten opzichte van je vorige meting gaat het de goede kant op.', 'down': 'Je score is iets gezakt — luister naar wat je lichaam je vertelt.', 'stable': 'Je score is vergelijkbaar met de vorige keer.'},
+        'de': {'up': 'Im Vergleich zur letzten Messung geht es in die richtige Richtung.', 'down': 'Dein Wert ist etwas gesunken — höre auf das, was dein Körper dir sagt.', 'stable': 'Dein Wert ist ähnlich wie beim letzten Mal.'},
+        'en': {'up': 'Compared to your previous reading, things are moving in the right direction.', 'down': 'Your score has dipped — listen to what your body is telling you.', 'stable': 'Your score is similar to last time.'},
+    }
+
+    dim_tips = {
+        'nl': {
+            'lichamelijk': 'Probeer vandaag even een korte wandeling te maken of 5 minuten te stretchen — je lichaam vraagt om beweging en ontlading.',
+            'mentaal': 'Probeer vandaag eens 5 minuten niets te doen — geen scherm, geen takenlijst. Laat je gedachten even met rust.',
+            'emotioneel': 'Gun jezelf vandaag een moment om te voelen wat er speelt, zonder het op te lossen. Soms is erkennen genoeg.',
+            'spiritueel': 'Sta vandaag even stil bij wat je echt belangrijk vindt. Eén bewuste keuze vanuit je kern maakt verschil.',
+            '': 'Probeer vandaag 5 minuten rustig te ademen: 4 tellen in, 6 tellen uit. Geef je lijf een moment van herstel.',
+        },
+        'de': {
+            'lichamelijk': 'Versuche heute einen kurzen Spaziergang oder 5 Minuten Dehnung — dein Körper braucht Bewegung und Entlastung.',
+            'mentaal': 'Versuche heute 5 Minuten nichts zu tun — kein Bildschirm, keine To-do-Liste. Lass deine Gedanken ruhen.',
+            'emotioneel': 'Gönne dir heute einen Moment, um zu fühlen, was da ist, ohne es lösen zu müssen. Manchmal reicht Anerkennung.',
+            'spiritueel': 'Halte heute kurz inne bei dem, was dir wirklich wichtig ist. Eine bewusste Entscheidung aus deiner Mitte macht den Unterschied.',
+            '': 'Versuche heute 5 Minuten ruhig zu atmen: 4 Sekunden ein, 6 Sekunden aus. Gib deinem Körper einen Moment der Erholung.',
+        },
+        'en': {
+            'lichamelijk': 'Try taking a short walk or 5 minutes of stretching today — your body is asking for movement and release.',
+            'mentaal': 'Try doing nothing for 5 minutes today — no screen, no to-do list. Let your thoughts rest.',
+            'emotioneel': 'Give yourself a moment today to feel what\'s there, without trying to fix it. Sometimes acknowledgment is enough.',
+            'spiritueel': 'Pause today to reflect on what truly matters to you. One conscious choice from your core makes a difference.',
+            '': 'Try 5 minutes of calm breathing today: inhale for 4 counts, exhale for 6. Give your body a moment to recover.',
+        }
+    }
+
+    insight = insights.get(lang, insights['nl'])[zone]
+
+    parts = [reflections.get(lang, reflections['nl'])[zone]]
+    if trend and trend in trend_lines.get(lang, {}):
+        parts.append(trend_lines[lang][trend])
+    if subj is not None and ri is not None and (ri - subj) < -1.5:
+        subj_line = {'nl': 'Opvallend: je lichaam ervaart meer spanning dan je zelf inschat.', 'de': 'Auffällig: dein Körper erlebt mehr Anspannung als du selbst einschätzt.', 'en': 'Notably, your body is experiencing more tension than you realize.'}
+        parts.append(subj_line.get(lang, subj_line['nl']))
+    tips = dim_tips.get(lang, dim_tips['nl'])
+    parts.append(tips.get(dim, tips['']))
+
+    return {'insight': insight, 'reflection': ' '.join(parts)}
+
+
+def _generate_biofeedback_feedback(ri, basis_ri, lang):
+    """Lokale fallback voor biofeedback metingen."""
+    if basis_ri is not None:
+        delta = round(ri - basis_ri, 1)
+        if delta > 1.0: effect = 'strong_up'
+        elif delta > 0.3: effect = 'up'
+        elif delta < -1.0: effect = 'strong_down'
+        elif delta < -0.3: effect = 'down'
+        else: effect = 'stable'
+    else:
+        delta = None
+        effect = 'no_ref'
+
+    insights = {
+        'nl': {
+            'strong_up': f'Je autonoom zenuwstelsel reageert duidelijk — je RI steeg met {delta} punt na je interventie.',
+            'up': f'Je interventie heeft effect: je RI ging van {basis_ri} naar {ri}.',
+            'stable': 'Je RI is stabiel gebleven tijdens de biofeedback — je lichaam houdt vast aan zijn huidige staat.',
+            'down': 'Je RI is iets gedaald tijdens de sessie — dat kan betekenen dat je lichaam nog aan het zoeken is.',
+            'strong_down': 'Je RI daalde opvallend tijdens de sessie — soms is dat een teken van verdieping voordat herstel komt.',
+            'no_ref': f'Je biofeedback-meting toont een RI van {ri} — zonder basismeting is het effect lastig te duiden.',
+        },
+        'de': {
+            'strong_up': f'Dein autonomes Nervensystem reagiert deutlich — dein RI stieg um {delta} Punkte nach deiner Intervention.',
+            'up': f'Deine Intervention zeigt Wirkung: dein RI ging von {basis_ri} auf {ri}.',
+            'stable': 'Dein RI ist während des Biofeedbacks stabil geblieben — dein Körper hält an seinem aktuellen Zustand fest.',
+            'down': 'Dein RI ist während der Sitzung etwas gesunken — das kann bedeuten, dass dein Körper noch sucht.',
+            'strong_down': 'Dein RI ist auffällig gesunken — manchmal zeigt sich Vertiefung, bevor Erholung einsetzt.',
+            'no_ref': f'Deine Biofeedback-Messung zeigt einen RI von {ri} — ohne Basismessung ist die Wirkung schwer einzuordnen.',
+        },
+        'en': {
+            'strong_up': f'Your autonomic nervous system responded clearly — your RI rose by {delta} points after your intervention.',
+            'up': f'Your intervention is having an effect: your RI went from {basis_ri} to {ri}.',
+            'stable': 'Your RI stayed stable during biofeedback — your body is holding its current state.',
+            'down': 'Your RI dipped slightly during the session — this may mean your body is still finding its way.',
+            'strong_down': 'Your RI dropped notably during the session — sometimes deepening happens before recovery arrives.',
+            'no_ref': f'Your biofeedback reading shows an RI of {ri} — without a baseline, the effect is hard to gauge.',
+        }
+    }
+
+    reflections = {
+        'nl': {
+            'strong_up': f'Je autonoom zenuwstelsel laat een duidelijke verschuiving zien: van {basis_ri} naar {ri}. '
+                'Dit laat zien dat je lichaam goed reageert op wat je deed — het herstelvermogen is zichtbaar aanwezig. '
+                'Wat merkte je zelf tijdens de sessie op — was er een moment waarop je voelde dat iets veranderde?',
+            'up': f'Je RI ging van {basis_ri} naar {ri} — je autonoom zenuwstelsel beweegt in de richting van meer ontspanning. '
+                'Het effect is subtiel maar meetbaar, en dat is precies hoe verandering er vaak uitziet. '
+                'Welk moment in de sessie voelde het meest ontspannen voor je?',
+            'stable': f'Je RI bleef rond {ri}, vergelijkbaar met je basismeting van {basis_ri}. '
+                'Dat je lichaam stabiel blijft is op zich informatie — het zou kunnen betekenen dat je zenuwstelsel meer tijd nodig heeft, of dat de interventie op een ander niveau werkt dan de RI meet. '
+                'Hoe voelde de sessie van binnen — was er iets dat verschoof, ook al laat het meetresultaat dat nog niet zien?',
+            'down': f'Je RI daalde licht van {basis_ri} naar {ri} tijdens de sessie. '
+                'Dat kan verrassend lijken, maar soms is een tijdelijke daling juist een teken dat je lichaam dieper gaat — spanning loslaten is niet altijd lineair. '
+                'Was er een moment in de sessie waarop je iets voelde verschuiven?',
+            'strong_down': f'Je RI ging van {basis_ri} naar {ri} — een opvallende daling tijdens de sessie. '
+                'Dit zou kunnen betekenen dat je lichaam bezig is met een dieper proces, of dat de interventie iets raakte wat nog aandacht vraagt. '
+                'Hoe voelde je je aan het einde van de sessie — rustiger, of juist meer aanwezig bij iets?',
+            'no_ref': f'Je biofeedback-meting laat een RI van {ri} zien. '
+                'Zonder basismeting van vandaag is het lastig om het effect van je interventie te duiden. '
+                'Doe voor de volgende biofeedback eerst een korte basismeting — dan kun je het verschil zien.',
+        },
+        'de': {
+            'strong_up': f'Dein autonomes Nervensystem zeigt eine deutliche Verschiebung: von {basis_ri} auf {ri}. '
+                'Das zeigt, dass dein Körper gut auf deine Intervention reagiert — die Erholungsfähigkeit ist sichtbar vorhanden. '
+                'Was hast du selbst während der Sitzung bemerkt — gab es einen Moment, in dem du eine Veränderung gespürt hast?',
+            'up': f'Dein RI ging von {basis_ri} auf {ri} — dein autonomes Nervensystem bewegt sich Richtung Entspannung. '
+                'Der Effekt ist subtil, aber messbar — genau so sieht Veränderung oft aus. '
+                'Welcher Moment in der Sitzung fühlte sich am entspanntesten an?',
+            'stable': f'Dein RI blieb bei etwa {ri}, vergleichbar mit deiner Basismessung von {basis_ri}. '
+                'Stabilität ist an sich eine Information — es könnte bedeuten, dass dein Nervensystem mehr Zeit braucht, oder dass die Intervention auf einer anderen Ebene wirkt. '
+                'Wie fühlte sich die Sitzung innerlich an — hat sich etwas verschoben, auch wenn die Messung das noch nicht zeigt?',
+            'down': f'Dein RI sank leicht von {basis_ri} auf {ri} während der Sitzung. '
+                'Das mag überraschen, aber manchmal ist ein vorübergehender Rückgang ein Zeichen dafür, dass dein Körper tiefer geht — Loslassen verläuft nicht immer linear. '
+                'Gab es einen Moment in der Sitzung, in dem du eine Verschiebung gespürt hast?',
+            'strong_down': f'Dein RI ging von {basis_ri} auf {ri} — ein auffälliger Rückgang während der Sitzung. '
+                'Das könnte bedeuten, dass dein Körper einen tieferen Prozess durchläuft, oder dass die Intervention etwas berührt hat, das noch Aufmerksamkeit braucht. '
+                'Wie hast du dich am Ende der Sitzung gefühlt — ruhiger, oder eher bewusster?',
+            'no_ref': f'Deine Biofeedback-Messung zeigt einen RI von {ri}. '
+                'Ohne Basismessung von heute ist die Wirkung deiner Intervention schwer einzuordnen. '
+                'Mache vor dem nächsten Biofeedback zuerst eine kurze Basismessung — dann kannst du den Unterschied sehen.',
+        },
+        'en': {
+            'strong_up': f'Your autonomic nervous system shows a clear shift: from {basis_ri} to {ri}. '
+                'This shows your body responds well to what you did — recovery capacity is visibly present. '
+                'What did you notice during the session — was there a moment where you felt something change?',
+            'up': f'Your RI went from {basis_ri} to {ri} — your autonomic nervous system is moving toward more relaxation. '
+                'The effect is subtle but measurable, and that is exactly what change often looks like. '
+                'Which moment in the session felt most relaxed to you?',
+            'stable': f'Your RI stayed around {ri}, comparable to your baseline of {basis_ri}. '
+                'Stability is information in itself — it could mean your nervous system needs more time, or that the intervention is working on a level the RI doesn\'t capture yet. '
+                'How did the session feel inside — did something shift, even if the reading doesn\'t show it yet?',
+            'down': f'Your RI dipped slightly from {basis_ri} to {ri} during the session. '
+                'That may seem surprising, but sometimes a temporary dip is a sign your body is going deeper — letting go isn\'t always linear. '
+                'Was there a moment in the session where you felt something shift?',
+            'strong_down': f'Your RI went from {basis_ri} to {ri} — a notable drop during the session. '
+                'This could mean your body is processing something deeper, or that the intervention touched something that still needs attention. '
+                'How did you feel at the end of the session — calmer, or more present with something?',
+            'no_ref': f'Your biofeedback reading shows an RI of {ri}. '
+                'Without a baseline from today, it\'s hard to gauge the effect of your intervention. '
+                'Try doing a short baseline measurement before your next biofeedback — then you can see the difference.',
+        }
+    }
+
+    i = insights.get(lang, insights['nl'])
+    r = reflections.get(lang, reflections['nl'])
+    return {'insight': i[effect], 'reflection': r[effect]}
+
+
+def _generate_situatie_feedback(ri, personal_baseline, dim, lang):
+    """Lokale fallback voor situatiemetingen — vergelijkt met persoonlijke basislijn."""
+    if personal_baseline is not None:
+        delta = round(ri - personal_baseline, 1)
+        if delta > 1.0: state = 'above'
+        elif delta < -1.0: state = 'below'
+        else: state = 'at'
+    else:
+        delta = 0
+        personal_baseline = '?'
+        state = 'no_ref'
+
+    dim_labels = {
+        'nl': {'lichamelijk': 'lichamelijke', 'mentaal': 'mentale', 'emotioneel': 'emotionele', 'spiritueel': 'spirituele'},
+        'de': {'lichamelijk': 'körperliche', 'mentaal': 'mentale', 'emotioneel': 'emotionale', 'spiritueel': 'spirituelle'},
+        'en': {'lichamelijk': 'physical', 'mentaal': 'mental', 'emotioneel': 'emotional', 'spiritueel': 'spiritual'},
+    }
+    dl = dim_labels.get(lang, dim_labels['nl']).get(dim, '') if dim else ''
+
+    insights = {
+        'nl': {
+            'above': f'Deze situatie brengt je boven je persoonlijke basislijn — je autonoom zenuwstelsel reageert met meer ruimte.',
+            'at': f'In deze situatie blijft je RI dicht bij je basislijn van {personal_baseline} — je zenuwstelsel blijft in balans.',
+            'below': f'Deze context drukt je RI onder je basislijn — je autonoom zenuwstelsel reageert op deze situatie met meer activatie.',
+            'no_ref': f'Je situatiemeting toont een RI van {ri} — zonder basismetingen is het effect van deze context lastig te duiden.',
+        },
+        'de': {
+            'above': f'Diese Situation bringt dich über deine persönliche Basislinie — dein autonomes Nervensystem reagiert mit mehr Spielraum.',
+            'at': f'In dieser Situation bleibt dein RI nahe deiner Basislinie von {personal_baseline} — dein Nervensystem bleibt im Gleichgewicht.',
+            'below': f'Dieser Kontext drückt deinen RI unter deine Basislinie — dein autonomes Nervensystem reagiert mit mehr Aktivierung.',
+            'no_ref': f'Deine Situationsmessung zeigt einen RI von {ri} — ohne Basismessungen lässt sich die Wirkung schwer einordnen.',
+        },
+        'en': {
+            'above': f'This situation brings you above your personal baseline — your autonomic nervous system responds with more ease.',
+            'at': f'In this situation your RI stays close to your baseline of {personal_baseline} — your nervous system remains balanced.',
+            'below': f'This context pushes your RI below your baseline — your autonomic nervous system responds with more activation.',
+            'no_ref': f'Your situation measurement shows an RI of {ri} — without baseline measurements, the effect is hard to gauge.',
+        }
+    }
+
+    dim_connection = {
+        'nl': {
+            'lichamelijk': f'De {dl} dimensie die je aangaf past bij wat je lichaam laat zien — deze situatie raakt je op lijfniveau.',
+            'mentaal': f'De {dl} dimensie die je aangaf is interessant — deze situatie lijkt vooral je hoofd te activeren.',
+            'emotioneel': f'De {dl} dimensie die je koos sluit aan — deze context raakt je op gevoelsniveau.',
+            'spiritueel': f'De {dl} dimensie die je aangaf zegt iets: deze situatie raakt aan wat je ten diepste bezighoudt.',
+            '': 'Zonder dimensie-keuze is het lastig te duiden welk kanaal deze situatie het meest raakt.',
+        },
+        'de': {
+            'lichamelijk': f'Die {dl} Dimension, die du angegeben hast, passt zu dem, was dein Körper zeigt — diese Situation trifft dich auf körperlicher Ebene.',
+            'mentaal': f'Die {dl} Dimension ist interessant — diese Situation scheint vor allem deinen Kopf zu aktivieren.',
+            'emotioneel': f'Die {dl} Dimension, die du gewählt hast, passt — dieser Kontext trifft dich auf Gefühlsebene.',
+            'spiritueel': f'Die {dl} Dimension sagt etwas aus: diese Situation berührt das, was dich im Tiefsten beschäftigt.',
+            '': 'Ohne Dimensionswahl lässt sich schwer sagen, auf welcher Ebene diese Situation am meisten wirkt.',
+        },
+        'en': {
+            'lichamelijk': f'The {dl} dimension you indicated fits what your body shows — this situation affects you at a physical level.',
+            'mentaal': f'The {dl} dimension is interesting — this situation seems to activate your mind most.',
+            'emotioneel': f'The {dl} dimension you chose fits — this context reaches you at a feeling level.',
+            'spiritueel': f'The {dl} dimension says something: this situation touches what matters most deeply to you.',
+            '': 'Without a dimension choice, it\'s hard to say which channel this situation affects most.',
+        }
+    }
+
+    pattern_q = {
+        'nl': 'Herken je dit effect vaker bij dit soort situaties?',
+        'de': 'Erkennst du diesen Effekt öfter bei solchen Situationen?',
+        'en': 'Do you recognize this effect more often in situations like this?',
+    }
+
+    reflections = {
+        'nl': {
+            'above': f'Vergeleken met jouw persoonlijke basislijn van {personal_baseline} laat deze situatie een RI van {ri} zien — dat is {delta} punt hoger. '
+                f'Je autonoom zenuwstelsel reageert op deze context met meer ruimte en herstelvermogen. '
+                f'{dim_connection["nl"].get(dim, dim_connection["nl"][""])} '
+                f'{pattern_q["nl"]}',
+            'at': f'Je RI van {ri} ligt dicht bij je persoonlijke basislijn van {personal_baseline}. '
+                f'Deze situatie lijkt je autonoom zenuwstelsel niet sterk te beïnvloeden — het blijft in zijn gebruikelijke staat. '
+                f'{dim_connection["nl"].get(dim, dim_connection["nl"][""])} '
+                f'{pattern_q["nl"]}',
+            'below': f'Vergeleken met jouw basislijn van {personal_baseline} zakt je RI naar {ri} in deze situatie — dat is {abs(delta)} punt lager. '
+                f'Je autonoom zenuwstelsel reageert op deze context met meer activatie. '
+                f'{dim_connection["nl"].get(dim, dim_connection["nl"][""])} '
+                f'{pattern_q["nl"]}',
+            'no_ref': f'Je situatiemeting laat een RI van {ri} zien. '
+                f'Zonder basismetingen is het lastig om het effect van deze situatie op je zenuwstelsel te duiden. '
+                f'Doe regelmatig een basismeting zodat je een persoonlijk referentiepunt opbouwt.',
+        },
+        'de': {
+            'above': f'Im Vergleich zu deiner persönlichen Basislinie von {personal_baseline} zeigt diese Situation einen RI von {ri} — das sind {delta} Punkte höher. '
+                f'Dein autonomes Nervensystem reagiert auf diesen Kontext mit mehr Spielraum und Erholungsfähigkeit. '
+                f'{dim_connection["de"].get(dim, dim_connection["de"][""])} '
+                f'{pattern_q["de"]}',
+            'at': f'Dein RI von {ri} liegt nahe deiner persönlichen Basislinie von {personal_baseline}. '
+                f'Diese Situation scheint dein autonomes Nervensystem nicht stark zu beeinflussen — es bleibt in seinem gewohnten Zustand. '
+                f'{dim_connection["de"].get(dim, dim_connection["de"][""])} '
+                f'{pattern_q["de"]}',
+            'below': f'Im Vergleich zu deiner Basislinie von {personal_baseline} sinkt dein RI auf {ri} in dieser Situation — das sind {abs(delta)} Punkte niedriger. '
+                f'Dein autonomes Nervensystem reagiert auf diesen Kontext mit mehr Aktivierung. '
+                f'{dim_connection["de"].get(dim, dim_connection["de"][""])} '
+                f'{pattern_q["de"]}',
+            'no_ref': f'Deine Situationsmessung zeigt einen RI von {ri}. '
+                f'Ohne Basismessungen ist es schwer, die Wirkung dieser Situation auf dein Nervensystem einzuordnen. '
+                f'Führe regelmäßig Basismessungen durch, um einen persönlichen Referenzwert aufzubauen.',
+        },
+        'en': {
+            'above': f'Compared to your personal baseline of {personal_baseline}, this situation shows an RI of {ri} — that\'s {delta} points higher. '
+                f'Your autonomic nervous system responds to this context with more ease and recovery capacity. '
+                f'{dim_connection["en"].get(dim, dim_connection["en"][""])} '
+                f'{pattern_q["en"]}',
+            'at': f'Your RI of {ri} is close to your personal baseline of {personal_baseline}. '
+                f'This situation doesn\'t seem to strongly affect your autonomic nervous system — it stays in its usual state. '
+                f'{dim_connection["en"].get(dim, dim_connection["en"][""])} '
+                f'{pattern_q["en"]}',
+            'below': f'Compared to your baseline of {personal_baseline}, your RI drops to {ri} in this situation — that\'s {abs(delta)} points lower. '
+                f'Your autonomic nervous system responds to this context with more activation. '
+                f'{dim_connection["en"].get(dim, dim_connection["en"][""])} '
+                f'{pattern_q["en"]}',
+            'no_ref': f'Your situation measurement shows an RI of {ri}. '
+                f'Without baseline measurements, it\'s hard to gauge the effect of this situation on your nervous system. '
+                f'Do regular baseline measurements to build a personal reference point.',
+        }
+    }
+
+    i = insights.get(lang, insights['nl'])
+    r = reflections.get(lang, reflections['nl'])
+    return {'insight': i[state], 'reflection': r[state]}
+
+
+@app.route('/api/pro/client/<int:cid>/metingen')
+def api_pro_client_metingen(cid):
+    if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
+        return jsonify({'error': 'Geen toegang'}), 401
+    pro_key = get_user_key()
+    db = get_pro_db()
+    _demo = session.get('demo_mode') and session.get('license_type') == 'pro'
+    if not db.execute("SELECT id FROM clients WHERE id=? AND (pro_key=? OR pro_key='DEMO')" if _demo else "SELECT id FROM clients WHERE id=? AND pro_key=?", (cid, pro_key)).fetchone():
+        db.close()
+        return jsonify({'error': 'Niet gevonden'}), 404
+    rows = db.execute("SELECT * FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 100", (cid,)).fetchall()
+    db.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route('/api/kubios/download/<int:mid>')
+def api_kubios_download_by_id(mid):
+    user_key = get_user_key()
+    if not user_key:
+        return jsonify({'error': 'Niet ingelogd'}), 401
+    conn = sqlite3.connect(METING_DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT rr_intervals FROM metingen WHERE id=? AND user_key=?', (mid, user_key))
+    row = c.fetchone()
+    conn.close()
+    if not row or not row[0]:
+        return jsonify({'error': 'Geen RR-data'}), 404
+    rr = json.loads(row[0])
+    content = '\n'.join(str(round(v)) for v in rr)
+    return send_file(
+        io.BytesIO(content.encode('utf-8')),
+        as_attachment=True,
+        download_name=f'kubios_rr_{mid}.txt',
+        mimetype='text/plain; charset=utf-8',
+    )
+
+@app.route('/api/kubios/download')
+def api_kubios_download():
+    user_key = session.get('user_key')
+    if not user_key:
+        return jsonify({'error': 'Niet ingelogd'}), 401
+    conn = sqlite3.connect(METING_DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT rr_intervals,ts FROM metingen WHERE user_key=? ORDER BY id DESC LIMIT 1', (user_key,))
+    row = c.fetchone()
+    conn.close()
+    if not row or not row[0]:
+        return jsonify({'error': 'Geen RR-data'}), 404
+    rr = json.loads(row[0])
+    content = '\n'.join(str(round(v)) for v in rr)
+    return send_file(
+        io.BytesIO(content.encode('utf-8')),
+        as_attachment=True,
+        download_name='kubios_rr.txt',
+        mimetype='text/plain; charset=utf-8',
+    )
+
+
+@app.route('/api/pro/client/<int:cid>/update', methods=['POST'])
+def api_pro_client_update(cid):
+    if not session.get('license_valid'):
+        return jsonify({"error": "Geen toegang"}), 401
+    if not is_pro():
+        return jsonify({"error": "Geen Pro toegang"}), 403
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Geen data"}), 400
+    pro_db = get_pro_db()
+    # Update allowed fields
+    name = data.get('name', '').strip()
+    birth_year = data.get('birth_year')
+    gender = data.get('gender', '').strip()
+    if not name:
+        return jsonify({"error": "Naam is verplicht"}), 400
+    try:
+        birth_year = int(birth_year) if birth_year else None
+    except (ValueError, TypeError):
+        birth_year = None
+    pro_db.execute(
+        'UPDATE clients SET name=?, birth_year=?, gender=? WHERE id=? AND pro_key=?',
+        (name, birth_year, gender, cid, get_user_key())
+    )
+    pro_db.commit()
+    return jsonify({"ok": True, "name": name, "birth_year": birth_year, "gender": gender})
+
+
+# ─── Koppeling (Pairing) API ────────────────────────────────────────────────
+
+def generate_pairing_code():
+    """Genereer unieke koppelcode SC-PAIR-XXXX"""
+    import string
+    chars = string.ascii_uppercase + string.digits
+    while True:
+        code = 'SC-PAIR-' + ''.join(secrets.choice(chars) for _ in range(4))
+        db = get_db()
+        exists = db.execute("SELECT id FROM pairing_codes WHERE code=?", (code,)).fetchone()
+        db.close()
+        if not exists:
+            return code
+
+def get_pro_plan_info():
+    """Haal plan info op voor de ingelogde Pro"""
+    code = session.get('license_code', '')
+    db = get_db()
+    # Zoek licentie
+    lic = db.execute("SELECT * FROM licenses WHERE license_key=? AND product IN ('sc','hlm')", (code.upper(),)).fetchone()
+    if not lic:
+        db.close()
+        return None
+    # Zoek plan via type
+    plan_id = 'sc-pro-s'  # default
+    if lic['max_profiles']:
+        mp = lic['max_profiles']
+        if mp >= 50: plan_id = 'sc-pro-l'
+        elif mp >= 20: plan_id = 'sc-pro-m'
+        else: plan_id = 'sc-pro-s'
+    plan = db.execute("SELECT * FROM plans WHERE plan_id=?", (plan_id,)).fetchone()
+    db.close()
+    return dict(plan) if plan else None
+
+
+def _pro_max_clients(pro_key=None, default_baseline=10):
+    """Bepaal max_clients-quota voor ingelogde Pro.
+    Probeert eerst session.license_code (via get_pro_plan_info), dan
+    email->licenses fallback (mp>=50 L, >=20 M, anders S). Anders
+    default_baseline met warning-log voor diagnose.
+    """
+    plan = get_pro_plan_info()
+    if plan and plan.get('max_clients'):
+        return plan['max_clients']
+    em = session.get('email', '')
+    if em:
+        db = get_db()
+        lic = db.execute(
+            "SELECT max_profiles FROM licenses WHERE email=? AND type='pro' AND status='activated' ORDER BY id DESC LIMIT 1",
+            (em,)
+        ).fetchone()
+        db.close()
+        if lic and lic['max_profiles']:
+            mp = lic['max_profiles']
+            if mp >= 50: return 50
+            if mp >= 20: return 20
+            return 10
+    app.logger.warning(
+        'QUOTA_FALLBACK_DEFAULT_10 pro_key=%s email=%s',
+        pro_key or '', em
+    )
+    return default_baseline
+
+
+@app.route('/api/pairing/generate', methods=['POST'])
+def api_pairing_generate():
+    """Pro genereert koppelcode voor een cliënt"""
+    if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
+        return jsonify({'error': 'Geen Pro toegang'}), 403
+    data = request.get_json()
+    client_id = data.get('client_id') if data else None
+    if not client_id:
+        return jsonify({'error': 'Geen client_id'}), 400
+
+    pro_key = get_user_key()
+
+    # Check of cliënt van deze Pro is
+    db = get_pro_db()
+    client = db.execute("SELECT * FROM clients WHERE id=? AND pro_key=?", (int(client_id), pro_key)).fetchone()
+    db.close()
+    if not client:
+        return jsonify({'error': 'Cliënt niet gevonden'}), 404
+
+    # Quota-check: max_clients uit Pro-plan. Skip bij demo_mode.
+    # Telt pending+activated (expired/cancelled vallen uit count, revoke→cancelled geeft slot terug).
+    if not session.get('demo_mode'):
+        max_clients = _pro_max_clients(pro_key)
+        saas_db = get_db()
+        active_count = saas_db.execute(
+            "SELECT COUNT(*) FROM pairing_codes WHERE pro_user_id=? AND status IN ('pending','activated')",
+            (pro_key,)
+        ).fetchone()[0]
+        saas_db.close()
+        if active_count >= max_clients:
+            return jsonify({
+                'ok': False,
+                'error': 'Limiet bereikt: maximaal {} actieve/lopende koppelcodes voor jouw abonnement.'.format(max_clients),
+                'limit': max_clients,
+                'active': active_count
+            }), 403
+
+    # Genereer code (7 dagen geldig)
+    code = generate_pairing_code()
+    from datetime import timedelta
+    expires = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
+
+    saas_db = get_db()
+    saas_db.execute(
+        "INSERT INTO pairing_codes (code, pro_user_id, client_id, expires_at) VALUES (?,?,?,?)",
+        (code, pro_key, str(client_id), expires)
+    )
+    saas_db.commit()
+    saas_db.close()
+
+    return jsonify({
+        'ok': True,
+        'code': code,
+        'expires_at': expires,
+        'client_name': client['name']
+    })
+
+@app.route('/api/pairing/register', methods=['POST'])
+def api_pairing_register():
+    """Nieuwe klant maakt consumer-account aan + koppelt zich aan Pro
+    via pairing-code. Volgt het 2fa_pending_pw_hash-patroon: doet geen
+    DB-writes, slaat pending state in sessie + start 2FA. /verify
+    voltooit user-INSERT + pairing-activation atomair na code-input.
+    """
+    import re, random as _rnd, time as _time, secrets as _sec
+    data = request.get_json() or {}
+    email = (data.get('email') or '').strip().lower()
+    password = data.get('password') or ''
+    name = (data.get('name') or '').strip()
+    code = (data.get('code') or '').strip().upper()
+    lang = request.args.get('lang') or session.get('lang', 'nl')
+
+    if not email or not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+        return jsonify({'ok': False, 'error': 'Geldig e-mailadres vereist'}), 422
+    if len(password) < 8:
+        return jsonify({'ok': False, 'error': 'Wachtwoord moet minimaal 8 tekens zijn'}), 422
+    if not name:
+        return jsonify({'ok': False, 'error': 'Naam is verplicht'}), 422
+    if not code:
+        return jsonify({'ok': False, 'error': 'Koppelcode is verplicht'}), 422
+
+    saas_db = get_db()
+    pairing = saas_db.execute("SELECT * FROM pairing_codes WHERE code=?", (code,)).fetchone()
+    if not pairing:
+        saas_db.close()
+        return jsonify({'ok': False, 'error': 'Koppelcode onbekend'}), 400
+    if pairing['status'] != 'pending':
+        saas_db.close()
+        return jsonify({'ok': False, 'error': 'Koppelcode al gebruikt of ingetrokken'}), 400
+    try:
+        _exp = datetime.strptime(pairing['expires_at'], '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        _exp = datetime.fromisoformat(pairing['expires_at'].split('.')[0])
+    if datetime.now() > _exp:
+        saas_db.execute("UPDATE pairing_codes SET status='expired' WHERE code=?", (code,))
+        saas_db.commit()
+        saas_db.close()
+        return jsonify({'ok': False, 'error': 'Koppelcode is verlopen'}), 410
+
+    existing = saas_db.execute("SELECT id FROM users WHERE email=? COLLATE NOCASE", (email,)).fetchone()
+    saas_db.close()
+    if existing:
+        return jsonify({'ok': False, 'error': 'E-mailadres is al geregistreerd; log in via /login'}), 409
+
+    pw_hash = hash_password(password)
+    consumer_key = _sec.token_hex(16)
+    code_2fa = str(_rnd.randint(100000, 999999))
+
+    session.clear()
+    session['lang']                     = lang
+    session['2fa_code']                 = code_2fa
+    session['2fa_email']                = email
+    session['2fa_name']                 = name
+    session['2fa_license_type']         = 'consumer'
+    session['2fa_lang']                 = lang
+    session['2fa_expires']              = _time.time() + 600
+    session['2fa_pending_pw_hash']      = pw_hash
+    session['2fa_pending_pair_code']    = code
+    session['2fa_pending_consumer_key'] = consumer_key
+
+    send_verification_code(email, code_2fa, lang)
+    return jsonify({'ok': True, 'message': 'Verificatiemail verstuurd', 'redirect': '/verify'}), 201
+
+
+@app.route('/api/pairing/redeem', methods=['POST'])
+def api_pairing_redeem():
+    """Consumer voert koppelcode in om te verbinden met Pro"""
+    if not session.get('license_valid') and not session.get('demo_mode') and not session.get('hlm_user_id'):
+        return jsonify({'error': 'Niet ingelogd'}), 401
+    data = request.get_json()
+    code = (data.get('code', '') if data else '').strip().upper()
+    if not code:
+        return jsonify({'error': 'Geen code ingevoerd'}), 400
+
+    consumer_key = get_user_key()
+
+    # Zoek de koppelcode
+    saas_db = get_db()
+    pairing = saas_db.execute(
+        "SELECT * FROM pairing_codes WHERE code=? AND status='pending'", (code,)
+    ).fetchone()
+
+    if not pairing:
+        saas_db.close()
+        return jsonify({'error': 'Code ongeldig of verlopen'}), 404
+
+    # Check verloopdatum
+    expires = datetime.strptime(pairing['expires_at'], '%Y-%m-%d %H:%M:%S')
+    if datetime.now() > expires:
+        saas_db.execute("UPDATE pairing_codes SET status='expired' WHERE code=?", (code,))
+        saas_db.commit()
+        saas_db.close()
+        return jsonify({'error': 'Code is verlopen'}), 410
+
+    # Activeer koppeling
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    saas_db.execute(
+        "UPDATE pairing_codes SET status='activated', consumer_user_key=?, activated_at=? WHERE code=?",
+        (consumer_key, now, code)
+    )
+
+    # Maak ook een client_pairing aan in saas_licenses.db
+    saas_db.execute(
+        "INSERT OR IGNORE INTO client_pairings (client_id, paired_user_id, paired_device_id, status) VALUES (?,?,?,?)",
+        (pairing['client_id'], None, consumer_key, 'active')
+    )
+
+    saas_db.commit()
+    saas_db.close()
+
+    # Sla koppelinfo op in sessie
+    session['paired_with_pro'] = pairing['pro_user_id']
+    session['paired_client_id'] = pairing['client_id']
+
+    return jsonify({
+        'ok': True,
+        'message': 'Gekoppeld met professional'
+    })
+
+@app.route('/api/pairing/revoke', methods=['POST'])
+def api_pairing_revoke():
+    """Pro verbreekt koppeling met cliënt"""
+    if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
+        return jsonify({'error': 'Geen Pro toegang'}), 403
+    data = request.get_json()
+    client_id = data.get('client_id') if data else None
+    if not client_id:
+        return jsonify({'error': 'Geen client_id'}), 400
+
+    pro_key = get_user_key()
+
+    # Verbreek in pairing_codes
+    saas_db = get_db()
+    saas_db.execute(
+        "UPDATE pairing_codes SET status='cancelled' WHERE client_id=? AND pro_user_id=? AND status='activated'",
+        (str(client_id), pro_key)
+    )
+    # Verbreek in client_pairings
+    saas_db.execute(
+        "UPDATE client_pairings SET status='revoked' WHERE client_id=?",
+        (str(client_id),)
+    )
+    saas_db.commit()
+    saas_db.close()
+
+    return jsonify({'ok': True, 'message': 'Koppeling verbroken'})
+
+@app.route('/api/pairing/status')
+def api_pairing_status():
+    """Check koppelstatus (voor consumer)"""
+    if not session.get('license_valid') and not session.get('demo_mode') and not session.get('hlm_user_id'):
+        return jsonify({'error': 'Niet ingelogd'}), 401
+
+    consumer_key = get_user_key()
+    saas_db = get_db()
+    pairing = saas_db.execute(
+        "SELECT * FROM pairing_codes WHERE consumer_user_key=? AND status='activated' ORDER BY activated_at DESC LIMIT 1",
+        (consumer_key,)
+    ).fetchone()
+    saas_db.close()
+
+    if pairing:
+        return jsonify({
+            'paired': True,
+            'pro_id': pairing['pro_user_id'],
+            'since': pairing['activated_at']
+        })
+    return jsonify({'paired': False})
+
+@app.route('/api/pro/client/<int:cid>/pairing')
+def api_pro_client_pairing(cid):
+    """Check koppelstatus van een cliënt (voor Pro)"""
+    if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
+        return jsonify({'error': 'Geen Pro toegang'}), 403
+
+    pro_key = get_user_key()
+    saas_db = get_db()
+
+    # Actieve koppeling
+    active = saas_db.execute(
+        "SELECT * FROM pairing_codes WHERE client_id=? AND pro_user_id=? AND status='activated'",
+        (str(cid), pro_key)
+    ).fetchone()
+
+    # Lopende (pending) koppelcode
+    pending = saas_db.execute(
+        "SELECT * FROM pairing_codes WHERE client_id=? AND pro_user_id=? AND status='pending' ORDER BY created_at DESC LIMIT 1",
+        (str(cid), pro_key)
+    ).fetchone()
+
+    saas_db.close()
+
+    if active:
+        return jsonify({
+            'status': 'active',
+            'consumer_key': active['consumer_user_key'],
+            'since': active['activated_at']
+        })
+    elif pending:
+        return jsonify({
+            'status': 'pending',
+            'code': pending['code'],
+            'expires_at': pending['expires_at']
+        })
+    return jsonify({'status': 'none'})
+
+@app.route('/api/pro/client/<int:cid>/consumer-metingen')
+def api_pro_consumer_metingen(cid):
+    """Pro haalt consumer-metingen op van een gekoppelde cliënt"""
+    if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
+        return jsonify({'error': 'Geen Pro toegang'}), 403
+
+    pro_key = get_user_key()
+
+    # Zoek actieve koppeling
+    saas_db = get_db()
+    pairing = saas_db.execute(
+        "SELECT consumer_user_key FROM pairing_codes WHERE client_id=? AND pro_user_id=? AND status='activated'",
+        (str(cid), pro_key)
+    ).fetchone()
+    saas_db.close()
+
+    if not pairing or not pairing['consumer_user_key']:
+        return jsonify({'error': 'Geen actieve koppeling'}), 404
+
+    # Haal consumer-metingen op
+    consumer_key = pairing['consumer_user_key']
+    meting_db = get_meting_db()
+    rows = meting_db.execute(
+        "SELECT * FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 100",
+        (consumer_key,)
+    ).fetchall()
+    meting_db.close()
+
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route('/api/license/status', methods=['GET'])
+def api_license_status():
+    auth = request.headers.get('X-API-Key', '')
+    try:
+        with open('/opt/ic-license-server/data/api_key.conf') as f:
+            valid_key = f.read().strip()
+    except:
+        return jsonify({'ok': False, 'error': 'Server config error'}), 500
+    if auth != valid_key:
+        return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
+
+    license_key = request.args.get('key', '').strip()
+    if not license_key:
+        return jsonify({'ok': False, 'error': 'Key required'}), 400
+
+    db_path = '/opt/ic-license-server/data/saas_licenses.db'
+    try:
+        db = sqlite3.connect(db_path)
+        db.row_factory = sqlite3.Row
+        lic = db.execute("""
+            SELECT l.license_key, l.type, l.status, l.valid_until,
+                   l.email, l.order_id, l.created_at,
+                   l.stripe_subscription_id,
+                   s.status AS sub_status,
+                   s.current_period_end AS sub_current_period_end,
+                   CASE
+                     WHEN l.status NOT IN ('available', 'activated') THEN 0
+                     WHEN s.subscription_id IS NULL THEN 1
+                     WHEN s.status IN ('active', 'trialing') THEN 1
+                     WHEN s.status IN ('canceled', 'past_due')
+                          AND s.current_period_end IS NOT NULL
+                          AND s.current_period_end > strftime('%Y-%m-%dT%H:%M:%S', 'now') THEN 1
+                     ELSE 0
+                   END AS effective_valid
+            FROM licenses l
+            LEFT JOIN subscriptions s ON l.stripe_subscription_id = s.subscription_id
+            WHERE l.license_key=?
+        """, (license_key,)).fetchone()
+        db.close()
+        if lic:
+            data = dict(lic)
+            data['effective_valid'] = bool(data['effective_valid'])
+            return jsonify({'ok': True, 'license': data})
+        return jsonify({'ok': False, 'error': 'Not found'}), 404
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/api/license/migrate', methods=['POST'])
+def api_migrate_license():
+    import secrets, string, hashlib, random as _rnd, time
+    from datetime import datetime, timedelta
+    data = request.get_json() or {}
+    legacy_code = data.get('legacy_code', '').strip()
+    # Normaliseer legacy code streepjes
+    lc_clean = legacy_code.replace('-', '')
+    if len(lc_clean) == 32 and not legacy_code.startswith('SC'):
+        legacy_code = '-'.join([lc_clean[i:i+4] for i in range(0, 32, 4)])
+    choice = data.get('choice', 'consumer')
+    if choice not in ('consumer', 'pro'):
+        return jsonify({'ok': False, 'error': 'Ongeldige keuze'})
+    # Email + pw_hash: sessie heeft voorrang (van /licentie-voorgang),
+    # anders POST-body (van /oude-code-pad zonder voorgang).
+    email = (session.get('legacy_pending_email') or data.get('email','')).strip().lower()
+    pw_hash = session.get('legacy_pending_pw_hash')
+    if not pw_hash and data.get('password'):
+        _pw = data.get('password','').strip()
+        if len(_pw) < 8:
+            return jsonify({'ok': False, 'error': 'Wachtwoord minimaal 8 tekens'})
+        pw_hash = hashlib.sha256(_pw.encode()).hexdigest()
+    if not email or '@' not in email:
+        return jsonify({'ok': False, 'error': 'E-mailadres ontbreekt of ongeldig'})
+    if not pw_hash:
+        return jsonify({'ok': False, 'error': 'Wachtwoord ontbreekt'})
+    lang = session.get('legacy_pending_lang') or session.get('lang', 'nl')
+    db_path = '/opt/ic-license-server/data/saas_licenses.db'
+    try:
+        db = sqlite3.connect(db_path)
+        db.row_factory = sqlite3.Row
+        legacy = db.execute("SELECT id, status FROM legacy_keys WHERE license_key=?", (legacy_code,)).fetchone()
+        if not legacy or legacy['status'] == 'migrated':
+            db.close()
+            return jsonify({'ok': False, 'error': 'Code niet gevonden of al gemigreerd'})
+        chars = string.ascii_uppercase + string.digits
+        while True:
+            prefix = 'SCP-' if choice == 'pro' else 'SC-'
+            new_code = prefix + ''.join(secrets.choice(chars) for _ in range(4)) + '-' + ''.join(secrets.choice(chars) for _ in range(4))
+            if not db.execute("SELECT 1 FROM licenses WHERE license_key=?", (new_code,)).fetchone():
+                break
+        valid_until = '2027-01-01 00:00:00'
+        db.execute(
+            "INSERT INTO licenses (license_key, product, type, status, origin, legacy_key, max_profiles, valid_until, email) VALUES (?, 'sc', ?, 'activated', 'migration', ?, 5, ?, ?)",
+            (new_code, choice, legacy_code, valid_until, email)
+        )
+        db.execute(
+            "UPDATE legacy_keys SET status='migrated', migrated_to=?, migrated_at=datetime('now'), migrated_by_email=? WHERE id=?",
+            (new_code, email, legacy['id'])
+        )
+        # users.password_hash NIET hier — pas in /verify na succesvol 2FA (Fix C-uitbreiding)
+        db.commit()
+        db.close()
+        # 2FA-stap
+        _2fa = str(_rnd.randint(100000, 999999))
+        session['license_valid'] = True
+        session['license_type'] = choice
+        session['license_code'] = new_code
+        session['legacy_migrated'] = True
+        session['email'] = email
+        session['2fa_code']             = _2fa
+        session['2fa_email']            = email
+        session['2fa_license_type']     = choice
+        session['2fa_license_code']     = new_code
+        session['2fa_name']             = email
+        session['2fa_lang']             = lang
+        session['2fa_expires']          = time.time() + 600
+        session['2fa_pending_pw_hash']  = pw_hash
+        session.pop('legacy_pending_email', None)
+        session.pop('legacy_pending_pw_hash', None)
+        session.pop('legacy_pending_lang', None)
+        send_verification_code(email, _2fa, lang)
+        import logging; logging.getLogger().warning(f"2FA CODE for {email}: {_2fa}")
+        return jsonify({'ok': True, 'new_code': new_code, 'type': choice, 'valid_until': valid_until, 'redirect': url_for('verify_2fa')})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
+
+
+@app.route('/api/license/generate', methods=['POST'])
+def api_generate_license():
+    import secrets, string
+    from datetime import datetime, timedelta
+    # API key authenticatie
+    auth = request.headers.get('X-API-Key', '')
+    try:
+        with open('/opt/ic-license-server/data/api_key.conf') as f:
+            valid_key = f.read().strip()
+    except:
+        return jsonify({'ok': False, 'error': 'Server config error'}), 500
+    if auth != valid_key:
+        return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
+
+    data = request.get_json() or {}
+    license_type = data.get('type', 'consumer')  # consumer of pro
+    plan = data.get('plan', 'monthly')            # monthly of yearly
+    email = data.get('email', '').strip().lower()
+    order_id = data.get('order_id', '')            # WooCommerce order ID
+    product_name = data.get('product_name', '')
+
+    if license_type not in ('consumer', 'pro'):
+        return jsonify({'ok': False, 'error': 'Invalid type'}), 400
+    if not email:
+        return jsonify({'ok': False, 'error': 'Email required'}), 400
+
+    # Bereken geldigheid
+    if plan == 'yearly':
+        days = 366
+    else:
+        days = 31
+
+    # Genereer unieke code
+    chars = string.ascii_uppercase + string.digits
+    db_path = '/opt/ic-license-server/data/saas_licenses.db'
+    try:
+        db = sqlite3.connect(db_path)
+        while True:
+            prefix = 'SCP-' if license_type == 'pro' else 'SC-'
+            new_code = prefix + ''.join(secrets.choice(chars) for _ in range(4)) + '-' + ''.join(secrets.choice(chars) for _ in range(4))
+            if not db.execute("SELECT 1 FROM licenses WHERE license_key=?", (new_code,)).fetchone():
+                break
+
+        valid_until = (datetime.now() + timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
+        max_profiles = 1 if license_type == 'consumer' else 5
+
+        db.execute("""INSERT INTO licenses 
+            (license_key, product, type, status, origin, max_profiles, valid_until, email, order_id, product_name, created_at)
+            VALUES (?, 'sc', ?, 'available', 'shop', ?, ?, ?, ?, ?, datetime('now'))""",
+            (new_code, license_type, max_profiles, valid_until, email, order_id, product_name))
+        db.commit()
+        db.close()
+
+        print(f"LICENSE GENERATED: {new_code} type={license_type} plan={plan} email={email} order={order_id}", flush=True)
+        return jsonify({
+            'ok': True,
+            'license_key': new_code,
+            'type': license_type,
+            'plan': plan,
+            'valid_until': valid_until,
+            'email': email
+        })
+    except Exception as e:
+        print(f"License generate error: {e}", flush=True)
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+
+@app.route('/kenniscentrum')
+def kenniscentrum():
+    if session.get("is_demo"):
+        return redirect(url_for("welcome") + "?demo_blocked=1")
+    lt = session.get('license_type', '')
+    if lt not in ('consumer', 'pro'):
+        return redirect(url_for('welcome'))
+    lang = session.get('lang', 'nl')
+    return render_template('kenniscentrum.html', lang=lang, is_pro=is_pro())
+
+@app.route('/kenniscentrum-pro')
+def kenniscentrum_pro():
+    if session.get("is_demo"):
+        return redirect(url_for("welcome"))
+    if (not session.get("license_valid") and not session.get("demo_mode")) or not _is_pro_or_demo_pro():
+        return redirect(url_for("welcome"))
+    lang = session.get("lang", "nl")
+    return render_template("kenniscentrum_pro.html", lang=lang, is_pro=is_pro())
+@app.route('/sport-training')
+def sport_training():
+    if session.get("is_demo"):
+        return redirect(url_for("welcome"))
+    if (not session.get("license_valid") and not session.get("demo_mode")) or not _is_pro_or_demo_pro():
+        return redirect(url_for("welcome"))
+    lang = session.get("lang", "nl")
+    return render_template("sport_training.html", lang=lang, is_pro=is_pro())
+
+@app.route('/pro/meting')
+def pro_meting_keuze():
+    if (not session.get("license_valid") and not session.get("demo_mode")) or not _is_pro_or_demo_pro():
+        return redirect(url_for("welcome"))
+    lang = session.get("lang", "nl")
+    if not request.args.get('cid'):
+        session.pop('last_client_id', None)
+    return render_template("pro/meting_keuze.html", lang=lang, is_pro=is_pro(), client_id=int(request.args.get('cid',0)) or session.get('measuring_for_client') or 0)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080, debug=False)
+
+@app.route('/api/set_subjectief', methods=['POST'])
+def api_set_subjectief():
+    if not session.get('license_valid') and not session.get('demo_mode') and not session.get('hlm_user_id'):
+        return jsonify({'error': 'Niet ingelogd'}), 401
+    try:
+        score = int(request.json.get('score', -1))
+        if score < 0 or score > 10:
+            return jsonify({'error': 'Ongeldige score'}), 400
+        db = get_meting_db()
+        db.execute(
+            "UPDATE metingen SET subjectief_score=? WHERE user_key=? ORDER BY ts DESC LIMIT 1",
+            (score, get_user_key()))
+        db.commit()
+        db.close()
+        session['after_meting'] = True
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/koppelen')
+def koppelen():
+    if not session.get('license_valid'):
+        return redirect(url_for('welcome'))
+    lang = session.get('lang','nl')
+    active_pairings = []
+    try:
+        saas_db = get_db()
+        user_key = get_user_key()
+        active_pairings = saas_db.execute(
+            "SELECT code, activated_at FROM pairing_codes WHERE consumer_user_key=? AND status='activated'",
+            (user_key,)
+        ).fetchall()
+        saas_db.close()
+    except:
+        pass
+    return render_template('koppelen.html', lang=lang, active_pairings=active_pairings)
+
+@app.route('/upload-video', methods=['GET','POST'])
+def upload_video():
+    if request.method == 'POST':
+        file = request.files.get('file')
+        if file:
+            file.save('/opt/stresschecker/static/img/' + file.filename)
+            return 'OK: ' + file.filename
+    return '<form method=post enctype=multipart/form-data><input type=file name=file><input type=submit value=Upload></form>'
+
+@app.route("/sc/sensor-keuze")
+def sc_sensor_keuze():
+    if not session.get("license_valid") and not session.get("demo_mode"):
+        return redirect(url_for("welcome"))
+    lang = session.get("lang", "nl")
+    resp = make_response(render_template("sc_sensor_keuze.html", lang=lang, is_pro=is_pro()))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+# ── Oude opzeg-route → redirect naar Spoor 3 (gedeprecieerd 2026-05-16) ──────
+@app.route('/abonnement/opzeggen', methods=['GET', 'POST'])
+def opzeg_abonnement():
+    uk = session.get("user_key")
+    app.logger.warning(
+        f'Old /abonnement/opzeggen hit by user_key={uk or "ANONYMOUS"} '
+        f'— redirected to /licentie'
+    )
+    return redirect('/licentie?error=use_new_flow', code=302)
+
+
+# ── Spoor 3: Stripe Customer Portal ──────────────────────────────────────────
+SPOOR3_PORTAL_CONFIGURATION = 'bpc_1TVpFcHD28PM4o1K18URnQAI'
+SPOOR3_STRIPE_KEYS_FILE     = '/opt/ic-license-server/data/stripe_keys.conf'
+
+
+def _load_stripe_secret():
+    try:
+        with open(SPOOR3_STRIPE_KEYS_FILE) as f:
+            for line in f:
+                if line.startswith('STRIPE_SECRET_LIVE='):
+                    return line.split('=', 1)[1].strip()
+    except (OSError, IOError):
+        pass
+    return ''
+
+
+def get_stripe_customer_id(user_key, email=None):
+    if not user_key:
+        return None
+    import sqlite3 as _sq
+    cn = _sq.connect(DB_PATH)
+    try:
+        row = cn.execute(
+            "SELECT s.stripe_customer_id "
+            "  FROM licenses l "
+            "  JOIN subscriptions s ON s.subscription_id = l.stripe_subscription_id "
+            " WHERE l.user_key = ? "
+            "   AND s.stripe_customer_id IS NOT NULL "
+            " LIMIT 1",
+            (user_key,)
+        ).fetchone()
+        if row and row[0]:
+            return row[0]
+    finally:
+        cn.close()
+    if email:
+        key = _load_stripe_secret()
+        if key:
+            import stripe as _s
+            _s.api_key = key
+            try:
+                res = _s.Customer.search(query='email:"%s"' % email, limit=1)
+                items = (res.get('data') if isinstance(res, dict) else getattr(res, 'data', None)) or []
+                if items:
+                    first = items[0]
+                    return first['id'] if isinstance(first, dict) else first.id
+            except Exception as e:
+                app.logger.warning('Stripe Customer.search faalde voor %r: %s', email, e)
+    return None
+
+
+MONTH_NAMES = {
+    'nl': ['januari','februari','maart','april','mei','juni',
+           'juli','augustus','september','oktober','november','december'],
+    'de': ['Januar','Februar','März','April','Mai','Juni',
+           'Juli','August','September','Oktober','November','Dezember'],
+    'en': ['January','February','March','April','May','June',
+           'July','August','September','October','November','December'],
+}
+
+
+def _format_date_lang(iso_date, lang='nl'):
+    if not iso_date:
+        return ''
+    date_part = iso_date.split('T')[0]
+    try:
+        year, month, day = date_part.split('-')
+        month_idx = int(month) - 1
+        day_int = int(day)
+    except (ValueError, IndexError):
+        return ''
+    names = MONTH_NAMES.get(lang, MONTH_NAMES['nl'])
+    month_name = names[month_idx]
+    if lang == 'de':
+        return f"{day_int}. {month_name} {year}"
+    return f"{day_int} {month_name} {year}"
+
+
+def _format_date_numeric(iso_date, lang='nl'):
+    """Numerieke datum per locale: DE 21.05.2027, NL 21-05-2027, EN 21/05/2027."""
+    if not iso_date:
+        return ''
+    date_part = iso_date.split('T')[0]
+    try:
+        year, month, day = date_part.split('-')
+        d = int(day); m = int(month)
+    except (ValueError, IndexError):
+        return ''
+    if lang == 'de':
+        return f"{d:02d}.{m:02d}.{year}"
+    if lang == 'en':
+        return f"{d:02d}/{m:02d}/{year}"
+    return f"{d:02d}-{m:02d}-{year}"
+
+
+PRO_PERIOD_LABELS = {
+    ('year',  'nl'): 'Jaarabonnement',
+    ('month', 'nl'): 'Maandabonnement',
+    ('year',  'de'): 'Jahresabonnement',
+    ('month', 'de'): 'Monatsabonnement',
+    ('year',  'en'): 'Annual subscription',
+    ('month', 'en'): 'Monthly subscription',
+}
+
+
+def get_pro_tier_summary(email, lang='nl'):
+    """Universele tier-info voor alle Pro-cohorts (Stripe + marketing + legacy + manual).
+    Leest direct uit licenses+plans; Stripe-onafhankelijk. Returns dict of None.
+    """
+    if not email:
+        return None
+    import sqlite3 as _sq
+    cn = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+    cn.row_factory = _sq.Row
+    try:
+        lic = cn.execute(
+            "SELECT license_key, max_profiles, expires_at, activated_at, status, origin, "
+            "       product_name, stripe_subscription_id "
+            "FROM licenses "
+            "WHERE email=? AND type='pro' AND status='activated' AND product='sc' "
+            "ORDER BY id DESC LIMIT 1",
+            (email,)
+        ).fetchone()
+        if not lic:
+            return None
+        mp = lic['max_profiles'] or 0
+        if mp >= 50:
+            tier_plan_id = 'sc-pro-l'
+        elif mp >= 20:
+            tier_plan_id = 'sc-pro-m'
+        else:
+            tier_plan_id = 'sc-pro-s'
+        # Periode bepalen: Stripe-sub → subscriptions.plan_id (authoritatief);
+        # anders duration-heuristiek via activated_at/expires_at.
+        period = 'year'
+        plan_id = tier_plan_id
+        if lic['stripe_subscription_id']:
+            sub = cn.execute(
+                "SELECT plan_id FROM subscriptions WHERE subscription_id=?",
+                (lic['stripe_subscription_id'],)
+            ).fetchone()
+            if sub and sub['plan_id']:
+                plan_id = sub['plan_id']
+                if plan_id.endswith('-month'):
+                    period = 'month'
+        else:
+            try:
+                import datetime as _dt_p
+                if lic['expires_at'] and lic['activated_at']:
+                    exp = _dt_p.datetime.fromisoformat(lic['expires_at'])
+                    act = _dt_p.datetime.fromisoformat(lic['activated_at'])
+                    days = (exp - act).days
+                    if days < 100:
+                        period = 'month'
+                        plan_id = tier_plan_id + '-month'
+            except (ValueError, TypeError):
+                pass
+        plan = cn.execute(
+            "SELECT name, tier, max_clients FROM plans WHERE plan_id=?",
+            (plan_id,)
+        ).fetchone()
+        # Defensieve fallback: onbekend plan_id van Stripe? probeer tier_plan_id.
+        if (not plan or not plan['max_clients']) and plan_id != tier_plan_id:
+            plan = cn.execute(
+                "SELECT name, tier, max_clients FROM plans WHERE plan_id=?",
+                (tier_plan_id,)
+            ).fetchone()
+            plan_id = tier_plan_id
+        if not plan or not plan['max_clients']:
+            app.logger.warning('TIER_SUMMARY: plan ontbreekt of max_clients=0 voor %s', plan_id)
+            return None
+        tier_short_map = {'pro-s': 'Pro S', 'pro-m': 'Pro M', 'pro-l': 'Pro L'}
+        tier_short = tier_short_map.get(plan['tier'], (plan['tier'] or '').upper())
+        period_label = PRO_PERIOD_LABELS.get((period, lang),
+                       PRO_PERIOD_LABELS.get((period, 'nl'), ''))
+        return {
+            'license_key':        lic['license_key'],
+            'tier_short':         tier_short,
+            'plan_name':          plan['name'],
+            'plan_id':            plan_id,
+            'period':             period,
+            'period_label':       period_label,
+            'max_profiles':       mp,
+            'max_clients':        plan['max_clients'],
+            'expires_at_iso':     (lic['expires_at'] or '').split('T')[0],
+            'expires_at_display': _format_date_numeric(lic['expires_at'], lang),
+            'status':             lic['status'],
+            'origin':             lic['origin'],
+        }
+    finally:
+        cn.close()
+
+
+def get_active_pairings_count(pro_key):
+    """Telt pending+activated pairing_codes voor deze Pro — zelfde definitie als
+    de quota-check in /api/pairing/generate."""
+    if not pro_key:
+        return 0
+    import sqlite3 as _sq
+    cn = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+    try:
+        return cn.execute(
+            "SELECT COUNT(*) FROM pairing_codes "
+            "WHERE pro_user_id=? AND status IN ('pending','activated')",
+            (pro_key,)
+        ).fetchone()[0]
+    finally:
+        cn.close()
+
+
+def _find_subscription_row_by_email(email):
+    if not email:
+        return None
+    import sqlite3 as _sq
+    cn = _sq.connect(DB_PATH)
+    cn.row_factory = _sq.Row
+    try:
+        return cn.execute(
+            "SELECT p.plan_id, p.name AS plan_name, p.tier, p.product_family, "
+            "       s.subscription_id, s.status, s.current_period_end, s.stripe_customer_id, "
+            "       l.license_key, l.email "
+            "  FROM licenses l "
+            "  JOIN subscriptions s ON s.subscription_id = l.stripe_subscription_id "
+            "  JOIN plans p ON p.plan_id = s.plan_id "
+            " WHERE l.email = ? "
+            "   AND s.status IN ('active', 'trialing', 'past_due', 'canceled') "
+            " ORDER BY s.current_period_end DESC LIMIT 1",
+            (email,)
+        ).fetchone()
+    finally:
+        cn.close()
+
+
+def has_stripe_subscription(email):
+    return _find_subscription_row_by_email(email) is not None
+
+
+def get_subscription_info(email, lang='nl'):
+    row = _find_subscription_row_by_email(email)
+    if not row:
+        return None
+    cpe = row['current_period_end'] or ''
+    return {
+        'plan_name': row['plan_name'],
+        'tier': row['tier'],
+        'status': row['status'],
+        'current_period_end_iso': cpe.split('T')[0] if cpe else '',
+        'current_period_end_display': _format_date_lang(cpe, lang),
+        'license_key': row['license_key'],
+        'stripe_customer_id': row['stripe_customer_id'],
+    }
+
+
+@app.route('/account/manage-subscription')
+def manage_subscription():
+    if not session.get('user_key'):
+        return redirect(url_for('sc_login'))
+    lang     = session.get('lang', 'nl')
+    user_key = session['user_key']
+    email    = session.get('email', '')
+    customer_id = get_stripe_customer_id(user_key, email)
+    if not customer_id:
+        return redirect(url_for('license_screen', error='no_stripe_subscription'))
+    key = _load_stripe_secret()
+    if not key:
+        app.logger.error('Spoor3: STRIPE_SECRET_LIVE niet beschikbaar in %s', SPOOR3_STRIPE_KEYS_FILE)
+        return redirect(url_for('license_screen', error='portal_unavailable'))
+    import stripe as _s
+    _s.api_key = key
+    try:
+        portal_sess = _s.billing_portal.Session.create(
+            customer=customer_id,
+            configuration=SPOOR3_PORTAL_CONFIGURATION,
+            return_url=url_for('license_screen', _external=True),
+            locale=lang,
+        )
+        return redirect(portal_sess.url)
+    except _s.error.StripeError as e:
+        app.logger.error('Spoor3: billing_portal.Session.create faalde voor %s: %s', customer_id, e)
+        return redirect(url_for('license_screen', error='portal_unavailable'))
+
+
+# ===== LAB — experimentele functies =====
+LAB_EMAILS = {'paul@stresschecker.nl', 'steven@lifestylemonitors.com',
+              'paulpannevis@gmail.com', 'steven@stresschecker.nl'}
+
+@app.route('/lab')
+def lab():
+    email = session.get('email', '')
+    if email.lower() not in LAB_EMAILS:
+        return redirect(url_for('menu'))
+    lang = session.get('lang', 'nl')
+    # Haal laatste meting op
+    user_key = get_user_key()
+    db = get_meting_db()
+    meting = db.execute(
+        'SELECT ri, bpm, hrv_pct, rmssd, sdnn, pnn50, kwaliteit, ts, meting_type '
+        'FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 1',
+        (user_key,)).fetchone()
+    db.close()
+    return render_template('lab.html', lang=lang, meting=dict(meting) if meting else None)

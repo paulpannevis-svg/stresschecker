@@ -1,0 +1,396 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="screen" style="max-width:480px;margin:0 auto;padding:16px 16px 40px;">
+
+  <h2 style="text-align:center;margin-bottom:20px;font-size:1.2rem;color:var(--text-primary);">
+    {% if lang == 'de' %}Einstellungen{% elif lang == 'en' %}Settings{% else %}Instellingen{% endif %}
+  </h2>
+
+  <!-- Mijn Pro-abonnement (alle Pro-cohorts) -->
+  {% if tier_summary %}
+  <div style="background:var(--white);border-radius:var(--radius);padding:20px;margin-bottom:12px;">
+    <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">
+      {% if lang == 'de' %}Mein Pro-Abonnement{% elif lang == 'en' %}My Pro subscription{% else %}Mijn Pro-abonnement{% endif %}
+    </div>
+    <div style="font-size:1rem;font-weight:600;color:var(--text-primary);margin-bottom:4px;">
+      <span style="color:var(--red);">{{ tier_summary.tier_short }}</span> — {{ tier_summary.period_label }}
+    </div>
+    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:6px;">
+      <strong style="color:var(--text-primary);">{{ active_pairings }}</strong>
+      {% if lang == 'de' %}von {{ tier_summary.max_clients }} aktive Kopplungen
+      {% elif lang == 'en' %}of {{ tier_summary.max_clients }} active pairings
+      {% else %}van {{ tier_summary.max_clients }} actieve koppelingen{% endif %}
+    </div>
+    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:6px;">
+      {% if lang == 'de' %}Gültig bis {{ tier_summary.expires_at_display }}
+      {% elif lang == 'en' %}Valid until {{ tier_summary.expires_at_display }}
+      {% else %}Geldig tot {{ tier_summary.expires_at_display }}{% endif %}
+    </div>
+    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+      Status: <span style="color:var(--text-primary);">{{ tier_summary.status }}</span>
+    </div>
+    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span>{% if lang == 'de' %}Lizenzcode:{% elif lang == 'en' %}License code:{% else %}Licentiecode:{% endif %}</span>
+      <code id="lic-code-display" data-full="{{ tier_summary.license_key }}" style="background:var(--beige);padding:3px 8px;border-radius:6px;font-family:monospace;color:var(--text-primary);">SC-PRO-••••••••</code>
+      <button type="button" onclick="window.__toggleLicCode()" id="lic-code-toggle" style="background:none;border:1px solid var(--beige-dark);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:.78rem;color:var(--text-muted);">
+        {% if lang == 'de' %}Anzeigen{% elif lang == 'en' %}Show{% else %}Tonen{% endif %}
+      </button>
+      <button type="button" onclick="window.__copyLicCode(this)" style="background:none;border:1px solid var(--beige-dark);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:.78rem;color:var(--text-muted);">
+        {% if lang == 'de' %}Kopieren{% elif lang == 'en' %}Copy{% else %}Kopiëren{% endif %}
+      </button>
+    </div>
+    <div style="font-size:0.75rem;color:var(--text-muted);opacity:0.75;margin-bottom:14px;line-height:1.4;">
+      {% if lang == 'de' %}Bewahren Sie diesen Code gut auf — Sie benötigen ihn, um StressChecker auf einem neuen Gerät zu aktivieren.
+      {% elif lang == 'en' %}Keep this code safe — you'll need it to activate StressChecker on a new device.
+      {% else %}Bewaar deze code goed — je hebt hem nodig om StressChecker te activeren op een nieuw apparaat.{% endif %}
+    </div>
+    {% if subscription_info %}
+    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;border-top:1px solid var(--beige);padding-top:10px;">
+      {% if lang == 'de' %}Nächste Rechnung: {{ subscription_info.current_period_end_display }}{% elif lang == 'en' %}Next billing: {{ subscription_info.current_period_end_display }}{% else %}Volgende factuur: {{ subscription_info.current_period_end_display }}{% endif %}
+    </div>
+    <a href="{{ url_for('manage_subscription') }}" class="btn btn-secondary" style="width:100%;">
+      {% if lang == 'de' %}Abonnement verwalten →{% elif lang == 'en' %}Manage subscription →{% else %}Abonnement beheren →{% endif %}
+    </a>
+    {% endif %}
+  </div>
+  <script>
+    window.__toggleLicCode = function(){
+      var el = document.getElementById('lic-code-display');
+      var btn = document.getElementById('lic-code-toggle');
+      var labels = {
+        de: {show:'Anzeigen', hide:'Verbergen'},
+        en: {show:'Show',     hide:'Hide'},
+        nl: {show:'Tonen',    hide:'Verbergen'}
+      };
+      var lang = "{{ lang }}";
+      var L = labels[lang] || labels.nl;
+      if (el.textContent.indexOf('•') !== -1) {
+        el.textContent = el.dataset.full;
+        btn.textContent = L.hide;
+      } else {
+        el.textContent = 'SC-PRO-••••••••';
+        btn.textContent = L.show;
+      }
+    };
+    window.__copyLicCode = function(btn){
+      var full = document.getElementById('lic-code-display').dataset.full;
+      navigator.clipboard.writeText(full).then(function(){
+        var orig = btn.textContent;
+        btn.textContent = '✓';
+        setTimeout(function(){ btn.textContent = orig; }, 1200);
+      }).catch(function(){ alert(full); });
+    };
+  </script>
+  {% endif %}
+
+  <!-- Profiel -->
+  <div style="background:var(--white);border-radius:var(--radius);padding:20px;margin-bottom:12px;">
+    <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">
+      {% if lang == 'de' %}Profil{% elif lang == 'en' %}Profile{% else %}Profiel{% endif %}
+    </div>
+
+    <!-- Naam -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:4px;">
+        {% if lang == 'de' %}Name{% elif lang == 'en' %}Name{% else %}Naam{% endif %}
+      </label>
+      <input type="text" id="inputName" value="{% if is_pro %}{{ session.get("pro_display_name", profile_name) }}{% else %}{{ profile_name }}{% endif %}"
+        style="width:100%;padding:8px 10px;border:1px solid var(--beige-dark);border-radius:8px;font-size:0.95rem;background:var(--beige);box-sizing:border-box;">
+    </div>
+
+    <!-- Geboortejaar -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:4px;">
+        {% if lang == 'de' %}Geburtsjahr{% elif lang == 'en' %}Birth year{% else %}Geboortejaar{% endif %}
+      </label>
+      <input type="number" id="inputBirthYear" value="{{ birth_year }}" min="1930" max="2010"
+        style="width:100%;padding:8px 10px;border:1px solid var(--beige-dark);border-radius:8px;font-size:0.95rem;background:var(--beige);box-sizing:border-box;">
+    </div>
+
+    <!-- Geslacht -->
+    <div>
+      <label style="font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:8px;">
+        {% if lang == 'de' %}Geschlecht{% elif lang == 'en' %}Gender{% else %}Geslacht{% endif %}
+      </label>
+      <div style="display:flex;gap:12px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.95rem;">
+          <input type="radio" name="gender" value="male" {% if gender == 'male' %}checked{% endif %}
+            style="accent-color:var(--red);width:18px;height:18px;">
+          {% if lang == 'de' %}Mann{% elif lang == 'en' %}Male{% else %}Man{% endif %}
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.95rem;">
+          <input type="radio" name="gender" value="female" {% if gender == 'female' %}checked{% endif %}
+            style="accent-color:var(--red);width:18px;height:18px;">
+          {% if lang == 'de' %}Frau{% elif lang == 'en' %}Female{% else %}Vrouw{% endif %}
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+  <!-- Taal -->
+  <div style="background:var(--white);border-radius:var(--radius);padding:20px;">
+    <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">
+      {% if lang == 'de' %}Sprache{% elif lang == 'en' %}Language{% else %}Taal{% endif %}
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="setLang('nl')" id="btnNL"
+        style="flex:1;padding:8px;border-radius:8px;border:2px solid {% if lang == 'nl' %}var(--red){% else %}var(--beige-dark){% endif %};background:{% if lang == 'nl' %}var(--beige-dark){% else %}var(--beige){% endif %};font-size:0.95rem;cursor:pointer;font-weight:{% if lang == 'nl' %}700{% else %}400{% endif %};">
+        NL
+      </button>
+      <button onclick="setLang('de')" id="btnDE"
+        style="flex:1;padding:8px;border-radius:8px;border:2px solid {% if lang == 'de' %}var(--red){% else %}var(--beige-dark){% endif %};background:{% if lang == 'de' %}var(--beige-dark){% else %}var(--beige){% endif %};font-size:0.95rem;cursor:pointer;font-weight:{% if lang == 'de' %}700{% else %}400{% endif %};">
+        DE
+      </button>
+      <button onclick="setLang('en')" id="btnEN"
+        style="flex:1;padding:8px;border-radius:8px;border:2px solid {% if lang == 'en' %}var(--red){% else %}var(--beige-dark){% endif %};background:{% if lang == 'en' %}var(--beige-dark){% else %}var(--beige){% endif %};font-size:0.95rem;cursor:pointer;font-weight:{% if lang == 'en' %}700{% else %}400{% endif %};">
+        EN
+      </button>
+    </div>
+  </div>
+
+  <!-- Sensor voorkeur -->
+  <div style="background:var(--white);border-radius:var(--radius);padding:20px;">
+    <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">
+      Sensor
+    </div>
+    <div style="display:flex;gap:12px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.95rem;">
+            <input type="radio" name="sensor" value="bluetooth" id="sensorBT" {%if session.get("sensor_pref","bluetooth")=="bluetooth"%}checked{%endif%}
+          style="accent-color:var(--red);width:18px;height:18px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/></svg> Bluetooth
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.95rem;">
+            <input type="radio" name="sensor" value="usb" id="sensorUSB" {%if session.get("sensor_pref","bluetooth")=="usb"%}checked{%endif%}
+          style="accent-color:var(--red);width:18px;height:18px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v11m0 0l-3-3m3 3l3-3M5 19a2 2 0 1 0 4 0 2 2 0 0 0-4 0zm10 0a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM7 19H5m14 0h-2M9 19V9h6v10"/></svg> USB
+      </label>
+    </div>
+  </div>
+  </div><!-- einde taal-sensor grid -->
+
+  
+  {% if not is_pro %}<!-- Koppeling met professional -->
+  <div style="background:var(--white);border-radius:var(--radius);padding:20px;margin-bottom:12px;">
+    <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">
+      {% if lang == 'de' %}Verbindung mit Fachmann{% elif lang == 'en' %}Connect with Professional{% else %}Verbind met professional{% endif %}
+    </div>
+
+    <div id="pairingStatus">
+      <!-- Wordt gevuld via JavaScript -->
+    </div>
+
+    <div id="pairingInput" style="display:flex;gap:8px;align-items:center;">
+      <input type="text" id="pairingCode" placeholder="SC-PAIR-XXXX"
+        style="flex:1;padding:8px 10px;border:1px solid var(--beige-dark);border-radius:8px;font-size:1rem;background:var(--beige);box-sizing:border-box;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;">
+      <button onclick="redeemPairing()" style="background:#FF9800;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:0.9rem;font-weight:600;white-space:nowrap;">
+        {% if lang == 'de' %}Verbinden{% elif lang == 'en' %}Connect{% else %}Verbinden{% endif %}
+      </button>
+    </div>
+
+    <div id="pairingFeedback" style="display:none;margin-top:8px;padding:8px;border-radius:6px;font-size:0.85rem;text-align:center;"></div>
+  </div>
+{% endif %}
+
+<script>
+// Check koppelstatus bij laden
+(function(){
+  fetch('/api/pairing/status')
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var statusEl = document.getElementById('pairingStatus');
+    var inputEl = document.getElementById('pairingInput');
+    if(d.paired){
+      statusEl.innerHTML = '<div style="background:#E8F5E9;border-radius:8px;padding:10px;margin-bottom:8px;">'
+        + '<span style="color:#2E7D32;font-weight:600;">\u2705 '
+        + (('{{ lang }}' === 'de') ? 'Verbunden seit ' : ('{{ lang }}' === 'en') ? 'Connected since ' : 'Verbonden sinds ')
+        + d.since + '</span></div>';
+      inputEl.style.display = 'none';
+    }
+  }).catch(function(){});
+})();
+
+function redeemPairing(){
+  var code = document.getElementById('pairingCode').value.trim().toUpperCase();
+  if(!code){alert('{{lang}}'==='de'?'Bitte Koppelcode eingeben':'{{lang}}'==='en'?'Please enter a pairing code':'Voer een koppelcode in');return;}
+
+  var fb = document.getElementById('pairingFeedback');
+  fb.style.display = 'block';
+  fb.style.background = '#FFF8E1';
+  fb.style.color = '#F57F17';
+  fb.textContent = 'Verbinden...';
+
+  fetch('/api/pairing/redeem',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code: code})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      fb.style.background = '#E8F5E9';
+      fb.style.color = '#2E7D32';
+      fb.textContent = '\u2705 ' + (('{{ lang }}' === 'de') ? 'Erfolgreich verbunden!' : ('{{ lang }}' === 'en') ? 'Successfully connected!' : 'Succesvol verbonden!');
+      setTimeout(function(){window.location.reload();}, 1500);
+    } else {
+      fb.style.background = '#FFEBEE';
+      fb.style.color = '#C62828';
+      fb.textContent = '\u274C ' + (d.error || 'Code ongeldig');
+    }
+  }).catch(function(e){
+    fb.style.background = '#FFEBEE';
+    fb.style.color = '#C62828';
+    fb.textContent = 'Fout: ' + e;
+  });
+}
+</script>
+
+  <!-- Opslaan knop -->
+        <input type="hidden" name="lang" value="{{ lang }}">
+        <button onclick="saveSettings()" class="btn btn-primary" style="width:100%;margin-bottom:12px;">{%if lang=="de"%}Speichern ►{%elif lang=="en"%}Save ►{%else%}Opslaan ►{%endif%}</button>
+
+  <a href="{{ url_for('menu') }}" class="btn btn-secondary" style="width:100%;display:block;text-align:center;">
+    ← {% if lang == 'de' %}Zurück{% elif lang == 'en' %}Back{% else %}Terug{% endif %}
+  </a>
+
+  <!-- Feedback -->
+  <div id="feedback" style="display:none;text-align:center;margin-top:14px;padding:10px;border-radius:8px;background:#E8F5E9;color:#2E7D32;font-size:0.9rem;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> {% if lang == 'de' %}Gespeichert{% elif lang == 'en' %}Saved{% else %}Opgeslagen{% endif %}
+  </div>
+
+</div>
+
+<script>
+  // Laad sensor voorkeur uit localStorage
+  // sensor voorkeur wordt geladen vanuit sessie via Jinja2 checked attribuut
+
+  function setLang(l) {
+    fetch('/api/settings/save', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({lang: l})
+    }).then(function() {
+      window.location.reload();
+    });
+  }
+
+  function saveSettings() {
+    var _btn=document.querySelector('[onclick*="saveSettings"]');
+    if(_btn){_btn.style.opacity='0.5';_btn.textContent='\u23F3';}
+    var _origSave=function(){
+        if(_btn){
+            var _lang = document.querySelector('input[name="lang"]') ? document.querySelector('input[name="lang"]').value : 'nl';
+      var _savedMsg = _lang === 'de' ? '\u2713 Gespeichert!' : (_lang === 'en' ? '\u2713 Saved!' : '\u2713 Opgeslagen!');
+      _btn.textContent = _savedMsg;
+            _btn.style.background='#2E7D32';
+            _btn.style.color='#fff';
+            _btn.style.opacity='1';
+            var _rl=document.querySelector('input[name="lang"]');var _lt=_rl?_rl.value:'nl';setTimeout(function(){_btn.textContent=_lt==='de'?'Speichern ▶':(_lt==='en'?'Save ▶':'Opslaan ▶');_btn.style.background='';_btn.style.color='';},2000);
+        }
+    };
+    setTimeout(_origSave, 800);
+    var name = document.getElementById('inputName').value.trim();
+    var birthYear = parseInt(document.getElementById('inputBirthYear').value);
+    var gender = document.querySelector('input[name="gender"]:checked').value;
+    var sensor = document.querySelector('input[name="sensor"]:checked').value;
+
+    // Sensor opslaan in localStorage (client-side)
+    localStorage.setItem('preferred_sensor', sensor);
+
+    // Profiel opslaan via API
+    fetch('/api/settings/save', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+          name: name,
+          birth_year: birthYear,
+          gender: gender,
+          sensor: document.querySelector('input[name="sensor"]:checked') ? document.querySelector('input[name="sensor"]:checked').value : 'bluetooth',
+          lang: document.querySelector('input[name="lang"]') ? document.querySelector('input[name="lang"]').value : 'nl'
+        })
+    }).then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        var fb = document.getElementById('feedback');
+        fb.style.display = 'block';
+        setTimeout(function() { fb.style.display = 'none'; }, 2000);
+      }
+    });
+  }
+</script>
+
+  <!-- Gegevens verwijderen -->
+  <div style="background:#fff5f5;border:1px solid #ffcccc;border-radius:var(--radius);padding:16px;margin-bottom:12px;margin-top:8px">
+    <div style="font-size:0.78rem;font-weight:700;color:#c00;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px">
+      {% if lang == 'de' %}Datenverwaltung{% elif lang == 'en' %}Data management{% else %}Gegevensbeheer{% endif %}
+    </div>
+
+    <!-- Meetgegevens verwijderen -->
+    <div style="margin-bottom:12px">
+      <p style="font-size:.83rem;color:#555;margin:0 0 8px">
+        {% if lang == 'de' %}Alle Messungen l&ouml;schen, Konto bleibt erhalten.{% elif lang == 'en' %}Delete all readings, keep account.{% else %}Verwijder alle metingen, account blijft behouden.{% endif %}
+      </p>
+      <button onclick="confirmDelete('measurements')" style="background:#fff;border:1px solid #ffaaaa;border-radius:8px;padding:8px 16px;font-size:.83rem;color:#c00;cursor:pointer;font-weight:600">
+        &#128465; {% if lang == 'de' %}Alle Messungen l&ouml;schen{% elif lang == 'en' %}Delete all readings{% else %}Alle metingen verwijderen{% endif %}
+      </button>
+    </div>
+
+    <!-- Account verwijderen -->
+    <div style="border-top:1px solid #ffcccc;padding-top:12px">
+      <p style="font-size:.83rem;color:#555;margin:0 0 8px">
+        {% if lang == 'de' %}Konto und alle Daten dauerhaft l&ouml;schen. Nicht r&uuml;ckg&auml;ngig zu machen.{% elif lang == 'en' %}Permanently delete account and all data. Cannot be undone.{% else %}Account en alle data permanent verwijderen. Kan niet ongedaan gemaakt worden.{% endif %}
+      </p>
+      <button onclick="confirmDelete('account')" style="background:#c00;border:none;border-radius:8px;padding:8px 16px;font-size:.83rem;color:#fff;cursor:pointer;font-weight:600">
+        &#9888; {% if lang == 'de' %}Konto l&ouml;schen{% elif lang == 'en' %}Delete account{% else %}Account verwijderen{% endif %}
+      </button>
+    </div>
+  </div>
+
+  <!-- Bevestigingsdialoog -->
+  <div id="deleteModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:320px;margin:16px;text-align:center">
+      <p id="deleteModalText" style="font-size:.9rem;color:#333;margin-bottom:20px;line-height:1.5"></p>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button onclick="document.getElementById('deleteModal').style.display='none'" style="background:#eee;border:none;border-radius:8px;padding:10px 20px;cursor:pointer;font-size:.85rem">
+          {% if lang == 'de' %}Abbrechen{% elif lang == 'en' %}Cancel{% else %}Annuleren{% endif %}
+        </button>
+        <button id="deleteConfirmBtn" style="background:#c00;border:none;border-radius:8px;padding:10px 20px;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600">
+          {% if lang == 'de' %}L&ouml;schen{% elif lang == 'en' %}Delete{% else %}Verwijderen{% endif %}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  var _deleteTarget = null;
+  var _deleteMsgs = {
+    measurements: {
+      nl: 'Weet je zeker dat je ALLE metingen wilt verwijderen? Dit kan niet ongedaan worden gemaakt.',
+      de: 'Möchten Sie wirklich ALLE Messungen löschen? Dies kann nicht rückgängig gemacht werden.',
+      en: 'Are you sure you want to delete ALL readings? This cannot be undone.'
+    },
+    account: {
+      nl: 'Weet je zeker dat je je ACCOUNT en alle bijbehorende data permanent wilt verwijderen?',
+      de: 'Möchten Sie Ihr KONTO und alle zugehörigen Daten dauerhaft löschen?',
+      en: 'Are you sure you want to permanently delete your ACCOUNT and all associated data?'
+    }
+  };
+  function confirmDelete(target) {
+    _deleteTarget = target;
+    var lang = document.querySelector('input[name="lang"]') ? document.querySelector('input[name="lang"]').value : 'nl';
+    document.getElementById('deleteModalText').textContent = _deleteMsgs[target][lang] || _deleteMsgs[target]['nl'];
+    var modal = document.getElementById('deleteModal');
+    modal.style.display = 'flex';
+    document.getElementById('deleteConfirmBtn').onclick = function() {
+      modal.style.display = 'none';
+      fetch('/api/delete/' + target, {method: 'POST', headers: {'Content-Type': 'application/json'}})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.ok) { window.location.href = d.redirect || '/'; }
+          else { alert(d.error || ('{{lang}}'==='de'?'Fehler':'{{lang}}'==='en'?'Error':'Fout')); }
+        });
+    };
+  }
+  </script>
+
+{% endblock %}
+
+
