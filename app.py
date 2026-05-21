@@ -3,6 +3,7 @@ import sqlite3, os, hashlib, secrets, json, io
 from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv()
+from eval_config import EVAL_DURATION_DAYS
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
@@ -545,11 +546,13 @@ def activate():
         session['legacy_pending_lang']    = lang
         return redirect(url_for('oude_code_keuze'))
     if result['valid']:
-        # === Marketing-code herclaim-bescherming ===
-        # Marketing-codes circuleren breed (campagnes/beurzen/partners). Eerste
+        # === Marketing/evaluation herclaim-bescherming ===
+        # Marketing-codes circuleren breed (campagnes/beurzen/partners); eval-codes
+        # zijn 1-op-1 aan een partner uitgegeven. In beide gevallen: eerste
         # activeerder zet email; tweede claim met afwijkend email wordt geweigerd.
         # Stripe/PayPal/manual hebben eigen risicoprofiel — geen vergelijkbare check.
-        if result.get('origin') == 'marketing':
+        _bind_origin = result.get('origin')
+        if _bind_origin in ('marketing', 'evaluation'):
             _bound = result.get('bound_email') or ''
             if _bound and _bound.lower() != email.lower():
                 return redirect(url_for('license_screen', error=(
@@ -557,8 +560,8 @@ def activate():
                     else ('Dieser Code wurde bereits aktiviert.' if lang=='de'
                     else 'This code has already been activated.'))))
 
-        # === Marketing-code binding bij activering (origin='marketing' AND email IS NULL) ===
-        if result.get('origin') == 'marketing' and not result.get('bound_email'):
+        # === Marketing/evaluation binding bij activering (email IS NULL) ===
+        if _bind_origin in ('marketing', 'evaluation') and not result.get('bound_email'):
             import datetime as _dt_mkt
             cea = result.get('code_expires_at')
             if not cea:
@@ -569,33 +572,49 @@ def activate():
             try:
                 cea_dt = _dt_mkt.datetime.fromisoformat(cea)
             except ValueError:
-                return redirect(url_for('license_screen', error=(
-                    'Deze code is niet geldig.' if lang=='nl'
-                    else ('Dieser Code ist ungültig.' if lang=='de'
-                    else 'This code is invalid.'))))
+                # Sommige bestaande code_expires_at-velden gebruiken 'YYYY-MM-DD HH:MM:SS'
+                try:
+                    cea_dt = _dt_mkt.datetime.strptime(cea, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    return redirect(url_for('license_screen', error=(
+                        'Deze code is niet geldig.' if lang=='nl'
+                        else ('Dieser Code ist ungültig.' if lang=='de'
+                        else 'This code is invalid.'))))
             if _dt_mkt.datetime.utcnow() > cea_dt:
                 return redirect(url_for('license_screen', error=(
                     'Deze code is verlopen.' if lang=='nl'
                     else ('Dieser Code ist abgelaufen.' if lang=='de'
                     else 'This code has expired.'))))
-            now_iso_mkt = _dt_mkt.datetime.utcnow().isoformat()
-            exp_iso_mkt = (_dt_mkt.datetime.utcnow() + _dt_mkt.timedelta(days=365)).isoformat()
             _bind_cn = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _bind_cn.row_factory = sqlite3.Row
+            # Resolve plan_id voor plan-driven expiry
+            _lic_row = _bind_cn.execute(
+                "SELECT type, max_profiles FROM licenses WHERE license_key=?", (code,)
+            ).fetchone()
+            _plan_id_resolved = _derive_plan_id_for_license(
+                _lic_row['type'] if _lic_row else 'pro',
+                _lic_row['max_profiles'] if _lic_row else 0,
+                _bind_origin,
+            )
+            _now_mkt = _dt_mkt.datetime.utcnow()
+            now_iso_mkt = _now_mkt.isoformat()
+            exp_iso_mkt = _compute_license_expires_at(_plan_id_resolved, _now_mkt)
             _bind_cn.execute(
-                "UPDATE licenses SET email=?, activated_at=?, expires_at=?, status='activated' "
-                "WHERE license_key=? AND origin='marketing' AND email IS NULL",
-                (email, now_iso_mkt, exp_iso_mkt, code)
+                "UPDATE licenses SET email=?, activated_at=?, expires_at=?, valid_until=?, status='activated' "
+                "WHERE license_key=? AND origin IN ('marketing','evaluation') AND email IS NULL",
+                (email, now_iso_mkt, exp_iso_mkt, exp_iso_mkt, code)
             )
             _bind_cn.execute(
                 "INSERT INTO activation_log (license_key, product, action, ip_address, user_agent, details) "
-                "VALUES (?, 'sc', 'activate_marketing', ?, ?, ?)",
-                (code, request.remote_addr, request.headers.get('User-Agent','')[:200],
-                 f'origin=marketing email={email}')
+                "VALUES (?, 'sc', ?, ?, ?, ?)",
+                (code, f'activate_{_bind_origin}', request.remote_addr,
+                 request.headers.get('User-Agent','')[:200],
+                 f'origin={_bind_origin} plan_id={_plan_id_resolved} email={email}')
             )
             _bind_cn.commit()
             _bind_cn.close()
             result = validate_license(code, email)
-        # === Einde marketing-branch ===
+        # === Einde marketing/evaluation-branch ===
 
         pw_hash = hashlib.sha256(password.encode()).hexdigest()
         session.clear()
@@ -4362,11 +4381,60 @@ def _format_date_numeric(iso_date, lang='nl'):
 PRO_PERIOD_LABELS = {
     ('year',  'nl'): 'Jaarabonnement',
     ('month', 'nl'): 'Maandabonnement',
+    ('eval',  'nl'): 'Evaluatielicentie',
     ('year',  'de'): 'Jahresabonnement',
     ('month', 'de'): 'Monatsabonnement',
+    ('eval',  'de'): 'Evaluierungslizenz',
     ('year',  'en'): 'Annual subscription',
     ('month', 'en'): 'Monthly subscription',
+    ('eval',  'en'): 'Evaluation license',
 }
+
+
+def _compute_license_expires_at(plan_id, now=None):
+    """Bepaal post-activatie license-expiry op basis van plan_id-suffix.
+
+    - *-eval   → now + EVAL_DURATION_DAYS dagen (centrale constante in eval_config.py)
+    - *-month  → now + 30 dagen
+    - anders   → now + 365 dagen (standaard jaarplan)
+
+    Plan_id-driven, niet origin-driven: een toekomstige niet-evaluatie marketing-code
+    op een ander plan-type (bv. consumer monthly) krijgt automatisch correcte expiry.
+    Returns ISO-format string.
+    """
+    import datetime as _dt
+    if now is None:
+        now = _dt.datetime.utcnow()
+    plan_id = plan_id or ''
+    if plan_id.endswith('-eval'):
+        delta = _dt.timedelta(days=EVAL_DURATION_DAYS)
+    elif plan_id.endswith('-month'):
+        delta = _dt.timedelta(days=30)
+    else:
+        delta = _dt.timedelta(days=365)
+    return (now + delta).isoformat()
+
+
+def _derive_plan_id_for_license(license_type, max_profiles, origin):
+    """Map (type, max_profiles, origin) → plan_id.
+
+    Gebruikt door /activate marketing-branch om plan-specifieke expiry te resolven.
+    Voor type='pro': tier komt uit max_profiles (≥50 L, ≥20 M, anders S).
+    Voor type='consumer': enkele tier ('sc' jaarlijks of 'sc-consumer-eval').
+    Origin='evaluation' voegt '-eval'-suffix toe (pro) of selecteert eval-variant (consumer).
+    """
+    is_eval = origin == 'evaluation'
+    mp = max_profiles or 0
+    if license_type == 'pro':
+        if mp >= 50:
+            tier = 'l'
+        elif mp >= 20:
+            tier = 'm'
+        else:
+            tier = 's'
+        return 'sc-pro-' + tier + ('-eval' if is_eval else '')
+    # consumer
+    return 'sc-consumer-eval' if is_eval else 'sc'
 
 
 def get_pro_tier_summary(email, lang='nl'):
@@ -4396,11 +4464,16 @@ def get_pro_tier_summary(email, lang='nl'):
             tier_plan_id = 'sc-pro-m'
         else:
             tier_plan_id = 'sc-pro-s'
-        # Periode bepalen: Stripe-sub → subscriptions.plan_id (authoritatief);
-        # anders duration-heuristiek via activated_at/expires_at.
+        # Periode bepalen:
+        #   1. origin='evaluation' → eval (heeft voorrang op Stripe/duration-checks)
+        #   2. Stripe-sub → subscriptions.plan_id (authoritatief voor month/year)
+        #   3. Anders: duration-heuristiek via activated_at/expires_at
         period = 'year'
         plan_id = tier_plan_id
-        if lic['stripe_subscription_id']:
+        if lic['origin'] == 'evaluation':
+            period = 'eval'
+            plan_id = tier_plan_id + '-eval'
+        elif lic['stripe_subscription_id']:
             sub = cn.execute(
                 "SELECT plan_id FROM subscriptions WHERE subscription_id=?",
                 (lic['stripe_subscription_id'],)
