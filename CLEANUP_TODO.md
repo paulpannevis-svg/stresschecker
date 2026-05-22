@@ -3,36 +3,35 @@
 Aangemaakt: 21-05-2026 na git init.
 Reden: bij git init op 21-05-2026 zijn root-level artefacten geconstateerd die in een latere sessie geadresseerd moeten worden voordat iemand een `git add .` doet die ongewenste bestanden meeneemt.
 
-## Te onderzoeken / op te ruimen
+## UITGEVOERD 22-05-2026
 
-- [ ] `app.py.current` — wat is dit? Oud merge-resultaat? Verplaatsen naar `/opt/backups/` of verwijderen.
-- [ ] `app.py.merge_backup` — idem.
-- [ ] `saas_licenses.db` in repo-root — moet verplaatst worden naar `data/` of een andere niet-getrackte locatie. **CRITICAL: bevat klantdata + license-keys.**
-- [ ] Andere root-level `*.db` bestanden inventariseren (`ic_licenses.db`, `sc_measurements.db`, `sc_pro.db`, `stresschecker.db`).
-- [ ] Andere root-level `*.bak` / `*.backup` bestanden inventariseren.
-- [ ] `gen_context.py.pre-leerpunt` (geen `.bak`-suffix → niet door huidige ignore gedekt).
-- [ ] `seed_anna.py.v1` (idem).
-- [ ] `templates_backup_20260224_*` directories — horen niet in source-tree; verplaatsen naar `/opt/backups/`.
+Gefaseerde cleanup met checkpoint-akkoorden. Details: CHANGELOG.md ## 2026-05-22 + archief `/opt/backups/cleanup_20260522/`.
 
-## .gitignore-uitbreiding na opruiming
+Originele agenda-items:
 
-Voeg expliciete patronen toe die ook root-level matchen:
+- [x] `app.py.current` (Mar 2, 1038 regels) — pre-2FA/SendGrid era, gearchiveerd
+- [x] `app.py.merge_backup` (Mar 2, 834 regels, byte-identiek aan app.py.bak.legacy*) — gearchiveerd
+- [x] `saas_licenses.db` in repo-root — **was 0 bytes**, geen klantdata. De CRITICAL-waarschuwing hierboven was feitelijk onjuist: de echte productie-DB woont in `/opt/ic-license-server/data/saas_licenses.db` en zat niet in deze repo. Root-stub verwijderd.
+- [x] Andere root-level `*.db`: `ic_licenses.db` (122 KB, leeg schema-prototype, geen code-refs → gearchiveerd in `db_archive/`); `sc_measurements.db`, `sc_pro.db`, `stresschecker.db` (0-byte stubs → verwijderd)
+- [x] Andere root-level `*.bak`/`*.backup`: 29 app.py.bak* + 6 gen_context.py.bak* + .env.bak_sendgrid + 2 CONTEXT.md.bak* — alle gearchiveerd
+- [x] `gen_context.py.pre-leerpunt` — gearchiveerd
+- [x] `seed_anna.py.v1` — gearchiveerd
+- [x] `templates_backup_20260224_*` (2 directories, 28 .html totaal) — gearchiveerd
 
-    /*.db
-    /*.bak
-    /*.backup
-    /app.py.*
-    /*.current
-    /*.merge_backup
-    /*.v1
-    /templates_backup_*
+Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en met akkoord toegevoegd:
 
-(Voorloop-`/` zorgt voor root-level match in git, in tegenstelling tot onbeperkte recursive patterns.)
+- [x] 74 backup-files in `templates/`-subtree (60 root + 11 pro/ + 3 hlm/) — Fase 1 scande alleen root-niveau
+- [x] 4 `hrv.js.bak*` in `static/js/`
+- [x] 1 `routes.py.bak` in `hlm/`
+- [x] 2 `.bak`-files in `tests/`
+- [x] 3 DB-snapshots in `data/` (sc_measurements.db.bak-live, sc_pro.db.bak.before_seed, sc_measurements_backup_20260412.db)
+- [x] `/opt/stresschecker/{templates/` brace-expansion accident (5 lege subdirs) — verwijderd
+- [x] `toegepast` 0-byte mystery file — verwijderd
+- [x] `templates/oude_code_keuze.html` 0-byte placeholder (niet door route gebruikt; route rendert `legacy_choice.html`) — verwijderd
+- [x] Latente bug `gen_context.py:9` (verwees naar 0-byte stub) — gefixt
+- [x] `.gitignore` uitbreiding met root-level anchors + brede subdir-patterns — toegevoegd
 
-## Verificatie na opruiming
+## TODO — voor latere sessies
 
-- `git status` moet schoon zijn
-- `git ls-files | grep -E '\.(db|bak|backup)$'` moet leeg zijn
-- Een test-commit met `git add .` mag GEEN ongewenste bestanden meenemen
-
-Niet vandaag uitvoeren — plannen voor een rustig moment.
+- [ ] **Untracked dirs git-tracken**: `hlm/`, `scripts/`, `static/`, `templates/`, `tests/`, `email_templates/`. Aparte sessie nodig: per directory bewust afwegen (secrets? configuratie? testdata?). Tot die sessie blijven deze dirs untracked en gaan ze niet mee met `git add .`.
+- [ ] **Docs-organisatie**: `LAUNCH_LOG.md`, `PWRESET_PLAN.md`, `TODO.md` (en eventueel `SYSTEM_REFERENCE.md`) — verplaatsen naar `docs/` subdir of in root laten? Aparte beslissing per file.

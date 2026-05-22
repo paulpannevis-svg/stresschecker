@@ -29,3 +29,18 @@ CONTEXT.md.bak*
 
 # Local-only
 .claude/
+
+# Toegevoegd 22-05-2026 na CLEANUP_TODO uitvoering — root-level safety
+/*.db
+/*.current
+/*.merge_backup
+/*.v1
+/*.pre-leerpunt
+/templates_backup_*/
+
+# Brede patterns voor backup-leftovers in subdirs
+*.backup
+*.backup-*
+
+# Specifieke artefacten
+toegepast

@@ -6,7 +6,7 @@ out.append("Gegenereerd: " + __import__('datetime').datetime.now().strftime("%Y-
 
 out.append("## Databases\n")
 dbs = [
-    '/opt/stresschecker/data/saas_licenses.db',
+    '/opt/ic-license-server/data/saas_licenses.db',
     '/opt/stresschecker/data/sc_measurements.db',
     '/opt/stresschecker/data/sc_pro.db',
 ]
