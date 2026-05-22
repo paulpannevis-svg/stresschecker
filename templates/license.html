@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block title %}{% if lang=="de" %}StressChecker® — Lizenz aktivieren{% else %}StressChecker® — Licentie activeren{% endif %}{% endblock %}
+
+{% block content %}
+<div class="screen">
+
+  <div class="compass-hero" style="width:70px;height:70px;margin-top:8px;">
+    <svg viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="46" fill="none" stroke="#E8344E" stroke-width="3"/>
+      <polygon points="50,14 46,50 50,44 54,50" fill="#E8344E"/>
+      <polygon points="50,86 46,50 50,56 54,50" fill="#E8344E" opacity="0.4"/>
+      <circle cx="50" cy="50" r="4" fill="#E8344E"/>
+    </svg>
+  </div>
+
+  <h1 id="pageTitle" class="screen-title" style="font-size:1.4rem;">
+    {% if lang == 'de' %}Lizenz aktivieren
+    {% elif lang == 'en' %}Activate license
+    {% else %}Licentie activeren{% endif %}
+  </h1>
+  <p class="screen-subtitle" style="margin-bottom:8px;">
+    {% if lang == 'de' %}Geben Sie Ihren Lizenzcode ein, um alle Funktionen freizuschalten
+    {% elif lang == 'en' %}Enter your license code to unlock all features
+    {% else %}Voer je licentiecode in om alle functies te ontgrendelen{% endif %}
+  </p>
+
+  {% if error %}
+  <div class="form-error">{{ error }}</div>
+  {% endif %}
+
+  <!-- Nieuw / Terugkeren tabs -->
+<div style="display:flex;gap:8px;margin-bottom:1.2rem">
+  <button type="button" id="tab-nieuw" onclick="switchTab('nieuw')"
+    style="flex:1;padding:.8rem .5rem;border:2px solid #2a9d8f;border-radius:10px;cursor:pointer;font-size:.9rem;font-weight:700;background:#2a9d8f;color:#fff;transition:all .2s;box-shadow:0 2px 6px rgba(42,157,143,.3)">
+    {% if lang=="de" %}✦ Neuer Nutzer{% elif lang=="en" %}✦ New user{% else %}✦ Nieuw account{% endif %}
+  </button>
+  <button type="button" id="tab-terug" onclick="switchTab('terug')"
+    style="flex:1;padding:.8rem .5rem;border:2px solid #ccc;border-radius:10px;cursor:pointer;font-size:.9rem;font-weight:700;background:#fff;color:#888;transition:all .2s">
+    {% if lang=="de" %}↩ Bereits registriert{% elif lang=="en" %}↩ Already registered{% else %}↩ Al een account{% endif %}
+  </button>
+</div>
+<p id="hint-nieuw" style="font-size:.82rem;color:#888;margin-bottom:1rem;text-align:center">
+  {% if lang=="de" %}Geben Sie Ihren Lizenzcode ein und erstelle ein neues Profil.
+  {% elif lang=="en" %}Enter your license code and create a new profile.
+  {% else %}Voer je licentiecode in en maak een nieuw profiel aan.{% endif %}
+</p>
+<p id="hint-terug" style="font-size:.82rem;color:#888;margin-bottom:1rem;text-align:center;display:none">
+  {% if lang=="de" %}Willkommen zurück! Geben Sie Ihren Code und Ihre E-Mail-Adresse ein.
+  {% elif lang=="en" %}Welcome back! Enter your code and email address.
+  {% else %}<span id="tab-desc">{% if lang=="de" %}Willkommen zurück! Geben Sie Ihren Code, E-Mail und Passwort ein.{% elif lang=="en" %}Welcome back! Enter your code, email and password.{% else %}Welkom terug! Voer je code, e-mailadres en wachtwoord in.{% endif %}</span>{% endif %}
+</p>
+<script>
+var btnLabels = {
+  nieuw: { nl: 'ACTIVEREN ▶', de: 'AKTIVIEREN ▶', en: 'ACTIVATE ▶' },
+  terug: { nl: 'INLOGGEN ▶', de: 'ANMELDEN ▶', en: 'LOG IN ▶' }
+};
+var currentLang = '{{ lang }}';
+function switchTab(tab) {
+  var isNieuw = tab === 'nieuw';
+  // Label en hints aanpassen
+  var desc = document.getElementById('tab-desc');
+  if (desc) {
+    desc.textContent = isNieuw
+      ? (document.documentElement.lang === 'de' ? 'Neues Konto erstellen.' : document.documentElement.lang === 'en' ? 'Create a new account.' : 'Nieuw account aanmaken.')
+      : (document.documentElement.lang === 'de' ? 'Willkommen zurück! Code, E-Mail und Passwort eingeben.' : document.documentElement.lang === 'en' ? 'Welcome back! Enter your code, email and password.' : 'Welkom terug! Voer je code, e-mailadres en wachtwoord in.');
+  }
+  var hint = document.getElementById('pw-hint');
+  if (hint) {
+    hint.textContent = isNieuw
+      ? (document.documentElement.lang === 'de' ? 'Speichern Sie dieses Passwort für Ihren nächsten Besuch.' : document.documentElement.lang === 'en' ? 'Save this password for your next visit.' : 'Bewaar dit wachtwoord voor je volgende bezoek.')
+      : (document.documentElement.lang === 'de' ? 'Wählen Sie ein neues Passwort.' : document.documentElement.lang === 'en' ? 'Choose a new password.' : 'Kies een nieuw wachtwoord.');
+  }
+  var lbl = document.getElementById('pw-label');
+  if (lbl) {
+    lbl.textContent = isNieuw
+      ? (document.documentElement.lang === 'de' ? 'Passwort wählen' : document.documentElement.lang === 'en' ? 'Choose password' : 'Wachtwoord kiezen')
+      : (document.documentElement.lang === 'de' ? 'Passwort' : document.documentElement.lang === 'en' ? 'Password' : 'Wachtwoord');
+  }
+  // Tab nieuw
+  document.getElementById('tab-nieuw').style.background = isNieuw ? '#2a9d8f' : '#fff';
+  document.getElementById('tab-nieuw').style.color = isNieuw ? '#fff' : '#888';
+  document.getElementById('tab-nieuw').style.border = isNieuw ? '2px solid #2a9d8f' : '2px solid #ccc';
+  document.getElementById('tab-nieuw').style.boxShadow = isNieuw ? '0 2px 6px rgba(42,157,143,.3)' : 'none';
+  // Tab terug
+  document.getElementById('tab-terug').style.background = isNieuw ? '#fff' : '#2a9d8f';
+  document.getElementById('tab-terug').style.color = isNieuw ? '#888' : '#fff';
+  document.getElementById('tab-terug').style.border = isNieuw ? '2px solid #ccc' : '2px solid #2a9d8f';
+  document.getElementById('tab-terug').style.boxShadow = isNieuw ? 'none' : '0 2px 6px rgba(42,157,143,.3)';
+  // Hints
+  document.getElementById('hint-nieuw').style.display = isNieuw ? 'block' : 'none';
+  document.getElementById('hint-terug').style.display = isNieuw ? 'none' : 'block';
+  document.getElementById('form-type').value = isNieuw ? 'nieuw' : 'terug';
+  document.getElementById('licenseForm').action = isNieuw ? '{{ url_for("activate") }}' : '/login';
+  document.getElementById('code-group').style.display = isNieuw ? 'block' : 'none';
+  if(document.getElementById('legacy-group')) document.getElementById('legacy-group').style.display = isNieuw ? 'block' : 'none';
+  if(document.getElementById('ri-notice')) document.getElementById('ri-notice').style.display = isNieuw ? 'block' : 'none';
+    // Privacy consent: required alleen bij nieuw account
+    var pc = document.querySelector('[name=privacy_consent]');
+    if(pc){ pc.required = isNieuw; pc.closest('div').style.display = isNieuw ? '' : 'none'; }
+  // Knoptekst
+  var lang = currentLang in btnLabels.nieuw ? currentLang : 'nl';
+  document.getElementById('submitBtn').textContent = isNieuw ? btnLabels.nieuw[lang] : btnLabels.terug[lang];
+  var titles = { nl: isNieuw ? 'Licentie activeren' : 'Inloggen', de: isNieuw ? 'Lizenz aktivieren' : 'Anmelden', en: isNieuw ? 'Activate license' : 'Log in' };
+  document.getElementById('pageTitle').textContent = titles[lang] || titles['nl'];
+}
+</script>
+
+<div class="card">
+    <form method="POST" action="{{ url_for('activate') }}" id="licenseForm">
+      <input type="hidden" name="lang" value="{{ lang }}">
+      <input type="hidden" name="type" id="form-type" value="nieuw">
+
+      <div class="form-group" id="code-group" style="margin-bottom:16px;">
+        <label class="form-label" for="code">
+          {% if lang == 'de' %}Abonnementcode{% elif lang == 'en' %}Subscription code{% else %}Abonnementcode{% endif %}
+        </label>
+        <input type="text" id="code" name="code"
+               class="form-input code-input"
+               placeholder="SC-XXXX-XXXX"
+               maxlength="50"
+               autocomplete="off"
+               autocapitalize="characters"
+               spellcheck="false"
+               >
+      </div>
+
+        <div class="form-group" id="legacy-group" style="margin-bottom:16px;">
+          <label class="form-label">
+            {%if lang=='de'%}Lizenzcode alte Version StressChecker{%elif lang=='en'%}License code old version StressChecker{%else%}Licentiecode oude versie StressChecker{%endif%}
+          </label>
+          <input type="text" id="legacy_code" name="legacy_code" class="form-input" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" style="text-align:center;" maxlength="39" autocomplete="off" spellcheck="false">
+          <span style="font-size:.75rem;color:#aaa;margin-top:4px;display:block;text-align:center;">
+            {%if lang=='de'%}M&#246;glich bis 31. Dezember 2026.{%elif lang=='en'%}Available until December 31, 2026.{%else%}Mogelijk tot 31 december 2026.{%endif%}
+          </span>
+        </div>
+
+      <div class="form-group" style="margin-bottom:24px;">
+        <label class="form-label" for="email">
+          {% if lang == 'de' %}E-Mail-Adresse{% elif lang == 'en' %}Email address{% else %}E-mailadres{% endif %}
+        </label>
+        <input type="email" id="email" name="email"
+               class="form-input"
+               placeholder="{% if lang=='de' %}name@beispiel.de{% elif lang=='en' %}name@example.com{% else %}naam@voorbeeld.nl{% endif %}"
+               autocomplete="email">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="password">
+                <span id="pw-label">{% if lang == 'de' %}Passwort wählen{% elif lang == 'en' %}Choose password{% else %}Wachtwoord kiezen{% endif %}</span>
+              </label>
+              <div style="position:relative;"><input type="password" id="password" name="password" class="form-input" autocomplete="new-password"><button type="button" onclick="var i=document.getElementById('password');i.type=i.type==='password'?'text':'password'" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#aaa;padding:0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+              <div class="form-hint" style="font-size:12px;color:#888;margin-top:4px;">
+                {% if lang == 'de' %}Für Ihren nächsten Login.
+                {% elif lang == 'en' %}You'll need this next time.
+                {% else %}<span id="pw-hint">{% if lang=="de" %}Speichern Sie dieses Passwort für Ihren nächsten Besuch.{% elif lang=="en" %}Save this password for your next visit.{% else %}Bewaar dit wachtwoord voor je volgende bezoek.{% endif %}</span>{% endif %}
+              </div
+      </div>
+
+      <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:14px;margin-bottom:16px;font-size:.82rem;color:#555;"><label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;line-height:1.5"><input type="checkbox" name="privacy_consent" required style="margin-top:3px;width:18px;height:18px;flex-shrink:0;accent-color:var(--primary)"><span>{% if lang == "de" %}Ich stimme zu, dass meine Gesundheitsdaten (Herzfrequenz, HRV, Stresswerte) zur Nutzung der App verarbeitet werden. Ich habe die <a href="/privacy" target="_blank" style="color:var(--primary)">Datenschutzerklaerung</a> gelesen.{% elif lang == "en" %}I agree that my health data (heart rate, HRV, stress values) will be processed for use of the app. I have read the <a href="/privacy" target="_blank" style="color:var(--primary)">privacy policy</a>.{% else %}Ik ga akkoord dat mijn gezondheidsgegevens worden verwerkt voor gebruik van de app. Ik heb de <a href="/privacy" target="_blank" style="color:var(--primary);text-decoration:underline;font-weight:600">privacyverklaring</a> gelezen.{% endif %}</span></label></div>
+<button type="submit" id="submitBtn" class="btn btn-primary">
+        {% if lang == 'de' %}AKTIVIEREN ▶
+        {% elif lang == 'en' %}ACTIVATE ▶
+        {% else %}ACTIVEREN ▶{% endif %}
+      </button>
+
+      <div id="ri-notice" style="font-size:0.8rem;color:#888;margin-top:14px;text-align:center;line-height:1.5;">
+        {% if lang == 'de' %}Nach der Aktivierung fragen wir nach Ihrem Geburtsjahr und Geschlecht. Diese werden für die wissenschaftlich korrekte Berechnung des Relax Index gemäß der Lifelines-Kohortenstudie verwendet.
+        {% elif lang == 'en' %}After activation we will ask for your year of birth and gender. These are used for scientifically correct Relax Index calculation according to the Lifelines Cohort Study.
+        {% else %}Na activatie vragen we uw geboortejaar en geslacht. Deze worden gebruikt voor wetenschappelijk correcte Relax Index berekening volgens de Lifelines Cohortstudie.{% endif %}
+      </div>
+    </form>
+  </div>
+
+  {% if has_stripe_subscription %}
+  <a href="{{ url_for('manage_subscription') }}" class="btn btn-secondary" style="max-width:480px;margin-top:12px;">
+    {% if lang == 'de' %}Abonnement verwalten
+    {% elif lang == 'en' %}Manage subscription
+    {% else %}Abonnement beheren{% endif %}
+  </a>
+  {% endif %}
+
+  <div class="divider-text">
+    {% if lang == 'de' %}oder{% elif lang == 'en' %}or{% else %}of{% endif %}
+  </div>
+
+  <a href="{{ url_for('free_mode') }}" class="btn btn-secondary" style="max-width:480px;">
+    {% if lang == 'de' %}Kostenlose Version verwenden
+    {% elif lang == 'en' %}Use free version
+    {% else %}Gratis versie gebruiken{% endif %}
+  </a>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function formatCode(input) {
+  let v = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (v.startsWith('SCPRO')) {
+    let parts = ['SC'];
+    if (v.length > 2)  parts.push(v.substring(2, 5));
+    if (v.length > 5)  parts.push(v.substring(5, 9));
+    if (v.length > 9)  parts.push(v.substring(9, 13));
+    input.value = parts.join('-');
+  } else if (v.startsWith('SC')) {
+    let parts = ['SC'];
+    if (v.length > 2) parts.push(v.substring(2, 6));
+    if (v.length > 6) parts.push(v.substring(6, 10));
+    input.value = parts.join('-');
+  } else {
+    input.value = v;
+  }
+}
+</script>
+{% endblock %}
+
+<div id="legacyChoice" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;padding:32px;max-width:440px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+    <div style="font-size:2.5rem;margin-bottom:8px;">&#127881;</div>
+    <h2 style="color:#E8344E;margin:0 0 8px;">{% if lang == 'de' %}Willkommen zur&#252;ck!{% elif lang == 'en' %}Welcome back!{% else %}Welkom terug!{% endif %}</h2>
+    <p style="color:#666;font-size:0.95rem;margin-bottom:24px;">
+      {% if lang == 'de' %}Ihr alter StressChecker-Code wurde erkannt. Sie erhalten kostenlosen Zugang bis 1. Januar 2027. W&#228;hlen Sie Ihre Version:
+      {% elif lang == 'en' %}Your old StressChecker code was recognized. You get free access until January 1, 2027. Choose your version:
+      {% else %}Uw oude StressChecker-code is herkend. U krijgt gratis toegang tot 1 januari 2027. Kies uw versie:{% endif %}
+    </p>
+    <div style="display:flex;gap:12px;margin-bottom:16px;">
+      <button onclick="migrateLegacy('consumer')" style="flex:1;padding:16px 12px;border:2px solid #E8344E;border-radius:12px;background:#fff;cursor:pointer;">
+        <div style="font-size:1.8rem;">&#128100;</div>
+        <div style="font-weight:700;color:#E8344E;">Consumer</div>
+        <div style="color:#888;font-size:0.8rem;">{% if lang == 'de' %}Pers&#246;nliche Nutzung{% elif lang == 'en' %}Personal use{% else %}Persoonlijk gebruik{% endif %}</div>
+      </button>
+      <button onclick="migrateLegacy('pro')" style="flex:1;padding:16px 12px;border:2px solid #E8344E;border-radius:12px;background:#fff;cursor:pointer;">
+        <div style="font-size:1.8rem;">&#127973;</div>
+        <div style="font-weight:700;color:#E8344E;">Professional</div>
+        <div style="color:#888;font-size:0.8rem;">{% if lang == 'de' %}Klienten verwalten{% elif lang == 'en' %}Manage clients{% else %}Cli&#235;nten beheren{% endif %}</div>
+      </button>
+    </div>
+    <div id="migrateStatus" style="display:none;padding:8px;border-radius:8px;font-size:0.85rem;"></div>
+  </div>
+</div>
+<script>
+var _legacyCode='';
+function showLegacyChoice(code){_legacyCode=code;document.getElementById('legacyChoice').style.display='flex';}
+function migrateLegacy(choice){
+    var s=document.getElementById('migrateStatus');
+    s.style.display='block';s.style.background='#FFF3E0';s.style.color='#E65100';
+    s.textContent='\u23F3 Migreren...';
+    fetch('/api/license/migrate',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({legacy_code:_legacyCode,choice:choice})
+    }).then(function(r){return r.json();}).then(function(d){
+        if(d.needs_choice){var c=document.querySelector('input[name="code"]');showLegacyChoice(c?c.value:'');return;}
+
+        if(d.ok){
+            s.style.background='#E8F5E9';s.style.color='#2E7D32';
+            s.innerHTML='\u2705 Geactiveerd!<br><b>Nieuwe code: '+d.new_code+'</b><br><small>Geldig tot '+d.valid_until+'</small>';
+            setTimeout(function(){window.location.href='/profiel';},3000);
+        }else{s.style.background='#FFEBEE';s.style.color='#C62828';s.textContent='\u274C '+(d.error||'Fout');}
+    }).catch(function(e){s.style.background='#FFEBEE';s.style.color='#C62828';s.textContent='Fout: '+e;});
+}
+</script>
+<script>
+{% if show_legacy_choice %}
+document.addEventListener('DOMContentLoaded', function(){
+    showLegacyChoice('{{ legacy_code }}');
+});
+{% endif %}
+</script>
+

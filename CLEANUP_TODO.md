@@ -63,3 +63,7 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
 - [ ] **activation_log gap voor manual-origin accounts**: log-INSERT zit alleen in marketing/evaluation-branch (`app.py:607-613`), niet in algemene activatie-flow. Handmatig aangemaakte accounts (origin='manual') ontbreken in audit-trail. Niet kritiek, wel relevant voor traceability bij latere klant- of audit-vragen. Aparte sessie.
 
 - [ ] **Notitie HLM-flow (22-05-2026)** *(geen losse fix nodig)*: HLM-flow heeft eigen client-side birth_year/gender via localStorage en eigen norm-tabel in `hlm/meting_src.html` die divergeert van `hrv.js`. Meenemen in HLM Pro nieuwe generatie doorontwikkeling (~1 aug 2026) vanaf de start.
+
+## Design-keuzes (geen actie nodig)
+
+- **NL-aanspreekvorm split** (bevestigd 22-05-2026): educatieve templates (`welcome.html`, `faq.html`, `upgrade.html`, `profile.html`, `waarschuwing.html`) hanteren **je-vorm**; juridische/activatie-templates (`privacy.html`, `license.html`, `koppelen.html`, plus de toelichting op `/licentie` onder de submit-knop) hanteren **u/uw-vorm**. Bewuste design-keuze, geen technische schuld. DE-equivalent: consumer-flow gebruikt overal `Sie/Ihr` (formeel), niet `du` zoals oorspronkelijk vermoed.
