@@ -58,6 +58,8 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
 
 - [ ] **Norm-tabel-consolidatie**: `hrv.js` N-array (13 buckets, ~5-jarig) en `hlm/meting_src.html` rmssdReference (7 buckets, 10-jarig) divergeren materieel — tot 1.3 RI-punten verschil voor jong-volwassenen bij identieke meting. Beide claimen Lifelines Cohort. Wetenschappelijke beslissing nodig over baseline. Aparte sessie.
 
+- [ ] **kwadrant.html:347-350 referentiewaarde-display gebruikt lokale binary norm-keuze (`female ? f : m`)** terwijl hrv.js Diff E (commit a1107a2 22-05-2026) divers/unspecified als gemiddelde m+f behandelt. Inconsistentie voor display in details-tabel: berekend HRV% klopt, maar getoonde referentiewaarde matcht niet. Aparte fix nodig om kwadrant.html lokale norm-keuze uit te breiden met divers/unspecified-pad. Impact in productie: 1 test-fixture id=26 SC-TEST-RIFIX-002 (geen echte klanten). Past mogelijk in hetzelfde moment als norm-tabel-consolidatie (hrv.js vs hlm/meting_src.html) omdat alle drie norm-tabel-aanrakingen tegelijk genomen kunnen worden.
+
 - [ ] **Profile-completion-tracking**: huidige check `_birth == 1970` triggert profile_setup ook voor echte 1970-geborenen (nu 0 in productie, edge case acceptabel). Voor cleaner design: voeg `profile_completed` boolean-kolom toe aan users-tabel. Vervangt heuristiek die afhangt van schema-defaults (`birth_year DEFAULT 1970`, `gender DEFAULT 'male'`).
 
 - [ ] **activation_log gap voor manual-origin accounts**: log-INSERT zit alleen in marketing/evaluation-branch (`app.py:607-613`), niet in algemene activatie-flow. Handmatig aangemaakte accounts (origin='manual') ontbreken in audit-trail. Niet kritiek, wel relevant voor traceability bij latere klant- of audit-vragen. Aparte sessie.
