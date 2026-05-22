@@ -1,5 +1,40 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-05-22 — RI birth_year/gender uitvraag in activatie-flow
+
+Verplichte uitvraag van `birth_year` + `gender` vóór eerste meting, met norm-mapping voor non-binary opties. Fixt drie samenhangende latente bugs en lift de "71% van users heeft default 1970/male"-anomalie.
+
+### Latente bugs gefixt
+
+- **save_profile sloeg birth_year/gender niet op in users-tabel** (`app.py:987-1007`). UPDATE-statement vulde alleen activated_at + license_expires. Birth_year/gender bleven session-only en gingen verloren bij logout. Nu: `display_name`, `birth_year`, `gender` worden gepersisteerd, met `COALESCE(activated_at, ?)` zodat eerste-keer-vulling intact blijft.
+- **license_expires-gat** (secundair gefixt): `license_notifications.py:225` filtert renewal-mails op `WHERE license_expires IS NOT NULL`. 71% van users had `license_expires=NULL` en kreeg dus géén 30/7-dagen-vervalwaarschuwing. Save_profile vult license_expires nu wél bij eerste keer.
+- **activated_at-gat** (impliciet gefixt door save_profile-COALESCE): users zonder profile_setup hadden `activated_at=NULL`.
+
+### Nieuwe features
+
+- **verify_2fa redirect naar profile_setup** als `users.birth_year IS NULL OR = 1970` (app.py:884).
+- **/sensor-en-meten block-check voor eigen-meting** (app.py:1140+): bij `_cid==0` redirect naar `/profiel?reason=meting_blocked` met visuele banner.
+- **4 gender-opties** in profile.html: male/female/divers/unspecified, geen default-checked, `placeholder="1985"` ipv `value="1970"`.
+- **hrv.js norm-mapping** voor `gender ∈ {divers, unspecified}` → `(n.m+n.f)/2`. Bewezen via node-test: male=78 > divers=74 = unspecified=74 > female=70 (age 41, RMSSD ≈ 28).
+
+### Buiten scope (vastgelegd in CLEANUP_TODO ## TODO)
+
+- HLM-flow: eigen client-side birth_year/gender via localStorage en eigen norm-tabel — meenemen in HLM Pro nieuwe generatie (~1 aug 2026).
+- Norm-tabel-consolidatie tussen hrv.js en hlm/meting_src.html (1.3 RI-punten divergentie).
+- `profile_completed` boolean-kolom (vervangt 1970-heuristiek).
+- activation_log gap voor manual-origin accounts.
+- **2FA-codes plaintext in journalctl** — HIGH PRIORITY, herbevestigd vandaag.
+
+### Validatie
+
+- Backup-snapshot vóór wijziging: `/opt/backups/*.20260522-1128`
+- `py_compile` na elke .py-Diff: OK
+- Jinja2 parse `profile.html`: OK
+- `node -c hrv.js`: OK
+- HUP gunicorn master: workers respawn zonder errors
+- End-to-end curl-flow + 2 test-fixtures (id=25 female 1985, id=26 divers 1990): alle 5 Diffs (A-E) bewezen werkend
+- Existing users (Paul 1949, Steven 1982): géén redirect-impact
+
 ## 2026-05-22
 
 Codebase cleanup volgens CLEANUP_TODO.md, gefaseerd uitgevoerd met checkpoint-akkoorden (Fase 1 inventarisatie, Fase 2 uitvoering A→H).

@@ -35,3 +35,31 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
 
 - [ ] **Untracked dirs git-tracken**: `hlm/`, `scripts/`, `static/`, `templates/`, `tests/`, `email_templates/`. Aparte sessie nodig: per directory bewust afwegen (secrets? configuratie? testdata?). Tot die sessie blijven deze dirs untracked en gaan ze niet mee met `git add .`.
 - [ ] **Docs-organisatie**: `LAUNCH_LOG.md`, `PWRESET_PLAN.md`, `TODO.md` (en eventueel `SYSTEM_REFERENCE.md`) — verplaatsen naar `docs/` subdir of in root laten? Aparte beslissing per file.
+
+- [ ] **SendGrid API-key audit**: drie unieke SendGrid API-keys in vier codebase-locaties gevonden tijdens 22-05-2026 cleanup-sessie (poging tot SendGrid-key-fallback-cleanup geannuleerd omdat scope buiten terminal-context viel):
+    - `/opt/stresschecker/.env` SENDGRID_API_KEY — suffix `8UuY` (huidige, post-12-05 rotatie)
+    - `weekly_email.py:8` fallback (hardcoded) — suffix `9Amg`
+    - `license_notifications.py:12` hardcoded (geen env-var-laag) — suffix `Ixc0` (matcht `.env.bak_sendgrid_20260512` ⇒ pre-12-05 rotatie)
+    - root crontab `weekly_email`-regel prefix — suffix `9Amg` (identiek aan `weekly_email.py:8` fallback, geen extra unieke key)
+
+    Status van obsolete keys ONBEKEND zonder SendGrid-dashboard-toegang; vermoeden ≠ bewijs.
+
+    Te doen in aparte sessie:
+    a. SendGrid-dashboard openen, lijst active/disabled keys met laatst-gebruikt timestamps
+    b. Match elke gevonden key tegen de 4 codebase-locaties (suffix-vergelijking volstaat)
+    c. Per locatie beslissen: vervangen door `os.environ`-only (met `load_dotenv("/opt/stresschecker/.env")`), key revoken in SendGrid, of beide. Voor `weekly_email.py` is `load_dotenv(..., override=True)` nodig omdat crontab-prefix anders voorrang krijgt.
+    d. Daarna kan **Untracked dirs git-tracken**-sessie (item 1) veilig doorgaan zonder dat hardcoded keys in git-historie belanden.
+
+    Tot die sessie blijven `weekly_email.py` en `license_notifications.py` untracked; geen acute git-leak-risico.
+
+### Toegevoegd 22-05-2026 na RI birth_year/gender uitvraag-sessie
+
+- [ ] **2FA-codes plaintext in journalctl** *(HIGH PRIORITY)*: herbevestigd 22-05; oorspronkelijk gemeld 12-05 in gen_context.py follow-ups. Voorbeeld vandaag: `gunicorn[1369644]: 2FA CODE for test-rifix@lifestylemonitors.com: 902758`. Log-redactie of verwijderen van de print-statement nodig (`app.py:671`, `app.py:692`). Productie-security-issue. Eerstvolgende cleanup-sessie aanpakken.
+
+- [ ] **Norm-tabel-consolidatie**: `hrv.js` N-array (13 buckets, ~5-jarig) en `hlm/meting_src.html` rmssdReference (7 buckets, 10-jarig) divergeren materieel — tot 1.3 RI-punten verschil voor jong-volwassenen bij identieke meting. Beide claimen Lifelines Cohort. Wetenschappelijke beslissing nodig over baseline. Aparte sessie.
+
+- [ ] **Profile-completion-tracking**: huidige check `_birth == 1970` triggert profile_setup ook voor echte 1970-geborenen (nu 0 in productie, edge case acceptabel). Voor cleaner design: voeg `profile_completed` boolean-kolom toe aan users-tabel. Vervangt heuristiek die afhangt van schema-defaults (`birth_year DEFAULT 1970`, `gender DEFAULT 'male'`).
+
+- [ ] **activation_log gap voor manual-origin accounts**: log-INSERT zit alleen in marketing/evaluation-branch (`app.py:607-613`), niet in algemene activatie-flow. Handmatig aangemaakte accounts (origin='manual') ontbreken in audit-trail. Niet kritiek, wel relevant voor traceability bij latere klant- of audit-vragen. Aparte sessie.
+
+- [ ] **Notitie HLM-flow (22-05-2026)** *(geen losse fix nodig)*: HLM-flow heeft eigen client-side birth_year/gender via localStorage en eigen norm-tabel in `hlm/meting_src.html` die divergeert van `hrv.js`. Meenemen in HLM Pro nieuwe generatie doorontwikkeling (~1 aug 2026) vanaf de start.

@@ -881,6 +881,9 @@ def verify_2fa():
             if _paired_pro_id:
                 session['paired_with_pro']  = _paired_pro_id
                 session['paired_client_id'] = _paired_client_id
+            # Verplicht profile_setup vóór menu als birth_year ontbreekt/default
+            if not _birth or _birth == 1970:
+                return redirect(url_for('profile_setup'))
             return redirect(url_for('pro_menu') if lt=='pro' else url_for('menu'))
         else:
             error='Onjuiste code.' if lang=='nl' else ('Falscher Code.' if lang=='de' else 'Incorrect.')
@@ -988,10 +991,13 @@ def profile_setup():
 def save_profile():
     if not session.get('license_valid') and not session.get('demo_mode'):
         return redirect(url_for('welcome'))
-    session['profile_name']       = request.form.get('name', '').strip()
-    session['profile_birth_year'] = int(request.form.get('birth_year', 1970))
-    session['profile_gender']     = request.form.get('gender', 'male')
-    # Sla activatiedatum op (alleen bij nieuwe registratie)
+    _name = request.form.get('name', '').strip()
+    _by   = int(request.form.get('birth_year', 1970))
+    _gen  = request.form.get('gender', 'male')
+    session['profile_name']       = _name
+    session['profile_birth_year'] = _by
+    session['profile_gender']     = _gen
+    # Persisteer + zet activated_at/license_expires alleen bij eerste keer
     import sqlite3 as _sq2, datetime as _dt2
     _cn2 = _sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
     _now = _dt2.datetime.utcnow()
@@ -1000,8 +1006,14 @@ def save_profile():
     else:
         _exp = _now + _dt2.timedelta(days=183)  # ~6 maanden
     _cn2.execute(
-        "UPDATE users SET activated_at=?, license_expires=? WHERE email=? AND activated_at IS NULL",
-        (_now.isoformat(), _exp.isoformat(), session.get('email',''))
+        "UPDATE users SET "
+        "display_name=?, birth_year=?, gender=?, "
+        "activated_at=COALESCE(activated_at, ?), "
+        "license_expires=COALESCE(license_expires, ?) "
+        "WHERE email=?",
+        (_name, _by, _gen,
+         _now.isoformat(), _exp.isoformat(),
+         session.get('email',''))
     )
     _cn2.commit()
     _cn2.close()
@@ -1142,6 +1154,18 @@ def sensor_en_meten():
     if not session.get("license_valid") and not session.get("demo_mode"):
         return redirect(url_for("welcome"))
     _cid = int(request.args.get("cid", 0)) or session.get("measuring_for_client") or 0
+    # Block-check: eigen-meting zonder ingevulde birth_year → profile_setup
+    if _cid == 0 and not session.get("demo_mode"):
+        import sqlite3 as _sq_blk
+        _cn_blk = _sq_blk.connect('/opt/ic-license-server/data/saas_licenses.db')
+        _by_row = _cn_blk.execute(
+            "SELECT birth_year FROM users WHERE email=?",
+            (session.get('email',''),)
+        ).fetchone()
+        _cn_blk.close()
+        _by = _by_row[0] if _by_row else None
+        if _by is None or _by == 1970:
+            return redirect(url_for('profile_setup') + '?reason=meting_blocked')
     if _cid and _is_pro_or_demo_pro():
         profile = {"id": _cid, "name": session.get("client_name",""),
                    "birth_year": session.get("client_birth_year", 1970),
