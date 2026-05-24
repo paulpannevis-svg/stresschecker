@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}StressChecker® — {% if lang=='de' %}Bericht generieren{% elif lang=='en' %}Generate report{% else %}Rapport genereren{% endif %}{% endblock %}
+{% block content %}
+<style>
+.rap-wrap{max-width:680px;margin:0 auto;padding:1rem;}
+.btn-action{background:#1565c0;color:#fff;padding:.5rem 1.2rem;border-radius:6px;text-decoration:none;font-weight:600;font-size:.9rem;border:none;cursor:pointer;}
+.btn-action.secondary{background:#fff;color:#1565c0;border:1px solid #1565c0;}
+.btn-action:hover{background:#0d47a1;}
+.rap-card{background:#fff;padding:1.4rem 1.5rem;border-radius:10px;border:1px solid #e0e6ed;margin-bottom:1.2rem;}
+.rap-form .field{margin-bottom:1rem;}
+.rap-form label{display:block;font-size:.88rem;color:#333;margin-bottom:.3rem;font-weight:600;}
+.rap-form select, .rap-form input{width:100%;padding:.5rem .7rem;border:1px solid #ddd;border-radius:6px;font-size:.95rem;box-sizing:border-box;}
+.rap-form .radio-group label{font-weight:400;display:flex;align-items:center;gap:.4rem;cursor:pointer;padding:.3rem 0;}
+.flash-success{background:#e8f5e9;color:#2e7d32;padding:.8rem 1rem;border-radius:6px;margin-bottom:1rem;}
+.flash-error{background:#fdecea;color:#b71c1c;padding:.6rem .9rem;border-radius:6px;margin-bottom:1rem;font-size:.92rem;}
+.back-link{display:inline-block;margin-top:1rem;color:#1565c0;text-decoration:none;font-size:.9rem;}
+.hint{font-size:.8rem;color:#888;margin-top:.2rem;}
+</style>
+
+<div class="rap-wrap">
+  <h2 style="font-size:1.2rem;margin-bottom:1rem;">
+    <span style="background:#1565c0;color:#fff;font-size:.7rem;padding:.2rem .55rem;border-radius:4px;vertical-align:middle;margin-right:.4rem;">{% if is_kk %}KK{% else %}PRO{% endif %}</span>
+    {% if lang=='de' %}Bericht generieren{% elif lang=='en' %}Generate report{% else %}Rapport genereren{% endif %}
+  </h2>
+
+  {% if request.args.get('error') == 'type' %}
+  <div class="flash-error">{% if lang=='de' %}Ungültiger Berichtstyp.{% elif lang=='en' %}Invalid report type.{% else %}Ongeldig rapport-type.{% endif %}</div>
+  {% endif %}
+  {% if request.args.get('error') == 'pro_key' %}
+  <div class="flash-error">{% if lang=='de' %}Konfigurationsfehler — bitte kontaktieren Sie support.{% elif lang=='en' %}Configuration error — please contact support.{% else %}Configuratiefout — neem contact op met support.{% endif %}</div>
+  {% endif %}
+
+  {% if requested_uuid %}
+  <div class="flash-success">
+    <strong>{% if lang=='de' %}Bericht wird erstellt{% elif lang=='en' %}Report is being generated{% else %}Rapport wordt gegenereerd{% endif %}.</strong><br>
+    {% if lang=='de' %}Sie erhalten in Kürze eine E-Mail an {{ email }} mit dem Download-Link.{% elif lang=='en' %}You will receive an email at {{ email }} shortly with the download link.{% else %}U ontvangt zo een e-mail op {{ email }} met de download-link.{% endif %}
+    <div style="font-size:.78rem;color:#666;margin-top:.4rem;">Job ID: <code>{{ requested_uuid }}</code></div>
+  </div>
+  <a href="{{ url_for('pro_rapport_form') }}" class="btn-action secondary">{% if lang=='de' %}Neuer Bericht{% elif lang=='en' %}New report{% else %}Nieuw rapport{% endif %}</a>
+  {% else %}
+
+  <div class="rap-card">
+    <form method="POST" action="{{ url_for('pro_rapport_genereer') }}" class="rap-form">
+      <div class="field">
+        <label>{% if lang=='de' %}Berichtstyp{% elif lang=='en' %}Report type{% else %}Rapport-type{% endif %} *</label>
+        <div class="radio-group">
+          {% if is_kk %}
+          <label><input type="radio" name="report_type" value="kk_overall" checked onchange="toggleOfficeField(this)">
+            {% if lang=='de' %}Gesamt (alle Standorte){% elif lang=='en' %}Overall (all locations){% else %}Overall (alle kantoren){% endif %}</label>
+          <label><input type="radio" name="report_type" value="kk_office" onchange="toggleOfficeField(this)">
+            {% if lang=='de' %}Pro Standort{% elif lang=='en' %}Per location{% else %}Per kantoor{% endif %}</label>
+          {% else %}
+          <label><input type="radio" name="report_type" value="pro_portfolio" checked onchange="toggleClientField(this)">
+            {% if lang=='de' %}Portfolio (alle Klienten){% elif lang=='en' %}Portfolio (all clients){% else %}Portefeuille (alle cliënten){% endif %}</label>
+          <label><input type="radio" name="report_type" value="pro_client" onchange="toggleClientField(this)">
+            {% if lang=='de' %}Einzelner Klient{% elif lang=='en' %}Single client{% else %}Individueel cliënt{% endif %}</label>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if is_kk %}
+      <div class="field" id="officeField" style="display:none;">
+        <label for="office_label">{% if lang=='de' %}Standort{% elif lang=='en' %}Location{% else %}Kantoor{% endif %} *</label>
+        <select id="office_label" name="office_label">
+          {% for o in offices %}<option value="{{ o }}">{{ o }}</option>{% endfor %}
+        </select>
+        {% if not offices %}<div class="hint" style="color:#c62828;">{% if lang=='de' %}Noch keine aktiven Standorte.{% elif lang=='en' %}No active locations yet.{% else %}Nog geen actieve kantoren.{% endif %}</div>{% endif %}
+      </div>
+      {% else %}
+      <div class="field" id="clientField" style="display:none;">
+        <label for="client_id">{% if lang=='de' %}Klient{% elif lang=='en' %}Client{% else %}Cliënt{% endif %} *</label>
+        <select id="client_id" name="client_id">
+          {% for c in clients %}<option value="{{ c.id }}">{{ c.name }}{% if c.surname %} {{ c.surname }}{% endif %} ({{ c.birth_year }})</option>{% endfor %}
+        </select>
+        {% if not clients %}<div class="hint" style="color:#c62828;">{% if lang=='de' %}Noch keine Klienten.{% elif lang=='en' %}No clients yet.{% else %}Nog geen cliënten.{% endif %}</div>{% endif %}
+      </div>
+      {% endif %}
+
+      <div class="field">
+        <label for="periode">{% if lang=='de' %}Zeitraum{% elif lang=='en' %}Period{% else %}Periode{% endif %} *</label>
+        <select id="periode" name="periode">
+          <option value="maand">{% if lang=='de' %}Letzter Monat{% elif lang=='en' %}Last month{% else %}Afgelopen maand{% endif %}</option>
+          <option value="kwartaal" selected>{% if lang=='de' %}Letztes Quartal{% elif lang=='en' %}Last quarter{% else %}Afgelopen kwartaal{% endif %}</option>
+          <option value="jaar">{% if lang=='de' %}Letztes Jahr{% elif lang=='en' %}Last year{% else %}Afgelopen jaar{% endif %}</option>
+          <option value="alles">{% if lang=='de' %}Gesamtzeitraum{% elif lang=='en' %}All time{% else %}Alles{% endif %}</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn-action">
+        {% if lang=='de' %}Generieren ▶{% elif lang=='en' %}Generate ▶{% else %}Genereren ▶{% endif %}
+      </button>
+      <div class="hint" style="margin-top:.6rem;">
+        {% if lang=='de' %}Der Bericht wird im Hintergrund erstellt und per E-Mail an {{ email }} zugestellt (~30 Sek).{% elif lang=='en' %}The report is generated in the background and emailed to {{ email }} (~30 sec).{% else %}Het rapport wordt op de achtergrond gegenereerd en per e-mail bezorgd op {{ email }} (~30 sec).{% endif %}
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <a href="{{ url_for('pro_menu') }}" class="back-link">← {% if lang=='de' %}Zurück zum Menü{% elif lang=='en' %}Back to menu{% else %}Terug naar menu{% endif %}</a>
+</div>
+
+<script>
+function toggleOfficeField(radio){
+  var f = document.getElementById('officeField');
+  if(f) f.style.display = (radio.value === 'kk_office') ? 'block' : 'none';
+}
+function toggleClientField(radio){
+  var f = document.getElementById('clientField');
+  if(f) f.style.display = (radio.value === 'pro_client') ? 'block' : 'none';
+}
+</script>
+{% endblock %}

@@ -2096,6 +2096,347 @@ def kk_locaties_import():
     return render_template('pro/locaties_import.html', lang=lang, errors=[])
 
 
+# ============================================================================
+# Rapportage-laag (Sessie B.2)
+# 4 rapport-types via WeasyPrint, async via threading.Thread.
+# Audit-trail in saas_licenses.db.report_jobs.
+# Coexisteert met /admin/krankenkasse (admin-route) en /pro/locaties (KK-beheer).
+# ============================================================================
+import threading as _threading
+import uuid as _uuid
+
+REPORT_BASE_DIR = '/opt/stresschecker/reports'
+REPORT_PUBLIC_BASE_URL = 'https://app.stresschecker.com'  # absolute link in mail
+
+
+@app.template_global()
+def pct(part, total):
+    """Jinja-helper: percentage als '54%' (rounded) of '–' bij nul-totaal."""
+    try:
+        if not total: return '–'
+        return f'{round(100.0 * float(part) / float(total))}%'
+    except (TypeError, ValueError, ZeroDivisionError):
+        return '–'
+
+
+@app.template_global()
+def zone_label_jinja(zone_key, lang):
+    """Jinja-helper: zone-key → label. Wrapt analytics.zone_label."""
+    import analytics as _analytics
+    return _analytics.zone_label(zone_key, lang)
+
+
+def _report_db():
+    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def _license_info(license_code):
+    db = _report_db()
+    row = db.execute(
+        "SELECT license_key, email, product, product_name, notes FROM licenses WHERE license_key=?",
+        (license_code,)).fetchone()
+    db.close()
+    return dict(row) if row else None
+
+
+def _license_pro_key(license_code):
+    """Voor KK: stabiele pro_key uit licensehouder-email (zoals get_user_key) doet."""
+    info = _license_info(license_code)
+    if not info or not info.get('email'):
+        return None
+    return hashlib.sha256(info['email'].encode()).hexdigest()[:32]
+
+
+def send_report_ready_email(to_email, uuid_str, lang='nl'):
+    """Mail: rapport klaar + download-link."""
+    try:
+        import sendgrid
+        from sendgrid.helpers.mail import Mail
+        sg = sendgrid.SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
+        link = f'{REPORT_PUBLIC_BASE_URL}/rapport/download/{uuid_str}'
+        if lang == 'de':
+            subject = 'Ihr StressChecker-Bericht ist bereit'
+            body = (f'Ihr Bericht wurde erstellt.\n\n'
+                    f'Sie koennen ihn hier herunterladen:\n{link}\n\n'
+                    f'Der Link funktioniert solange Sie eingeloggt sind.\n\n'
+                    f'Mit freundlichen Gruessen,\nLifestyle Monitors')
+        elif lang == 'en':
+            subject = 'Your StressChecker report is ready'
+            body = (f'Your report has been generated.\n\n'
+                    f'Download it here:\n{link}\n\n'
+                    f'The link works as long as you are logged in.\n\n'
+                    f'Kind regards,\nLifestyle Monitors')
+        else:
+            subject = 'Uw StressChecker-rapport is klaar'
+            body = (f'Uw rapport is gegenereerd.\n\n'
+                    f'Download het hier:\n{link}\n\n'
+                    f'De link werkt zolang u ingelogd bent.\n\n'
+                    f'Met vriendelijke groet,\nLifestyle Monitors')
+        msg = Mail(from_email='noreply@lifestylemonitors.com', to_emails=to_email,
+                   subject=subject, plain_text_content=body)
+        sg.send(msg)
+        return True
+    except Exception as e:
+        print('Report-ready-mail fout:', e)
+        return False
+
+
+def send_report_failed_email(to_email, lang, err_summary):
+    try:
+        import sendgrid
+        from sendgrid.helpers.mail import Mail
+        sg = sendgrid.SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
+        if lang == 'de':
+            subject = 'StressChecker-Bericht: Fehler bei der Generierung'
+            body = (f'Leider konnte Ihr Bericht nicht erstellt werden.\n\n'
+                    f'Fehler: {err_summary}\n\n'
+                    f'Bitte versuchen Sie es erneut oder kontaktieren Sie support@lifestylemonitors.com.')
+        elif lang == 'en':
+            subject = 'StressChecker report: generation failed'
+            body = (f'Sorry, your report could not be generated.\n\n'
+                    f'Error: {err_summary}\n\n'
+                    f'Please retry or contact support@lifestylemonitors.com.')
+        else:
+            subject = 'StressChecker-rapport: generatie mislukt'
+            body = (f'Helaas kon uw rapport niet worden gegenereerd.\n\n'
+                    f'Fout: {err_summary}\n\n'
+                    f'Probeer opnieuw of neem contact op met support@lifestylemonitors.com.')
+        msg = Mail(from_email='noreply@lifestylemonitors.com', to_emails=to_email,
+                   subject=subject, plain_text_content=body)
+        sg.send(msg)
+    except Exception as e:
+        print('Report-failed-mail fout:', e)
+
+
+def _render_report_async(uuid_str, license_code, user_email, lang, report_type, params, pro_key):
+    """Background thread. Genereert PDF, slaat op, update DB-row, verstuurt mail.
+    Niet-daemon zodat Gunicorn graceful shutdown wacht."""
+    import analytics
+    db = _report_db()
+    try:
+        period_kind = params.get('periode', 'kwartaal')
+        period_start, period_end = analytics.period_bounds(period_kind)
+        lic = _license_info(license_code) or {}
+        license_name = (lic.get('notes') or '').replace('Krankenkasse: ', '').strip() \
+                       or lic.get('product_name') or license_code
+
+        zone_order = analytics.ZONE_KEYS
+        common_ctx = {
+            'lang': lang,
+            'license_code': license_code,
+            'license_name': license_name,
+            'period_start_date': period_start[:10],
+            'period_end_date':   period_end[:10],
+            'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'generated_label': {'de':'Generiert','en':'Generated','nl':'Gegenereerd'}.get(lang,'Gegenereerd'),
+            'page_label':      {'de':'Seite','en':'Page','nl':'Pagina'}.get(lang,'Pagina'),
+            'report_label':    {'kk_overall': 'Krankenkasse', 'kk_office':'Krankenkasse', 'pro_client':'Pro','pro_portfolio':'Pro'}.get(report_type,''),
+            'zone_order':   zone_order,
+            'zone_label':   analytics.zone_label,
+        }
+
+        if report_type == 'kk_overall':
+            overall = analytics.aggregate_period(license_code, pro_key, period_start, period_end, group_by='office_label')
+            office_groups = overall.pop('groups', [])
+            region_agg = analytics.aggregate_period(license_code, pro_key, period_start, period_end, group_by='region')
+            region_groups = region_agg.get('groups', [])
+            # Active office count
+            kk_db = _report_db()
+            tot_active = kk_db.execute(
+                "SELECT COUNT(*) FROM krankenkasse_offices WHERE license_code=? AND active=1",
+                (license_code,)).fetchone()[0]
+            kk_db.close()
+            ctx = {**common_ctx, 'overall': overall, 'office_groups': office_groups,
+                   'region_groups': region_groups, 'total_offices_active': tot_active}
+            template_name = 'reports/kk_overall.html'
+
+        elif report_type == 'kk_office':
+            office_name = params.get('office_label', '')
+            overall = analytics.aggregate_period(license_code, pro_key, period_start, period_end,
+                                                 filter={'office_label': office_name})
+            # Region lookup
+            office_region = ''
+            kk_db = _report_db()
+            r = kk_db.execute(
+                "SELECT region FROM krankenkasse_offices WHERE license_code=? AND office_name=?",
+                (license_code, office_name)).fetchone()
+            kk_db.close()
+            office_region = (r['region'] if r else '') or ''
+            ctx = {**common_ctx, 'overall': overall, 'office_name': office_name,
+                   'office_region': office_region}
+            template_name = 'reports/kk_office.html'
+
+        elif report_type == 'pro_client':
+            client_id = int(params.get('client_id', 0))
+            client = analytics.client_meta(pro_key, client_id)
+            if not client:
+                raise ValueError(f'client_id {client_id} niet gevonden voor pro_key')
+            overall = analytics.aggregate_period(license_code, pro_key, period_start, period_end,
+                                                 filter={'client_id': client_id})
+            series = analytics.time_series(pro_key, client_id, period_start, period_end)
+            ctx = {**common_ctx, 'overall': overall, 'client': client, 'series': series}
+            template_name = 'reports/pro_client.html'
+
+        elif report_type == 'pro_portfolio':
+            overall = analytics.aggregate_period(license_code, pro_key, period_start, period_end, group_by='client_id')
+            client_groups = overall.pop('groups', [])
+            pro_name = (lic.get('notes') or '').strip() or user_email
+            ctx = {**common_ctx, 'overall': overall, 'client_groups': client_groups, 'pro_name': pro_name}
+            template_name = 'reports/pro_portfolio.html'
+
+        else:
+            raise ValueError(f'Onbekend report_type: {report_type}')
+
+        # Render via app.jinja_env (geen request-context nodig)
+        template = app.jinja_env.get_template(template_name)
+        html_str = template.render(**ctx)
+
+        from weasyprint import HTML
+        pdf_bytes = HTML(string=html_str, base_url=app.root_path).write_pdf()
+
+        # Opslaan op disk (RELATIEVE pad in DB voor portabiliteit)
+        rel_dir = f'reports/{license_code}'
+        abs_dir = os.path.join('/opt/stresschecker', rel_dir)
+        os.makedirs(abs_dir, mode=0o750, exist_ok=True)
+        rel_path = f'{rel_dir}/{uuid_str}.pdf'
+        abs_path = os.path.join('/opt/stresschecker', rel_path)
+        with open(abs_path, 'wb') as f:
+            f.write(pdf_bytes)
+
+        db.execute(
+            "UPDATE report_jobs SET status='ready', pdf_path=?, delivered_at=datetime('now') WHERE uuid=?",
+            (rel_path, uuid_str))
+        db.commit()
+
+        send_report_ready_email(user_email, uuid_str, lang)
+
+    except Exception as e:
+        import traceback
+        err = (str(e) or 'unknown')[:300]
+        app.logger.warning('REPORT JOB FAIL uuid=%s err=%s\n%s', uuid_str, err, traceback.format_exc())
+        try:
+            db.execute(
+                "UPDATE report_jobs SET status='failed', error_message=? WHERE uuid=?",
+                (err, uuid_str))
+            db.commit()
+        except Exception:
+            pass
+        send_report_failed_email(user_email, lang, err)
+    finally:
+        db.close()
+
+
+def _user_can_request_report():
+    """Inlog + (KK óf is_pro())."""
+    if not session.get('license_valid'):
+        return False
+    return is_pro() or is_krankenkasse_session()
+
+
+@app.route('/pro/rapport', methods=['GET'])
+def pro_rapport_form():
+    if not _user_can_request_report():
+        return redirect(url_for('welcome'))
+    lang = session.get('lang', 'nl')
+    license_code = session.get('license_code', '')
+    is_kk = is_krankenkasse_session()
+    offices = []
+    clients = []
+    if is_kk:
+        kk_db = _report_db()
+        offices = [r['office_name'] for r in kk_db.execute(
+            "SELECT office_name FROM krankenkasse_offices WHERE license_code=? AND active=1 ORDER BY office_name",
+            (license_code,)).fetchall()]
+        kk_db.close()
+    else:
+        pro_db = get_pro_db()
+        clients = [dict(r) for r in pro_db.execute(
+            "SELECT id, name, surname, birth_year FROM clients WHERE pro_key=? AND active=1 ORDER BY name",
+            (get_user_key(),)).fetchall()]
+        pro_db.close()
+    return render_template('pro/rapport.html', lang=lang, is_kk=is_kk,
+                           offices=offices, clients=clients,
+                           email=session.get('email', ''))
+
+
+@app.route('/pro/rapport/genereer', methods=['POST'])
+def pro_rapport_genereer():
+    if not _user_can_request_report():
+        return redirect(url_for('welcome'))
+    lang = session.get('lang', 'nl')
+    license_code = session.get('license_code', '')
+    user_email = session.get('email', '')
+    report_type = (request.form.get('report_type', '') or '').strip()
+    is_kk = is_krankenkasse_session()
+
+    # Validatie report_type tegen audience
+    kk_types = ('kk_overall', 'kk_office')
+    pro_types = ('pro_client', 'pro_portfolio')
+    if is_kk and report_type not in kk_types:
+        return redirect(url_for('pro_rapport_form', error='type'))
+    if (not is_kk) and report_type not in pro_types:
+        return redirect(url_for('pro_rapport_form', error='type'))
+
+    params = {
+        'periode': request.form.get('periode', 'kwartaal'),
+        'office_label': request.form.get('office_label', ''),
+        'client_id': request.form.get('client_id', '0'),
+    }
+
+    # KK gebruikt licensehouder-pro_key (stabiel), Pro gebruikt eigen email-hash
+    pro_key = _license_pro_key(license_code) if is_kk else get_user_key()
+    if not pro_key:
+        return redirect(url_for('pro_rapport_form', error='pro_key'))
+
+    job_uuid = _uuid.uuid4().hex
+    db = _report_db()
+    db.execute(
+        "INSERT INTO report_jobs (uuid, license_code, user_email, report_type, status, params_json) "
+        "VALUES (?, ?, ?, ?, 'pending', ?)",
+        (job_uuid, license_code, user_email, report_type, json.dumps(params)))
+    db.commit()
+    db.close()
+
+    _threading.Thread(
+        target=_render_report_async,
+        args=(job_uuid, license_code, user_email, lang, report_type, params, pro_key),
+        daemon=False
+    ).start()
+
+    return render_template('pro/rapport.html', lang=lang, is_kk=is_kk,
+                           offices=[], clients=[],
+                           email=user_email, requested_uuid=job_uuid)
+
+
+@app.route('/rapport/download/<uuid_str>')
+def rapport_download(uuid_str):
+    if not session.get('license_valid'):
+        abort(403)
+    uuid_str = (uuid_str or '').strip()
+    if not uuid_str or not all(c in '0123456789abcdef' for c in uuid_str.lower()):
+        abort(400)
+    db = _report_db()
+    row = db.execute(
+        "SELECT license_code, user_email, status, pdf_path FROM report_jobs WHERE uuid=?",
+        (uuid_str,)).fetchone()
+    db.close()
+    if not row:
+        abort(404)
+    # Cross-tenant guard: alleen toegankelijk voor zelfde licentie-sessie
+    if row['license_code'] != session.get('license_code', ''):
+        abort(403)
+    if row['status'] != 'ready' or not row['pdf_path']:
+        # 202 met retry-msg zou netter zijn; voor MVP gewoon melding
+        return ('Rapport is nog niet klaar of mislukt. Status: ' + row['status'], 202)
+    abs_path = os.path.join('/opt/stresschecker', row['pdf_path'])
+    if not os.path.exists(abs_path):
+        abort(410)
+    return send_file(abs_path, mimetype='application/pdf', as_attachment=False,
+                     download_name=f'stresschecker-rapport-{uuid_str[:8]}.pdf')
+
+
 @app.route('/pro/client/toevoegen', methods=['GET','POST'])
 @require_kk_office_if_krankenkasse
 def pro_client_add():

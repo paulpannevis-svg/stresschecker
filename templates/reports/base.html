@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="{{ lang or 'nl' }}">
+<head>
+<meta charset="UTF-8">
+<title>{% block title %}StressChecker Rapport{% endblock %}</title>
+<style>
+@page {
+  size: A4;
+  margin: 2cm 1.8cm 2.5cm 1.8cm;
+  @top-left {
+    content: element(pageheader);
+  }
+  @bottom-left {
+    content: "{{ generated_label }}: {{ generated_at }}";
+    font-size: 8pt;
+    color: #888;
+  }
+  @bottom-right {
+    content: "{{ page_label }} " counter(page) " / " counter(pages);
+    font-size: 8pt;
+    color: #888;
+  }
+}
+body {
+  font-family: 'Helvetica', 'Arial', sans-serif;
+  font-size: 10pt;
+  color: #222;
+  line-height: 1.4;
+}
+#pageheader {
+  position: running(pageheader);
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #1565c0;
+  padding-bottom: .3cm;
+  margin-bottom: .2cm;
+}
+.brand-text {
+  font-size: 8pt;
+  color: #1565c0;
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+.report-tag {
+  font-size: 7.5pt;
+  color: #888;
+}
+h1 { font-size: 18pt; color: #1565c0; margin: 0 0 .2cm 0; }
+h2 { font-size: 13pt; color: #333; border-bottom: 1px solid #e0e6ed; padding-bottom: .15cm; margin-top: .9cm; }
+h3 { font-size: 11pt; color: #1565c0; margin: .8cm 0 .2cm 0; }
+.meta {
+  color: #888;
+  font-size: 9.5pt;
+  margin-bottom: .6cm;
+}
+.stats-row {
+  display: flex;
+  gap: .5cm;
+  margin: .5cm 0 .8cm 0;
+}
+.stat-block {
+  flex: 1;
+  background: #f6f8fb;
+  padding: .4cm .5cm;
+  border-radius: 6px;
+  text-align: center;
+}
+.stat-block .value {
+  font-size: 18pt;
+  font-weight: 700;
+  color: #1565c0;
+  display: block;
+}
+.stat-block .label {
+  font-size: 8pt;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  margin: .3cm 0 .6cm 0;
+}
+table.data th {
+  background: #f0f4f8;
+  text-align: left;
+  padding: .15cm .3cm;
+  font-size: 9pt;
+  border-bottom: 1.5px solid #1565c0;
+  color: #444;
+}
+table.data td {
+  padding: .12cm .3cm;
+  border-bottom: 1px solid #eef0f3;
+  font-size: 9.5pt;
+}
+table.data tr:nth-child(even) td {
+  background: #fafbfc;
+}
+.zone-row td.label {
+  font-weight: 600;
+}
+.zone-veerkrachtig { color: #2e7d32; }
+.zone-in_balans     { color: #1565c0; }
+.zone-licht_belast  { color: #f57f17; }
+.zone-belast        { color: #e65100; }
+.zone-zwaar_belast  { color: #b71c1c; }
+.bar {
+  display: inline-block;
+  height: .25cm;
+  background: #1565c0;
+  vertical-align: middle;
+  border-radius: 1px;
+}
+.method-block {
+  margin-top: 1cm;
+  padding: .5cm .6cm;
+  background: #f6f8fb;
+  border-radius: 6px;
+  font-size: 8.5pt;
+  color: #555;
+  line-height: 1.45;
+}
+.method-block h3 { color: #1565c0; font-size: 10pt; margin-top: 0; }
+.footer-brand {
+  margin-top: .6cm;
+  font-size: 8pt;
+  color: #888;
+  text-align: center;
+}
+.page-break { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<div id="pageheader">
+  <span class="brand-text">StressChecker® — Lifestyle Monitors</span>
+  <span class="report-tag">{{ report_label }}</span>
+</div>
+
+{% block content %}{% endblock %}
+
+<div class="method-block">
+  <h3>{% if lang=='de' %}Methodik &amp; Erläuterung{% elif lang=='en' %}Methodology &amp; explanation{% else %}Methodische toelichting{% endif %}</h3>
+  <p style="margin:.1cm 0;">
+    {% if lang=='de' %}<strong>Relax Index (RI)</strong> ist ein Wert zwischen 0 und 10, abgeleitet aus der Herzratenvariabilität (HRV) mittels RMSSD, normalisiert nach Alter und Geschlecht (Verveen-Tabellen).{% elif lang=='en' %}<strong>Relax Index (RI)</strong> is a score 0–10 derived from heart-rate variability (HRV/RMSSD), normalised by age and gender (Verveen tables).{% else %}<strong>Relax Index (RI)</strong> is een score 0-10 afgeleid uit hartritmevariabiliteit (HRV/RMSSD), genormaliseerd op leeftijd en geslacht (Verveen-tabellen).{% endif %}
+  </p>
+  <p style="margin:.1cm 0;">
+    <strong>{% if lang=='de' %}Zonen{% elif lang=='en' %}Zones{% else %}Zones{% endif %}:</strong>
+    <span class="zone-zwaar_belast">&lt;2 {% if lang=='de' %}Schwer belastet{% elif lang=='en' %}Heavily strained{% else %}Zwaar belast{% endif %}</span>
+    · <span class="zone-belast">2–4 {% if lang=='de' %}Belastet{% elif lang=='en' %}Strained{% else %}Belast{% endif %}</span>
+    · <span class="zone-licht_belast">4–6 {% if lang=='de' %}Leicht belastet{% elif lang=='en' %}Lightly strained{% else %}Licht belast{% endif %}</span>
+    · <span class="zone-in_balans">6–8 {% if lang=='de' %}Im Gleichgewicht{% elif lang=='en' %}In balance{% else %}In balans{% endif %}</span>
+    · <span class="zone-veerkrachtig">≥8 {% if lang=='de' %}Vital{% elif lang=='en' %}Resilient{% else %}Veerkrachtig{% endif %}</span>
+  </p>
+  <p style="margin:.1cm 0;">
+    {% if lang=='de' %}Aggregierte Werte sind anonym; einzelne Messungen lassen sich nicht auf Personen zurückführen.{% elif lang=='en' %}Aggregated values are anonymous; individual readings cannot be traced back to persons.{% else %}Geaggregeerde waardes zijn anoniem; individuele metingen zijn niet te herleiden naar personen.{% endif %}
+  </p>
+</div>
+
+<div class="footer-brand">
+  Lifestyle Monitors · info@lifestylemonitors.com · www.stresschecker.com
+</div>
+
+</body>
+</html>

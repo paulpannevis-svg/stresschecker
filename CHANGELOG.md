@@ -1,5 +1,102 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-05-24 — Rapportage-laag Krankenkasse + Pro (Sessie B.2)
+
+Vier PDF-rapport-types via WeasyPrint, async generatie via threading, mail-bezorging met download-link. Hergebruikbare `analytics.py`-module voor aggregatie. Audit-trail in `report_jobs`-tabel.
+
+### System dependencies
+- `pip install --break-system-packages weasyprint` (v68.1) + deps (brotli, zopfli, tinyhtml5, Pyphen, pydyf, fonttools)
+- `apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0` (runtime-libs voor weasyprint)
+
+### Schema
+- `saas_licenses.db`: `CREATE TABLE report_jobs (uuid TEXT PK, license_code TEXT, user_email TEXT, report_type TEXT, status TEXT, pdf_path TEXT, error_message TEXT, params_json TEXT, created_at, delivered_at)`
+- `pdf_path` opgeslagen als **RELATIEF** pad (`reports/<license_code>/<uuid>.pdf`) voor portabiliteit
+
+### Storage
+- `/opt/stresschecker/reports/<license_code>/<uuid>.pdf` (owner www-data, 0750)
+- Pre-migratie backup: `/opt/backups/*.20260524-2031`
+
+### Nieuwe module: `analytics.py`
+
+Pure data-functies (geen template-rendering, geen DB-writes):
+- `zone_for_ri(ri)` + `zone_label(zone_key, lang)` — RI→zone-mapping (drempels 2/4/6/8 uit `static/js/hrv.js:78-82`). 5-zone-systeem; EN-strings nieuw toegevoegd (ontbraken in hrv.js).
+- `age_category(birth_year, ref_year=current)` — '<30'/'30-45'/'45-60'/'>60'/'unknown'
+- `period_bounds(kind)` — maand/kwartaal/jaar/alles → ISO-strings
+- `aggregate_period(license_code, pro_key, start, end, group_by, filter)` — centrale aggregatie met optionele groep-by ('office_label', 'region', 'client_id'). Cross-DB merge (saas_licenses.db.krankenkasse_offices voor region-lookup + sc_pro.db.client_metingen ⨝ clients voor M/V/age).
+- `time_series(pro_key, client_id, start, end)` — tijdreeks voor pro_client-rapport
+- `client_meta(pro_key, client_id)` — cliënt-info voor rapport-header
+
+### Backend (app.py)
+
+Plek: na `/pro/locaties/import`-route, vóór `pro_client_add`. Imports: `threading`, `uuid`.
+
+Helpers:
+- `pct()` + `zone_label_jinja()` als `@app.template_global()` voor PDF-templates
+- `_report_db()`, `_license_info()`, `_license_pro_key()` — voor stabiele KK-pro_key (sha256 van `licenses.email`, niet huidige session-email — meerdere KK-collega's loggen in onder hetzelfde adres)
+- `send_report_ready_email(to, uuid, lang)` + `send_report_failed_email(to, lang, err)` — NL/DE/EN, from `noreply@lifestylemonitors.com`
+- `_render_report_async(uuid, license_code, user_email, lang, report_type, params, pro_key)` — background worker, niet-daemon thread, render via `app.jinja_env.get_template(...).render(...)` (geen request-context nodig), WeasyPrint `HTML(string=..., base_url=app.root_path).write_pdf()`, opslag op disk, UPDATE report_jobs, mail. Errors → log + status='failed' + foutmail.
+
+Routes:
+- `GET /pro/rapport` — formulier (conditioneel KK vs Pro via `is_krankenkasse_session()` flag)
+- `POST /pro/rapport/genereer` — INSERT report_jobs pending + `Thread(target=_render_report_async, daemon=False).start()`; rendert dezelfde template met `requested_uuid` flash
+- `GET /rapport/download/<uuid>` — session-licensie-gate + cross-tenant guard + `send_file(application/pdf)`. UUID-format validatie (hex). 202 als nog niet `ready`, 404 onbekend, 410 als bestand weg.
+
+### Templates
+
+Rapport-templates (`templates/reports/`):
+- `base.html` — A4 met @page-CSS (margin, header-element via `position:running()`, footer met `counter(page)/counter(pages)`), method-block, Lifestyle Monitors footer
+- `kk_overall.html` — overall stats (kantoor-count + metingen + ri-avg) + M/V + leeftijd + zone-verdeling + per-kantoor tabel + per-region tabel
+- `kk_office.html` — één-kantoor variant zonder cross-kantoor tabellen
+- `pro_client.html` — cliënt-meta + zone-verdeling + tijdreeks-tabel
+- `pro_portfolio.html` — portefeuille-stats + zone-verdeling + per-cliënt tabel
+
+UI:
+- `templates/pro/rapport.html` — radio-buttons voor report_type, conditional dropdown voor kantoor/cliënt, periode-select (maand/kwartaal/jaar/alles), JS-toggle voor afhankelijke velden, flash-melding "wordt gegenereerd" met job-uuid
+
+### Verificatie
+
+- `pip3 install weasyprint` + `apt install libpango-1.0-0 libpangoft2-1.0-0` → minimal HTML→PDF render produceert PDF-1.7 (4854 bytes voor smoke-string)
+- `py_compile app.py` + `py_compile analytics.py`: OK
+- Jinja-parse op 6 templates via app.jinja_env: OK
+- `tests/run_all.sh`: 18/18 groen
+- **End-to-end** met seeded test-data (6 cliënten × 3 metingen × 3 kantoren = 18 rijen): alle 4 rapport-types renderen succesvol; aggregatie correct (Hamburg n=6 ri_avg=4.57, Hannover n=6 ri_avg=5.7, München n=6 ri_avg=3.5; M/V/D-counts kloppen)
+- **Thread-pad**: POST → thread → status='ready' binnen 2 seconden → download 200 met %PDF-1.7 magic (19106 bytes)
+- **Cross-tenant guard**: andere licentie-sessie download → 403
+- **Consumer-sessie** → 302 redirect /welkom
+- **KK probeert pro_portfolio** → 302 redirect met `error=type`
+- **Onbekende UUID** → 404
+- **Schone journal** na restart
+
+### Inspectie-PDFs (blijven voor visuele check)
+
+`/opt/stresschecker/reports/SC-KK-44F6-14A3/`:
+- KK Overall: ~21 KB
+- KK Office (Hamburg): ~19 KB
+- Pro Client: ~18 KB
+- Pro Portfolio: ~20 KB
+
+### TODOs / latente optimalisaties
+
+1. **`CREATE INDEX idx_report_jobs_license_created ON report_jobs(license_code, created_at)`** — niet gebouwd nu; nodig zodra rapport-geschiedenis-pagina komt (Sessie B.3?) en `WHERE license_code=? ORDER BY created_at DESC`-queries normaal worden.
+2. **Mail-link-cookie-afhankelijkheid**: `/rapport/download/<uuid>` werkt alleen bij actieve session. Gebruiker uit-en-in-loggen tussen "mail ontvangen" en "klikken" verliest niet de toegang (de UUID is stabiel), maar wel als session-cookie verlopen is. Voor lange retentie eventueel signed-token-link.
+3. **Geen scheduling/recurring** — alleen on-demand. Voor maand/kwartaal-recurring overweeg later cron met service-account-sessie.
+4. **WeasyPrint UTC-deprecation warning** in stdlib (analytics.py:datetime.utcnow). Werkt nog onder Python 3.12; toekomstige Python kan dit verwijderen → toen vervangen met `datetime.now(tz=timezone.utc)`.
+5. **PDF-size optimalisatie**: huidige rapporten 18-21 KB, prima. Geen Brotli-compressie nodig.
+6. **Audit-trail** voor INSERT/UPDATE in `report_jobs` zit in tabel zelf (created_at, delivered_at, status); geen apart log nodig.
+7. **Test-fixtures behouden**: PDFs uit smoke-test blijven in `/opt/stresschecker/reports/SC-KK-44F6-14A3/` voor Paul's visuele inspectie.
+
+### Geraakte bestanden
+
+- `analytics.py` (NIEUW, 230 regels)
+- `app.py` — imports (threading, uuid), helpers, 3 routes, 2 mail-functies, 1 async worker
+- `templates/reports/base.html` (NIEUW)
+- `templates/reports/kk_overall.html` (NIEUW)
+- `templates/reports/kk_office.html` (NIEUW)
+- `templates/reports/pro_client.html` (NIEUW)
+- `templates/reports/pro_portfolio.html` (NIEUW)
+- `templates/pro/rapport.html` (NIEUW)
+- `CHANGELOG.md` — deze entry
+
 ## 2026-05-24 — KKH-zelfbeheer kantoor-master-lijst (Sessie B.1)
 
 Self-service kantoor-beheer voor KK-licenties. Schmidt (KKH-admin) en collega's loggen in op hetzelfde KK-account; één-rol-model. CRUD + CSV-bulk-import + overzicht met meting-counts en M/V-tellers per kantoor. Geen rol-onderscheid, geen aparte logins. Coexisteert met de bestaande Paul-only `/admin/krankenkasse/<code>/offices` (cross-licentie-toegang).

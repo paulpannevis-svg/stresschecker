@@ -1,0 +1,69 @@
+{% extends "reports/base.html" %}
+{% block title %}Portfolio Bericht{% endblock %}
+{% block content %}
+
+<h1>{% if lang=='de' %}Portfolio-Bericht{% elif lang=='en' %}Portfolio report{% else %}Portefeuille-rapport{% endif %}</h1>
+<div class="meta">
+  {{ pro_name }} — {{ period_start_date }} → {{ period_end_date }}
+</div>
+
+<div class="stats-row">
+  <div class="stat-block">
+    <span class="value">{{ client_groups|length }}</span>
+    <span class="label">{% if lang=='de' %}Aktive Klienten{% elif lang=='en' %}Active clients{% else %}Actieve cliënten{% endif %}</span>
+  </div>
+  <div class="stat-block">
+    <span class="value">{{ overall.total_metingen }}</span>
+    <span class="label">{% if lang=='de' %}Messungen{% elif lang=='en' %}Readings{% else %}Metingen{% endif %}</span>
+  </div>
+  <div class="stat-block">
+    <span class="value">{{ overall.ri_average if overall.ri_average is not none else '–' }}</span>
+    <span class="label">{% if lang=='de' %}Durchschn. RI{% elif lang=='en' %}Avg. RI{% else %}Gem. RI{% endif %}</span>
+  </div>
+</div>
+
+<h2>{% if lang=='de' %}Geschlechtsverteilung{% elif lang=='en' %}Gender distribution{% else %}Geslachts­verdeling{% endif %}</h2>
+<table class="data">
+  <tr><th style="width:30%;">{% if lang=='de' %}Geschlecht{% elif lang=='en' %}Gender{% else %}Geslacht{% endif %}</th><th>{% if lang=='de' %}Anzahl{% elif lang=='en' %}Count{% else %}Aantal{% endif %}</th><th>%</th></tr>
+  <tr><td>{% if lang=='de' %}Frau{% elif lang=='en' %}Female{% else %}Vrouw{% endif %}</td>     <td>{{ overall.gender_distribution['V'] }}</td>       <td>{{ pct(overall.gender_distribution['V'], overall.total_metingen) }}</td></tr>
+  <tr><td>{% if lang=='de' %}Mann{% elif lang=='en' %}Male{% else %}Man{% endif %}</td>          <td>{{ overall.gender_distribution['M'] }}</td>       <td>{{ pct(overall.gender_distribution['M'], overall.total_metingen) }}</td></tr>
+  <tr><td>{% if lang=='de' %}Divers{% elif lang=='en' %}Other{% else %}Divers{% endif %}</td>    <td>{{ overall.gender_distribution['D'] }}</td>       <td>{{ pct(overall.gender_distribution['D'], overall.total_metingen) }}</td></tr>
+  <tr><td>{% if lang=='de' %}Unbekannt{% elif lang=='en' %}Unknown{% else %}Onbekend{% endif %}</td><td>{{ overall.gender_distribution['unknown'] }}</td><td>{{ pct(overall.gender_distribution['unknown'], overall.total_metingen) }}</td></tr>
+</table>
+
+<h2>{% if lang=='de' %}Zonenverteilung (alle Klienten){% elif lang=='en' %}Zone distribution (all clients){% else %}Zoneverdeling (alle cliënten){% endif %}</h2>
+<table class="data">
+  <tr><th style="width:35%;">{% if lang=='de' %}Zone{% elif lang=='en' %}Zone{% else %}Zone{% endif %}</th><th>{% if lang=='de' %}Anzahl{% elif lang=='en' %}Count{% else %}Aantal{% endif %}</th><th>%</th></tr>
+  {% for z in zone_order %}
+  <tr class="zone-row">
+    <td class="label zone-{{ z }}">{{ zone_label(z, lang) }}</td>
+    <td>{{ overall.zone_distribution[z] }}</td>
+    <td>{{ pct(overall.zone_distribution[z], overall.total_metingen) }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% if client_groups %}
+<div class="page-break"></div>
+<h2>{% if lang=='de' %}Pro Klient{% elif lang=='en' %}Per client{% else %}Per cliënt{% endif %}</h2>
+<table class="data">
+  <tr>
+    <th>{% if lang=='de' %}Klient{% elif lang=='en' %}Client{% else %}Cliënt{% endif %}</th>
+    <th style="text-align:right;">{% if lang=='de' %}Jhg.{% elif lang=='en' %}Yr.{% else %}Jg.{% endif %}</th>
+    <th>{% if lang=='de' %}Geschl.{% elif lang=='en' %}Gender{% else %}Geslacht{% endif %}</th>
+    <th style="text-align:right;">{% if lang=='de' %}Messungen{% elif lang=='en' %}Readings{% else %}Metingen{% endif %}</th>
+    <th style="text-align:right;">{% if lang=='de' %}Durchschn. RI{% elif lang=='en' %}Avg. RI{% else %}Gem. RI{% endif %}</th>
+  </tr>
+  {% for g in client_groups %}
+  <tr>
+    <td>{{ g.client_name }}{% if g.client_surname %} {{ g.client_surname }}{% endif %}</td>
+    <td style="text-align:right;">{{ g.birth_year or '–' }}</td>
+    <td>{% if g.gender == 'male' %}M{% elif g.gender == 'female' %}{% if lang=='en' %}F{% else %}V{% endif %}{% else %}{{ g.gender or '–' }}{% endif %}</td>
+    <td style="text-align:right;font-weight:600;">{{ g.total_metingen }}</td>
+    <td style="text-align:right;">{{ g.ri_average if g.ri_average is not none else '–' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{% endblock %}
