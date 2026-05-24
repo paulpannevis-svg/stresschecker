@@ -1,5 +1,78 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-05-24 — KKH-zelfbeheer kantoor-master-lijst (Sessie B.1)
+
+Self-service kantoor-beheer voor KK-licenties. Schmidt (KKH-admin) en collega's loggen in op hetzelfde KK-account; één-rol-model. CRUD + CSV-bulk-import + overzicht met meting-counts en M/V-tellers per kantoor. Geen rol-onderscheid, geen aparte logins. Coexisteert met de bestaande Paul-only `/admin/krankenkasse/<code>/offices` (cross-licentie-toegang).
+
+### Migratie
+
+- `saas_licenses.db`: `ALTER TABLE krankenkasse_offices ADD COLUMN region TEXT` — 3 fixtures behouden, region=NULL voor bestaande rijen
+- Pre-migratie backup: `/opt/backups/*.20260524-2006`
+
+### Backend (app.py)
+
+Helpers vlak na `pro_locatie`-route:
+- `_kk_require()` — `abort(403)` voor anon en niet-KK-sessies
+- `_kk_db()` — sqlite3-connect saas_licenses.db met Row-factory
+- `_kk_office_stats(license_code, pro_key)` — cross-DB aggregatie (saas_licenses.db.krankenkasse_offices + sc_pro.db.client_metingen∗clients). Twee queries, Python-merge — geen ATTACH
+- `_parse_kk_csv(raw_bytes, max_rows=500)` — strikte parser: header verplicht `office_name`+`region`, UTF-8 + BOM, autodetect `,`/`;`/`\t`, 100-char cap, lege names → skip + error
+
+8 nieuwe routes (allemaal `_kk_require()`-gated, géén `@require_kk_office_if_krankenkasse` zodat Schmidt zonder eerst kantoor te kiezen kan importeren):
+
+| Route | Methode | Gedrag |
+|---|---|---|
+| `/pro/locaties` | GET | Overzicht read-only met sort (`name`/`region`/`metingen`) + zoek-query (`q=`) |
+| `/pro/locaties/beheren` | GET | Beheer-UI met form + per-rij always-editable input + acties |
+| `/pro/locaties/toevoegen` | POST | INSERT single, case-insensitive dup-check, redirect `?created=1`/`?error=leeg`/`?error=dup` |
+| `/pro/locaties/<oid>/bewerken` | POST | UPDATE naam+region, cross-tenant 404-guard, refresh `session['kk_office']` bij naam-wijziging van actief kantoor (historische `client_metingen.office_label`-strings blijven bewaard — audit-trail) |
+| `/pro/locaties/<oid>/deactiveren` | POST | `active=0` |
+| `/pro/locaties/<oid>/reactiveren` | POST | `active=1` |
+| `/pro/locaties/import` | GET | Form |
+| `/pro/locaties/import` | POST | 2-staps: upload → preview met `csv_text` hidden field; confirm=1 → batch-INSERT met dup-skip, redirect overzicht met `?imported=X&dups=Y` |
+
+`abort` toegevoegd aan top-level Flask-import (regel 1).
+
+### Templates (4 nieuwe + 2 menu-link-edits)
+
+- `templates/pro/locaties_overzicht.html` — read-only tabel met Naam/Regio/Status/Metingen/M/V/Overig, sort-knoppen (default `name` asc), zoekveld, KK-badge `#1565c0`, empty-state met CSV-importeren-CTA
+- `templates/pro/locaties_beheren.html` — flash-messages (created/updated/deactivated/reactivated/error=leeg/dup), add-form bovenaan, lijst met always-editable input-velden per rij + Opslaan/Deact/React-acties + JS `confirm()` voor deactiveren in 3 talen, empty-state
+- `templates/pro/locaties_import.html` — file-upload-form, format-uitleg met live CSV-voorbeeld (Hamburg-Mitte / Bayern / Niedersachsen samples)
+- `templates/pro/locaties_import_preview.html` — summary (totaal/nieuw/dup-counts), preview-tabel (max 20 nieuwe rijen + max 10 duplicates), warning-list voor parse-errors, "X importeren"-knop met `confirm=1` + hidden `csv_text`, Annuleren-link
+- `templates/pro/locatie_keuze.html` — kleine "⚙ Locaties beheren →"-link onderaan (alleen voor KK, niet prominent)
+- `templates/settings.html` — KK-tier-widget krijgt extra link "⚙ Locaties beheren →" onder "Huidige locatie"
+
+### Verificatie
+
+- `py_compile app.py`: OK
+- Jinja-parse via `app.jinja_env` op 6 templates: OK
+- `tests/run_all.sh`: 18/18 groen
+- KK-render-smoke: /pro/locaties + /pro/locaties/beheren + /pro/locaties/import alle 200 met verwachte elementen
+- **CSV-flow**: upload `office_name,region\nSMOKE_one,RegionA\nSMOKE_two,RegionB\nHannover,Niedersachsen\n` → preview toont 2 nieuw + 1 dup met Hannover in dup-list; confirm → 302 `/pro/locaties?imported=2&dups=1`; DB-state na confirm: SMOKE_one + SMOKE_two ingevoegd, Hannover (case-insensitive dup) overgeslagen
+- **Edit-flow**: bewerken → `?updated=1` + flash; deactiveren → `?deactivated=1` + flash zichtbaar; reactiveren → `?reactivated=1`
+- **Cross-tenant lek-test** (uit backend-fase): andere licentie's office-id bewerken vanuit KK-sessie → 404
+- **Parser-tests**: BOM+semicolon → autodetect; missende `region`-kolom → duidelijke error; lege office_name → skip + warning; >500 rijen → cap
+- **Pro-regressie**: niet-KK-sessie → 403 op alle 3 GET-routes; bestaande Pro-flows ongewijzigd
+- Journalctl schoon na restart
+
+### Geraakte bestanden
+
+- `app.py` — abort-import + 3 helpers + 8 routes
+- `CHANGELOG.md` — deze entry
+- `templates/pro/locaties_overzicht.html` (nieuw)
+- `templates/pro/locaties_beheren.html` (nieuw)
+- `templates/pro/locaties_import.html` (nieuw)
+- `templates/pro/locaties_import_preview.html` (nieuw)
+- `templates/pro/locatie_keuze.html` — beheer-link onderaan
+- `templates/settings.html` — beheer-link in KK-tier-widget
+
+### TODOs / open punten
+
+1. **Cross-DB `_kk_office_stats` is O(licentie-omvang)** — twee queries per render. Voor 80+ kantoren is dit nog OK; bij honderden actieve KK-licenties met elk veel kantoren kan caching nuttig zijn. Out-of-scope voor B.1.
+2. **Soft-delete vs hard-delete**: alleen soft (active=0). Historische metingen blijven gekoppeld aan de oude `office_label`-string. Bij hernoeming wordt de nieuwe naam in `session['kk_office']` gezet; nieuwe metingen krijgen nieuwe naam, oude metingen blijven onder oude naam (audit-trail). Geen overschrijving van bestaande `client_metingen.office_label`.
+3. **CSV-confirm-flow stuurt `csv_text` via hidden field** — voor 500 rijen × ~50 chars ≈ 25 KB POST-body. Acceptabel; bij groter volume zou je server-side temp-storage of session-based draft willen.
+4. **Geen audit-log voor kantoor-wijzigingen** — INSERT/UPDATE/DELETE acties worden niet gelogd in `activation_log` (zoals admin-routes wel doen). Overweeg bij privacy/compliance-eisen vanuit KKH. Out-of-scope nu.
+5. **Browser-end-to-end-check** door Paul (zoals Sessie A) — alle paden via Flask-test-client bewezen.
+
 ## 2026-05-24 — Krankenkasse-UI-verfijningen (Sessie A.1)
 
 Cleanup na browser-test Sessie A: PRO-badge en consumer-pairing-flow zichtbaar in /pro-context die voor KK-medewerker misleidend zijn. Alleen Jinja-conditionals, geen DB-wijzigingen, geen routes, geen helpers.

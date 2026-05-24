@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}StressChecker® — {% if lang=='de' %}Standorte verwalten{% elif lang=='en' %}Manage locations{% else %}Locaties beheren{% endif %}{% endblock %}
+{% block content %}
+<style>
+.loc-wrap{max-width:880px;margin:0 auto;padding:1rem;}
+.loc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;}
+.btn-action{background:#1565c0;color:#fff;padding:.45rem 1rem;border-radius:6px;text-decoration:none;font-weight:600;font-size:.9rem;border:none;cursor:pointer;}
+.btn-action.secondary{background:#fff;color:#1565c0;border:1px solid #1565c0;}
+.btn-action:hover{background:#0d47a1;}
+.flash-success{background:#e8f5e9;color:#2e7d32;padding:.6rem .9rem;border-radius:6px;margin-bottom:1rem;font-size:.92rem;}
+.flash-error{background:#fdecea;color:#b71c1c;padding:.6rem .9rem;border-radius:6px;margin-bottom:1rem;font-size:.92rem;}
+.add-card{background:#f6f8fb;padding:1rem 1.2rem;border-radius:8px;margin-bottom:1.4rem;}
+.add-card h3{margin:0 0 .7rem 0;font-size:1rem;color:#1565c0;}
+.add-form{display:flex;gap:.5rem;align-items:end;flex-wrap:wrap;}
+.add-form .field{flex:1;min-width:140px;}
+.add-form label{display:block;font-size:.78rem;color:#666;margin-bottom:.2rem;}
+.add-form input{width:100%;padding:.4rem .6rem;border:1px solid #ddd;border-radius:6px;font-size:.95rem;box-sizing:border-box;}
+.dashboard-table-wrap{overflow-x:auto;}
+.dashboard-table{width:100%;border-collapse:collapse;font-size:.93rem;}
+.dashboard-table thead tr{background:#f0f4f8;}
+.dashboard-table th{padding:.55rem 1rem;text-align:left;font-weight:600;color:#555;border-bottom:2px solid #dde3ea;white-space:nowrap;}
+.dashboard-table td{padding:.5rem 1rem;border-bottom:1px solid #eef0f3;vertical-align:middle;}
+.dashboard-table tbody tr.inactive{opacity:.55;background:#fafafa;}
+.row-input{width:100%;padding:.3rem .5rem;border:1px solid #ddd;border-radius:5px;font-size:.92rem;box-sizing:border-box;}
+.row-actions{display:flex;gap:.35rem;flex-wrap:wrap;}
+.btn-small{font-size:.82rem;padding:.3rem .7rem;border-radius:5px;cursor:pointer;border:none;}
+.btn-save{background:#1565c0;color:#fff;}
+.btn-deact{background:#fff;color:#c62828;border:1px solid #c62828;}
+.btn-react{background:#fff;color:#2e7d32;border:1px solid #2e7d32;}
+.empty{background:#fffbe6;border:1px dashed #f0d58a;padding:1.2rem;border-radius:8px;text-align:center;color:#7a6730;}
+.back-link{display:inline-block;margin-top:1rem;color:#1565c0;text-decoration:none;font-size:.9rem;}
+</style>
+
+<div class="loc-wrap">
+  <div class="loc-header">
+    <h2 style="margin:0;font-size:1.2rem;">
+      <span style="background:#1565c0;color:#fff;font-size:.7rem;padding:.2rem .55rem;border-radius:4px;vertical-align:middle;margin-right:.4rem;">KK</span>
+      {% if lang=='de' %}Standorte verwalten{% elif lang=='en' %}Manage locations{% else %}Locaties beheren{% endif %}
+    </h2>
+    <div style="display:flex;gap:.5rem;">
+      <a href="{{ url_for('kk_locaties_overzicht') }}" class="btn-action secondary">{% if lang=='de' %}Übersicht{% elif lang=='en' %}Overview{% else %}Overzicht{% endif %}</a>
+      <a href="{{ url_for('kk_locaties_import') }}" class="btn-action">{% if lang=='de' %}CSV importieren{% elif lang=='en' %}Import CSV{% else %}CSV importeren{% endif %}</a>
+    </div>
+  </div>
+
+  {% if created %}<div class="flash-success">{% if lang=='de' %}Standort hinzugefügt.{% elif lang=='en' %}Location added.{% else %}Locatie toegevoegd.{% endif %}</div>{% endif %}
+  {% if updated %}<div class="flash-success">{% if lang=='de' %}Standort aktualisiert.{% elif lang=='en' %}Location updated.{% else %}Locatie bijgewerkt.{% endif %}</div>{% endif %}
+  {% if deactivated %}<div class="flash-success">{% if lang=='de' %}Standort deaktiviert.{% elif lang=='en' %}Location deactivated.{% else %}Locatie gedeactiveerd.{% endif %}</div>{% endif %}
+  {% if reactivated %}<div class="flash-success">{% if lang=='de' %}Standort reaktiviert.{% elif lang=='en' %}Location reactivated.{% else %}Locatie gereactiveerd.{% endif %}</div>{% endif %}
+  {% if error == 'leeg' %}<div class="flash-error">{% if lang=='de' %}Name darf nicht leer sein.{% elif lang=='en' %}Name cannot be empty.{% else %}Naam mag niet leeg zijn.{% endif %}</div>{% endif %}
+  {% if error == 'dup' %}<div class="flash-error">{% if lang=='de' %}Standort mit diesem Namen existiert bereits.{% elif lang=='en' %}Location with this name already exists.{% else %}Locatie met deze naam bestaat al.{% endif %}</div>{% endif %}
+
+  <div class="add-card">
+    <h3>{% if lang=='de' %}+ Neuer Standort{% elif lang=='en' %}+ New location{% else %}+ Nieuwe locatie{% endif %}</h3>
+    <form method="POST" action="{{ url_for('kk_locaties_toevoegen') }}" class="add-form">
+      <div class="field">
+        <label for="add_name">{% if lang=='de' %}Name{% elif lang=='en' %}Name{% else %}Naam{% endif %} *</label>
+        <input type="text" id="add_name" name="office_name" placeholder="Hannover-Mitte" maxlength="100" required>
+      </div>
+      <div class="field">
+        <label for="add_region">{% if lang=='de' %}Region{% elif lang=='en' %}Region{% else %}Regio{% endif %}</label>
+        <input type="text" id="add_region" name="region" placeholder="Niedersachsen" maxlength="100">
+      </div>
+      <button type="submit" class="btn-action">{% if lang=='de' %}Hinzufügen{% elif lang=='en' %}Add{% else %}Toevoegen{% endif %}</button>
+    </form>
+  </div>
+
+  {% if offices %}
+  <div class="dashboard-table-wrap">
+    <table class="dashboard-table">
+      <thead>
+        <tr>
+          <th style="width:30%;">{% if lang=='de' %}Name{% elif lang=='en' %}Name{% else %}Naam{% endif %}</th>
+          <th style="width:25%;">{% if lang=='de' %}Region{% elif lang=='en' %}Region{% else %}Regio{% endif %}</th>
+          <th style="width:14%;">{% if lang=='de' %}Status{% elif lang=='en' %}Status{% else %}Status{% endif %}</th>
+          <th style="width:9%;text-align:right;">{% if lang=='de' %}Mess.{% elif lang=='en' %}Read.{% else %}Met.{% endif %}</th>
+          <th style="width:22%;"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for o in offices %}
+        <tr class="{% if not o.active %}inactive{% endif %}">
+          <form method="POST" action="{{ url_for('kk_locaties_bewerken', oid=o.id) }}" id="edit-{{ o.id }}">
+          </form>
+          <td><input class="row-input" form="edit-{{ o.id }}" type="text" name="office_name" value="{{ o.office_name }}" maxlength="100" required></td>
+          <td><input class="row-input" form="edit-{{ o.id }}" type="text" name="region" value="{{ o.region }}" maxlength="100"></td>
+          <td>
+            {% if o.active %}
+            <span style="background:#e8f5e9;color:#2e7d32;padding:.15rem .55rem;border-radius:10px;font-size:.78rem;font-weight:600;">{% if lang=='de' %}aktiv{% elif lang=='en' %}active{% else %}actief{% endif %}</span>
+            {% else %}
+            <span style="background:#fafafa;color:#999;padding:.15rem .55rem;border-radius:10px;font-size:.78rem;">{% if lang=='de' %}inaktiv{% elif lang=='en' %}inactive{% else %}inactief{% endif %}</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;font-weight:600;">{{ o.total_metingen }}</td>
+          <td>
+            <div class="row-actions">
+              <button type="submit" form="edit-{{ o.id }}" class="btn-small btn-save">{% if lang=='de' %}Speichern{% elif lang=='en' %}Save{% else %}Opslaan{% endif %}</button>
+              {% if o.active %}
+              <form method="POST" action="{{ url_for('kk_locaties_deactiveren', oid=o.id) }}" style="display:inline;"
+                    onsubmit="return confirm('{% if lang=='de' %}Sind Sie sicher, dass Sie {{ o.office_name|e }} deaktivieren möchten?{% elif lang=='en' %}Are you sure you want to deactivate {{ o.office_name|e }}?{% else %}Weet u zeker dat u {{ o.office_name|e }} wilt deactiveren?{% endif %}');">
+                <button type="submit" class="btn-small btn-deact">{% if lang=='de' %}Deaktiv.{% elif lang=='en' %}Deact.{% else %}Deact.{% endif %}</button>
+              </form>
+              {% else %}
+              <form method="POST" action="{{ url_for('kk_locaties_reactiveren', oid=o.id) }}" style="display:inline;">
+                <button type="submit" class="btn-small btn-react">{% if lang=='de' %}Reaktiv.{% elif lang=='en' %}React.{% else %}React.{% endif %}</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <p style="margin:0 0 .5rem 0;font-weight:600;">{% if lang=='de' %}Noch keine Standorte hinzugefügt.{% elif lang=='en' %}No locations added yet.{% else %}Nog geen locaties toegevoegd.{% endif %}</p>
+    <p style="margin:0;font-size:.9rem;">{% if lang=='de' %}Importieren Sie eine CSV oder fügen Sie über das Formular oben hinzu.{% elif lang=='en' %}Import a CSV or add via the form above.{% else %}Importeer CSV of voeg toe via het formulier hierboven.{% endif %}</p>
+  </div>
+  {% endif %}
+
+  <a href="{{ url_for('pro_menu') }}" class="back-link">← {% if lang=='de' %}Zurück zum Menü{% elif lang=='en' %}Back to menu{% else %}Terug naar menu{% endif %}</a>
+</div>
+{% endblock %}

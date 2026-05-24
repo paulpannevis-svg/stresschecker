@@ -1,4 +1,4 @@
-from flask import Flask, render_template, make_response, request, jsonify, session, redirect, url_for, Response, send_file
+from flask import Flask, render_template, make_response, request, jsonify, session, redirect, url_for, Response, send_file, abort
 import sqlite3, os, hashlib, secrets, json, io
 from datetime import datetime
 from dotenv import load_dotenv
@@ -1806,6 +1806,294 @@ def pro_locatie():
         (license_code,)).fetchall()]
     db.close()
     return render_template('pro/locatie_keuze.html', lang=lang, offices=offices, current=session.get('kk_office',''))
+
+
+# ============================================================================
+# Krankenkasse self-service kantoor-beheer (Sessie B.1)
+# /pro/locaties/*  — KK-account beheert eigen kantoor-master-lijst.
+# Auth: alleen KK-sessie (geen @require_kk_office_if_krankenkasse — beheer
+# moet bereikbaar zijn zonder eerst een kantoor te kiezen).
+# Coexisteert met /admin/krankenkasse/<code>/offices (Paul-only cross-licentie).
+# ============================================================================
+
+def _kk_require():
+    """Hard 403 voor niet-KK-sessies. Geen redirect — admin-toegang heeft een
+    inlog-flow en wordt verondersteld al doorlopen."""
+    if not session.get('license_valid') or not is_krankenkasse_session():
+        abort(403)
+
+
+def _kk_db():
+    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def _kk_office_stats(license_code, pro_user_key):
+    """Per-office aggregatie: actief/inactief + totaal metingen + M/V/overig-tellers.
+    Cross-DB: offices uit saas_licenses.db, metingen uit sc_pro.db. Twee queries,
+    Python-merge — geen ATTACH (eenvoudiger + minder lock-risk)."""
+    db = _kk_db()
+    offices = db.execute(
+        "SELECT id, office_name, region, active, created_at FROM krankenkasse_offices "
+        "WHERE license_code=? ORDER BY active DESC, office_name COLLATE NOCASE",
+        (license_code,)).fetchall()
+    db.close()
+
+    pro_db = get_pro_db()
+    rows = pro_db.execute("""
+        SELECT cm.office_label AS office_name,
+               COUNT(*) AS total,
+               SUM(CASE WHEN c.gender='male'   THEN 1 ELSE 0 END) AS male,
+               SUM(CASE WHEN c.gender='female' THEN 1 ELSE 0 END) AS female,
+               SUM(CASE WHEN c.gender NOT IN ('male','female') OR c.gender IS NULL THEN 1 ELSE 0 END) AS other
+        FROM client_metingen cm
+        LEFT JOIN clients c ON c.id = cm.client_id
+        WHERE cm.pro_key=? AND cm.office_label IS NOT NULL AND cm.office_label != ''
+        GROUP BY cm.office_label
+    """, (pro_user_key,)).fetchall()
+    pro_db.close()
+    stats = {r['office_name']: dict(r) for r in rows}
+    out = []
+    for o in offices:
+        s = stats.get(o['office_name'], {})
+        out.append({
+            'id': o['id'],
+            'office_name': o['office_name'],
+            'region': o['region'] or '',
+            'active': bool(o['active']),
+            'created_at': o['created_at'],
+            'total_metingen': s.get('total', 0) or 0,
+            'male':   s.get('male', 0) or 0,
+            'female': s.get('female', 0) or 0,
+            'other':  s.get('other', 0) or 0,
+        })
+    return out
+
+
+def _parse_kk_csv(raw_bytes, max_rows=500):
+    """Parseer CSV-bytes naar lijst van {office_name, region, line}-dicts.
+    Returns (rows, errors). Strict: header moet 'office_name' EN 'region' bevatten.
+    UTF-8 verplicht, BOM (utf-8-sig) tolerated. Trim + lengthcap 100 chars."""
+    import csv as _csv, io as _io
+    errors = []
+    try:
+        text = raw_bytes.decode('utf-8-sig')
+    except UnicodeDecodeError:
+        try:
+            text = raw_bytes.decode('utf-8')
+        except UnicodeDecodeError as e:
+            return ([], [f'Bestand is geen geldig UTF-8: {e}'])
+    sample = text[:2048]
+    try:
+        dialect = _csv.Sniffer().sniff(sample, delimiters=',;\t')
+    except _csv.Error:
+        dialect = _csv.excel
+    reader = _csv.DictReader(_io.StringIO(text), dialect=dialect)
+    if not reader.fieldnames:
+        return ([], ['CSV is leeg of heeft geen header-rij'])
+    headers_lc = [(h or '').strip().lower() for h in reader.fieldnames]
+    if 'office_name' not in headers_lc or 'region' not in headers_lc:
+        return ([], [f'CSV moet kolommen "office_name" en "region" bevatten. '
+                     f'Gevonden: {", ".join(reader.fieldnames)}'])
+    rows = []
+    for i, raw in enumerate(reader, start=2):
+        if len(rows) >= max_rows:
+            errors.append(f'Maximum van {max_rows} rijen bereikt; rest overgeslagen')
+            break
+        norm = {(k or '').strip().lower(): (v or '').strip() for k, v in raw.items()}
+        name = norm.get('office_name', '')[:100]
+        region = norm.get('region', '')[:100]
+        if not name:
+            errors.append(f'Regel {i}: lege office_name overgeslagen')
+            continue
+        rows.append({'office_name': name, 'region': region, 'line': i})
+    return (rows, errors)
+
+
+@app.route('/pro/locaties')
+def kk_locaties_overzicht():
+    _kk_require()
+    license_code = session.get('license_code', '')
+    pro_key = get_user_key()
+    offices = _kk_office_stats(license_code, pro_key)
+    lang = session.get('lang', 'nl')
+    sort = request.args.get('sort', 'name')
+    q = (request.args.get('q', '') or '').strip().lower()
+    if q:
+        offices = [o for o in offices
+                   if q in o['office_name'].lower() or q in (o['region'] or '').lower()]
+    if sort == 'metingen':
+        offices.sort(key=lambda o: (-o['total_metingen'], o['office_name'].lower()))
+    elif sort == 'region':
+        offices.sort(key=lambda o: ((o['region'] or '').lower(), o['office_name'].lower()))
+    else:  # 'name' (default)
+        offices.sort(key=lambda o: (not o['active'], o['office_name'].lower()))
+    try:
+        imported = int(request.args.get('imported', 0))
+    except (TypeError, ValueError):
+        imported = 0
+    try:
+        dups = int(request.args.get('dups', 0))
+    except (TypeError, ValueError):
+        dups = 0
+    return render_template('pro/locaties_overzicht.html', lang=lang, offices=offices,
+                           sort=sort, q=q, imported=imported, dups=dups)
+
+
+@app.route('/pro/locaties/beheren')
+def kk_locaties_beheren():
+    _kk_require()
+    license_code = session.get('license_code', '')
+    pro_key = get_user_key()
+    offices = _kk_office_stats(license_code, pro_key)
+    lang = session.get('lang', 'nl')
+    return render_template('pro/locaties_beheren.html', lang=lang, offices=offices,
+                           created=request.args.get('created') == '1',
+                           updated=request.args.get('updated') == '1',
+                           deactivated=request.args.get('deactivated') == '1',
+                           reactivated=request.args.get('reactivated') == '1',
+                           error=request.args.get('error', ''))
+
+
+@app.route('/pro/locaties/toevoegen', methods=['POST'])
+def kk_locaties_toevoegen():
+    _kk_require()
+    license_code = session.get('license_code', '')
+    name = (request.form.get('office_name', '') or '').strip()[:100]
+    region = (request.form.get('region', '') or '').strip()[:100]
+    if not name:
+        return redirect(url_for('kk_locaties_beheren', error='leeg'))
+    db = _kk_db()
+    dup = db.execute(
+        "SELECT id FROM krankenkasse_offices WHERE license_code=? AND LOWER(office_name)=LOWER(?)",
+        (license_code, name)).fetchone()
+    if dup:
+        db.close()
+        return redirect(url_for('kk_locaties_beheren', error='dup'))
+    db.execute("INSERT INTO krankenkasse_offices (license_code, office_name, region) VALUES (?, ?, ?)",
+               (license_code, name, region or None))
+    db.commit()
+    db.close()
+    return redirect(url_for('kk_locaties_beheren', created='1'))
+
+
+@app.route('/pro/locaties/<int:oid>/bewerken', methods=['POST'])
+def kk_locaties_bewerken(oid):
+    _kk_require()
+    license_code = session.get('license_code', '')
+    name = (request.form.get('office_name', '') or '').strip()[:100]
+    region = (request.form.get('region', '') or '').strip()[:100]
+    if not name:
+        return redirect(url_for('kk_locaties_beheren', error='leeg'))
+    db = _kk_db()
+    row = db.execute("SELECT id, office_name FROM krankenkasse_offices WHERE id=? AND license_code=?",
+                     (oid, license_code)).fetchone()
+    if not row:
+        db.close()
+        abort(404)
+    dup = db.execute(
+        "SELECT id FROM krankenkasse_offices WHERE license_code=? AND LOWER(office_name)=LOWER(?) AND id<>?",
+        (license_code, name, oid)).fetchone()
+    if dup:
+        db.close()
+        return redirect(url_for('kk_locaties_beheren', error='dup'))
+    db.execute("UPDATE krankenkasse_offices SET office_name=?, region=? WHERE id=? AND license_code=?",
+               (name, region or None, oid, license_code))
+    # Cascade: als naam wijzigt, kk_office in session refresh (toont nieuw label
+    # in header bij volgende request); historische client_metingen blijven hangen
+    # met oude office_name — bewust, want audit-trail.
+    if session.get('kk_office', '').lower() == (row['office_name'] or '').lower():
+        session['kk_office'] = name
+    db.commit()
+    db.close()
+    return redirect(url_for('kk_locaties_beheren', updated='1'))
+
+
+@app.route('/pro/locaties/<int:oid>/deactiveren', methods=['POST'])
+def kk_locaties_deactiveren(oid):
+    _kk_require()
+    license_code = session.get('license_code', '')
+    db = _kk_db()
+    db.execute("UPDATE krankenkasse_offices SET active=0 WHERE id=? AND license_code=?",
+               (oid, license_code))
+    db.commit()
+    db.close()
+    return redirect(url_for('kk_locaties_beheren', deactivated='1'))
+
+
+@app.route('/pro/locaties/<int:oid>/reactiveren', methods=['POST'])
+def kk_locaties_reactiveren(oid):
+    _kk_require()
+    license_code = session.get('license_code', '')
+    db = _kk_db()
+    db.execute("UPDATE krankenkasse_offices SET active=1 WHERE id=? AND license_code=?",
+               (oid, license_code))
+    db.commit()
+    db.close()
+    return redirect(url_for('kk_locaties_beheren', reactivated='1'))
+
+
+@app.route('/pro/locaties/import', methods=['GET', 'POST'])
+def kk_locaties_import():
+    _kk_require()
+    license_code = session.get('license_code', '')
+    lang = session.get('lang', 'nl')
+
+    if request.method == 'POST':
+        # Confirm-fase: hidden csv_text + confirm=1 wordt opnieuw geparsed en in DB gezet
+        if request.form.get('confirm') == '1':
+            csv_text = request.form.get('csv_text', '') or ''
+            rows, errors = _parse_kk_csv(csv_text.encode('utf-8'))
+            if not rows:
+                return render_template('pro/locaties_import.html', lang=lang, errors=errors)
+            db = _kk_db()
+            existing_lc = {r['office_name'].lower() for r in db.execute(
+                "SELECT office_name FROM krankenkasse_offices WHERE license_code=?",
+                (license_code,)).fetchall()}
+            new_count = 0
+            dup_count = 0
+            for r in rows:
+                if r['office_name'].lower() in existing_lc:
+                    dup_count += 1
+                    continue
+                db.execute("INSERT INTO krankenkasse_offices (license_code, office_name, region) "
+                           "VALUES (?, ?, ?)",
+                           (license_code, r['office_name'], r['region'] or None))
+                existing_lc.add(r['office_name'].lower())
+                new_count += 1
+            db.commit()
+            db.close()
+            return redirect(url_for('kk_locaties_overzicht', imported=new_count, dups=dup_count))
+
+        # Preview-fase: file upload → parse → toon preview met csv_text in hidden field
+        f = request.files.get('csv_file')
+        if not f or not f.filename:
+            return render_template('pro/locaties_import.html', lang=lang,
+                                   errors=['Geen bestand geüpload.'])
+        raw = f.read(2 * 1024 * 1024)  # 2MB cap
+        rows, errors = _parse_kk_csv(raw)
+        if not rows:
+            return render_template('pro/locaties_import.html', lang=lang, errors=errors)
+        db = _kk_db()
+        existing_lc = {r['office_name'].lower() for r in db.execute(
+            "SELECT office_name FROM krankenkasse_offices WHERE license_code=?",
+            (license_code,)).fetchall()}
+        db.close()
+        new_rows = [r for r in rows if r['office_name'].lower() not in existing_lc]
+        dup_rows = [r for r in rows if r['office_name'].lower() in existing_lc]
+        preview = new_rows[:20]
+        try:
+            csv_text = raw.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            csv_text = raw.decode('utf-8', errors='replace')
+        return render_template('pro/locaties_import_preview.html', lang=lang,
+                               preview=preview, total_new=len(new_rows),
+                               total_dup=len(dup_rows), total_rows=len(rows),
+                               errors=errors, csv_text=csv_text,
+                               dup_preview=dup_rows[:10])
+
+    return render_template('pro/locaties_import.html', lang=lang, errors=[])
 
 
 @app.route('/pro/client/toevoegen', methods=['GET','POST'])

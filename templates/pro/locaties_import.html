@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}StressChecker® — {% if lang=='de' %}CSV importieren{% elif lang=='en' %}Import CSV{% else %}CSV importeren{% endif %}{% endblock %}
+{% block content %}
+<style>
+.loc-wrap{max-width:680px;margin:0 auto;padding:1rem;}
+.btn-action{background:#1565c0;color:#fff;padding:.5rem 1.2rem;border-radius:6px;text-decoration:none;font-weight:600;font-size:.9rem;border:none;cursor:pointer;}
+.btn-action.secondary{background:#fff;color:#1565c0;border:1px solid #1565c0;}
+.btn-action:hover{background:#0d47a1;}
+.upload-card{background:#fff;padding:1.4rem 1.5rem;border-radius:10px;border:1px solid #e0e6ed;margin-bottom:1.2rem;}
+.format-card{background:#f6f8fb;padding:1rem 1.3rem;border-radius:8px;font-size:.88rem;color:#555;margin-bottom:1.2rem;}
+.format-card code{display:block;background:#fff;border:1px solid #e0e6ed;border-radius:6px;padding:.6rem .9rem;margin-top:.5rem;font-family:monospace;font-size:.85rem;white-space:pre;}
+.flash-error{background:#fdecea;color:#b71c1c;padding:.6rem .9rem;border-radius:6px;margin-bottom:1rem;font-size:.92rem;}
+.flash-error ul{margin:.3rem 0 0 1rem;padding:0;}
+.back-link{display:inline-block;margin-top:1rem;color:#1565c0;text-decoration:none;font-size:.9rem;}
+</style>
+
+<div class="loc-wrap">
+  <h2 style="font-size:1.2rem;margin-bottom:1rem;">
+    <span style="background:#1565c0;color:#fff;font-size:.7rem;padding:.2rem .55rem;border-radius:4px;vertical-align:middle;margin-right:.4rem;">KK</span>
+    {% if lang=='de' %}Standorte aus CSV importieren{% elif lang=='en' %}Import locations from CSV{% else %}Locaties importeren uit CSV{% endif %}
+  </h2>
+
+  {% if errors %}
+  <div class="flash-error">
+    <strong>{% if lang=='de' %}Fehler{% elif lang=='en' %}Errors{% else %}Fouten{% endif %}:</strong>
+    <ul>
+      {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <div class="upload-card">
+    <form method="POST" action="{{ url_for('kk_locaties_import') }}" enctype="multipart/form-data">
+      <label style="display:block;font-size:.92rem;color:#333;margin-bottom:.5rem;">
+        {% if lang=='de' %}CSV-Datei auswählen (max. 2&nbsp;MB, max. 500&nbsp;Zeilen){% elif lang=='en' %}Choose CSV file (max 2&nbsp;MB, max 500&nbsp;rows){% else %}Kies CSV-bestand (max 2&nbsp;MB, max 500&nbsp;rijen){% endif %}
+      </label>
+      <input type="file" name="csv_file" accept=".csv,text/csv" required style="margin-bottom:1rem;">
+      <br>
+      <button type="submit" class="btn-action">{% if lang=='de' %}Hochladen & Vorschau{% elif lang=='en' %}Upload & preview{% else %}Uploaden & voorbeeld{% endif %} ▶</button>
+    </form>
+  </div>
+
+  <div class="format-card">
+    <strong>{% if lang=='de' %}Erwartetes Format{% elif lang=='en' %}Expected format{% else %}Verwacht formaat{% endif %}:</strong>
+    {% if lang=='de' %}<p style="margin:.5rem 0 0 0;">Zwei Spalten mit Header. UTF-8-Kodierung. Komma, Semikolon oder Tab als Trennzeichen wird automatisch erkannt.</p>{% elif lang=='en' %}<p style="margin:.5rem 0 0 0;">Two columns with header. UTF-8 encoding. Comma, semicolon or tab delimiter is auto-detected.</p>{% else %}<p style="margin:.5rem 0 0 0;">Twee kolommen met header. UTF-8-codering. Komma, puntkomma of tab als scheidingsteken wordt automatisch gedetecteerd.</p>{% endif %}
+    <code>office_name,region
+Hamburg-Mitte,Hamburg
+Hamburg-Altona,Hamburg
+München-Zentrum,Bayern
+Lüneburg,Niedersachsen</code>
+    <p style="margin:.6rem 0 0 0;font-size:.82rem;color:#888;">
+      {% if lang=='de' %}Bereits vorhandene Namen (Groß-/Kleinschreibung egal) werden übersprungen.{% elif lang=='en' %}Existing names (case-insensitive) will be skipped.{% else %}Reeds aanwezige namen (hoofdletter-ongevoelig) worden overgeslagen.{% endif %}
+    </p>
+  </div>
+
+  <a href="{{ url_for('kk_locaties_beheren') }}" class="back-link">← {% if lang=='de' %}Zurück zur Verwaltung{% elif lang=='en' %}Back to management{% else %}Terug naar beheer{% endif %}</a>
+</div>
+{% endblock %}

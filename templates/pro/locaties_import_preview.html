@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}StressChecker® — {% if lang=='de' %}Import-Vorschau{% elif lang=='en' %}Import preview{% else %}Import-voorbeeld{% endif %}{% endblock %}
+{% block content %}
+<style>
+.loc-wrap{max-width:780px;margin:0 auto;padding:1rem;}
+.btn-action{background:#1565c0;color:#fff;padding:.5rem 1.2rem;border-radius:6px;text-decoration:none;font-weight:600;font-size:.9rem;border:none;cursor:pointer;}
+.btn-action.secondary{background:#fff;color:#1565c0;border:1px solid #1565c0;}
+.btn-action:hover{background:#0d47a1;}
+.summary-card{background:#f6f8fb;padding:1rem 1.3rem;border-radius:8px;margin-bottom:1.2rem;}
+.summary-row{display:flex;gap:1.5rem;flex-wrap:wrap;font-size:.95rem;}
+.summary-row .item strong{display:block;color:#1565c0;font-size:1.3rem;}
+.summary-row .item span{color:#666;font-size:.85rem;}
+.dashboard-table{width:100%;border-collapse:collapse;font-size:.92rem;margin-bottom:.8rem;}
+.dashboard-table thead tr{background:#f0f4f8;}
+.dashboard-table th{padding:.5rem .8rem;text-align:left;font-weight:600;color:#555;border-bottom:2px solid #dde3ea;}
+.dashboard-table td{padding:.45rem .8rem;border-bottom:1px solid #eef0f3;}
+.dup-table tbody tr{opacity:.6;}
+.flash-warn{background:#fff8e1;color:#7a6730;padding:.6rem .9rem;border-radius:6px;margin-bottom:1rem;font-size:.92rem;}
+.flash-warn ul{margin:.3rem 0 0 1rem;padding:0;}
+.actions{display:flex;gap:.6rem;margin-top:1rem;}
+.back-link{display:inline-block;margin-top:1rem;color:#1565c0;text-decoration:none;font-size:.9rem;}
+</style>
+
+<div class="loc-wrap">
+  <h2 style="font-size:1.2rem;margin-bottom:1rem;">
+    <span style="background:#1565c0;color:#fff;font-size:.7rem;padding:.2rem .55rem;border-radius:4px;vertical-align:middle;margin-right:.4rem;">KK</span>
+    {% if lang=='de' %}Import-Vorschau{% elif lang=='en' %}Import preview{% else %}Import-voorbeeld{% endif %}
+  </h2>
+
+  <div class="summary-card">
+    <div class="summary-row">
+      <div class="item">
+        <strong>{{ total_rows }}</strong>
+        <span>{% if lang=='de' %}Zeilen gelesen{% elif lang=='en' %}rows read{% else %}rijen gelezen{% endif %}</span>
+      </div>
+      <div class="item">
+        <strong style="color:#2e7d32;">{{ total_new }}</strong>
+        <span>{% if lang=='de' %}neu{% elif lang=='en' %}new{% else %}nieuw{% endif %}</span>
+      </div>
+      <div class="item">
+        <strong style="color:#999;">{{ total_dup }}</strong>
+        <span>{% if lang=='de' %}bereits vorhanden (übersprungen){% elif lang=='en' %}existing (skipped){% else %}reeds aanwezig (overgeslagen){% endif %}</span>
+      </div>
+    </div>
+  </div>
+
+  {% if errors %}
+  <div class="flash-warn">
+    <strong>{% if lang=='de' %}Warnungen{% elif lang=='en' %}Warnings{% else %}Waarschuwingen{% endif %}:</strong>
+    <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  {% if preview %}
+  <h3 style="font-size:1rem;margin-bottom:.5rem;">
+    {% if lang=='de' %}Vorschau (erste {{ preview|length }} von {{ total_new }} neuen){% elif lang=='en' %}Preview (first {{ preview|length }} of {{ total_new }} new){% else %}Voorbeeld (eerste {{ preview|length }} van {{ total_new }} nieuw){% endif %}
+  </h3>
+  <table class="dashboard-table">
+    <thead><tr>
+      <th style="width:50%;">{% if lang=='de' %}Name{% elif lang=='en' %}Name{% else %}Naam{% endif %}</th>
+      <th>{% if lang=='de' %}Region{% elif lang=='en' %}Region{% else %}Regio{% endif %}</th>
+    </tr></thead>
+    <tbody>
+    {% for r in preview %}
+      <tr><td>{{ r.office_name }}</td><td>{{ r.region or '—' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="flash-warn">
+    {% if lang=='de' %}Keine neuen Standorte zum Importieren — alle Namen sind bereits vorhanden.{% elif lang=='en' %}No new locations to import — all names already exist.{% else %}Geen nieuwe locaties om te importeren — alle namen bestaan al.{% endif %}
+  </div>
+  {% endif %}
+
+  {% if dup_preview %}
+  <h3 style="font-size:.95rem;margin:1.2rem 0 .4rem 0;color:#999;">
+    {% if lang=='de' %}Übersprungen (erste {{ dup_preview|length }}){% elif lang=='en' %}Skipped (first {{ dup_preview|length }}){% else %}Overgeslagen (eerste {{ dup_preview|length }}){% endif %}
+  </h3>
+  <table class="dashboard-table dup-table">
+    <tbody>
+    {% for r in dup_preview %}
+      <tr><td style="width:50%;">{{ r.office_name }}</td><td>{{ r.region or '—' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if total_new > 0 %}
+  <form method="POST" action="{{ url_for('kk_locaties_import') }}" class="actions">
+    <input type="hidden" name="confirm" value="1">
+    <input type="hidden" name="csv_text" value="{{ csv_text|e }}">
+    <button type="submit" class="btn-action">
+      {% if lang=='de' %}{{ total_new }} Standort(e) jetzt importieren{% elif lang=='en' %}Import {{ total_new }} location(s) now{% else %}{{ total_new }} locatie(s) nu importeren{% endif %} ▶
+    </button>
+    <a href="{{ url_for('kk_locaties_import') }}" class="btn-action secondary">{% if lang=='de' %}Abbrechen{% elif lang=='en' %}Cancel{% else %}Annuleren{% endif %}</a>
+  </form>
+  {% else %}
+  <a href="{{ url_for('kk_locaties_beheren') }}" class="btn-action secondary" style="display:inline-block;margin-top:.5rem;">{% if lang=='de' %}Zurück zur Verwaltung{% elif lang=='en' %}Back to management{% else %}Terug naar beheer{% endif %}</a>
+  {% endif %}
+
+  <a href="{{ url_for('kk_locaties_import') }}" class="back-link">← {% if lang=='de' %}Andere Datei wählen{% elif lang=='en' %}Choose other file{% else %}Ander bestand kiezen{% endif %}</a>
+</div>
+{% endblock %}

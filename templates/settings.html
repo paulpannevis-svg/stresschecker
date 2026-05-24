@@ -26,6 +26,11 @@
       — <a href="{{ url_for('pro_locatie') }}" style="color:var(--red);">{% if lang == 'de' %}wechseln{% elif lang == 'en' %}change{% else %}wijzigen{% endif %}</a>
     </div>
     {% endif %}
+    <div style="font-size:0.82rem;color:var(--text-muted);margin-top:.6rem;border-top:1px solid var(--beige);padding-top:.6rem;">
+      <a href="{{ url_for('kk_locaties_beheren') }}" style="color:#1565c0;text-decoration:none;">
+        ⚙ {% if lang == 'de' %}Standorte verwalten{% elif lang == 'en' %}Manage locations{% else %}Locaties beheren{% endif %} →
+      </a>
+    </div>
   </div>
   {% endif %}
 
