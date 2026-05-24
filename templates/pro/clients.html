@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{% if lang=='de' %}Klienten{% elif lang=='en' %}Clients{% else %}Cliënten{% endif %}{% endblock %}
+{% block content %}
+<style>
+.dashboard-table-wrap { overflow-x:auto; margin:1.2rem 0 1.8rem 0; }
+.dashboard-table { width:100%; border-collapse:collapse; font-size:.93rem; }
+.dashboard-table thead tr { background:#f0f4f8; }
+.dashboard-table th { padding:.7rem 1rem; text-align:left; font-weight:600; color:#555; border-bottom:2px solid #dde3ea; white-space:nowrap; }
+.dashboard-table td { padding:.65rem 1rem; border-bottom:1px solid #eef0f3; vertical-align:middle; }
+.dashboard-table tbody tr:hover { background:#f7f9fc; cursor:pointer; }
+.ri-badge { display:inline-block; min-width:2.2rem; text-align:center; padding:.2rem .6rem; border-radius:999px; font-weight:700; font-size:.95rem; }
+.ri-0,.ri-1 { background:#fdecea; color:#b71c1c; }
+.ri-2,.ri-3 { background:#fff3e0; color:#e65100; }
+.ri-4,.ri-5 { background:#fffde7; color:#f57f17; }
+.ri-6,.ri-7 { background:#e8f5e9; color:#2e7d32; }
+.ri-8,.ri-9,.ri-10 { background:#e3f2fd; color:#1565c0; }
+.trend-up { color:#2e7d32; font-size:.88rem; font-weight:600; }
+.trend-down { color:#c62828; font-size:.88rem; font-weight:600; }
+.trend-flat { color:#999; font-size:.88rem; }
+.trend-nodata { color:#ccc; font-size:.88rem; }
+.cl-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; }
+.cl-add { background:#c0392b; color:#fff; padding:.5rem 1.1rem; border-radius:6px; text-decoration:none; font-weight:600; font-size:.93rem; }
+.cl-add:hover { background:#a93226; }
+.back-link { display:inline-block; margin-top:1.5rem; color:#c0392b; text-decoration:none; font-size:.9rem; }
+</style>
+<div style="max-width:820px;margin:0 auto;padding:1rem;">
+  <div class="cl-header">
+    <h2 style="margin:0;">
+      {% if not is_krankenkasse %}<span style="background:#c0392b;color:#fff;font-size:.7rem;padding:.2rem .5rem;border-radius:4px;vertical-align:middle;margin-right:.4rem;">PRO</span>{% endif %}
+      {% if lang=="de" %}Meine Klienten{% elif lang=="en" %}My clients{% else %}Mijn cliënten{% endif %}
+    </h2>
+    <a href="{{ url_for("pro_client_add") }}" class="cl-add">+ {% if lang=="de" %}Neuer Klient{% elif lang=="en" %}New client{% else %}Nieuwe cliënt{% endif %}</a>
+  </div>
+  {% if clients %}
+  <div class="dashboard-table-wrap">
+    <table class="dashboard-table">
+      <thead><tr>
+        <th>{% if lang=="de" %}Name{% elif lang=="en" %}Name{% else %}Naam{% endif %}</th>
+        <th>{% if lang=="de" %}Ø RI Woche{% elif lang=="en" %}Avg RI week{% else %}Gem. RI week{% endif %}</th>
+        <th>Trend</th>
+        <th>{% if lang=="de" %}Letzte Messung{% elif lang=="en" %}Last reading{% else %}Laatste meting{% endif %}</th>
+        <th>{% if lang=="de" %}Was beschäftigt sie{% elif lang=="en" %}What is going on{% else %}Wat speelt er{% endif %}</th>
+        <th>{% if lang=="de" %}Messungen{% elif lang=="en" %}Readings{% else %}Metingen{% endif %}</th>
+      </tr></thead>
+      <tbody>
+      {% for c in clients %}
+        <tr onclick="window.location='{{ url_for("pro_client_detail", cid=c["id"]) }}'">
+          <td><strong>{{ c["name"] }}</strong></td>
+          <td>{% if c["week_avg"] %}<span class="ri-badge ri-{{ c["week_avg"]|int }}">{{ c["week_avg"] }}</span>{% else %}—{% endif %}</td>
+          <td>{% if c["trend"][0] == "up" %}<span class="trend-up">&uarr; +{{ c["trend"][1] }}</span>{% elif c["trend"][0] == "down" %}<span class="trend-down">&darr; {{ c["trend"][1] }}</span>{% elif c["trend"][0] == "flat" %}<span class="trend-flat">&rarr; {% if lang=="de" %}stabil{% elif lang=="en" %}stable{% else %}stabiel{% endif %}</span>{% else %}<span class="trend-nodata">—</span>{% endif %}</td>
+          <td>{{ c["last_ts"] or "—" }}</td>
+          <td>{% set _d=c["top_dimensie"] or "" %}{%if _d%}{%if lang=="de"%}{{"Körperlich" if _d=="lichamelijk" else "Mental" if _d=="mentaal" else "Emotional" if _d=="emotioneel" else "Spirituell" if _d=="spiritueel" else _d}}{%elif lang=="en"%}{{"Physical" if _d=="lichamelijk" else "Mental" if _d=="mentaal" else "Emotional" if _d=="emotioneel" else "Spiritual" if _d=="spiritueel" else _d}}{%else%}{{"Lichamelijk" if _d=="lichamelijk" else "Mentaal" if _d=="mentaal" else "Emotioneel" if _d=="emotioneel" else "Spiritueel" if _d=="spiritueel" else _d}}{%endif%}{%else%}—{%endif%}</td>
+          <td>{{ c["total_metingen"] }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:3rem 1rem;color:#888;">
+    <p>{% if lang=="de" %}Noch keine Klienten.{% elif lang=="en" %}No clients yet.{% else %}Nog geen cliënten.{% endif %}</p>
+    <a href="{{ url_for("pro_client_add") }}" class="cl-add">+ {% if lang=="de" %}Ersten Klienten{% elif lang=="en" %}Add first client{% else %}Eerste cliënt toevoegen{% endif %}</a>
+  </div>
+  {% endif %}
+  <a href="{{ url_for("pro_menu") }}" class="back-link">&#8592; {% if lang=="de" %}Zurück zum Dashboard{% elif lang=="en" %}Back to dashboard{% else %}Terug naar dashboard{% endif %}</a>
+</div>
+{% endblock %}

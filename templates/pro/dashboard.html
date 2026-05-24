@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{% if lang=='de' %}Pro Dashboard{% elif lang=='en' %}Pro dashboard{% else %}Pro dashboard{% endif %}{% endblock %}
+{% block content %}
+<style>
+.dash-wrap { max-width:960px; margin:0 auto; padding:1rem; }
+.dash-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:.6rem; }
+.dash-header h2 { margin:0; }
+.pro-badge { background:#c0392b; color:#fff; font-size:.7rem; padding:.2rem .5rem; border-radius:4px; vertical-align:middle; margin-right:.4rem; }
+.dash-table-wrap { overflow-x:auto; margin:1rem 0 1.5rem 0; }
+.dash-table { width:100%; border-collapse:collapse; font-size:.93rem; background:#fff; }
+.dash-table thead tr { background:#f0f4f8; }
+.dash-table th { padding:.7rem 1rem; text-align:left; font-weight:600; color:#555; border-bottom:2px solid #dde3ea; white-space:nowrap; }
+.dash-table td { padding:.65rem 1rem; border-bottom:1px solid #eef0f3; vertical-align:middle; }
+.dash-table tbody tr:hover { background:#f7f9fc; cursor:pointer; }
+.ri-badge { display:inline-block; min-width:2.2rem; text-align:center; padding:.2rem .6rem; border-radius:999px; font-weight:700; font-size:.95rem; }
+.ri-0,.ri-1 { background:#fdecea; color:#b71c1c; }
+.ri-2,.ri-3 { background:#fff3e0; color:#e65100; }
+.ri-4,.ri-5 { background:#fffde7; color:#f57f17; }
+.ri-6,.ri-7 { background:#e8f5e9; color:#2e7d32; }
+.ri-8,.ri-9,.ri-10 { background:#e3f2fd; color:#1565c0; }
+.trend-up { color:#2e7d32; font-size:1.1rem; }
+.trend-down { color:#c62828; font-size:1.1rem; }
+.trend-flat { color:#bbb; font-size:1.1rem; }
+.dim-pill { display:inline-block; background:#eef2f7; color:#444; padding:.15rem .55rem; border-radius:999px; font-size:.85rem; }
+.empty { text-align:center; padding:3rem 1rem; color:#888; }
+.back-link { display:inline-block; margin-top:1.5rem; color:#c0392b; text-decoration:none; font-size:.9rem; }
+</style>
+<div class="dash-wrap">
+  <div class="dash-header">
+    <h2>
+      {% if not is_krankenkasse %}<span class="pro-badge">PRO</span>{% endif %}
+      {% if lang=="de" %}Dashboard{% elif lang=="en" %}Dashboard{% else %}Dashboard{% endif %}
+    </h2>
+  </div>
+
+  {% if rows %}
+  <div class="dash-table-wrap">
+    <table class="dash-table">
+      <thead><tr>
+        <th>{% if lang=="de" %}Klient{% elif lang=="en" %}Client{% else %}Cliënt{% endif %}</th>
+        <th>{% if lang=="de" %}Ø RI{% elif lang=="en" %}Avg RI{% else %}Gem. RI{% endif %}</th>
+        <th>Trend</th>
+        <th>{% if lang=="de" %}Letzte Messung{% elif lang=="en" %}Last reading{% else %}Laatste meting{% endif %}</th>
+        <th>{% if lang=="de" %}Was beschäftigt sie{% elif lang=="en" %}What is going on{% else %}Wat speelt er{% endif %}</th>
+        <th>{% if lang=="de" %}Anzahl{% elif lang=="en" %}Count{% else %}Aantal{% endif %}</th>
+      </tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr onclick="window.location='{{ url_for("pro_client_detail", cid=r["id"]) }}'">
+          <td><strong>{{ r["name"] }}</strong></td>
+          <td>
+            {% if r["avg_ri"] is not none %}
+              <span class="ri-badge ri-{{ r["avg_ri"]|int }}">{{ r["avg_ri"] }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if r["trend"] == "up" %}<span class="trend-up" title="{% if lang=='de' %}steigend{% elif lang=='en' %}rising{% else %}stijgend{% endif %}">&#9650;</span>
+            {% elif r["trend"] == "down" %}<span class="trend-down" title="{% if lang=='de' %}fallend{% elif lang=='en' %}falling{% else %}dalend{% endif %}">&#9660;</span>
+            {% else %}<span class="trend-flat" title="{% if lang=='de' %}stabil{% elif lang=='en' %}stable{% else %}stabiel{% endif %}">&#9644;</span>{% endif %}
+          </td>
+          <td>{{ r["last_ts"] or "—" }}</td>
+          <td>{% set _d=r["top_dimensie"] or "" %}{%if _d%}<span class="dim-pill">{%if lang=="de"%}{{"Körperlich" if _d=="lichamelijk" else "Mental" if _d=="mentaal" else "Emotional" if _d=="emotioneel" else "Spirituell" if _d=="spiritueel" else _d}}{%elif lang=="en"%}{{"Physical" if _d=="lichamelijk" else "Mental" if _d=="mentaal" else "Emotional" if _d=="emotioneel" else "Spiritual" if _d=="spiritueel" else _d}}{%else%}{{"Lichamelijk" if _d=="lichamelijk" else "Mentaal" if _d=="mentaal" else "Emotioneel" if _d=="emotioneel" else "Spiritueel" if _d=="spiritueel" else _d}}{%endif%}</span>{%else%}—{%endif%}</td>
+          <td>{{ r["total"] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>{% if lang=="de" %}Noch keine Klienten.{% elif lang=="en" %}No clients yet.{% else %}Nog geen cliënten.{% endif %}</p>
+    <a href="{{ url_for("pro_client_add") }}" style="color:#c0392b;">+ {% if lang=="de" %}Klient hinzufügen{% elif lang=="en" %}Add client{% else %}Cliënt toevoegen{% endif %}</a>
+  </div>
+  {% endif %}
+
+  <a href="{{ url_for("pro_menu") }}" class="back-link">&#8592; {% if lang=="de" %}Zurück{% elif lang=="en" %}Back{% else %}Terug{% endif %}</a>
+</div>
+{% endblock %}

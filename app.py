@@ -348,6 +348,12 @@ def require_kk_office_if_krankenkasse(view):
     return _wrapped
 
 
+@app.context_processor
+def _inject_kk_flags():
+    """Maakt `is_krankenkasse` in elke template beschikbaar zonder per-view-doorgift."""
+    return {'is_krankenkasse': is_krankenkasse_session()}
+
+
 def get_meting_count_for_current_context():
     """Telt metingen relevant voor de huidige sessie-context.
 

@@ -1,5 +1,47 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-05-24 — Krankenkasse-UI-verfijningen (Sessie A.1)
+
+Cleanup na browser-test Sessie A: PRO-badge en consumer-pairing-flow zichtbaar in /pro-context die voor KK-medewerker misleidend zijn. Alleen Jinja-conditionals, geen DB-wijzigingen, geen routes, geen helpers.
+
+### Context-processor
+
+`@app.context_processor _inject_kk_flags()` (app.py vlak na `require_kk_office_if_krankenkasse`) — levert `is_krankenkasse` aan ELKE template, zonder view-functies te hoeven aanpassen. Sluit aan op de bestaande `is_krankenkasse_session()`-helper uit Sessie A. Vier regels.
+
+### Templates aangepast
+
+| Bestand | Wijziging |
+|---|---|
+| `templates/pro/client_detail.html` | PRO-badge in `.pro-nav` (regel 44) → `{% if not is_krankenkasse %}`; volledige Koppeling-sectie (pairingSection div + script-block met `generatePairingCode`/`revokePairing`/`showConsumerMetingen`) gewrapt in `{% if not is_krankenkasse %}...{% endif %}`. Twee separate Jinja-blocks: één voor de div (regel ~85-91), één voor het script (regel ~93-180). De later JS-block op regel 204 (`var lang = lang || "{{ lang }}"`) gebruikt fallback en blijft werken zonder de eerste script-block. |
+| `templates/pro/clients.html` | PRO-badge in header (regel 29) → conditional |
+| `templates/pro/dashboard.html` | PRO-badge `<span class="pro-badge">` (regel 31) → conditional |
+| `templates/pro/client_add.html` | PRO-badge in screen-title (regel 6) → conditional. Aanvulling op Sessie A waar alleen de form-velden conditioneel waren. |
+
+NIET aangeraakt (must-stay voor KK):
+- "Meting kiezen"-knop, "Cliënt verwijderen"-knop, cliënt-info, breadcrumb "← Cliënten / ≡ Pro Menu"
+- pro/eigen_metingen.html, pro/verloop.html, pro/meting_keuze.html (geen PRO-badge-instances of misleidende koppeling-refs)
+- "Pro Menu" → "KK Menu"-hernoeming overwogen maar afgewezen; valt onder NIET-aanraken-lijst van de spec
+
+### Verificatie
+
+- `py_compile app.py`: OK
+- Jinja-parse via `app.jinja_env.get_template()` op 4 templates: OK (vereist app-context vanwege custom `full_name` filter)
+- Service restart schoon; geen errors in journal
+- `tests/run_all.sh`: 18/18 groen
+- Smoke via Flask test-client met temp-cliënten onder correcte pro_key-hash (paulpannevis@gmail.com + paulpannevis+kktest@gmail.com); cliënten direct opgeruimd na test:
+
+**Pro-sessie** (regressie): PRO-badge zichtbaar op /pro/clienten + /pro/client/<id> + /pro/dashboard + /pro/client/toevoegen ✓; Koppeling-blok zichtbaar op /pro/client/<id> ✓; Meting-knop + Verwijderen-knop blijven zichtbaar ✓.
+
+**KK-sessie**: PRO-badge weg op alle 4 plekken ✓; Koppeling-blok volledig uit DOM ✓; Meting-knop + Verwijderen-knop blijven zichtbaar (must-stay) ✓.
+
+### Backup
+
+`/opt/backups/*.20260524-1939`
+
+### Open punten
+
+- Geen TODOs uit deze sub-sessie. Resterende Sessie-A-TODOs blijven open (browser-end-to-end-check door Paul, Reply-To-bevestiging info@lifestylemonitors.de, KK-tier-widget zonder einddatum, 2FA-codes plaintext in journal).
+
 ## 2026-05-24 — Krankenkasse-licentie-tier — fundering (Sessie A)
 
 Nieuwe licentie-categorie voor Krankenkassen (gezondheidsdagen, multi-kantoor onder één centraal account). Eerste klant: KKH. Tier-gestaffeld (Kompakt/Standard/Premium) op verzekerden-aantal; handmatige activatie (geen Stripe Payment Link).

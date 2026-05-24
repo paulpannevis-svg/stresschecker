@@ -41,7 +41,7 @@
 
 <!-- PRO Navigation Bar -->
 <div class="pro-nav">
-  <span class="badge">PRO</span>
+  {% if not is_krankenkasse %}<span class="badge">PRO</span>{% endif %}
   <strong>{{ client|full_name }}</strong>
   <a href="{{ url_for('pro_clients') }}">← {% if lang=="de" %}Klienten{% elif lang=="en" %}Clients{% else %}Cliënten{% endif %}</a>
   <a href="{{ url_for('pro_menu') }}">≡ Pro Menu</a>
@@ -82,6 +82,7 @@
 </div>
 
 
+{% if not is_krankenkasse %}
 <!-- Koppeling sectie -->
 <div id="pairingSection" style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:10px;padding:1rem;margin:1rem 0">
   <div style="font-size:.78rem;font-weight:700;color:#F57F17;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">
@@ -89,7 +90,9 @@
   </div>
   <div id="pairingContent">{%if lang=="de"%}Laden...{%elif lang=="en"%}Loading...{%else%}Laden...{%endif%}</div>
 </div>
+{% endif %}
 
+{% if not is_krankenkasse %}
 <script>
 var lang = "{{ lang }}";
 
@@ -178,6 +181,7 @@ function showConsumerMetingen(cid){
   }).catch(function(e){alert((lang==='de'?'Fehler: ':lang==='en'?'Error: ':'Fout: ')+e);});
 }
 </script>
+{% endif %}
 
 {% if stats %}
 <div style="background:#fff;border-radius:12px;padding:1rem 1.5rem;margin-bottom:1rem;display:flex;gap:2rem;flex-wrap:wrap;">

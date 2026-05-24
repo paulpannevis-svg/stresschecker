@@ -3,7 +3,7 @@
 {% block content %}
 <div class="screen">
   <h1 class="screen-title" style="font-size:1.3rem;">
-    <span style="background:#E8344E;color:#fff;font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:10px;vertical-align:middle;margin-right:.3rem;">PRO</span>
+    {% if not is_krankenkasse %}<span style="background:#E8344E;color:#fff;font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:10px;vertical-align:middle;margin-right:.3rem;">PRO</span>{% endif %}
     {%if lang=='de'%}Neuer Klient{%elif lang=='en'%}New client{%else%}Nieuwe cliënt{%endif%}
   </h1>
   <p class="screen-subtitle" style="margin-bottom:12px;">
