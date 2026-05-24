@@ -257,6 +257,7 @@ def validate_license(code, email):
         row = db.execute("""
             SELECT l.license_key, l.type, l.status, l.valid_until,
                    l.stripe_subscription_id, l.origin, l.email, l.code_expires_at,
+                   p.audience AS plan_audience, p.plan_id AS plan_id, p.tier AS plan_tier,
                    s.status AS sub_status, s.current_period_end,
                    CASE
                      WHEN l.status NOT IN ('available', 'activated') THEN 0
@@ -269,13 +270,19 @@ def validate_license(code, email):
                    END AS effective_valid
             FROM licenses l
             LEFT JOIN subscriptions s ON l.stripe_subscription_id = s.subscription_id
+            LEFT JOIN plans p ON p.plan_id = l.product
             WHERE l.license_key=?
         """, (code,)).fetchone()
         if row:
             if row['status'] not in ('available', 'activated'):
                 return {'valid': False, 'error': 'Licentie verlopen of geannuleerd'}
             if row['effective_valid']:
-                result = {'valid': True, 'type': row['type'] or 'consumer', 'source': 'license', 'valid_until': row['valid_until'],
+                _type = row['type'] or 'consumer'
+                # audience uit plans als beschikbaar, anders afleiden uit type
+                _audience = row['plan_audience'] or _type
+                result = {'valid': True, 'type': _type, 'audience': _audience,
+                          'plan_id': row['plan_id'], 'plan_tier': row['plan_tier'],
+                          'source': 'license', 'valid_until': row['valid_until'],
                           'origin': row['origin'], 'bound_email': row['email'], 'code_expires_at': row['code_expires_at']}
                 if row['sub_status'] in ('canceled', 'past_due') and row['current_period_end']:
                     result['grace_until'] = row['current_period_end']
@@ -311,6 +318,34 @@ def _is_pro_or_demo_pro():
     Pro-routes binnenkomt en cliëntdata of -lijsten ziet.
     """
     return is_pro() or (session.get('demo_mode') and session.get('license_type') == 'pro')
+
+
+def is_krankenkasse_session():
+    """True wanneer huidige sessie hoort bij een Krankenkasse-licentie (plans.audience='krankenkasse').
+    Krankenkasse-gebruikers tellen ook als is_pro() — de audience is een sub-rol bovenop Pro."""
+    return session.get('audience') == 'krankenkasse'
+
+
+def kk_tier_label():
+    """Renderbaar tier-label voor Krankenkasse-licentie (Kompakt/Standard/Premium).
+    Leest plan_id uit session; valt terug op '?' wanneer onbekend."""
+    pid = session.get('plan_id') or ''
+    if pid.endswith('-kompakt'):  return 'Kompakt'
+    if pid.endswith('-standard'): return 'Standard'
+    if pid.endswith('-premium'):  return 'Premium'
+    return '?'
+
+
+def require_kk_office_if_krankenkasse(view):
+    """Decorator: KK-sessie zonder gekozen kantoor → redirect naar /pro/locatie.
+    Andere audiences ongemoeid; geen redirect-loop op pro_locatie zelf (die zit niet onder deze decorator)."""
+    import functools
+    @functools.wraps(view)
+    def _wrapped(*args, **kwargs):
+        if is_krankenkasse_session() and not session.get('kk_office'):
+            return redirect(url_for('pro_locatie'))
+        return view(*args, **kwargs)
+    return _wrapped
 
 
 def get_meting_count_for_current_context():
@@ -647,6 +682,8 @@ def activate():
         session.clear()
         session['license_valid'] = True
         session['license_type']  = result['type']
+        session['audience']      = result.get('audience') or result['type']
+        session['plan_id']       = result.get('plan_id')
         session['license_code']  = code
         session['email']         = email
         session['lang']          = lang
@@ -692,6 +729,8 @@ def activate():
             session['2fa_code']         = _2fa_code
             session['2fa_email']        = email
             session['2fa_license_type'] = session.get('license_type', 'consumer')
+            session['2fa_audience']     = session.get('audience', session.get('license_type', 'consumer'))
+            session['2fa_plan_id']      = session.get('plan_id')
             session['2fa_license_code'] = code
             session['2fa_name']         = session.get('profile_name', email)
             session['2fa_lang']         = lang
@@ -713,6 +752,8 @@ def activate():
             session["2fa_code"]         = _2fa_code
             session["2fa_email"]        = email
             session["2fa_license_type"] = session.get("license_type", "consumer")
+            session["2fa_audience"]     = session.get("audience", session.get("license_type", "consumer"))
+            session["2fa_plan_id"]      = session.get("plan_id")
             session["2fa_license_code"] = code
             session["2fa_name"]         = session.get("profile_name", email)
             session["2fa_lang"]         = lang
@@ -726,11 +767,202 @@ def activate():
 
 
 
+# ============================================================================
+# Krankenkasse admin (Sessie A) — licentie-aanmaak + kantoor-beheer
+# ============================================================================
+def _admin_kk_authorized():
+    """Check ADMIN_KK_TOKEN-match via X-Admin-Token header of ?token=… query."""
+    import hmac
+    expected = os.environ.get('ADMIN_KK_TOKEN', '')
+    given = request.headers.get('X-Admin-Token', '') or request.args.get('token', '') or request.form.get('token', '')
+    if not expected or not given:
+        return False
+    return hmac.compare_digest(given, expected)
+
+
+def _gen_kk_license_code():
+    """Format: SC-KK-XXXX-XXXX (hex). Garandeert uniciteit tegen licenses-tabel."""
+    import secrets
+    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    try:
+        for _ in range(20):
+            code = 'SC-KK-' + secrets.token_hex(2).upper() + '-' + secrets.token_hex(2).upper()
+            exists = db.execute("SELECT 1 FROM licenses WHERE license_key=?", (code,)).fetchone()
+            if not exists:
+                return code
+        raise RuntimeError('Could not generate unique KK code after 20 tries')
+    finally:
+        db.close()
+
+
+def send_kk_activation_email(to_email, contact_name, license_code, tier_label, lang='de'):
+    """Welkomstmail naar Krankenkasse-contactpersoon. Zakelijke DE-tekst,
+    Reply-To info@lifestylemonitors.de voor DE-context."""
+    try:
+        import sendgrid
+        from sendgrid.helpers.mail import Mail, ReplyTo
+        sg = sendgrid.SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
+        greeting = contact_name or 'Sehr geehrte Damen und Herren'
+        subject = f'Ihre StressChecker Krankenkasse-Lizenz ({tier_label}) ist aktiviert'
+        body = (
+            f'Sehr geehrte/r {greeting},\n\n'
+            f'wir freuen uns, Ihnen mitteilen zu koennen, dass Ihre StressChecker '
+            f'Krankenkasse-Lizenz ({tier_label}) eingerichtet wurde. Die Laufzeit '
+            f'betraegt 12 Monate ab Erstanmeldung.\n\n'
+            f'Ihr Lizenzschluessel: {license_code}\n\n'
+            f'So melden Sie sich an:\n'
+            f'  1. Oeffnen Sie https://app.stresschecker.com/licentie\n'
+            f'  2. Geben Sie den Lizenzschluessel und Ihre E-Mail-Adresse ein\n'
+            f'  3. Waehlen Sie ein Passwort (mindestens 8 Zeichen)\n'
+            f'  4. Bestaetigen Sie den per E-Mail zugesandten Verifizierungscode\n\n'
+            f'Standorte (Buero-Bezeichnungen) fuer Ihre Gesundheitstage werden '
+            f'zentral durch unser Team konfiguriert. Bitte teilen Sie uns die '
+            f'gewuenschten Standortnamen mit, sobald diese feststehen — eine '
+            f'Antwort auf diese E-Mail genuegt.\n\n'
+            f'Bei Fragen erreichen Sie uns unter sales@lifestylemonitors.com.\n\n'
+            f'Mit freundlichen Gruessen,\n'
+            f'Lifestyle Monitors'
+        )
+        msg = Mail(from_email='noreply@lifestylemonitors.com', to_emails=to_email,
+                   subject=subject, plain_text_content=body)
+        msg.reply_to = ReplyTo('info@lifestylemonitors.de')
+        sg.send(msg)
+        return True
+    except Exception as e:
+        print('KK-activatie-mail fout:', e)
+        return False
+
+
+@app.route('/admin/krankenkasse/new', methods=['GET', 'POST'])
+def admin_kk_new():
+    """Aanmaak van nieuwe Krankenkasse-licentie + optionele welkomstmail."""
+    if not _admin_kk_authorized():
+        return ('Unauthorized — provide X-Admin-Token header or ?token=… query parameter.', 401)
+    if request.method == 'POST':
+        name = (request.form.get('kk_name','') or '').strip()
+        tier = (request.form.get('tier','') or '').strip()
+        contact_email = (request.form.get('contact_email','') or '').strip().lower()
+        contact_name = (request.form.get('contact_name','') or '').strip()
+        send_mail_now = request.form.get('send_mail', '0') == '1'
+        if tier not in ('kompakt', 'standard', 'premium') or not name or not contact_email:
+            return render_template('admin/kk_new.html',
+                                   error='Vul naam, tier (kompakt/standard/premium) en contact-e-mail in.',
+                                   token=request.form.get('token',''))
+        plan_id = f'sc-krankenkasse-{tier}'
+        tier_label = {'kompakt':'Kompakt','standard':'Standard','premium':'Premium'}[tier]
+        license_code = _gen_kk_license_code()
+        import datetime as _dt
+        now_iso = _dt.datetime.utcnow().isoformat()
+        valid_until = (_dt.datetime.utcnow() + _dt.timedelta(days=365)).isoformat()
+        code_expires_at = (_dt.datetime.utcnow() + _dt.timedelta(days=60)).isoformat()
+        db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+        try:
+            db.execute(
+                "INSERT INTO licenses (license_key, product, type, status, origin, max_profiles, "
+                "email, product_name, valid_until, code_expires_at, notes, created_at) "
+                "VALUES (?, ?, 'pro', 'available', 'krankenkasse', -1, ?, ?, ?, ?, ?, ?)",
+                (license_code, plan_id, contact_email,
+                 f'Krankenkasse {tier_label}', valid_until, code_expires_at,
+                 f'Krankenkasse: {name}', now_iso)
+            )
+            db.execute(
+                "INSERT INTO activation_log (license_key, product, action, ip_address, user_agent, details) "
+                "VALUES (?, 'sc', 'admin_kk_create', ?, ?, ?)",
+                (license_code, request.remote_addr,
+                 (request.headers.get('User-Agent','') or '')[:200],
+                 f'name={name} tier={tier} contact={contact_email}')
+            )
+            db.commit()
+        finally:
+            db.close()
+        mail_status = ''
+        if send_mail_now:
+            sent = send_kk_activation_email(contact_email, contact_name, license_code, tier_label, lang='de')
+            mail_status = 'sent' if sent else 'failed'
+        return redirect(url_for('admin_kk_offices', license_code=license_code,
+                                token=request.form.get('token',''),
+                                mail=mail_status, created='1'))
+    return render_template('admin/kk_new.html', token=request.args.get('token',''))
+
+
+@app.route('/admin/krankenkasse/<license_code>/offices', methods=['GET', 'POST'])
+def admin_kk_offices(license_code):
+    """Beheer van kantoor-master-lijst voor een Krankenkasse-licentie."""
+    if not _admin_kk_authorized():
+        return ('Unauthorized — provide X-Admin-Token header or ?token=… query parameter.', 401)
+    license_code = license_code.strip().upper()
+    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db.row_factory = sqlite3.Row
+    lic = db.execute(
+        "SELECT l.license_key, l.email, l.notes, l.product, l.product_name, p.tier "
+        "FROM licenses l LEFT JOIN plans p ON p.plan_id=l.product WHERE l.license_key=?",
+        (license_code,)).fetchone()
+    if not lic or not (lic['product'] or '').startswith('sc-krankenkasse-'):
+        db.close()
+        return ('Onbekende of niet-Krankenkasse licentie.', 404)
+    if request.method == 'POST':
+        office_name = (request.form.get('office_name','') or '').strip()
+        if office_name:
+            db.execute("INSERT INTO krankenkasse_offices (license_code, office_name) VALUES (?, ?)",
+                       (license_code, office_name))
+            db.commit()
+        db.close()
+        return redirect(url_for('admin_kk_offices', license_code=license_code,
+                                token=request.form.get('token','')))
+    offices = db.execute(
+        "SELECT id, office_name, active, created_at FROM krankenkasse_offices "
+        "WHERE license_code=? ORDER BY active DESC, office_name", (license_code,)).fetchall()
+    db.close()
+    return render_template('admin/kk_offices.html',
+                           license=dict(lic), offices=[dict(o) for o in offices],
+                           token=request.args.get('token',''),
+                           created=request.args.get('created') == '1',
+                           mail_status=request.args.get('mail',''))
+
+
+@app.route('/admin/krankenkasse/<license_code>/offices/<int:oid>/deactivate', methods=['POST'])
+def admin_kk_office_deactivate(license_code, oid):
+    if not _admin_kk_authorized():
+        return ('Unauthorized', 401)
+    license_code = license_code.strip().upper()
+    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db.execute("UPDATE krankenkasse_offices SET active=0 WHERE id=? AND license_code=?",
+               (oid, license_code))
+    db.commit()
+    db.close()
+    return redirect(url_for('admin_kk_offices', license_code=license_code,
+                            token=request.form.get('token','')))
+
+
+@app.route('/admin/krankenkasse/<license_code>/send-welcome', methods=['POST'])
+def admin_kk_send_welcome(license_code):
+    if not _admin_kk_authorized():
+        return ('Unauthorized', 401)
+    license_code = license_code.strip().upper()
+    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db.row_factory = sqlite3.Row
+    lic = db.execute(
+        "SELECT l.license_key, l.email, l.notes, p.tier FROM licenses l "
+        "LEFT JOIN plans p ON p.plan_id=l.product WHERE l.license_key=?",
+        (license_code,)).fetchone()
+    db.close()
+    if not lic or not lic['email']:
+        return ('Licentie of contact-e-mail ontbreekt.', 400)
+    tier_label = {'krankenkasse-kompakt':'Kompakt','krankenkasse-standard':'Standard',
+                  'krankenkasse-premium':'Premium'}.get(lic['tier'] or '', '?')
+    contact_name = (lic['notes'] or '').replace('Krankenkasse: ','').strip()
+    sent = send_kk_activation_email(lic['email'], contact_name, license_code, tier_label, lang='de')
+    return redirect(url_for('admin_kk_offices', license_code=license_code,
+                            token=request.form.get('token',''),
+                            mail='sent' if sent else 'failed'))
+
+
 @app.route('/admin-login-bypass-9x7k')
 def admin_bypass():
     session.clear()
     session['logged_in'] = True
     session['license_type'] = 'pro'
+    session['audience'] = 'pro'
     session['email'] = 'paulpannevis@gmail.com'
     session['profile_name'] = 'Paul'
     session['profile_surname'] = 'Pannevis'
@@ -874,6 +1106,8 @@ def verify_2fa():
             lt = session.pop('2fa_license_type','consumer')
             if lt == "consumer" and session.get("2fa_login_type") == "pro":
                 lt = "pro"
+            audience_2fa = session.pop('2fa_audience', lt)
+            plan_id_2fa  = session.pop('2fa_plan_id', None)
             em = session.pop('2fa_email','')
             nm = session.pop('2fa_name',em)
             if nm == em:
@@ -902,6 +1136,9 @@ def verify_2fa():
             _lic_code = session.get('2fa_license_code', '')
             session.clear()
             session['license_valid']=True; session['license_type']=lt
+            session['audience']=audience_2fa or lt
+            session['plan_id']=plan_id_2fa
+            session['license_code']=_lic_code
             session['email']=em; session['session_id']=em; session['lang']=lang
             # Link license to email and mark as activated
             import sqlite3 as _sq2; _ldb2=_sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
@@ -1349,6 +1586,7 @@ def settings():
                             gender=_gd,
                             subscription_info=get_subscription_info(email, _lang),
                             tier_summary=get_pro_tier_summary(email, _lang),
+                            kk_tier=kk_tier_label(),
                             active_pairings=get_active_pairings_count(get_user_key()))
 @app.route('/verloop')
 def verloop():
@@ -1385,6 +1623,7 @@ def biofeedback():
 # ─── PRO routes ──────────────────────────────────────────────────────────────
 
 @app.route('/pro')
+@require_kk_office_if_krankenkasse
 def pro_menu():
     if not session.get('license_valid') and not session.get('demo_mode'):
         return redirect(url_for('welcome'))
@@ -1425,9 +1664,11 @@ def pro_menu():
                            demo_msg=("Nur fur Pro-Abonnenten" if lang=="de" else "Pro subscribers only" if lang=="en" else "Alleen voor Pro-abonnees"),
                            subscription_info=get_subscription_info(_email, lang),
                            tier_summary=get_pro_tier_summary(_email, lang),
+                           kk_tier=kk_tier_label(),
                            active_pairings=get_active_pairings_count(pro_key))
 
 @app.route('/pro/mijn-metingen')
+@require_kk_office_if_krankenkasse
 def pro_eigen_metingen():
     if not session.get('license_valid') or not is_pro():
         return redirect(url_for('welcome'))
@@ -1456,6 +1697,7 @@ def pro_eigen_metingen():
     return resp
 
 @app.route('/pro/clienten')
+@require_kk_office_if_krankenkasse
 def pro_clients():
     if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
         return redirect(url_for('welcome'))
@@ -1487,6 +1729,7 @@ def pro_clients():
     return render_template('pro/clients.html', lang=lang, clients=client_list)
 
 @app.route('/pro/dashboard')
+@require_kk_office_if_krankenkasse
 def pro_dashboard():
     if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
         return redirect(url_for('welcome'))
@@ -1530,21 +1773,53 @@ def pro_dashboard():
     db.close()
     return render_template('pro/dashboard.html', lang=lang, rows=rows)
 
+@app.route('/pro/locatie', methods=['GET','POST'])
+def pro_locatie():
+    """Krankenkasse-flow: keuze van actief kantoor voor de huidige sessie.
+    Een Krankenkasse-licentie heeft 1..N kantoren in krankenkasse_offices; gekozen
+    waarde landt in session['kk_office'] en wordt door api_meting_opslaan op elke
+    nieuwe meting in client_metingen.office_label opgeslagen."""
+    if not session.get('license_valid') or not is_krankenkasse_session():
+        return redirect(url_for('welcome'))
+    lang = session.get('lang', 'nl')
+    license_code = session.get('license_code', '')
+    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db.row_factory = sqlite3.Row
+    if request.method == 'POST':
+        chosen = (request.form.get('office_name','') or '').strip()
+        row = db.execute(
+            "SELECT office_name FROM krankenkasse_offices WHERE license_code=? AND office_name=? AND active=1",
+            (license_code, chosen)).fetchone()
+        db.close()
+        if row:
+            session['kk_office'] = row['office_name']
+            return redirect(url_for('pro_menu'))
+        return redirect(url_for('pro_locatie', error='invalid'))
+    offices = [r['office_name'] for r in db.execute(
+        "SELECT office_name FROM krankenkasse_offices WHERE license_code=? AND active=1 ORDER BY office_name",
+        (license_code,)).fetchall()]
+    db.close()
+    return render_template('pro/locatie_keuze.html', lang=lang, offices=offices, current=session.get('kk_office',''))
+
+
 @app.route('/pro/client/toevoegen', methods=['GET','POST'])
+@require_kk_office_if_krankenkasse
 def pro_client_add():
     if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
         return redirect(url_for('welcome'))
     lang = session.get('lang', 'nl')
+    is_kk = is_krankenkasse_session()
     if request.method == 'POST':
         name = request.form.get('name','').strip()
         surname = request.form.get('surname','').strip() or None
         birth_year = int(request.form.get('birth_year', 1970))
         gender = request.form.get('gender', 'male')
-        email = request.form.get('email','').strip()
-        phone = request.form.get('phone','').strip()
-        notes = request.form.get('notes','').strip()
+        # Krankenkasse-flow: e-mail/telefoon/notities niet uitgevraagd
+        email = '' if is_kk else request.form.get('email','').strip()
+        phone = '' if is_kk else request.form.get('phone','').strip()
+        notes = '' if is_kk else request.form.get('notes','').strip()
         if not name:
-            return render_template('pro/client_add.html', lang=lang, error='Vul een naam in.')
+            return render_template('pro/client_add.html', lang=lang, error='Vul een naam in.', is_krankenkasse=is_kk)
         pro_key = get_user_key()
         client_code = generate_client_code()
         db = get_pro_db()
@@ -1553,9 +1828,10 @@ def pro_client_add():
         db.commit()
         db.close()
         return redirect(url_for('pro_clients'))
-    return render_template('pro/client_add.html', lang=lang)
+    return render_template('pro/client_add.html', lang=lang, is_krankenkasse=is_kk)
 
 @app.route('/pro/client/<int:cid>')
+@require_kk_office_if_krankenkasse
 def pro_client_detail(cid):
     if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
         return redirect(url_for('welcome'))
@@ -1579,6 +1855,7 @@ def pro_client_detail(cid):
     return resp
 
 @app.route('/pro/client/<int:cid>/meten')
+@require_kk_office_if_krankenkasse
 def pro_client_measure(cid):
     if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
         return redirect(url_for('welcome'))
@@ -1681,8 +1958,10 @@ def api_save_meting():
         _ctx_vrije_tekst = (str(data.get('ctx_vrije_tekst') or '')).strip()[:100] or None
         if client_id > 0 and _is_pro_or_demo_pro():
             db = get_pro_db()
-            _vals=(int(client_id),get_user_key(),int(data.get('ts',__import__('datetime').datetime.now().timestamp()*1000)),float(data.get('ri',0)),int(data.get('bpm',0)),int(data.get('hrv',0)),float(data.get('rmssd',0)),float(data.get('sdnn',0)),float(data.get('pnn50',0)),int(data.get('beats',0)),int(data.get('duration',90)),str(data.get('sensor','demo')),str(data.get('notes','')),str(data.get('timeseries','')),str(data.get('rr_intervals','')),int(data.get('kwaliteit',100)),str(data.get('meting_type','basismeting')),str(data.get('ctx_dimensie','')),float(data.get('ctx_vitaliteit',0)) if data.get('ctx_vitaliteit') else None,_subj_score,_ctx_ongemak,_ctx_vrije_tekst)
-            db.execute('INSERT INTO client_metingen (client_id,pro_key,ts,ri,bpm,hrv_pct,rmssd,sdnn,pnn50,beats,duration,sensor_type,notes,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',_vals)
+            # office_label vult alleen bij Krankenkasse-sessie; voor reguliere Pro blijft de kolom NULL
+            _office = session.get('kk_office') if is_krankenkasse_session() else None
+            _vals=(int(client_id),get_user_key(),int(data.get('ts',__import__('datetime').datetime.now().timestamp()*1000)),float(data.get('ri',0)),int(data.get('bpm',0)),int(data.get('hrv',0)),float(data.get('rmssd',0)),float(data.get('sdnn',0)),float(data.get('pnn50',0)),int(data.get('beats',0)),int(data.get('duration',90)),str(data.get('sensor','demo')),str(data.get('notes','')),str(data.get('timeseries','')),str(data.get('rr_intervals','')),int(data.get('kwaliteit',100)),str(data.get('meting_type','basismeting')),str(data.get('ctx_dimensie','')),float(data.get('ctx_vitaliteit',0)) if data.get('ctx_vitaliteit') else None,_subj_score,_ctx_ongemak,_ctx_vrije_tekst,_office)
+            db.execute('INSERT INTO client_metingen (client_id,pro_key,ts,ri,bpm,hrv_pct,rmssd,sdnn,pnn50,beats,duration,sensor_type,notes,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,office_label) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',_vals)
             db.commit()
             db.close()
             return jsonify({'ok': True, 'client_id': int(client_id)})
@@ -4278,6 +4557,7 @@ def sport_training():
     return render_template("sport_training.html", lang=lang, is_pro=is_pro())
 
 @app.route('/pro/meting')
+@require_kk_office_if_krankenkasse
 def pro_meting_keuze():
     if (not session.get("license_valid") and not session.get("demo_mode")) or not _is_pro_or_demo_pro():
         return redirect(url_for("welcome"))

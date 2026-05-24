@@ -1,5 +1,88 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-05-24 — Krankenkasse-licentie-tier — fundering (Sessie A)
+
+Nieuwe licentie-categorie voor Krankenkassen (gezondheidsdagen, multi-kantoor onder één centraal account). Eerste klant: KKH. Tier-gestaffeld (Kompakt/Standard/Premium) op verzekerden-aantal; handmatige activatie (geen Stripe Payment Link).
+
+### Migraties
+
+- `saas_licenses.db`:
+  - 3 nieuwe rijen in `plans`: `sc-krankenkasse-{kompakt,standard,premium}` (audience='krankenkasse', max_profiles=-1, max_clients=-1, stripe_price_id=NULL)
+  - Nieuwe tabel `krankenkasse_offices(id, license_code, office_name, active, created_at)` + index `idx_kk_offices_license`
+- `sc_pro.db`:
+  - `ALTER TABLE client_metingen ADD COLUMN office_label TEXT` — 220 bestaande rijen behouden, allemaal NULL
+
+### Audience-onderscheid
+
+`audience` wordt voor het eerst in code gebruikt. `validate_license()` joint nu `plans.audience` mee; resultaat populeert `session['audience']` + `session['plan_id']` in `/activeer`, `verify_2fa` en `admin_bypass`-paden. Bestaande `is_pro()`-detectie blijft via `session['license_type']='pro'` voor KK-licenties (sub-rol bovenop Pro).
+
+Nieuwe helpers (app.py vlak na `_is_pro_or_demo_pro`):
+- `is_krankenkasse_session()` — boolean
+- `kk_tier_label()` — 'Kompakt'/'Standard'/'Premium'/'?' uit `session['plan_id']`
+- `@require_kk_office_if_krankenkasse` — decorator: KK-sessie zonder `session['kk_office']` → redirect naar `/pro/locatie`
+
+Decorator-coverage: `pro_menu`, `pro_eigen_metingen`, `pro_clients`, `pro_dashboard`, `pro_client_detail`, `pro_client_measure`, `pro_client_add`, `pro_meting_keuze`. NIET op `pro_locatie` zelf, `settings`, `logout` (anders redirect-loop of geen ontsnapping).
+
+### Locatie-keuze-flow
+
+`/pro/locatie` (GET+POST) — leest `krankenkasse_offices` voor `session['license_code']`, dropdown met active=1 rijen, POST verifieert keuze tegen DB en zet `session['kk_office']`. Header in `base.html` toont KK-badge "Locatie: {office} [Wijzigen]" alleen voor KK-sessie. `templates/pro/locatie_keuze.html` (nieuw).
+
+### Verkorte invoer-UI
+
+`templates/pro/client_add.html` — Jinja-conditional `{% if not is_krankenkasse %}`: surname/email/phone/notes + hr-separator volledig weggelaten uit DOM voor KK-sessie. Voornaam blijft verplicht; geboortejaar+geslacht worden verplicht (i.p.v. defaults op 1970/male) zodat HRV-norm-mapping per deelnemer klopt.
+
+### Office-label op meting
+
+`api_meting_opslaan`: INSERT in `client_metingen` uitgebreid met 23e kolom `office_label`. Waarde = `session.get('kk_office')` enkel als `is_krankenkasse_session()` — voor Pro-sessie blijft de kolom NULL (regressie-bewezen via test-client).
+
+### Admin-flow (handmatige activatie)
+
+Nieuwe routes met `X-Admin-Token`/`?token=…` gate (env-var `ADMIN_KK_TOKEN` in `/opt/stresschecker/.env`, 43-char urlsafe):
+- `GET/POST /admin/krankenkasse/new` — licentie aanmaken, code-formaat `SC-KK-XXXX-XXXX` (hex), origin='krankenkasse', plan_id-binding, optioneel direct welkomstmail
+- `GET/POST /admin/krankenkasse/<code>/offices` — kantoor-master-lijst beheren (toevoegen)
+- `POST /admin/krankenkasse/<code>/offices/<id>/deactivate` — soft delete (active=0)
+- `POST /admin/krankenkasse/<code>/send-welcome` — welkomstmail (her)verzenden
+
+Nieuwe templates: `admin/kk_new.html`, `admin/kk_offices.html`.
+
+`send_kk_activation_email` (DE zakelijk, Reply-To `info@lifestylemonitors.de`, from `noreply@lifestylemonitors.com`) volgt het patroon van `send_verification_code`. Gebruikt ASCII-fallbacks (ueber/fuer/Gruessen) consistent met bestaand `mail_template_umlauts`-patroon.
+
+### Tier-widget (Pro vs KK)
+
+Bestaande Pro-tier widget op `/pro` (`pro/menu.html`) en `/instellingen` (`settings.html`) toont voor `audience='krankenkasse'` een KK-variant: "Krankenkasse-Lizenz: {Tier}" + "Unbegrenzte Teilnehmerzahl bei Gesundheitstagen" (NL/DE/EN). Reguliere Pro-cohorts behouden Pro S/M/L-rendering (regressie-bewezen via curl).
+
+### Backups + verificatie
+
+- Pre-migratie backup: `/opt/backups/*.20260524-1856`
+- `py_compile app.py`: OK
+- `tests/run_all.sh`: 18/18 groen (categorie A 6/6, B 4/4, C 8/8)
+- Jinja2 parse op 7 geraakte templates: OK
+- Smoke-tests admin-flow: 401 zonder token, 200 met token, POST → licentie aangemaakt + kantoren toegevoegd (DB-verificatie)
+- KK-flow end-to-end via Flask test-client: validate_license → audience='krankenkasse'; /pro zonder kk_office → redirect /pro/locatie; POST locatie → /pro met KK-widget zichtbaar; client_add toont alleen voornaam/birth_year/gender; api/meting/opslaan vult office_label='Hannover'
+- Pro-regressie: alle 4 optionele velden zichtbaar; office_label blijft NULL; bestaande Pro S/M/L tier-widget rendert ongewijzigd
+
+### Test-fixture (per TEST_ACCOUNTS-policy: niet opruimen)
+
+- Licentiecode: `SC-KK-44F6-14A3` (sc-krankenkasse-standard)
+- Contact-email: `paulpannevis+kktest@gmail.com`
+- 3 kantoren: Hannover, Hamburg, München
+- Notes-flag: `Krankenkasse: KKH-Test-<ts>`
+
+### Out-of-scope (komt in Sessie B)
+
+- Rapportage-laag (aggregatie-queries per office, PDF-generatie, async generatie)
+- Office-label uitgebreid analytics (per kantoor RI-distributie, etc.)
+- Pro-rapportages
+- HLM-blueprint blijft ongemoeid (zomer 2026 herbouw)
+
+### Open punten / TODOs
+
+- Welkomstmail-flow: bij POST via `X-Admin-Token` header is `request.form['token']` leeg → redirect-URL bevat `?token=` (leeg). Voor browser-flow met hidden form-veld werkt het correct. Curl-gebruikers moeten handmatig token toevoegen aan vervolgaanroepen.
+- KK-tier-widget toont géén einddatum (valid_until ligt 365d weg, geen Stripe-renewal). Eventueel later toevoegen als KK-contracten daadwerkelijk verlopen.
+- `templates/pro/locatie_keuze.html` toont "neem contact op met sales"-fallback als offices=0; admin-flow voorziet hier nu in maar de KK-contactpersoon krijgt geen automatische hint. Later: link naar contact-pagina.
+- 2FA-codes plaintext in journalctl blijft staan (pre-existing HIGH-PRIORITY follow-up).
+- Daadwerkelijke browser-end-to-end (login via /activeer + 2FA-mail) niet tijdens deze sessie uitgevoerd: vereist email-toegang voor verificatiecode. Alle paden zijn via Flask test-client end-to-end bewezen.
+
 ## 2026-05-24 — Optioneel achternaam-veld (drie naam-rollen)
 
 Voornaam blijft verplicht, achternaam optioneel toegevoegd aan zowel het profiel van de gebruiker (consument en Pro delen `users.display_name`) als aan Pro-cliëntprofielen (`sc_pro.db.clients`).

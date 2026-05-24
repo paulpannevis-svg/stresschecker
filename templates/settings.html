@@ -6,8 +6,31 @@
     {% if lang == 'de' %}Einstellungen{% elif lang == 'en' %}Settings{% else %}Instellingen{% endif %}
   </h2>
 
-  <!-- Mijn Pro-abonnement (alle Pro-cohorts) -->
-  {% if tier_summary %}
+  <!-- Krankenkasse-licentie-widget (audience='krankenkasse') -->
+  {% if session.get('audience') == 'krankenkasse' %}
+  <div style="background:var(--white);border-radius:var(--radius);padding:20px;margin-bottom:12px;">
+    <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">
+      {% if lang == 'de' %}Meine Krankenkasse-Lizenz{% elif lang == 'en' %}My insurer license{% else %}Mijn Krankenkasse-licentie{% endif %}
+    </div>
+    <div style="font-size:1rem;font-weight:600;color:var(--text-primary);margin-bottom:6px;">
+      <span style="color:var(--red);">
+        {% if lang == 'de' %}Krankenkasse-Lizenz{% elif lang == 'en' %}Insurer license{% else %}Krankenkasse-licentie{% endif %}: {{ kk_tier }}
+      </span>
+    </div>
+    <div style="font-size:0.88rem;color:var(--text-muted);margin-bottom:6px;">
+      {% if lang == 'de' %}Unbegrenzte Teilnehmerzahl bei Gesundheitstagen{% elif lang == 'en' %}Unlimited participants at health days{% else %}Onbeperkt aantal deelnemers tijdens gezondheidsdagen{% endif %}
+    </div>
+    {% if session.get('kk_office') %}
+    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:6px;">
+      {% if lang == 'de' %}Aktueller Standort{% elif lang == 'en' %}Current location{% else %}Huidige locatie{% endif %}: <strong style="color:var(--text-primary);">{{ session.get('kk_office') }}</strong>
+      — <a href="{{ url_for('pro_locatie') }}" style="color:var(--red);">{% if lang == 'de' %}wechseln{% elif lang == 'en' %}change{% else %}wijzigen{% endif %}</a>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Mijn Pro-abonnement (alle Pro-cohorts, niet voor Krankenkasse) -->
+  {% if tier_summary and session.get('audience') != 'krankenkasse' %}
   <div style="background:var(--white);border-radius:var(--radius);padding:20px;margin-bottom:12px;">
     <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">
       {% if lang == 'de' %}Mein Pro-Abonnement{% elif lang == 'en' %}My Pro subscription{% else %}Mijn Pro-abonnement{% endif %}

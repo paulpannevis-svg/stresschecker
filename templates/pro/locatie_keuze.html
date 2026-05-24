@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}StressChecker® — {% if lang=='de' %}Standort wählen{% elif lang=='en' %}Choose location{% else %}Locatie kiezen{% endif %}{% endblock %}
+{% block content %}
+<div style="max-width:520px;margin:0 auto;padding:1rem;">
+  <h1 class="screen-title" style="font-size:1.3rem;">
+    <span style="background:#1565c0;color:#fff;font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:10px;vertical-align:middle;margin-right:.3rem;">KK</span>
+    {% if lang=='de' %}Für welchen Standort arbeitest du jetzt?{% elif lang=='en' %}Which location are you working at now?{% else %}Voor welke locatie ga je nu werken?{% endif %}
+  </h1>
+  <p class="screen-subtitle" style="margin-bottom:18px;color:#555;">
+    {% if lang=='de' %}Alle Messungen werden mit diesem Standort verknüpft, bis du ihn änderst.{% elif lang=='en' %}All measurements will be tagged with this location until you change it.{% else %}Alle metingen worden gekoppeld aan deze locatie totdat je ze wijzigt.{% endif %}
+  </p>
+
+  {% if request.args.get('error') == 'invalid' %}
+  <div class="form-error" style="background:#fdecea;color:#b71c1c;padding:.6rem .8rem;border-radius:6px;margin-bottom:1rem;">
+    {% if lang=='de' %}Ungültige Auswahl.{% elif lang=='en' %}Invalid choice.{% else %}Ongeldige keuze.{% endif %}
+  </div>
+  {% endif %}
+
+  {% if offices %}
+  <div class="card" style="padding:1.2rem;">
+    <form method="POST" action="{{ url_for('pro_locatie') }}">
+      {% for office in offices %}
+      <label style="display:flex;align-items:center;gap:.6rem;padding:.5rem 0;cursor:pointer;border-bottom:1px solid #f0f0f0;">
+        <input type="radio" name="office_name" value="{{ office }}" {% if office == current %}checked{% endif %} required>
+        <span style="font-size:1.02rem;">{{ office }}</span>
+      </label>
+      {% endfor %}
+      <button type="submit" class="btn btn-primary" style="margin-top:1.2rem;width:100%;">
+        {% if lang=='de' %}Standort bestätigen ▶{% elif lang=='en' %}Confirm location ▶{% else %}Locatie bevestigen ▶{% endif %}
+      </button>
+    </form>
+  </div>
+  {% else %}
+  <div class="card" style="padding:1.2rem;background:#fff8e1;">
+    <p style="margin:0;">
+      {% if lang=='de' %}Es sind noch keine Standorte konfiguriert. Bitte wenden Sie sich an <a href="mailto:sales@lifestylemonitors.com">sales@lifestylemonitors.com</a>.{% elif lang=='en' %}No locations configured yet. Please contact <a href="mailto:sales@lifestylemonitors.com">sales@lifestylemonitors.com</a>.{% else %}Er zijn nog geen locaties geconfigureerd. Neem contact op met <a href="mailto:sales@lifestylemonitors.com">sales@lifestylemonitors.com</a>.{% endif %}
+    </p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

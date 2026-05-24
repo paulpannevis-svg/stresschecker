@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}StressChecker® Pro — Dashboard
+    <!-- Kenniscentrum Pro knop -->
+    <div style="text-align:center;margin-top:1rem;padding-bottom:1rem">
+      {%if is_pro and not session.get('free_trial') and not session.get('is_demo')%}
+      <a href="/kenniscentrum-pro" onclick="{% if session.get('is_demo') %}event.preventDefault();alert('Alleen voor abonnementhouders');{% endif %}" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.2rem;background:#e8f5f3;color:#2a9d8f;border:1px solid #b2dbd5;border-radius:20px;text-decoration:none;font-size:.82rem;font-weight:600">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        {%if lang=='de'%}Wissenszentrum Pro{%elif lang=='en'%}Knowledge Centre Pro{%else%}Kenniscentrum Pro{%endif%}
+      </a>
+      {%else%}
+      <span onclick="alert('{%if lang=="de"%}Nur für Pro-Abonnenten{%elif lang=="en"%}Pro subscribers only{%else%}Alleen voor Pro-abonnees{%endif%}')" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.2rem;background:#f5f5f5;color:#aaa;border:1px solid #ddd;border-radius:20px;font-size:.82rem;cursor:pointer">
+        🔒 {%if lang=='de'%}Wissenszentrum Pro{%elif lang=='en'%}Knowledge Centre Pro{%else%}Kenniscentrum Pro{%endif%}
+      </span>
+      {%endif%}
+    </div>
+
+    
+    <!-- Kenniscentrum Pro knop -->
+    <div style="text-align:center;margin-top:1rem;padding-bottom:1rem">
+      {%if is_pro and not session.get('free_trial') and not session.get('is_demo')%}
+      <a href="/kenniscentrum-pro" onclick="{% if session.get('is_demo') %}event.preventDefault();alert('Alleen voor abonnementhouders');{% endif %}" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.2rem;background:#e8f5f3;color:#2a9d8f;border:1px solid #b2dbd5;border-radius:20px;text-decoration:none;font-size:.82rem;font-weight:600">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        {%if lang=='de'%}Wissenszentrum Pro{%elif lang=='en'%}Knowledge Centre Pro{%else%}Kenniscentrum Pro{%endif%}
+      </a>
+      {%else%}
+        <span onclick="this.nextElementSibling.style.display='block';this.style.color='#E8344E';" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.2rem;background:#f5f5f5;color:#aaa;border:1px solid #ddd;border-radius:20px;font-size:.82rem;cursor:pointer;flex-direction:column;">
+        🔒 {%if lang=='de'%}Wissenszentrum Pro{%elif lang=='en'%}Knowledge Centre Pro{%else%}Kenniscentrum Pro{%endif%}
+        </span>
+        {%endif%}
+        <div id="demo-msg-pro" style="display:none;font-size:.78rem;color:#E8344E;margin-top:6px;text-align:center;">Alleen voor Pro-abonnees</div>
+        <span onclick="this.nextElementSibling.style.display='block';this.style.color='#E8344E';" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.2rem;background:#f5f5f5;color:#aaa;border:1px solid #ddd;border-radius:20px;font-size:.82rem;cursor:pointer;flex-direction:column;">
+
+{% endblock %}
+{% block content %}
+<style>
+.pro-wrap{max-width:1080px;margin:0 auto;padding:1.5rem 1rem 2rem;}
+.pro-welcome{margin-bottom:.8rem;}
+.pro-welcome{text-align:center;} .pro-label{font-size:1rem;color:#6B6360;text-transform:uppercase;letter-spacing:.1em;}
+.pro-name{font-size:1.5rem;font-weight:700;color:#E8344E;display:flex;align-items:center;gap:.5rem;justify-content:center;}
+.pro-badge{display:inline-block;background:#E8344E;color:#fff;font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:10px;letter-spacing:.08em;vertical-align:middle;}
+
+/* Stats bar */
+.pro-status{background:#fff;border-radius:14px;padding:.8rem 1.2rem;box-shadow:0 2px 10px rgba(0,0,0,.07);margin-bottom:1.2rem;display:flex;align-items:center;justify-content:center;gap:1.5rem;font-size:.88rem;color:#6B6360;}
+.pro-status strong{color:#E8344E;font-size:1.1rem;}
+
+/* Card grid - match consumer style */
+.pro-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.2rem;}
+@media(max-width:768px){.pro-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:480px){.pro-grid{grid-template-columns:1fr;}}
+
+.pro-card{background:#fff;border-radius:14px;padding:1.5rem 1rem;box-shadow:0 2px 10px rgba(0,0,0,.07);text-align:center;display:flex;flex-direction:column;align-items:center;gap:.5rem;}
+.pro-card-icon{width:64px;height:64px;border-radius:50%;background:#fce8ec;display:flex;align-items:center;justify-content:center;color:#E8344E;margin-bottom:.3rem;}
+.pro-card h3{font-size:.95rem;font-weight:700;color:#333;margin:0;}
+.pro-card p{font-size:.78rem;color:#6B6360;margin:0;line-height:1.3;min-height:2.2em;}
+.pro-card .btn-open{display:block;width:100%;padding:.55rem 0;background:#E8344E;color:#fff;border:none;border-radius:24px;font-size:.85rem;font-weight:700;letter-spacing:.05em;cursor:pointer;text-decoration:none;text-align:center;transition:background .15s;margin-top:.5rem;}
+.pro-card .btn-open:hover{background:#c72a40;}
+
+/* Full-width bottom card */
+.pro-full{background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 2px 10px rgba(0,0,0,.07);text-align:center;margin-bottom:1rem;}
+.pro-full-icon{width:64px;height:64px;border-radius:50%;background:#fce8ec;display:flex;align-items:center;justify-content:center;color:#E8344E;margin:0 auto .6rem;}
+.pro-full h3{font-size:.95rem;font-weight:700;color:#333;margin:0 0 .2rem;}
+.pro-full p{font-size:.78rem;color:#6B6360;margin:0 0 .8rem;}
+.pro-full .btn-open{display:block;max-width:600px;margin:0 auto;padding:.55rem 0;background:#E8344E;color:#fff;border:none;border-radius:24px;font-size:.85rem;font-weight:700;letter-spacing:.05em;cursor:pointer;text-decoration:none;text-align:center;transition:background .15s;}
+.pro-full .btn-open:hover{background:#c72a40;}
+</style>
+
+<div class="pro-wrap">
+  <!-- Welcome -->
+  <div class="pro-welcome">
+    <div class="pro-label">{%if lang=='de'%}Willkommen{%elif lang=='en'%}Welcome{%else%}Welkom{%endif%}</div>
+    <div class="pro-name">{{ (name or "Professional").split()[0] }}</div>
+  </div>
+
+  <!-- Tier-strook (alle Pro-cohorts) -->
+  {% if session.get('audience') == 'krankenkasse' %}
+  <div class="pro-tier" style="background:var(--beige);border:1px solid var(--beige-dark);border-radius:14px;padding:.7rem 1.2rem;margin-bottom:.8rem;text-align:center;font-size:.88rem;color:var(--text-muted);">
+    <strong style="color:var(--red);font-size:1rem;letter-spacing:.02em;">
+      {%if lang=='de'%}Krankenkasse-Lizenz{%elif lang=='en'%}Insurer license{%else%}Krankenkasse-licentie{%endif%}: {{ kk_tier }}
+    </strong>
+    <div style="margin-top:.25rem;">
+      {%if lang=='de'%}Unbegrenzte Teilnehmerzahl bei Gesundheitstagen{%elif lang=='en'%}Unlimited participants at health days{%else%}Onbeperkt aantal deelnemers tijdens gezondheidsdagen{%endif%}
+    </div>
+  </div>
+  {% elif tier_summary %}
+  <div class="pro-tier" style="background:var(--beige);border:1px solid var(--beige-dark);border-radius:14px;padding:.7rem 1.2rem;margin-bottom:.8rem;text-align:center;font-size:.88rem;color:var(--text-muted);">
+    <strong style="color:var(--red);font-size:1rem;letter-spacing:.02em;">{{ tier_summary.tier_short }}</strong>
+    <span style="margin:0 .5rem;">·</span>
+    <strong style="color:var(--text-primary);">{{ active_pairings }}</strong>
+    {%if lang=='de'%} von {{ tier_summary.max_clients }} aktive Kopplungen
+    {%elif lang=='en'%} of {{ tier_summary.max_clients }} active pairings
+    {%else%} van {{ tier_summary.max_clients }} actieve koppelingen{%endif%}
+    <span style="margin:0 .5rem;">·</span>
+    {%if lang=='de'%}Gültig bis {{ tier_summary.expires_at_display }}
+    {%elif lang=='en'%}Valid until {{ tier_summary.expires_at_display }}
+    {%else%}Geldig tot {{ tier_summary.expires_at_display }}{%endif%}
+  </div>
+  {% endif %}
+
+  <!-- Status bar -->
+  <div class="pro-status">
+    <span><strong>{{ client_count }}</strong> {%if lang=='de'%}Klienten{%elif lang=='en'%}clients{%else%}cliënten{%endif%}</span>
+    <span>·</span>
+    <span><strong>{{ recent_count }}</strong> {%if lang=='de'%}Messungen (7 Tage){%elif lang=='en'%}readings (7 days){%else%}metingen (7 dagen){%endif%}</span>
+  </div>
+
+  <!-- Mijn abonnement (Fase 2) -->
+  {% if subscription_info %}
+  <div class="pro-full">
+    <h3>
+      {%if lang=='de'%}Mein Abonnement{%elif lang=='en'%}My subscription{%else%}Mijn abonnement{%endif%}
+    </h3>
+    <p>
+      <strong>{{ subscription_info.plan_name }}</strong><br>
+      {%if lang=='de'%}Nächste Rechnung: {{ subscription_info.current_period_end_display }}{%elif lang=='en'%}Next billing: {{ subscription_info.current_period_end_display }}{%else%}Volgende factuur: {{ subscription_info.current_period_end_display }}{%endif%}
+    </p>
+    <a href="{{ url_for('manage_subscription') }}" class="btn btn-primary">
+      {%if lang=='de'%}Abonnement verwalten →{%elif lang=='en'%}Manage subscription →{%else%}Abonnement beheren →{%endif%}
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- 4 Cards -->
+  <div class="pro-grid">
+    <!-- Mijn cliënten -->
+    <div class="pro-card">
+      <div class="pro-card-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <h3>{%if lang=='de'%}Meine Klienten{%elif lang=='en'%}My clients{%else%}Mijn cliënten{%endif%}</h3>
+      <p>{%if lang=='de'%}Klienten verwalten und Messungen einsehen{%elif lang=='en'%}Manage clients and view readings{%else%}Cliënten beheren en metingen bekijken{%endif%}</p>
+      <a href="{{ url_for('pro_clients') }}" class="btn-open">{% if lang=="de" %}ÖFFNEN{% elif lang=="en" %}OPEN{% else %}OPEN{% endif %}</a>
+    </div>
+
+    <!-- Nieuwe cliënt -->
+    <div class="pro-card">
+      <div class="pro-card-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+      </div>
+      <h3>{%if lang=='de'%}Neuer Klient{%elif lang=='en'%}New client{%else%}Nieuwe cliënt{%endif%}</h3>
+      <p>{%if lang=='de'%}Klient hinzufügen und Profil anlegen{%elif lang=='en'%}Add client and create profile{%else%}Cliënt toevoegen en profiel aanmaken{%endif%}</p>
+      <a href="{{ url_for('pro_client_add') }}" class="btn-open">{% if lang=="de" %}ÖFFNEN{% elif lang=="en" %}OPEN{% else %}OPEN{% endif %}</a>
+    </div>
+
+    <!-- Eigen meting -->
+    <div class="pro-card">
+      <div class="pro-card-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      </div>
+      <h3>{%if lang=='de'%}Eigene Messung{%elif lang=='en'%}Own reading{%else%}Eigen meting{%endif%}</h3>
+      <p>{%if lang=='de'%}Messungen für sich selbst{%elif lang=='en'%}Readings for yourself{%else%}Metingen voor jezelf{%endif%}</p>
+      <a href="/pro/meting" class="btn-open">{% if lang=="de" %}ÖFFNEN{% elif lang=="en" %}OPEN{% else %}OPEN{% endif %}</a>
+        <a href="/pro/mijn-metingen" style="display:block;text-align:center;margin-top:.5rem;font-size:.8rem;color:#E8344E;text-decoration:none;">{%if lang=="de"%}Verlauf &amp; Übersicht{%elif lang=="en"%}Progress &amp; Overview{%else%}Verloop Basismeting &amp; Overzicht metingen{%endif%} &rarr;</a>
+        <a href="/pro/mijn-metingen" style="display:block;text-align:center;margin-top:.25rem;font-size:.8rem;color:#888;text-decoration:none;">{%if lang=="de"%}Detail Info Messungen{%elif lang=="en"%}Detail Info Readings{%else%}Detail Info Metingen{%endif%} &rarr;</a>
+    </div>
+
+    <!-- Instellingen -->
+    <div class="pro-card">
+      <div class="pro-card-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+      <h3>{%if lang=='de'%}Einstellungen{%elif lang=='en'%}Settings{%else%}Instellingen{%endif%}</h3>
+      <p>{%if lang=='de'%}Profil und Voreinstellungen{%elif lang=='en'%}Profile and preferences{%else%}Profiel en voorkeuren{%endif%}</p>
+      <a href="{{ url_for('settings') }}" class="btn-open">{% if lang=="de" %}ÖFFNEN{% elif lang=="en" %}OPEN{% else %}OPEN{% endif %}</a>
+    </div>
+  </div>
+
+  
+    <!-- Pro-exclusive items -->
+    <div class="pro-card">
+        <div class="pro-card-icon">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <h3>{%if lang=='de'%}Pro Beruf{%elif lang=='en'%}Per Profession{%else%}Per Beroep{%endif%}</h3>
+        <p>{%if lang=='de'%}Berufsspezifische Anwendungen{%elif lang=='en'%}Profession-specific applications{%else%}Beroepsspecifieke toepassingen{%endif%}</p>
+        <a href="/beroepen" class="btn-open">{% if lang=="de" %}ÖFFNEN{% elif lang=="en" %}OPEN{% else %}OPEN{% endif %}</a>
+    </div>
+
+    <div class="pro-card">
+        <div class="pro-card-icon">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <h3>{%if lang=='de'%}Sport, Training & Stress{%elif lang=='en'%}Sport, Training & Stress{%else%}Sport, Training & Stress{%endif%}</h3>
+        <p>{%if lang=='de'%}Training optimieren & Übertraining vermeiden{%elif lang=='en'%}Optimise training & prevent overtraining{%else%}Trainingsoptimalisatie voor sporters en trainers{%endif%}</p>
+                <a href="/sport-training" class="btn-open" {% if session.get("is_demo") %}onclick="return false;" style="pointer-events:none;cursor:default;opacity:0.5;"{% endif %}>{% if not session.get("is_demo") %}OPEN{% else %}🔒{% endif %}</a>
+    <!-- Kenniscentrum Pro knop -->
+    <div class="pro-card">
+      <div class="pro-card-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      </div>
+      <h3>{%if lang=="de"%}Wissenszentrum Pro{%elif lang=="en"%}Knowledge Centre Pro{%else%}Kenniscentrum Pro{%endif%}</h3>
+      <p>{%if lang=="de"%}HRV, ANS, Atmung und Stressphysiologie{%elif lang=="en"%}HRV, ANS, breathing and stress physiology{%else%}HRV, ANS, ademhaling en stressfysiologie{%endif%}</p>
+      {%if is_pro and not session.get("free_trial") and not session.get("is_demo")%}
+        <a href="/kenniscentrum-pro" class="btn-open">{% if lang=="de" %}ÖFFNEN{% elif lang=="en" %}OPEN{% else %}OPEN{% endif %}</a>
+      {%else%}
+        <a class="btn-open" style="opacity:.4;pointer-events:none;cursor:default">🔒</a>
+      {%endif%}
+    </div>
+    </div>
+
+    <!-- Resultaten full-width -->
+
+    
+
+
+
+{% endblock %}
