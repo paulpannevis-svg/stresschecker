@@ -1,5 +1,59 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-05-24 — Optioneel achternaam-veld (drie naam-rollen)
+
+Voornaam blijft verplicht, achternaam optioneel toegevoegd aan zowel het profiel van de gebruiker (consument en Pro delen `users.display_name`) als aan Pro-cliëntprofielen (`sc_pro.db.clients`).
+
+### Migraties
+
+Twee `ALTER TABLE … ADD COLUMN surname TEXT`:
+
+- `/opt/ic-license-server/data/saas_licenses.db` → `users` (dekt rol 1 consument en rol 2 Pro eigen profiel — gedeeld pad via `save_profile` + `api_save_settings`)
+- `/opt/stresschecker/data/sc_pro.db` → `clients` (dekt rol 3 Pro's cliënt)
+
+De andere kandidaat-tabellen (`sc_measurements.db.user_profiles.naam` en `saas_licenses.db.profiles.name`) zijn ongemoeid gelaten — beide hadden 0 rijen en geen INSERT/UPDATE-pad in app.py (dode schema's).
+
+### Display-logica
+
+Nieuwe Jinja-filter `full_name` (app.py:99) rendert `'voornaam achternaam'` als `surname` aanwezig, anders alleen `voornaam`. Werkt op `sqlite3.Row`, dict, object met `.name`/`.surname`-attrs, of string + optionele 2e arg. Gebruikt in `pro/client_detail.html` (h2, nav-bar, Innerlijk Kompas-kop), `measure.html`, `sensor_en_meten.html`. Voor `kwadrant.html` wordt de full-name server-side in `client_name` gestopt (regel 1267 in app.py).
+
+### Sessie-beleid
+
+- `session['profile_name']` blijft voornaam (compact, header-badge `base.html:51` ongewijzigd).
+- `session['profile_surname']` apart bijgehouden, gerenderd op detail-pagina's en meet-schermen.
+
+### Backward compatibility
+
+Bestaande rijen behouden hun string in `name`/`display_name`; `surname=NULL`. Geen auto-split: "Anna de Vries", "Paul Pannevis", "Steven P" worden ongewijzigd weergegeven. Bij volgende edit kan de eigenaar de naam zelf splitsen.
+
+### Templates uitgebreid
+
+- `templates/profile.html` — surname-input onder voornaam (consument + Pro eigen profiel)
+- `templates/settings.html` — `inputSurname`-veld + JS-payload uitgebreid
+- `templates/pro/client_add.html` — surname-input (Pro nieuwe cliënt)
+- `templates/pro/client_detail.html` — `editSurname`-input + display via `{{ client|full_name }}` op 3 locaties
+
+### Routes uitgebreid (app.py)
+
+`save_profile`, `api_save_settings`, `pro_client_add`, `api_pro_client_update`, `pro_client_measure` (session), `sensor_en_meten` (profile-dict), `biofeedback` (profile-dict), `kwadrant` (client_name), `settings` (template-context). Login-paden (regel 644, 856) lezen surname mee. `admin_bypass` splitst Paul/Pannevis.
+
+### Out-of-scope (TODO achtergelaten)
+
+- HLM-blueprint gebruikt aparte `clients`-tabel in saas_licenses.db (schema met `display_name`); wordt zomer-2026 herbouwd. TODO-comment op beide initials-regels in `hlm/meting_src.html` (8449, 8754).
+- Pre-existing issues opgemerkt, niet aangeraakt:
+  - `/admin-login-bypass-9x7k` zet `user_key` handmatig maar `get_user_key()` overschrijft direct op basis van `sha256(email)[:32]`.
+  - Dode `session['pro_display_name']`-fallback in `settings.html:97` — nergens geset.
+
+### Validatie
+
+- Pre-migratie backup: `/opt/backups/*.20260524-1457`
+- `py_compile app.py`: OK
+- `systemctl restart stresschecker`: workers up, geen errors in journal
+- `tests/run_all.sh`: 18/18 groen
+- 3-talen smoke (NL/DE/EN): labels correct, full-name rendering correct
+- Backward compat: Anna de Vries blijft "Anna de Vries", avatar='A', geen NULL of rare karakters
+- Nieuwe cliënt Peter+Pannevis: DB → name='Peter', surname='Pannevis'; rendering → "Peter Pannevis" overal (h2, meting-schermen, kwadrant)
+
 ## 2026-05-22 — RI birth_year/gender uitvraag in activatie-flow
 
 Verplichte uitvraag van `birth_year` + `gender` vóór eerste meting, met norm-mapping voor non-binary opties. Fixt drie samenhangende latente bugs en lift de "71% van users heeft default 1970/male"-anomalie.

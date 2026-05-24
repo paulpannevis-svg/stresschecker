@@ -89,12 +89,21 @@
       {% if lang == 'de' %}Profil{% elif lang == 'en' %}Profile{% else %}Profiel{% endif %}
     </div>
 
-    <!-- Naam -->
+    <!-- Voornaam -->
     <div style="margin-bottom:14px;">
       <label style="font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:4px;">
-        {% if lang == 'de' %}Name{% elif lang == 'en' %}Name{% else %}Naam{% endif %}
+        {% if lang == 'de' %}Vorname{% elif lang == 'en' %}First name{% else %}Voornaam{% endif %}
       </label>
-      <input type="text" id="inputName" value="{% if is_pro %}{{ session.get("pro_display_name", profile_name) }}{% else %}{{ profile_name }}{% endif %}"
+      <input type="text" id="inputName" autocomplete="given-name" value="{% if is_pro %}{{ session.get("pro_display_name", profile_name) }}{% else %}{{ profile_name }}{% endif %}"
+        style="width:100%;padding:8px 10px;border:1px solid var(--beige-dark);border-radius:8px;font-size:0.95rem;background:var(--beige);box-sizing:border-box;">
+    </div>
+
+    <!-- Achternaam (optioneel) -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:0.85rem;color:var(--text-muted);display:block;margin-bottom:4px;">
+        {% if lang == 'de' %}Nachname (optional){% elif lang == 'en' %}Last name (optional){% else %}Achternaam (optioneel){% endif %}
+      </label>
+      <input type="text" id="inputSurname" autocomplete="family-name" placeholder="{% if lang == 'de' %}Optional{% elif lang == 'en' %}Optional{% else %}Optioneel{% endif %}" value="{{ profile_surname or '' }}"
         style="width:100%;padding:8px 10px;border:1px solid var(--beige-dark);border-radius:8px;font-size:0.95rem;background:var(--beige);box-sizing:border-box;">
     </div>
 
@@ -288,6 +297,8 @@ function redeemPairing(){
     };
     setTimeout(_origSave, 800);
     var name = document.getElementById('inputName').value.trim();
+    var _surnameEl = document.getElementById('inputSurname');
+    var surname = _surnameEl ? _surnameEl.value.trim() : '';
     var birthYear = parseInt(document.getElementById('inputBirthYear').value);
     var gender = document.querySelector('input[name="gender"]:checked').value;
     var sensor = document.querySelector('input[name="sensor"]:checked').value;
@@ -301,6 +312,7 @@ function redeemPairing(){
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
           name: name,
+          surname: surname,
           birth_year: birthYear,
           gender: gender,
           sensor: document.querySelector('input[name="sensor"]:checked') ? document.querySelector('input[name="sensor"]:checked').value : 'bluetooth',

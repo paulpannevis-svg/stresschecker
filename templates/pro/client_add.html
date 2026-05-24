@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}StressChecker® Pro — {%if lang=='de'%}Neuer Klient{%elif lang=='en'%}New client{%else%}Nieuwe cliënt{%endif%}{% endblock %}
+{% block content %}
+<div class="screen">
+  <h1 class="screen-title" style="font-size:1.3rem;">
+    <span style="background:#E8344E;color:#fff;font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:10px;vertical-align:middle;margin-right:.3rem;">PRO</span>
+    {%if lang=='de'%}Neuer Klient{%elif lang=='en'%}New client{%else%}Nieuwe cliënt{%endif%}
+  </h1>
+  <p class="screen-subtitle" style="margin-bottom:12px;">
+    {%if lang=='de'%}Profil für einen neuen Klienten anlegen{%elif lang=='en'%}Create profile for a new client{%else%}Profiel aanmaken voor een nieuwe cliënt{%endif%}
+  </p>
+
+  {% if error %}
+  <div class="form-error">{{ error }}</div>
+  {% endif %}
+
+  <div class="card">
+    <form method="POST" action="{{ url_for('pro_client_add') }}">
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label" for="name">{%if lang=='de'%}Vorname{%elif lang=='en'%}First name{%else%}Voornaam{%endif%} *</label>
+        <input type="text" id="name" name="name" class="form-input" autocomplete="given-name" placeholder="{%if lang=='de'%}Vorname{%elif lang=='en'%}First name{%else%}Voornaam{%endif%}" required>
+      </div>
+
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label" for="surname">{%if lang=='de'%}Nachname (optional){%elif lang=='en'%}Last name (optional){%else%}Achternaam (optioneel){%endif%}</label>
+        <input type="text" id="surname" name="surname" class="form-input" autocomplete="family-name" placeholder="{%if lang=='de'%}Optional{%elif lang=='en'%}Optional{%else%}Optioneel{%endif%}">
+      </div>
+
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label" for="birth_year">{%if lang=='de'%}Geburtsjahr{%elif lang=='en'%}Birth year{%else%}Geboortejaar{%endif%}</label>
+        <input type="number" id="birth_year" name="birth_year" class="form-input" value="1970" min="1920" max="2020">
+      </div>
+
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label">{%if lang=='de'%}Geschlecht{%elif lang=='en'%}Gender{%else%}Geslacht{%endif%}</label>
+        <div style="display:flex;gap:1.5rem;margin-top:.3rem;">
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;">
+            <input type="radio" name="gender" value="male" checked> {%if lang=='de'%}Männlich{%elif lang=='en'%}Male{%else%}Man{%endif%}
+          </label>
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;">
+            <input type="radio" name="gender" value="female"> {%if lang=='de'%}Weiblich{%elif lang=='en'%}Female{%else%}Vrouw{%endif%}
+          </label>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
+
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label" for="email">E-mail <span style="color:#aaa;font-weight:400;">({%if lang=='de'%}optional{%elif lang=='en'%}optional{%else%}optioneel{%endif%})</span></label>
+        <input type="email" id="email" name="email" class="form-input" placeholder="{% if lang=="de" %}name@beispiel.de{% elif lang=="en" %}name@example.com{% else %}naam@voorbeeld.nl{% endif %}">
+      </div>
+
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label" for="phone">{%if lang=='de'%}Telefon{%elif lang=='en'%}Phone{%else%}Telefoon{%endif%} <span style="color:#aaa;font-weight:400;">({%if lang=='de'%}optional{%elif lang=='en'%}optional{%else%}optioneel{%endif%})</span></label>
+        <input type="tel" id="phone" name="phone" class="form-input">
+      </div>
+
+      <div class="form-group" style="margin-bottom:20px;">
+        <label class="form-label" for="notes">{%if lang=='de'%}Notizen{%elif lang=='en'%}Notes{%else%}Notities{%endif%} <span style="color:#aaa;font-weight:400;">({%if lang=='de'%}optional{%elif lang=='en'%}optional{%else%}optioneel{%endif%})</span></label>
+        <textarea id="notes" name="notes" class="form-input" rows="3" style="resize:vertical;"></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        {%if lang=='de'%}KLIENT HINZUFÜGEN ▶{%elif lang=='en'%}ADD CLIENT ▶{%else%}CLIËNT TOEVOEGEN ▶{%endif%}
+      </button>
+    </form>
+  </div>
+
+  <a href="{{ url_for('pro_clients') }}" style="font-size:.85rem;color:var(--text-muted);margin-top:8px;display:inline-block;">← {%if lang=='de'%}Zurück{%elif lang=='en'%}Back{%else%}Terug{%endif%}</a>
+</div>
+{% endblock %}

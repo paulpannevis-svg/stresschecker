@@ -36,6 +36,15 @@
       </div>
 
       <div class="form-group" style="margin-bottom:16px;">
+        <label class="form-label" for="surname">
+          {% if lang == 'de' %}Nachname (optional){% elif lang == 'en' %}Last name (optional){% else %}Achternaam (optioneel){% endif %}
+        </label>
+        <input type="text" id="surname" name="surname" class="form-input"
+               placeholder="{% if lang == 'de' %}Optional{% elif lang == 'en' %}Optional{% else %}Optioneel{% endif %}"
+               autocomplete="family-name">
+      </div>
+
+      <div class="form-group" style="margin-bottom:16px;">
         <label class="form-label" for="birth_year">
           {% if lang == 'de' %}Geburtsjahr{% elif lang == 'en' %}Year of birth{% else %}Geboortejaar{% endif %}
         </label>

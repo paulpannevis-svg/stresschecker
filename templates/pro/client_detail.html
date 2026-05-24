@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  html,body{overflow-x:hidden;max-width:100vw;}
+  .pro-nav{background:#E8344E;color:#fff;padding:.6rem 1rem;border-radius:10px;margin-bottom:1rem;display:flex;align-items:center;gap:.8rem;flex-wrap:wrap}
+  .pro-nav .badge{background:#fff;color:#E8344E;padding:2px 8px;border-radius:4px;font-weight:700;font-size:.8rem}
+  .pro-nav a{color:#fff;text-decoration:none;font-size:.85rem}
+  .client-header{display:flex;align-items:center;gap:1rem;margin-bottom:1rem}
+  .client-avatar{width:50px;height:50px;border-radius:50%;background:#E8344E;color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700}
+  .client-info h2{margin:0;font-size:1.2rem;display:inline}
+  .client-info p{margin:0;color:#888;font-size:.85rem}
+  .edit-btn{background:none;border:none;cursor:pointer;font-size:.7em;vertical-align:middle}
+  #editForm{display:none;background:#fff;border:2px solid #E8344E;border-radius:10px;padding:1rem;margin-bottom:1rem}
+  #editForm h3{color:#E8344E;margin-top:0}
+  #editForm label{display:block;font-size:.85rem;color:#666;margin-top:.5rem}
+  #editForm input,#editForm select{width:100%;padding:.4rem;border:1px solid #ddd;border-radius:5px;font-size:.95rem;box-sizing:border-box}
+  .edit-row{display:flex;gap:1rem}
+  .edit-row>div{flex:1}
+  .btn-save{background:#E8344E;color:#fff;border:none;padding:.5rem 1.2rem;border-radius:6px;cursor:pointer;font-size:.85rem}
+  .btn-cancel{background:#eee;color:#555;border:none;padding:.5rem 1.2rem;border-radius:6px;cursor:pointer;font-size:.85rem}
+  .btn-meting{display:inline-flex;align-items:center;gap:.5rem;background:#E8344E;color:#fff;padding:.6rem 1.2rem;border-radius:8px;text-decoration:none;font-weight:600;font-size:.95rem}
+  .btn-meting:hover{background:#c62d42}
+  .result-card{background:#f8f8f8;border-radius:12px;padding:1rem;margin:1rem 0;display:flex;align-items:center;gap:1rem}
+  .ri-circle{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700}
+  .ri-low{border:3px solid #E8344E;color:#E8344E}
+  .ri-mid{border:3px solid #FF9800;color:#FF9800}
+  .ri-high{border:3px solid #4CAF50;color:#4CAF50}
+  .meting-tabel{width:100%;border-collapse:collapse;font-size:.85rem}
+  .meting-tabel th{text-align:left;color:#999;padding:.4rem .3rem;border-bottom:1px solid #eee}
+  .meting-tabel td{padding:.5rem .3rem;border-bottom:1px solid #f5f5f5}
+  @media (max-width: 1400px) {
+    .meting-tabel { font-size: 12px; }
+    .meting-tabel th, .meting-tabel td { font-size: 12px; padding: 4px 3px !important; }
+    .meting-tabel .col-notiz, .meting-tabel .col-dimension { display: none; }
+  }
+  .ri-dot{display:inline-block;width:10px;height:10px;border-radius:50%}
+  .dot-red{background:#E8344E}
+  .dot-orange{background:#FF9800}
+  .dot-green{background:#4CAF50}
+</style>
+
+<!-- PRO Navigation Bar -->
+<div class="pro-nav">
+  <span class="badge">PRO</span>
+  <strong>{{ client|full_name }}</strong>
+  <a href="{{ url_for('pro_clients') }}">← {% if lang=="de" %}Klienten{% elif lang=="en" %}Clients{% else %}Cliënten{% endif %}</a>
+  <a href="{{ url_for('pro_menu') }}">≡ Pro Menu</a>
+</div>
+
+<!-- Client Header -->
+<div class="client-header">
+  <div class="client-avatar">{{ client.name[0] }}</div>
+  <div class="client-info">
+    <h2>{{ client|full_name }}</h2> <button class="edit-btn" onclick="toggleEdit()">✏️</button>
+    <p>{{ (2026 - client.birth_year) }} {% if lang=="de" %}Jahre{% elif lang=="en" %}years{% else %}jaar{% endif %} · {{ 'V' if client.gender == 'female' else 'M' }}</p>
+  </div>
+</div>
+
+<!-- Edit Form (hidden) -->
+<div id="editForm">
+  <h3>{% if lang=="de" %}Klient bearbeiten{% elif lang=="en" %}Edit client{% else %}Cliënt bewerken{% endif %}</h3>
+  <div class="edit-row">
+    <div><label>{% if lang=="de" %}Vorname{% elif lang=="en" %}First name{% else %}Voornaam{% endif %}</label><input id="editName" autocomplete="given-name" value="{{ client.name }}"></div>
+    <div><label>{% if lang=="de" %}Nachname (optional){% elif lang=="en" %}Last name (optional){% else %}Achternaam (optioneel){% endif %}</label><input id="editSurname" autocomplete="family-name" placeholder="{% if lang=='de' %}Optional{% elif lang=='en' %}Optional{% else %}Optioneel{% endif %}" value="{{ client.surname or '' }}"></div>
+    <div><label>{% if lang=="de" %}Geburtsjahr{% elif lang=="en" %}Birth year{% else %}Geboortejaar{% endif %}</label><input id="editYear" type="number" value="{{ client.birth_year }}"></div>
+  </div>
+  <label>{% if lang=="de" %}Geschlecht{% elif lang=="en" %}Gender{% else %}Geslacht{% endif %}</label>
+  <select id="editGender">
+    <option value="male" {{ 'selected' if client.gender == 'male' }}>Man</option>
+    <option value="female" {{ 'selected' if client.gender == 'female' }}>Vrouw</option>
+  </select>
+  <div style="margin-top:1rem">
+    <button class="btn-save" onclick="saveClient()">{% if lang=="de" %}Speichern{% elif lang=="en" %}Save{% else %}Opslaan{% endif %}</button>
+    <button class="btn-cancel" onclick="toggleEdit()">{% if lang=="de" %}Abbrechen{% elif lang=="en" %}Cancel{% else %}Annuleren{% endif %}</button>
+  </div>
+</div>
+
+<!-- Actions -->
+<div style="margin:1rem 0">
+  <a href="{{ url_for('pro_client_measure', cid=client.id) }}" class="btn-meting">♥ {% if lang=="de" %}Messung wählen{% elif lang=="en" %}Choose reading{% else %}Meting kiezen{% endif %}</a>
+  <a href="{{ url_for('pro_clients') }}" style="margin-left:1rem;color:#666;text-decoration:none">← {% if lang=="de" %}Klienten{% elif lang=="en" %}Clients{% else %}Cliënten{% endif %}</a>
+</div>
+
+
+<!-- Koppeling sectie -->
+<div id="pairingSection" style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:10px;padding:1rem;margin:1rem 0">
+  <div style="font-size:.78rem;font-weight:700;color:#F57F17;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">
+    🔗 {% if lang=="de" %}KOPPLUNG{% elif lang=="en" %}PAIRING{% else %}KOPPELING{% endif %}
+  </div>
+  <div id="pairingContent">{%if lang=="de"%}Laden...{%elif lang=="en"%}Loading...{%else%}Laden...{%endif%}</div>
+</div>
+
+<script>
+var lang = "{{ lang }}";
+
+// Laad koppelstatus
+(function(){
+  var cid = {{ client.id }};
+  fetch('/api/pro/client/'+cid+'/pairing')
+  .then(function(r){return r.json();})
+  .then(function(d){
+    console.log('[pairing] response:', d);
+    var el = document.getElementById('pairingContent');
+    if(d.status === 'active'){
+      el.innerHTML = '<div style="color:#2E7D32;font-weight:600">✅ {% if lang=="de" %}Gekoppelt{% elif lang=="en" %}Connected{% else %}Gekoppeld{% endif %}</div>'
+        + '<p style="margin:.3rem 0;font-size:.85rem;color:#666">{% if lang=="de" %}Verbraucher verbunden seit{% elif lang=="en" %}Consumer connected since{% else %}Consumer verbonden sinds{% endif %} ' + d.since + '</p>'
+        + '<button onclick="'+(d.demo?'':('revokePairing('+cid+')'))+'" '+(d.demo?'style="opacity:.4;cursor:not-allowed;pointer-events:none"':'')+' x=" style="margin-top:.5rem;background:#E8344E;color:#fff;border:none;padding:.4rem 1rem;border-radius:6px;cursor:pointer;font-size:.85rem">{% if lang=="de" %}Verbindung trennen{% elif lang=="en" %}Disconnect{% else %}Ontkoppelen{% endif %}</button>'
+        + '<button onclick="'+(d.demo?'':('showConsumerMetingen('+cid+')'))+'" '+(d.demo?'style="opacity:.4;cursor:not-allowed;pointer-events:none"':'')+' x=" style="margin-top:.5rem;margin-left:.5rem;background:#1976D2;color:#fff;border:none;padding:.4rem 1rem;border-radius:6px;cursor:pointer;font-size:.85rem">📊 '+(lang==="de"?"Heim-Messungen":lang==="en"?"Home readings":"Thuis-metingen")+'</button>';
+    } else if(d.status === 'pending'){
+    el.innerHTML = '<div style="color:#E65100;font-weight:600">⏳ ' + (lang=="de" ? "Koppelcode gesendet" : lang=="en" ? "Code sent" : "Koppelcode verstuurd") + "</div>"
+        + '<div style="background:#fff;border:2px dashed #FFB74D;border-radius:8px;padding:.8rem;margin:.5rem 0;text-align:center">'
+        + '<span style="font-size:1.5rem;font-weight:700;letter-spacing:.15em;color:#E65100">' + d.code + '</span>'
+        + '<br><span style="font-size:.75rem;color:#999">' + (lang=="de"?"Gültig bis ":lang=="en"?"Valid until ":"Geldig tot ") + d.expires_at + '</span></div>'
+        + '<p style="font-size:.85rem;color:#666">' + (lang=="de"?"Geben Sie diesen Code Ihrem Klienten. Der Klient gibt den Code unter Einstellungen \u2192 \u201EMit Professional verbinden\u201C ein.":lang=="en"?"Give this code to your client. The client enters the code via Settings \u2192 \"Connect with professional\".":"Geef deze code aan uw cliënt. De cliënt voert de code in via Instellingen \u2192 \"Verbind met professional\".") + '</p>';
+    } else {
+      el.innerHTML = '<p style="color:#666;font-size:.85rem;margin-bottom:.5rem">' + (lang=="de"?"Noch nicht mit einem Pro-Konto verknüpft.":lang=="en"?"Not yet linked to a Pro account.":"Nog niet aan een proaccount gekoppeld.") + '</p>'
+        + '<button onclick="generatePairingCode('+cid+')" style="background:#FF9800;color:#fff;border:none;padding:.5rem 1.2rem;border-radius:6px;cursor:pointer;font-size:.9rem;font-weight:600">🔗 ' + (lang=="de"?"Koppelcode generieren":lang=="en"?"Generate pairing code":"Koppelcode genereren") + '</button>';
+    }
+  }).catch(function(e){
+  console.log('[pairing] error:', e);
+  document.getElementById('pairingContent').innerHTML = '<span style="color:#999">' + ("{{ lang }}"=="de" ? "Kopplung nicht verfügbar" : "{{ lang }}"=="en" ? "Pairing not available" : "Koppeling niet beschikbaar") + "</span>";
+  });
+})();
+
+function generatePairingCode(cid){
+  fetch('/api/pairing/generate',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({client_id: cid})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      window.location.reload();
+    } else {
+      alert(d.error || (lang==='de'?'Fehler beim Generieren':lang==='en'?'Error generating code':'Fout bij genereren'));
+    }
+  }).catch(function(e){alert((lang==='de'?'Fehler: ':lang==='en'?'Error: ':'Fout: ')+e);});
+}
+
+function revokePairing(cid){
+  if(!confirm(lang==='de'?'Sind Sie sicher, dass Sie die Kopplung trennen möchten?':lang==='en'?'Are you sure you want to disconnect?':'Weet u zeker dat u de koppeling wilt verbreken?')) return;
+  fetch('/api/pairing/revoke',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({client_id: cid})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok) window.location.reload();
+    else alert(d.error || (lang==='de'?'Fehler':lang==='en'?'Error':'Fout'));
+  });
+}
+
+function showConsumerMetingen(cid){
+  fetch('/api/pro/client/'+cid+'/consumer-metingen')
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if(data.error){alert(data.error);return;}
+    var lang='{{lang}}';
+    var html = '<h3 style="color:#1976D2;margin:.5rem 0">🏠 '+(lang==='de'?'Heim-Messungen':lang==='en'?'Home readings':'Thuis-metingen')+' (' + data.length + ')</h3>';
+    if(data.length === 0){
+      html += '<p style="color:#999">'+(lang==='de'?'Noch keine Heim-Messungen empfangen.':lang==='en'?'No home readings received yet.':'Nog geen thuis-metingen ontvangen.')+'</p>';
+    } else {
+      html += '<table class="meting-tabel"><tr><th>'+(lang==='de'?'DATUM':lang==='en'?'DATE':'DATUM')+'</th><th>'+(lang==='de'?'ZEIT':lang==='en'?'TIME':'TIJD')+'</th><th>RI</th><th>BPM</th><th>HRV%</th><th>RMSSD</th><th>'+(lang==='de'?'BEZEICHNUNG':lang==='en'?'LABEL':'LABEL')+'</th></tr>';
+      data.forEach(function(m){
+        var date = m.created_at ? m.created_at.substring(0,10) : '';
+        var tijd = m.created_at ? m.created_at.substring(11,16) : '';
+        var cls = m.ri < 4 ? 'dot-red' : m.ri < 7 ? 'dot-orange' : 'dot-green';
+        html += '<tr><td>'+date+'</td><td><span class="ri-dot '+cls+'"></span> '+m.ri+'</td><td>'+m.bpm+'</td><td>'+m.hrv_pct+'%</td><td>'+(m.rmssd||0).toFixed(1)+'</td><td>'+(m.ctx_dimensie||'')+"'</td><td>'"+(m.meting_type||'')+'</td><td>'+(m.notes||'')+'</td></tr>';
+      });
+      html += '</table>';
+    }
+    var el = document.getElementById('consumerMetingen');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'consumerMetingen';
+      el.style.cssText = 'background:#fff;border-radius:12px;padding:1.25rem 1.5rem;margin:1rem 0;width:100%;box-sizing:border-box;overflow-x:auto';
+      document.getElementById('pairingSection').after(el);
+    }
+    el.innerHTML = html;
+  }).catch(function(e){alert((lang==='de'?'Fehler: ':lang==='en'?'Error: ':'Fout: ')+e);});
+}
+</script>
+
+{% if stats %}
+<div style="background:#fff;border-radius:12px;padding:1rem 1.5rem;margin-bottom:1rem;display:flex;gap:2rem;flex-wrap:wrap;">
+<div style="text-align:center"><div style="font-size:1.4rem;font-weight:700;color:#E8344E;">{{ stats.count }}</div><div style="font-size:.75rem;color:#999;">{%if lang=="de"%}Messungen{%elif lang=="en"%}Measurements{%else%}Metingen{%endif%}</div></div>
+{% if stats.gem_ri %}<div style="text-align:center"><div style="font-size:1.4rem;font-weight:700;color:#E8344E;">{{ stats.gem_ri }}</div><div style="font-size:.75rem;color:#999;">{%if lang=="de"%}Durchschn. RI{%elif lang=="en"%}Avg. RI{%else%}Gem. RI{%endif%}</div></div>{% endif %}
+{% if stats.best_ri %}<div style="text-align:center"><div style="font-size:1.4rem;font-weight:700;color:#E8344E;">{{ stats.best_ri }}</div><div style="font-size:.75rem;color:#999;">{%if lang=="de"%}Bester RI{%elif lang=="en"%}Best RI{%else%}Best RI{%endif%}</div></div>{% endif %}
+{% if stats.gem_bpm %}<div style="text-align:center"><div style="font-size:1.4rem;font-weight:700;color:#E8344E;">{{ stats.gem_bpm|int }}</div><div style="font-size:.75rem;color:#999;">{%if lang=="de"%}Durchschn. BPM{%elif lang=="en"%}Avg. BPM{%else%}Gem. BPM{%endif%}</div></div>{% endif %}
+</div>
+{% endif %}
+<!-- Verloop grafiek -->
+{% if metingen %}
+<div style="margin-top:1.5rem;background:#fff;border-radius:12px;padding:1.25rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+    <h3 style="font-size:.95rem;color:#888;margin:0;">{% if lang=="de" %}VERLAUF RELAX INDEX{% elif lang=="en" %}RELAX INDEX TREND{% else %}VERLOOP RELAX INDEX{% endif %}</h3>
+    <div id="verlPeriodBtns" style="display:flex;gap:.4rem;">
+      <button onclick="verlSetPeriod('week')" id="vbWeek" style="font-size:.75rem;padding:.25rem .6rem;border-radius:6px;border:1px solid #ddd;cursor:pointer;background:#E8344E;color:#fff;">{% if lang=="de" %}Woche{% elif lang=="en" %}Week{% else %}Week{% endif %}</button>
+      <button onclick="verlSetPeriod('maand')" id="vbMaand" style="font-size:.75rem;padding:.25rem .6rem;border-radius:6px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#666;">{% if lang=="de" %}Monat{% elif lang=="en" %}Month{% else %}Maand{% endif %}</button>
+      <button onclick="verlSetPeriod('jaar')" id="vbJaar" style="font-size:.75rem;padding:.25rem .6rem;border-radius:6px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#666;">{% if lang=="de" %}Jahr{% elif lang=="en" %}Year{% else %}Jaar{% endif %}</button>
+      <button onclick="verlSetPeriod('3jaar')" id="vbAlles" style="font-size:.75rem;padding:.25rem .6rem;border-radius:6px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#666;">{% if lang=="de" %}Alles{% elif lang=="en" %}All{% else %}Alles{% endif %}</button>
+    </div>
+  </div>
+  <div style="width:100%;max-width:100%;overflow:hidden;"><canvas id="proVerlChart" style="display:block;width:100% !important;max-width:100% !important;height:200px;"></canvas></div><div id="verlChartHint" style="display:none;text-align:center;font-size:.78rem;color:#999;font-style:italic;margin-top:.4rem;">{%if lang=="de"%}Fügen Sie weitere Messungen hinzu, um den Verlauf zu sehen{%elif lang=="en"%}Add more readings to see the trend{%else%}Voeg meer metingen toe om het verloop te zien{%endif%}</div><div style="display:flex;gap:1.5rem;margin-top:.5rem;font-size:.78rem;color:#555;"><span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#fff;border:1px solid rgba(0,0,0,.3);margin-right:.3rem;"></span>Relax Index</span></div>
+</div>
+<script>
+var lang = lang || "{{ lang }}";
+var VERL_ALL = {{ metingen_chart | tojson }};
+VERL_ALL = VERL_ALL.filter(function(d){ return d.ri != null; });
+VERL_ALL.sort(function(a,b){ return a.ts - b.ts; });
+var VERL_PERIOD = 'week';
+window.verlSetPeriod = function(p){
+  VERL_PERIOD = p;
+  ['Week','Maand','Jaar','3jaar'].forEach(function(x){
+    var btn = document.getElementById('vb'+x);
+    if(btn){ btn.style.background=x.toLowerCase()===p?'#E8344E':'#fff'; btn.style.color=x.toLowerCase()===p?'#fff':'#666'; }
+  });
+  window.verlDraw();
+};
+window.verlDraw = function(){
+  console.log('[verlDraw] called, VERL_ALL=', VERL_ALL, 'VERL_PERIOD=', VERL_PERIOD);
+  var now=Date.now(), msDay=86400000;
+  var data=[], labels=[], szV=[];
+  var dn=lang==='de'?['So','Mo','Di','Mi','Do','Fr','Sa']:lang==='en'?['Sun','Mon','Tue','Wed','Thu','Fri','Sat']:['Zo','Ma','Di','Wo','Do','Vr','Za'];
+  var mn=lang==='de'?['Jan','Feb','Mrz','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']:lang==='en'?['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']:['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+  if(VERL_PERIOD==='week'){
+    for(var i=6;i>=0;i--){
+      var ds=new Date();ds.setHours(0,0,0,0);ds=ds.getTime()-i*msDay;
+      var pts=VERL_ALL.filter(function(d){return d.ts>=ds&&d.ts<ds+msDay;});
+      var dd=new Date(ds);
+      labels.push(dn[dd.getDay()]+' '+dd.getDate()+'/'+(dd.getMonth()+1));
+      data.push(pts.length?Math.round(pts.reduce(function(s,x){return s+x.ri;},0)/pts.length*10)/10:null);var _sp=pts.filter(function(d){return d.subj!=null;});szV.push(_sp.length?_sp.reduce(function(s,x){return s+x.subj;},0)/_sp.length:null);
+    }
+  } else if(VERL_PERIOD==='maand'){
+    for(var i=29;i>=0;i--){
+      var ds=new Date();ds.setHours(0,0,0,0);ds=ds.getTime()-i*msDay;
+      var pts=VERL_ALL.filter(function(d){return d.ts>=ds&&d.ts<ds+msDay;});
+      var dd=new Date(ds);
+      labels.push(dd.getDate()+'/'+(dd.getMonth()+1));
+      data.push(pts.length?Math.round(pts.reduce(function(s,x){return s+x.ri;},0)/pts.length*10)/10:null);var _sp=pts.filter(function(d){return d.subj!=null;});szV.push(_sp.length?_sp.reduce(function(s,x){return s+x.subj;},0)/_sp.length:null);
+    }
+  } else if(VERL_PERIOD==='jaar'){
+    var nd=new Date();
+    for(var i=11;i>=0;i--){
+      var m=new Date(nd.getFullYear(),nd.getMonth()-i,1),me=new Date(nd.getFullYear(),nd.getMonth()-i+1,1);
+      var pts=VERL_ALL.filter(function(d){return d.ts>=m.getTime()&&d.ts<me.getTime();});
+      labels.push(mn[m.getMonth()]+String(m.getFullYear()).slice(2));
+      data.push(pts.length?Math.round(pts.reduce(function(s,x){return s+x.ri;},0)/pts.length*10)/10:null);var _sp=pts.filter(function(d){return d.subj!=null;});szV.push(_sp.length?_sp.reduce(function(s,x){return s+x.subj;},0)/_sp.length:null);
+    }
+  } else {
+    if(VERL_ALL.length===0){data=[];labels=[];}
+    else {
+      var first=new Date(VERL_ALL[0].ts), last=new Date(VERL_ALL[VERL_ALL.length-1].ts);
+      var sm=new Date(first.getFullYear(),first.getMonth(),1);
+      var em=new Date(last.getFullYear(),last.getMonth()+1,1);
+      while(sm<em){
+        var me=new Date(sm.getFullYear(),sm.getMonth()+1,1);
+        var pts=VERL_ALL.filter(function(d){return d.ts>=sm.getTime()&&d.ts<me.getTime();});
+        labels.push(mn[sm.getMonth()]+String(sm.getFullYear()).slice(2));
+        data.push(pts.length?Math.round(pts.reduce(function(s,x){return s+x.ri;},0)/pts.length*10)/10:null);var _sp=pts.filter(function(d){return d.subj!=null;});szV.push(_sp.length?_sp.reduce(function(s,x){return s+x.subj;},0)/_sp.length:null);
+        sm=me;
+      }
+    }
+  }
+  console.log('[verlDraw] data=', data, 'labels=', labels, 'nonNull count=', data.filter(function(v){return v!==null;}).length);
+  var cv=document.getElementById('proVerlChart');
+  console.log('[verlDraw] canvas element=', cv, 'width=', cv?cv.width:null, 'height=', cv?cv.height:null);
+  if(!cv)return;
+  cv.width=700;cv.height=200;
+  var ctx=cv.getContext('2d'),W=cv.width,H=cv.height,P={l:8,r:8,t:10,b:36};
+  ctx.clearRect(0,0,W,H);ctx.fillStyle="#999";ctx.font="9px sans-serif";ctx.textAlign="right";for(var yi=0;yi<=10;yi+=2){ctx.fillText(yi,P.l-2,yPos(yi)+3);}
+  var zones=[{min:0,max:2,col:'rgba(200,40,40,.75)'},{min:2,max:4,col:'rgba(210,100,20,.68)'},{min:4,max:7,col:'rgba(210,170,10,.65)'},{min:7,max:10,col:'rgba(20,170,70,.68)'}];
+  function yPos(ri){return H-P.b-(ri/10)*(H-P.t-P.b);}
+  zones.forEach(function(z){ctx.fillStyle=z.col;ctx.fillRect(P.l,yPos(z.max),W-P.l-P.r,yPos(z.min)-yPos(z.max));});
+  var N=data.length;
+  function xPos(i){return P.l+(i/(N-1||1))*(W-P.l-P.r);}
+  ctx.fillStyle='rgba(0,0,0,.55)';ctx.font='10px sans-serif';ctx.textAlign='center';
+  var step=Math.max(1,Math.ceil(N/10));
+  labels.forEach(function(lb,i){
+    if(i%step!==0 && i!==N-1)return;
+    ctx.textAlign=i===0?"left":(i===N-1?"right":"center");
+      ctx.fillText(lb,xPos(i),H-P.b+14);
+  });
+  ctx.beginPath();ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=2;
+  var first=true;
+  data.forEach(function(v,i){if(v===null)return;if(first){ctx.moveTo(xPos(i),yPos(v));first=false;}else ctx.lineTo(xPos(i),yPos(v));});
+  ctx.stroke();
+  // Y-as label
+  ctx.save();ctx.fillStyle='rgba(0,0,0,.4)';ctx.font='9px sans-serif';ctx.textAlign='left';ctx.fillText('Relax Index',P.l+4,P.t+10);ctx.restore();
+  // Subjectief lijn (zwart)
+  var subjData=szV;
+  var hasSubj=subjData.some(function(v){return v!==null;});
+  if(hasSubj){ctx.beginPath();ctx.strokeStyle='rgba(0,80,200,.8)';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);var fs2=true;subjData.forEach(function(v,i){if(v===null)return;if(fs2){ctx.moveTo(xPos(i),yPos(v));fs2=false;}else ctx.lineTo(xPos(i),yPos(v));});ctx.stroke();ctx.setLineDash([]);subjData.forEach(function(v,i){if(v===null)return;ctx.beginPath();ctx.arc(xPos(i),yPos(v),4,0,2*Math.PI);ctx.fillStyle='rgba(0,80,200,.8)';ctx.fill();});}
+  var nonNull=data.filter(function(v){return v!==null;});
+  var isSingle=nonNull.length<=1;
+  var dotR=isSingle?7:4;
+  data.forEach(function(v,i){
+    if(v===null)return;
+    ctx.beginPath();ctx.arc(xPos(i),yPos(v),dotR,0,2*Math.PI);
+    ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle=isSingle?'#333':'rgba(0,0,0,.3)';ctx.lineWidth=isSingle?2.5:1;ctx.stroke();
+    if(isSingle){ctx.beginPath();ctx.arc(xPos(i),yPos(v),3,0,2*Math.PI);ctx.fillStyle='#E8344E';ctx.fill();}
+  });
+  var hint=document.getElementById('verlChartHint');
+  if(hint){hint.style.display=nonNull.length<=1?'block':'none';}
+};
+window.verlDraw();
+</script>
+{% else %}
+<p style="color:#999;text-align:center;margin:2rem 0">{%if lang=="de"%}Noch keine Messungen für diesen Klienten.{%elif lang=="en"%}No readings for this client yet.{%else%}Nog geen metingen voor deze cliënt.{%endif%}</p>
+{% endif %}
+
+<!-- PERSOONLIJKE FEEDBACK CLIENT -->
+{% if metingen and metingen|length > 0 %}
+<div id="feedbackCard" style="display:none;background:linear-gradient(135deg,#fdfaf7 0%,#f9f3ec 100%);border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:1.2rem 1.4rem;margin:1rem 0;border-left:4px solid #E8A020;">
+  <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8A020" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="#E8A020" stroke="none"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+    <span style="font-size:.75rem;font-weight:700;letter-spacing:.08em;color:#C08A2A;text-transform:uppercase;">
+      {% if lang=='de' %}Innerer Kompass — {{ client|full_name }}{% elif lang=='en' %}Inner Compass — {{ client|full_name }}{% else %}Innerlijk Kompas — {{ client|full_name }}{% endif %}
+    </span>
+  </div>
+  <div id="feedbackInsight" style="font-size:.95rem;font-weight:700;color:#3C3228;line-height:1.6;margin-bottom:.4rem;"></div>
+  <div id="feedbackReflection" style="font-size:.88rem;color:#4a3f35;line-height:1.7;"></div>
+  <div id="feedbackQuestion" style="font-size:.88rem;font-style:italic;color:#C08A2A;line-height:1.6;margin-top:.6rem;padding-top:.5rem;border-top:1px solid rgba(192,138,42,.2);"></div>
+  <div id="feedbackLoading" style="font-size:.82rem;color:#aaa;padding:.5rem 0;">
+    <span style="display:inline-block;animation:fbPulse 1.2s infinite;">&#9679;</span>
+    {% if lang=='de' %}Einen Moment...{% elif lang=='en' %}One moment...{% else %}Even geduld...{% endif %}
+  </div>
+</div>
+<div id="feedbackTrendHint" style="display:none;font-size:.75rem;font-style:italic;color:#999;line-height:1.5;margin-top:.5rem;"></div>
+<style>@keyframes fbPulse{0%,100%{opacity:.3}50%{opacity:1}}</style>
+<div style="font-size:.72rem;font-style:italic;color:#a09890;line-height:1.5;margin-top:1.2rem;padding-top:.5rem;">{%if lang=='de'%}Wie Sie das lesen, wird auch davon beeinflusst, wie Sie sich jetzt fühlen — das ist selbst auch Information.{%elif lang=='en'%}How you read this is also influenced by how you feel right now — that itself is information too.{%else%}Hoe je dit leest wordt mede bepaald door hoe je je nu voelt — dat is zelf ook informatie.{%endif%}</div>
+<script>
+(function(){
+  var card=document.getElementById('feedbackCard');
+  var insEl=document.getElementById('feedbackInsight');
+  var refEl=document.getElementById('feedbackReflection');
+  var qEl=document.getElementById('feedbackQuestion');
+  var loadEl=document.getElementById('feedbackLoading');
+  if(!card||!insEl)return;
+  card.style.display='block';
+  fetch('/api/feedback?cid={{ client.id }}').then(function(r){return r.json();}).then(function(result){
+    if(result.reflection){
+      if(insEl)insEl.textContent=result.insight||'';
+      if(refEl)refEl.textContent=result.reflection;
+      if(qEl&&result.question)qEl.textContent=result.question;
+      if(loadEl)loadEl.style.display='none';
+      var thEl=document.getElementById('feedbackTrendHint');
+      if(thEl&&result.trend_hint){thEl.textContent=result.trend_hint;thEl.style.display='block';}
+    } else{card.style.display='none';}
+  }).catch(function(){card.style.display='none';});
+})();
+</script>
+{% endif %}
+
+<!-- Measurement History -->
+<div style="background:#fff;border-radius:12px;padding:1.25rem 1.5rem;margin:1rem 0;width:100%;max-width:100%;box-sizing:border-box;overflow-x:auto;-webkit-overflow-scrolling:touch;">
+{% if metingen and metingen|length > 0 %}
+<table class="meting-tabel">
+  <tr><th style="min-width:90px">{%if lang=="de"%}DATUM{%elif lang=="en"%}DATE{%else%}DATUM{%endif%}</th><th style="min-width:55px">{%if lang=="de"%}ZEIT{%elif lang=="en"%}TIME{%else%}TIJD{%endif%}</th><th style="min-width:50px">RI</th><th style="min-width:50px">BPM</th><th style="min-width:55px">HRV%</th><th style="min-width:65px">RMSSD</th><th class="col-dimension" style="min-width:130px">{%if lang=="de"%}WAS BESCHÄFTIGT SIE{%elif lang=="en"%}WHAT'S GOING ON{%else%}WAT SPEELT ER{%endif%}</th><th style="min-width:110px">{%if lang=="de"%}MESSUNG{%elif lang=="en"%}MEASUREMENT{%else%}METING{%endif%}</th><th class="col-notiz" style="min-width:60px">{%if lang=="de"%}NOTIZ{%elif lang=="en"%}NOTE{%else%}LABEL{%endif%}</th></tr>
+  {% for m in metingen %}
+  <tr>
+    <td>{{ m.created_at[:10] if m.created_at else '' }}</td><td>{{ m.created_at[11:16] if m.created_at else "" }}</td>
+    <td><span class="ri-dot {% if m.ri < 4 %}dot-red{% elif m.ri < 7 %}dot-orange{% else %}dot-green{% endif %}"></span> {{ m.ri }}</td>
+    <td>{{ m.bpm }}</td>
+    <td>{{ m.hrv_pct }}%</td>
+    <td>{{ "%.1f"|format(m.rmssd) }}</td><td class="col-dimension">{% set _d=m.ctx_dimensie or "" %}{% if lang=="de" %}{% if _d=="mentaal" %}mental{% elif _d=="emotioneel" %}emotional{% elif _d=="lichamelijk" %}körperlich{% elif _d=="spiritueel" %}spirituell{% else %}{{ _d }}{% endif %}{% elif lang=="en" %}{% if _d=="mentaal" %}mental{% elif _d=="emotioneel" %}emotional{% elif _d=="lichamelijk" %}physical{% elif _d=="spiritueel" %}spiritual{% else %}{{ _d }}{% endif %}{% else %}{{ _d }}{% endif %}</td>
+      <td>{% if m.meting_type == "Basismeting" %}{%if lang=="de"%}Basismessung{%elif lang=="en"%}Baseline measurement{%else%}Basismeting{%endif%}{% elif m.meting_type == "Biofeedback" %}Biofeedback{% elif m.meting_type == "Situatiemeting" %}{%if lang=="de"%}Situationsmessung{%elif lang=="en"%}Situation measurement{%else%}Situatiemeting{%endif%}{% else %}{{ m.meting_type or "" }}{% endif %}</td><td class="col-notiz">{{ m.notes or "" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+{%  endif %}
+<script>
+function hideColumnsOnMobile() {
+  var w = window.innerWidth;
+  var notizCols = document.querySelectorAll('.col-notiz');
+  var dimCols = document.querySelectorAll('.col-dimension');
+  var hide = w < 1400;
+  notizCols.forEach(function(el) { el.style.display = hide ? 'none' : ''; });
+  dimCols.forEach(function(el) { el.style.display = hide ? 'none' : ''; });
+}
+hideColumnsOnMobile();
+window.addEventListener('resize', hideColumnsOnMobile);
+</script>
+
+<!-- Delete client -->
+<form method="POST" action="{{ url_for('pro_client_delete', cid=client.id) }}" style="margin-top:1.5rem"
+      onsubmit="return confirm('{%if lang=='de'%}Klient wirklich löschen?{%elif lang=='en'%}Really delete client?{%else%}Client echt verwijderen?{%endif%}')">
+  <button type="submit" style="background:none;border:1px solid #ccc;color:#999;padding:.4rem 1rem;border-radius:5px;cursor:pointer;font-size:.8rem">{% if lang=="de" %}Klient löschen{% elif lang=="en" %}Delete client{% else %}Cliënt verwijderen{% endif %}</button>
+</form>
+
+<script>
+function toggleEdit(){
+  var f=document.getElementById('editForm');
+  if(f) f.style.display = (f.style.display==='none'||f.style.display==='') ? 'block' : 'none';
+}
+function saveClient(){
+  var cid={{ client.id }};
+  var _sn = document.getElementById('editSurname');
+  var data={
+    name: document.getElementById('editName').value,
+    surname: _sn ? _sn.value : '',
+    birth_year: document.getElementById('editYear').value,
+    gender: document.getElementById('editGender').value
+  };
+  fetch('/api/pro/client/'+cid+'/update',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(data)
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){window.location.reload();}
+    else{alert(d.error||(lang==='de'?'Fehler beim Speichern':lang==='en'?'Error saving':'Fout bij opslaan'));}
+  }).catch(function(e){alert((lang==='de'?'Fehler: ':lang==='en'?'Error: ':'Fout: ')+e);});
+}
+</script>
+{% endblock %}

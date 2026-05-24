@@ -1,0 +1,772 @@
+{% extends "base.html" %}
+{% block title %}{% if lang=='de' %}Messung{% else %}Meting{% endif %}{% endblock %}
+
+{% block content %}
+<!-- Pro context bar -->
+{% if client_id and client_id > 0 and (is_pro or is_demo) %}
+<div id="pro-measure-bar" style="background:linear-gradient(135deg,#E8344E,#c72a40);color:#fff;padding:.5rem 1rem;text-align:center;font-size:.85rem;display:flex;align-items:center;justify-content:center;gap:.8rem;">
+  <span style="background:rgba(255,255,255,.2);padding:2px 10px;border-radius:10px;font-size:.65rem;font-weight:700;letter-spacing:.08em;">PRO</span>
+  <span>{%if lang=='de'%}Messung für{%elif lang=='en'%}Measurement for{%else%}Meting voor{%endif%} <strong>{{ profile|full_name }}</strong></span>
+</div>
+{% endif %}
+
+<div class="measure-container">
+
+  <!-- FASE 1: Sensor koppelen (+ conditioneel: functie van de bol) -->
+  <div class="phase active" id="phase-sensor">
+    <h2>{%if lang=="de"%}Sensor koppeln{%elif lang=="en"%}Connect sensor{%else%}Sensor koppelen{%endif%}</h2>
+    <p class="measure-sub">{{ profile|full_name }}</p>
+    <div class="sensor-grid">
+        <button class="sensor-card" onclick="navigator.bluetooth.requestDevice({filters:[{services:[0x180D]}]}).then(function(d){window._btDev=d;selectSensor('bluetooth');}).catch(function(e){if(e.name!=='NotFoundError')alert(e.name?e.name+': '+e.message:('{{lang}}'==='de'?'Bluetooth-Verbindung fehlgeschlagen':'{{lang}}'==='en'?'Bluetooth connection failed':'Bluetooth verbinding mislukt'));})" style="background: linear-gradient(135deg, #E8344E, #C4293F); color:#fff;">
+        <span class="sensor-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/></svg></span>
+        <span class="sensor-name">Bluetooth</span>
+        <span class="sensor-sub"></span>
+      </button>
+      <button class="sensor-card" onclick="selectSensor('usb')" style="background: linear-gradient(135deg, #E8344E, #C4293F); color:#fff;">
+        <span class="sensor-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v11m0 0l-3-3m3 3l3-3M5 19a2 2 0 1 0 4 0 2 2 0 0 0-4 0zm10 0a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM7 19H5m14 0h-2M9 19V9h6v10"/></svg></span>
+        <span class="sensor-name">USB</span>
+        <span class="sensor-sub"></span>
+      </button>
+    </div>
+
+<div style="text-align:center;margin-top:.8rem;font-size:.72rem;color:#aaa;line-height:1.5;">
+  {%if lang=="de"%}
+    📱 <strong>iPhone/iPad:</strong> Bluetooth erfordert den <a href="https://apps.apple.com/app/bluefy/id1492822055" style="color:#aaa;">Bluefy Browser</a> (App Store).<br>
+    🤖 <strong>Android:</strong> Verwenden Sie Chrome für Bluetooth.<br>
+    💻 <strong>USB:</strong> Funktioniert mit Chrome oder Edge auf Windows/Mac.<br>
+    🛒 Bluetooth- und USB-Herzfrequenzsensoren erhältlich bei <a href="https://www.lifestylemonitors.com" target="_blank" style="color:#c0392b;text-decoration:none">www.lifestylemonitors.com</a>
+  {%elif lang=="en"%}
+    📱 <strong>iPhone/iPad:</strong> Bluetooth requires the <a href="https://apps.apple.com/app/bluefy/id1492822055" style="color:#aaa;">Bluefy Browser</a> (App Store).<br>
+    🤖 <strong>Android:</strong> Use Chrome for Bluetooth.<br>
+    💻 <strong>USB:</strong> Works with Chrome or Edge on Windows/Mac.<br>
+    🛒 Bluetooth and USB heart rate sensors available at <a href="https://www.lifestylemonitors.com" target="_blank" style="color:#c0392b;text-decoration:none">www.lifestylemonitors.com</a>
+  {%else%}
+    📱 <strong>iPhone/iPad:</strong> Bluetooth vereist de <a href="https://apps.apple.com/app/bluefy/id1492822055" style="color:#aaa;">Bluefy browser</a> (App Store).<br>
+    🤖 <strong>Android:</strong> Gebruik de Chrome browser voor Bluetooth.<br>
+    💻 <strong>USB:</strong> Werkt met Chrome of Edge op Windows/Mac.<br>
+    🛒 Bluetooth en USB hartslagmeters verkrijgbaar bij <a href="https://www.lifestylemonitors.com" target="_blank" style="color:#c0392b;text-decoration:none">www.lifestylemonitors.com</a>
+  {%endif%}
+</div>
+    <a class="demo-link" style="display:none" onclick="selectSensor('demo')">{%if lang=="de"%}Demo ohne Sensor{%elif lang=="en"%}Demo without sensor{%else%}Demo zonder sensor{%endif%}</a>
+    <p class="status-text" id="statusText"></p>
+
+    <button type="button" id="btnStartMeasure" class="btn-primary btn-start-measure" onclick="startMeasure()" disabled>
+      {%if lang=="de"%}Messung starten{%elif lang=="en"%}Start reading{%else%}Start meting{%endif%}
+    </button>
+
+  </div>
+
+  <!-- FASE 2: Actieve meting — geen educatieve tekst meer, alleen ademcirkel + metrics -->
+  <div class="phase" id="phase-measure">
+    <p class="measure-running"><span class="dot-green">●</span> {%if lang=="de"%}Messung läuft{%elif lang=="en"%}Measurement running{%else%}Meting loopt{%endif%}</p>
+    {% if meting_type == "biofeedback" %}
+    <div id="biofeedCountdown" style="font-size:2.2rem;font-weight:700;color:#E8344E;margin:.4rem 0 .6rem;letter-spacing:.04em;font-variant-numeric:tabular-nums;text-align:center">{{ '%02d'|format(duration//60) }}:{{ '%02d'|format(duration%60) }}</div>
+    {% endif %}
+
+    <!-- Tijdens-de-meting toggles (Info-toggle bewust verwijderd) -->
+    <div class="measure-toggles">
+      <button type="button" id="tglBreath" class="mtoggle" onclick="this.blur(); _ensureAudioCtx(); toggleBreath()" aria-pressed="true">
+        <span class="mtoggle-ico">🫁</span>
+        <span class="mtoggle-lbl">{%if lang=="de"%}Atmung{%elif lang=="en"%}Breathing{%else%}Adem{%endif%}</span>
+        <span class="mtoggle-state mtoggle-state-on">{%if lang=="de"%}an{%elif lang=="en"%}on{%else%}aan{%endif%}</span>
+        <span class="mtoggle-state mtoggle-state-off">{%if lang=="de"%}aus{%elif lang=="en"%}off{%else%}uit{%endif%}</span>
+      </button>
+      <button type="button" id="tglNoise" class="mtoggle" onclick="this.blur(); _ensureAudioCtx(); toggleNoise()" aria-pressed="true">
+        <span class="mtoggle-ico">🎵</span>
+        <span class="mtoggle-lbl">{%if lang=="de"%}Ton{%elif lang=="en"%}Sound{%else%}Geluid{%endif%}</span>
+        <span class="mtoggle-state mtoggle-state-on">{%if lang=="de"%}an{%elif lang=="en"%}on{%else%}aan{%endif%}</span>
+        <span class="mtoggle-state mtoggle-state-off">{%if lang=="de"%}aus{%elif lang=="en"%}off{%else%}uit{%endif%}</span>
+      </button>
+    </div>
+
+    <!-- Ademhalingsgids -->
+    <div id="breathPanel" class="breath-panel">
+      <div class="breath-circle" id="breathCircle"></div>
+      <p class="breath-label" id="breathLabel">{%if lang=="de"%}Einatmen{%elif lang=="en"%}Breathe in{%else%}Adem in{%endif%}</p>
+      <div class="breath-settings-wrap">
+        <button type="button" id="tglBreathSettings" class="breath-settings-btn" onclick="toggleBreathSettings()" aria-expanded="false">
+          <span>⚙ {%if lang=="de"%}Atemrhythmus{%elif lang=="en"%}Breathing rhythm{%else%}Ademritme{%endif%}</span>
+          <span class="bs-chev">▾</span>
+        </button>
+        <div id="breathSettings" class="breath-settings" hidden>
+          <div class="bs-row">
+            <label><strong>{%if lang=="de"%}Einatmen{%elif lang=="en"%}Inhale{%else%}Inademing{%endif%}</strong><span><span id="bsInVal">4</span>s</span></label>
+            <input type="range" id="bsIn" min="3" max="8" step="1" value="4">
+          </div>
+          <div class="bs-row">
+            <label><strong>{%if lang=="de"%}Ausatmen{%elif lang=="en"%}Exhale{%else%}Uitademing{%endif%}</strong> <span class="bs-info" title="{%if lang=="de"%}Ausatmen aktiviert Entspannung{%elif lang=="en"%}Exhale activates relaxation{%else%}Uitademing activeert ontspanning{%endif%}">i</span><span><span id="bsOutVal">6</span>s</span></label>
+            <input type="range" id="bsOut" min="5" max="8" step="1" value="6">
+          </div>
+          <div class="bs-row">
+            <label><strong>{%if lang=="de"%}Pause{%elif lang=="en"%}Pause{%else%}Pauze{%endif%}</strong><span><span id="bsHoldVal">2</span>s</span></label>
+            <input type="range" id="bsHold" min="1" max="6" step="1" value="2">
+          </div>
+          <div class="bs-hint">{%if lang=="de"%}Ausatmung immer länger als Einatmung{%elif lang=="en"%}Exhale always longer than inhale{%else%}Uitademing altijd langer dan inademing{%endif%}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="heart-wrap">
+      <div class="heart" id="heartEl"><svg width="32" height="32" viewBox="0 0 24 24" fill="#c0392b" stroke="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
+    </div>
+    <div class="metric-row">
+      <div class="metric">
+        <span class="metric-val" id="bpmEl">--</span>
+        <span class="metric-lbl">BPM</span>
+      </div>
+      <div class="metric">
+        <span class="metric-val" id="hrvEl">--</span>
+        <span class="metric-lbl">HRV%</span>
+      </div>
+      <div class="metric">
+        <span class="metric-val" id="slagenEl">0</span>
+        <span class="metric-lbl">Slagen</span>
+      </div>
+    </div>
+    <div class="ri-box">
+      <p class="ri-label">Relax Index</p>
+      <p class="ri-val" id="riEl">--</p>
+      <p class="ri-lbl" id="riLblEl"></p>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-labels">
+        <span>{%if lang=="de"%}Messung{%elif lang=="en"%}Measurement{%else%}Meting{%endif%}</span>
+        {%if meting_type == "biofeedback"%}<span id="timeLeft" style="color:#E8344E">BIOFEEDBACK</span>{%else%}<span id="timeLeft">{{ duration }}s</span>{%endif%}
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressBar"></div></div>
+    </div>
+        {%if meting_type == "biofeedback"%}<button class="btn-cancel" onclick="stopBiofeedback()" style="background:#e74c3c;color:#fff;border-color:#e74c3c;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:999;min-width:200px;padding:14px 24px;font-size:1.1rem">⏹ STOP</button>{%else%}<button class="btn-cancel" onclick="cancelMeasure()">{%if lang=="de"%}× Abbrechen{%elif lang=="en"%}× Cancel{%else%}× Annuleren{%endif%}</button>{%endif%}
+  </div>
+
+  <!-- FASE 3: Klaar -->
+  <div class="phase" id="phase-result">
+    <div class="result-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <h2>{%if lang=="de"%}Fertig!{%elif lang=="en"%}Done!{%else%}Klaar!{%endif%}</h2>
+    <div class="ri-box">
+      <p class="ri-label">Relax Index</p>
+      <p class="ri-val" id="riEndEl">--</p>
+      <p class="ri-lbl" id="riEndLblEl"></p>
+      <div class="metric-row" style="margin-top:1rem">
+        <div class="metric">
+          <span class="metric-val" id="bpmEndEl">--</span>
+          <span class="metric-lbl">BPM</span>
+        </div>
+        <div class="metric">
+          <span class="metric-val" id="hrvEndEl">--</span>
+          <span class="metric-lbl">HRV%</span>
+        </div>
+        <div class="metric">
+          <span class="metric-val" id="slagenEndEl">--</span>
+            <span class="metric-val" id="kwaliteitEndEl" style="font-size:0.85em;color:#888">--</span>
+            <div style="font-size:0.7em;color:#888">{%if lang=="de"%}Qualität{%elif lang=="en"%}Quality{%else%}Kwaliteit{%endif%}</div>
+          <span class="metric-lbl">Slagen</span>
+        </div>
+      </div>
+    </div>
+    {%if meting_type == "biofeedback"%}
+    <button onclick="document.getElementById('biofeedLabelModal').style.display='flex';" class="btn-primary" style="margin-top:1.5rem;border:none;cursor:pointer;width:100%">{%if lang=='de'%}Messung speichern{%elif lang=='en'%}Save reading{%else%}Meting opslaan{%endif%}</button>
+    {%else%}
+    <button onclick="saveBiofeedback(true);" class="btn-primary" style="margin-top:1.5rem;border:none;cursor:pointer;width:100%">{%if lang=='de'%}Messung speichern{%elif lang=='en'%}Save reading{%else%}Meting opslaan{%endif%}</button>
+    {%endif%}
+  </div>
+
+</div>
+
+<style>
+.measure-container { max-width: 520px; margin: 0 auto; padding: 1.5rem .75rem; text-align: center; }
+.phase { display: none; flex-direction: column; align-items: center; gap: .75rem; }
+.phase.active { display: flex; }
+.measure-sub { color: #888; margin-top: -.5rem; }
+.sensor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; width: 100%; max-width: 380px; margin: 1rem 0; }
+.sensor-card { border: none; border-radius: 16px; padding: 3rem 2.5rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 1.2rem; font-family: inherit; min-width: 140px; font-size: 1.1rem; transition: transform .15s, box-shadow .15s; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+.sensor-card:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+.sensor-icon { font-size: 2.5rem; }
+.sensor-name { font-weight: 700; font-size: 1.2rem; color: #fff; }
+.sensor-sub { color: rgba(255,255,255,0.75); font-size: .85rem; }
+.demo-link { color: #999; font-size: .9rem; cursor: pointer; text-decoration: underline; margin-top: .5rem; }
+.demo-link:hover { color: #666; }
+.status-text { color: #c0392b; font-size: .9rem; min-height: 1.2rem; }
+.measure-running { font-size: 1rem; color: #E8344E; font-weight: 500; }
+.dot-green { color: #E8344E; }
+.heart-wrap { font-size: 4rem; line-height: 1; margin: .5rem 0; }
+.heart { display: inline-block; transition: transform .15s; }
+.heart.beat { transform: scale(1.25); }
+.metric-row { display: flex; gap: 2rem; justify-content: center; }
+.metric { display: flex; flex-direction: column; align-items: center; }
+.metric-val { font-size: 1.8rem; font-weight: 700; color: #2c2c2c; }
+.metric-lbl { font-size: .75rem; color: #888; text-transform: uppercase; }
+.ri-box { background: #fff; border: 1.5px solid #e8e0d6; border-radius: 14px; padding: 1.25rem 2rem; width: 100%; max-width: 420px; }
+.ri-label { color: #888; font-size: .85rem; margin-bottom: .25rem; }
+.ri-val { font-size: 3rem; font-weight: 800; color: #E8344E; margin: 0; }
+.ri-lbl { font-size: 1rem; font-weight: 600; margin-top: .25rem; }
+.progress-wrap { width: 100%; max-width: 420px; }
+.progress-labels { display: flex; justify-content: space-between; font-size: .8rem; color: #888; margin-bottom: .3rem; }
+.progress-bar { background: #e8e0d6; border-radius: 6px; height: 8px; overflow: hidden; }
+.progress-fill { height: 100%; background: #c0392b; border-radius: 6px; width: 0%; transition: width 1s linear; }
+.btn-cancel { background: transparent; border: 1.5px solid #ccc; border-radius: 10px; padding: .7rem 2rem; cursor: pointer; font-family: inherit; font-size: .9rem; color: #666; margin-top: .5rem; }
+.btn-cancel:hover { border-color: #999; }
+.result-icon { font-size: 3.5rem; margin-bottom: .5rem; }
+.btn-primary { display: block; background: #c0392b; color: #fff; text-decoration: none; border-radius: 10px; padding: .9rem; font-weight: 600; font-size: 1rem; }
+.btn-start-measure { margin: 1rem auto 0; max-width: 320px; width: 100%; border: none; cursor: pointer; transition: opacity .15s, background .15s; }
+.btn-start-measure:disabled { background: #ccc; cursor: not-allowed; opacity: .75; }
+.btn-start-measure:not(:disabled):hover { background: #a82e22; }
+.btn-secondary { display: block; background: #f0ebe4; color: #555; text-decoration: none; border-radius: 10px; padding: .75rem; font-size: .95rem; }
+
+/* Tijdens-de-meting toggles */
+.measure-toggles { display:flex; gap:.4rem; justify-content:center; flex-wrap:wrap; margin:.25rem 0 .25rem; }
+.mtoggle { display:inline-flex; align-items:center; gap:.3rem; padding:.3rem .65rem; border:1.5px solid #E8344E; border-radius:999px; background:#E8344E; color:#fff; font-family:inherit; font-size:.75rem; font-weight:600; cursor:pointer; transition:background .15s,color .15s,border-color .15s; }
+.mtoggle[aria-pressed="false"] { background:#fff; color:#999; border-color:#E8344E; }
+.mtoggle[aria-pressed="false"] .mtoggle-ico { filter:grayscale(100%); opacity:.55; }
+.mtoggle-ico { font-size:.95rem; line-height:1; }
+.mtoggle-state { font-weight:500; opacity:.9; margin-left:.15rem; }
+.mtoggle .mtoggle-state-off { display:none; }
+.mtoggle[aria-pressed="false"] .mtoggle-state-on { display:none; }
+.mtoggle[aria-pressed="false"] .mtoggle-state-off { display:inline; }
+
+/* Educatief blok via <details> — FUNCTIE VAN DE BOL in FASE 1 */
+.edu-block{margin:1.2rem 0 .4rem;background:#faf6f1;border:1px solid #ece4d8;border-radius:12px;overflow:hidden;max-width:460px;width:100%;text-align:left;}
+.edu-block > summary{list-style:none;cursor:pointer;padding:.85rem 1rem;font-size:.9rem;font-weight:600;color:#4B3629;display:flex;justify-content:space-between;align-items:center;letter-spacing:.02em;gap:.5rem;}
+.edu-block > summary::-webkit-details-marker{display:none;}
+.summary-cue{display:inline-flex;align-items:center;gap:.35rem;flex-shrink:0;}
+.summary-cue .cue-txt{font-size:.78rem;font-weight:500;color:#E8344E;letter-spacing:.02em;text-transform:lowercase;}
+.summary-cue .cue-arrow{font-size:1.12rem;color:#E8344E;transition:transform .25s ease;line-height:1;}
+.edu-block .summary-cue .cue-open{display:none;}
+.edu-block[open] .summary-cue .cue-closed{display:none;}
+.edu-block[open] .summary-cue .cue-open{display:inline;}
+.edu-block[open] .summary-cue .cue-arrow{transform:rotate(180deg);}
+.edu-block > summary:hover{background:#f3ebdd;}
+.edu-body{padding:.2rem 1rem 1rem;font-size:.88rem;color:#555;line-height:1.6;}
+.edu-body h4{font-size:.95rem;color:#4B3629;margin:.9rem 0 .35rem;font-weight:700;}
+.edu-body h4:first-child{margin-top:.3rem;}
+.edu-body p{margin:0 0 .55rem;}
+.edu-body ul{margin:0 0 .6rem;padding-left:1.2rem;}
+.edu-body li{margin-bottom:.25rem;}
+
+/* Ademhalingsgids */
+.breath-panel { display:flex; flex-direction:column; align-items:center; gap:.3rem; margin:.25rem 0; }
+.breath-panel[hidden] { display:none; }
+.breath-circle { width:60px; height:60px; border-radius:50%; background:radial-gradient(circle at 35% 35%, #ffb8c1, #E8344E); box-shadow:0 0 18px rgba(232,52,78,.35); transform:scale(.55); transition-property:transform; transition-timing-function:ease-in-out; }
+.breath-circle.phase-in { transform:scale(1.25); transition-timing-function:ease-in-out; }
+.breath-circle.phase-out { transform:scale(.55); transition-timing-function:ease-in-out; }
+.breath-circle.phase-hold { transition-timing-function:linear; }
+.breath-label { margin:0; font-size:.85rem; color:#c0392b; font-weight:600; letter-spacing:.02em; }
+/* Ademritme instellingen */
+.breath-settings-wrap { margin:.3rem auto 0; width:100%; max-width:320px; }
+.breath-settings-btn { width:100%; background:#faf6f1; border:1px solid #ece4d8; border-radius:10px; padding:.42rem .7rem; font-size:.78rem; color:#6b5d4f; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:.35rem; font-family:inherit; }
+.breath-settings-btn:hover { background:#f3ebdd; }
+.breath-settings-btn[aria-expanded="true"] .bs-chev { transform:rotate(180deg); }
+.bs-chev { transition:transform .2s ease; font-size:.7rem; color:#9A8F8A; }
+.breath-settings { background:#fff; border:1px solid #ece4d8; border-radius:10px; padding:.5rem .85rem .6rem; margin-top:.3rem; text-align:left; }
+.breath-settings[hidden] { display:none; }
+.bs-row { margin:.4rem 0; }
+.bs-row label { font-size:.75rem; color:#555; display:flex; justify-content:space-between; align-items:baseline; gap:.4rem; }
+.bs-row label strong { color:#4B3629; font-weight:600; }
+.bs-row input[type=range] { width:100%; accent-color:#E8344E; margin-top:.1rem; cursor:pointer; }
+.bs-info { font-size:.7rem; color:#E8344E; cursor:help; border:1px solid #E8344E; border-radius:50%; width:14px; height:14px; display:inline-flex; align-items:center; justify-content:center; line-height:1; }
+.bs-hint { font-size:.68rem; color:#999; font-style:italic; margin-top:.35rem; text-align:center; }
+</style>
+
+<script>window.SC_LANG="{{lang}}";</script>
+<script src="/static/js/hrv.js?v=3"></script>
+<script src="/static/js/sensor.js"></script>
+<script>
+const DURATION = {{ duration }};
+  var rrFiltered=[];
+    var BIRTH_YEAR = {{ profile.birth_year }};
+  var GENDER = '{{ profile.gender }}';
+  var AGE = new Date().getFullYear() - BIRTH_YEAR;
+const PROFILE_ID = {{ profile.id }};
+
+let rrIntervals = [];
+let beatCount = 0;
+let timerInterval = null;
+let elapsed = 0;
+let timeseriesData = [];
+let _sensorReady = false;
+let _measureActive = false;
+
+function startMeasure() {
+  if (!_sensorReady || _measureActive) return;
+  _measureActive = true;
+  rrIntervals = [];
+  beatCount = 0;
+  document.getElementById('statusText').textContent = '';
+  showPhase('phase-measure');
+  startTimer();
+}
+
+function showPhase(id) {
+  document.querySelectorAll('.phase').forEach(function(el) {
+    el.classList.remove('active');
+  });
+  var el = document.getElementById(id);
+  if (el) el.classList.add('active');
+  if (id === 'phase-measure') {
+    applyMeasureHelpers();
+  } else {
+    stopBreath();
+    stopNoise();
+  }
+}
+
+/* ---------- Tijdens-de-meting helpers (ademhaling / ruis) ---------- */
+var SC_LS = {
+  breath:'sc_measure_breathing_on',
+  noise: 'sc_measure_noise_on',
+  brIn:  'sc_breath_in',
+  brOut: 'sc_breath_out',
+  brHold:'sc_breath_hold'
+};
+function _getPref(k, def) {
+  try { var v = localStorage.getItem(k); return v === null ? def : (v === 'true'); }
+  catch(e) { return def; }
+}
+function _setPref(k, v) { try { localStorage.setItem(k, v ? 'true' : 'false'); } catch(e){} }
+function _getNumPref(k, def) {
+  try { var v = parseInt(localStorage.getItem(k), 10); return isNaN(v) ? def : v; }
+  catch(e) { return def; }
+}
+function _setNumPref(k, v) { try { localStorage.setItem(k, String(v)); } catch(e){} }
+function _getBreathDurations() {
+  var i = Math.max(3, Math.min(8, _getNumPref(SC_LS.brIn, 4)));
+  var h = Math.max(1, Math.min(6, _getNumPref(SC_LS.brHold, 2)));
+  var o = _getNumPref(SC_LS.brOut, 6);
+  o = Math.max(i+1, Math.min(i*2, o));
+  return { in: i, out: o, hold: h };
+}
+
+function applyMeasureHelpers() {
+  var breathOn = _getPref(SC_LS.breath, true);
+  var noiseOn  = _getPref(SC_LS.noise,  true);
+  _renderBreath(breathOn);
+  _renderNoise(noiseOn);
+  _bsInit();
+}
+
+/* --- Ademhaling --- */
+var _breathTimer = null;
+function _breathLabels() {
+  var L = window.SC_LANG || 'nl';
+  if (L === 'de') return { in:'Einatmen', out:'Ausatmen', hold:'Pause' };
+  if (L === 'en') return { in:'Breathe in', out:'Breathe out', hold:'Hold' };
+  return { in:'Adem in', out:'Adem uit', hold:'Pauze' };
+}
+function _breathStep(state) {
+  var c = document.getElementById('breathCircle');
+  var l = document.getElementById('breathLabel');
+  var labels = _breathLabels();
+  var d = _getBreathDurations();
+  if (c) c.classList.remove('phase-in','phase-out','phase-hold');
+  var nextState, durSec;
+  if (state === 'in')   { durSec = d.in;   if(c){c.style.transitionDuration = durSec+'s'; c.classList.add('phase-in');}  if(l) l.textContent = labels.in;   nextState = 'out';  }
+  if (state === 'out')  { durSec = d.out;  if(c){c.style.transitionDuration = durSec+'s'; c.classList.add('phase-out');} if(l) l.textContent = labels.out;  nextState = 'hold'; }
+  if (state === 'hold') { durSec = d.hold; if(c){c.style.transitionDuration = durSec+'s'; c.classList.add('phase-hold');}if(l) l.textContent = labels.hold; nextState = 'in';   }
+  _playBreathTone(state, durSec);
+  _breathTimer = setTimeout(function(){ _breathStep(nextState); }, durSec*1000);
+}
+function startBreath() {
+  stopBreath();
+  _breathStep('in');
+}
+function stopBreath() {
+  if (_breathTimer) { clearTimeout(_breathTimer); _breathTimer = null; }
+  var c = document.getElementById('breathCircle');
+  if (c) c.classList.remove('phase-in','phase-out','phase-hold');
+  _stopCurrentTone(120);
+}
+function _renderBreath(on) {
+  var panel = document.getElementById('breathPanel');
+  var btn   = document.getElementById('tglBreath');
+  if (panel) panel.hidden = !on;
+  if (btn)   btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  if (on) startBreath(); else stopBreath();
+}
+function toggleBreath() {
+  var cur = _getPref(SC_LS.breath, true);
+  _setPref(SC_LS.breath, !cur);
+  _renderBreath(!cur);
+}
+
+/* --- Ademritme instellingen --- */
+function toggleBreathSettings() {
+  var btn = document.getElementById('tglBreathSettings');
+  var panel = document.getElementById('breathSettings');
+  if (!btn || !panel) return;
+  var open = btn.getAttribute('aria-expanded') === 'true';
+  btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+  panel.hidden = open;
+}
+function _bsClampOut() {
+  var iIn  = document.getElementById('bsIn');
+  var iOut = document.getElementById('bsOut');
+  if (!iIn || !iOut) return;
+  var i = parseInt(iIn.value, 10);
+  iOut.min = i + 1;
+  iOut.max = i * 2;
+  var v = parseInt(iOut.value, 10);
+  if (v < i + 1) iOut.value = i + 1;
+  if (v > i * 2) iOut.value = i * 2;
+  var lbl = document.getElementById('bsOutVal');
+  if (lbl) lbl.textContent = iOut.value;
+}
+var _bsInited = false;
+function _bsInit() {
+  if (_bsInited) return;
+  var iIn  = document.getElementById('bsIn');
+  var iOut = document.getElementById('bsOut');
+  var iHold= document.getElementById('bsHold');
+  if (!iIn || !iOut || !iHold) return;
+  var d = _getBreathDurations();
+  iIn.value = d.in; iOut.value = d.out; iHold.value = d.hold;
+  document.getElementById('bsInVal').textContent   = d.in;
+  document.getElementById('bsOutVal').textContent  = d.out;
+  document.getElementById('bsHoldVal').textContent = d.hold;
+  iOut.min = d.in + 1; iOut.max = d.in * 2;
+  iIn.addEventListener('input', function() {
+    document.getElementById('bsInVal').textContent = iIn.value;
+    _setNumPref(SC_LS.brIn, iIn.value);
+    _bsClampOut();
+    _setNumPref(SC_LS.brOut, document.getElementById('bsOut').value);
+  });
+  iOut.addEventListener('input', function() {
+    _bsClampOut();
+    _setNumPref(SC_LS.brOut, document.getElementById('bsOut').value);
+  });
+  iHold.addEventListener('input', function() {
+    document.getElementById('bsHoldVal').textContent = iHold.value;
+    _setNumPref(SC_LS.brHold, iHold.value);
+  });
+  _bsInited = true;
+}
+
+/* --- Ademhalingstonen via Web Audio API --- */
+var _audioCtx = null;
+var _currentOsc = null;
+var _currentGain = null;
+var _noiseOn = false;
+var _noiseActivatedThisSession = false;
+
+function _ensureAudioCtx() {
+  try {
+    if (!_audioCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      _audioCtx = new AC();
+    }
+    if (_audioCtx.state === 'suspended' && _audioCtx.resume) {
+      try { _audioCtx.resume(); } catch(e){}
+    }
+    return _audioCtx;
+  } catch(e) { return null; }
+}
+
+try {
+  document.addEventListener('click', function() {
+    if (_audioCtx && _audioCtx.state === 'suspended') {
+      try { _audioCtx.resume(); } catch(e){}
+    }
+  }, { once: true });
+} catch(e){}
+
+function _stopCurrentTone(fadeMs) {
+  if (!_audioCtx || !_currentOsc) return;
+  var f = (fadeMs || 120) / 1000;
+  var now = _audioCtx.currentTime;
+  var osc = _currentOsc, g = _currentGain;
+  _currentOsc = null; _currentGain = null;
+  try {
+    g.gain.cancelScheduledValues(now);
+    g.gain.setValueAtTime(g.gain.value, now);
+    g.gain.linearRampToValueAtTime(0.0001, now + f);
+    osc.stop(now + f + 0.05);
+  } catch(e){}
+}
+
+function _playBreathTone(phase, durSec) {
+  if (!_noiseOn) return;
+  if (!_audioCtx) return;
+  if (_audioCtx.state !== 'running') return;
+  var ctx = _audioCtx;
+  _stopCurrentTone(80);
+  var osc = ctx.createOscillator();
+  var gain = ctx.createGain();
+  osc.type = 'sine';
+  var now = ctx.currentTime;
+  var fadeIn = 0.30, fadeOut = 0.40;
+  var target, duration = durSec || 4;
+  if (phase === 'in') {
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.linearRampToValueAtTime(280, now + duration);
+    target = 0.12;
+  } else if (phase === 'out') {
+    osc.frequency.setValueAtTime(260, now);
+    osc.frequency.linearRampToValueAtTime(180, now + duration);
+    target = 0.10;
+  } else {
+    osc.frequency.setValueAtTime(160, now);
+    target = 0.05;
+  }
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.linearRampToValueAtTime(target, now + fadeIn);
+  var holdUntil = Math.max(now + fadeIn, now + duration - fadeOut);
+  gain.gain.setValueAtTime(target, holdUntil);
+  gain.gain.linearRampToValueAtTime(0.0001, now + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + duration + 0.05);
+  _currentOsc = osc;
+  _currentGain = gain;
+}
+
+function startNoise() { _noiseOn = true; }
+function stopNoise()  { _noiseOn = false; _stopCurrentTone(120); }
+
+/* Meting-einde: hard-kill alle audio vóór redirect — geen 120ms fade,
+   geen dubbel-ringende volgorde. Idempotent. */
+function _killAudioNow() {
+  try { if (_breathTimer) { clearTimeout(_breathTimer); _breathTimer = null; } } catch(e){}
+  _noiseOn = false;
+  try {
+    if (_audioCtx && _currentOsc && _currentGain) {
+      var now = _audioCtx.currentTime;
+      try { _currentGain.gain.cancelScheduledValues(now); _currentGain.gain.setValueAtTime(0, now); } catch(e){}
+      try { _currentOsc.stop(now); } catch(e){}
+    }
+    _currentOsc = null; _currentGain = null;
+  } catch(e){}
+  try { if (_audioCtx && _audioCtx.state === 'running') _audioCtx.suspend(); } catch(e){}
+}
+
+function _renderNoise(on) {
+  var btn = document.getElementById('tglNoise');
+  if (btn) btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  if (on) startNoise(); else stopNoise();
+}
+function toggleNoise() {
+  var cur = _getPref(SC_LS.noise, true);
+  if (!_noiseActivatedThisSession && cur) {
+    _noiseActivatedThisSession = true;
+    _renderNoise(true);
+    return;
+  }
+  _noiseActivatedThisSession = true;
+  _setPref(SC_LS.noise, !cur);
+  _renderNoise(!cur);
+}
+
+{% if is_demo %}
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.sensor-card').forEach(function(btn) {
+      btn.onclick = function() { selectSensor("demo"); };
+    });
+  });
+{% else %}
+  if(new URLSearchParams(window.location.search).get("sensor")==="demo"){selectSensor("demo");}
+{% endif %}
+  function selectSensor(type) {
+  document.getElementById('statusText').textContent = 'App maakt contact met meter...';
+
+  function onBeat(rr) {
+    if (!_sensorReady) {
+      _sensorReady = true;
+      document.getElementById('statusText').textContent =
+        (SC_LANG === 'de' ? 'Sensor verbunden'
+        : SC_LANG === 'en' ? 'Sensor connected'
+        : 'Sensor gekoppeld');
+      var btn = document.getElementById('btnStartMeasure');
+      if (btn) btn.disabled = false;
+      return;
+    }
+    if (!_measureActive) return;
+    beatCount++;
+    rrIntervals.push(rr);
+    if (rrIntervals.length > 300) rrIntervals.shift();
+    updateDisplay(rr);
+    pulseHeart();
+  }
+
+  function onConnect(sensorType, name) {
+    document.getElementById('statusText').textContent =
+      (SC_LANG === 'de' ? 'Sensor gefunden, warte auf Signal...'
+      : SC_LANG === 'en' ? 'Sensor found, waiting for signal...'
+      : 'Sensor gevonden, wachten op signaal...');
+  }
+
+  function onError(msg) {
+    document.getElementById('statusText').textContent = msg || 'App maakt contact met meter...';
+  }
+
+  if (type === 'demo') {
+    Sensor.startDemo(onBeat, onConnect);
+  } else if (type === 'usb') {
+    Sensor.connectUSB(onBeat, onConnect, onError);
+    } else if (type === 'bluetooth') {
+      if(!navigator.bluetooth){alert(SC_LANG==='de'?'Web Bluetooth nicht verfügbar':SC_LANG==='en'?'Web Bluetooth not available':'Web Bluetooth niet beschikbaar');return;}
+      Sensor.connectBluetooth(onBeat, onConnect, function() {
+        document.getElementById('statusText').textContent = 'Verbinding verbroken';
+      }, onError);
+    }
+  }
+
+function updateDisplay(rr) {
+  var bpm = Math.round(60000 / rr);
+  document.getElementById('bpmEl').textContent = bpm;
+  document.getElementById('slagenEl').textContent = beatCount;
+
+    var _f=HRV.filterRR(rrIntervals);rrFiltered=_f.filtered||_f;
+        hrv = HRV.calculateHRVPercent(rrFiltered, AGE, GENDER);
+    var rmssd = HRV.calculateRMSSD(rrIntervals);
+    var ri = HRV.lookupRelaxIndex(bpm, hrv);
+    var label = HRV.getLabel(ri);
+
+  document.getElementById('bpmEndEl').textContent = avgBpm;
+  document.getElementById('hrvEndEl').textContent = hrv + '%';
+  document.getElementById('slagenEndEl').textContent = beatCount;
+  var kwEl=document.getElementById('kwaliteitEndEl');
+  if(kwEl){kwEl.textContent=kwaliteit+'%';kwEl.style.color=kwaliteit>=85?'#E8344E':kwaliteit>=70?'#f39c12':'#c0392b';}
+  if(kwaliteit < 85) {
+    document.getElementById('riEndEl').textContent = '--';
+    document.getElementById('riEndEl').style.color = '#c0392b';
+    document.getElementById('riEndLblEl').textContent = 'ONBETROUWBAAR';
+  } else {
+    document.getElementById('riEndEl').textContent = ri.toFixed(1);
+    document.getElementById('riEndEl').style.color = HRV.getColor(ri);
+    document.getElementById('riEndLblEl').textContent = label;
+  }
+
+    document.getElementById('hrvEl').textContent = hrv + '%';
+    document.getElementById('riEl').textContent = ri.toFixed(1);
+    document.getElementById('riLblEl').textContent = label;
+    document.getElementById('riEl').style.color = HRV.getColor(ri);
+  }
+
+function pulseHeart() {
+  var h = document.getElementById('heartEl');
+  h.classList.add('beat');
+  setTimeout(function() { h.classList.remove('beat'); }, 150);
+}
+
+function startTimer() {
+  elapsed = 0;
+  var bar = document.getElementById('progressBar');
+  var timeLeft = document.getElementById('timeLeft');
+  var countdownEl = document.getElementById('biofeedCountdown');
+
+  timerInterval = setInterval(function() {
+    elapsed++;
+    if (countdownEl && DURATION > 0) {
+      var rem = Math.max(0, DURATION - elapsed);
+      var mm = Math.floor(rem/60), ss = rem % 60;
+      countdownEl.textContent = (mm<10?'0':'') + mm + ':' + (ss<10?'0':'') + ss;
+    }
+    if(elapsed===15&&rrIntervals.length===0){alert(SC_LANG==='de'?'Kein Sensorsignal. Überprüfen Sie die Verbindung.':SC_LANG==='en'?'No sensor signal. Check the connection.':'Geen sensor signaal. Controleer de verbinding.');}
+    if(elapsed % 5 === 0 && rrIntervals.length >= 20){
+        var liveRR=rrIntervals.length>40?rrIntervals.slice(-40):rrIntervals; if(HRV.filterRR&&liveRR.length>20){try{var f=HRV.filterRR(liveRR).filtered;if(f.length>10)liveRR=f;}catch(e){}}
+      var sH=HRV.calculateHRVPercent(liveRR,AGE,GENDER);
+      var sB=Math.round(60000/(liveRR.reduce(function(a,b){return a+b;},0)/liveRR.length));
+      var sR=HRV.lookupRelaxIndex(sB,sH);
+      var sRMSSD=rrFiltered.length>1?Math.sqrt(rrFiltered.slice(1).reduce(function(s,v,i){var d=v-rrFiltered[i];return s+d*d;},0)/(rrFiltered.length-1)):0;timeseriesData.push({t:elapsed,ri:sR||0,rmssd:Math.round(sRMSSD*10)/10,hrv:sH||0,bpm:sB||0});
+    }
+    var pct = DURATION>0 ? (elapsed / DURATION) * 100 : Math.min(elapsed,90)/90*100;
+    bar.style.width = pct + '%';
+    timeLeft.textContent='';
+    if (DURATION > 0 && elapsed >= DURATION) {
+      clearInterval(timerInterval);
+      Sensor.stop();
+          biofeedLabel = ""; finishMeasure();
+    }
+  }, 1000);
+}
+
+function stopBiofeedback(){
+  clearInterval(timerInterval);
+  Sensor.stop();
+  stopBreath(); stopNoise(); _killAudioNow();
+  biofeedLabel = ''; finishMeasure();
+}
+var biofeedLabel = '';
+var avgBpm, hrv, ri, rmssdFinal, kwaliteit;
+function saveBiofeedback(skip){
+    _killAudioNow();
+    biofeedLabel = skip ? '' : document.getElementById('biofeedLabelInput').value;
+    var _modal=document.getElementById('biofeedLabelModal');if(_modal)_modal.style.display='none';
+    fetch('/api/meting/opslaan', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        profile_id: PROFILE_ID,
+      client_id: ({{ client_id if client_id and client_id > 0 else 0 }} || new URLSearchParams(window.location.search).get("cid") || null),
+            ri: timeseriesData.length>0 ? Math.round(timeseriesData.reduce(function(s,v){return s+v.ri;},0)/timeseriesData.length*10)/10 : ri,
+        bpm: avgBpm,
+        hrv: hrv,
+        beats: beatCount,
+        duration: elapsed,
+        notes: biofeedLabel,
+            ctx_vitaliteit: sessionStorage.getItem("sc_ctx_vitaliteit") || "5",
+            ctx_dimensie: sessionStorage.getItem("sc_ctx_dimensie") || "",
+            ctx_ongemak: parseInt(sessionStorage.getItem("sc_ctx_ongemak") || "5", 10),
+            ctx_vrije_tekst: (sessionStorage.getItem("sc_ctx_vrije_tekst") || "").slice(0, 100),
+          subjectief_pre: sessionStorage.getItem('sc_subjectief_pre') || '5',
+            timeseries: JSON.stringify(timeseriesData),
+            rr_intervals: JSON.stringify(rrIntervals),
+        rmssd: rmssdFinal,
+            kwaliteit: (function(){try{return HRV.getMeetKwaliteit(rrIntervals);}catch(e){return 0;}})(),
+        meting_type: "{{ meting_type }}",
+            sdnn: (function(){try{return HRV.calculateSDNN(rrIntervals);}catch(e){return 0;}})(),
+            pnn50: (function(){try{return HRV.calculatePNN50(rrIntervals);}catch(e){return 0;}})()
+      })
+    }).then(function(){var _cid=parseInt(new URLSearchParams(window.location.search).get("cid")||"0");var _dest="/kwadrant"+(_cid?"?cid="+_cid:"");window.location.href=_dest;}).catch(function(e){console.log("Opslaan mislukt:",e);window.location.href=_dest;});
+}
+function setBiofeedLabel(lbl){
+  document.getElementById('biofeedLabelInput').value=lbl;
+}
+function cancelMeasure() {
+  clearInterval(timerInterval);
+  Sensor.stop();
+  stopBreath(); stopNoise(); _killAudioNow();
+    var cid = parseInt("{{ client_id|default(0) }}") || 0;
+    if(cid > 0) { window.location = "/pro/client/" + cid; } else { window.location = "/welkom"; }
+}
+
+function finishMeasure() {
+  Sensor.stop();
+  stopBreath(); stopNoise(); _killAudioNow();
+
+  var rrWarm = rrIntervals.length>15?rrIntervals.slice(15):rrIntervals; var rrFiltered=HRV.filterRR(rrWarm).filtered; var bpmVals = rrFiltered.map(function(rr) { return Math.round(60000 / rr); });
+  avgBpm = Math.round(bpmVals.reduce(function(a,b){return a+b;}, 0) / bpmVals.length);
+  hrv = HRV.calculateHRVPercent(rrFiltered, AGE, GENDER);
+  rmssdFinal = HRV.calculateRMSSD(rrFiltered);
+  kwaliteit = HRV.getMeetKwaliteit(rrIntervals);
+    ri = HRV.lookupRelaxIndex(avgBpm, hrv);
+  var label = HRV.getLabel(ri);
+
+  var bpmEndEl = document.getElementById('bpmEndEl');
+  var kwEl = document.getElementById('kwaliteitEndEl');
+  if(bpmEndEl) bpmEndEl.textContent = avgBpm;
+  if(kwEl){ kwEl.textContent=kwaliteit+'%'; kwEl.style.color=kwaliteit>=85?'#E8344E':kwaliteit>=70?'#f39c12':'#c0392b'; }
+
+  // Direct opslaan, kwadrant toont resultaat
+  saveBiofeedback(true);
+}
+</script>
+
+<div id="biofeedLabelModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:28px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
+    <h3 style="margin:0 0 8px;color:#333">{%if lang=="de"%}Messung speichern{%elif lang=="en"%}Save reading{%else%}Meting opslaan{%endif%}</h3>
+    <p style="color:#666;font-size:.9rem;margin:0 0 16px">{%if lang=="de"%}Geben Sie dieser Messung ein Label{%elif lang=="en"%}Give this reading a label{%else%}Geef deze meting een label{%endif%}</p>
+    <input id="biofeedLabelInput" type="text" placeholder="{%if lang=='de'%}z.B. Nach Yoga, Vor Präsentation...{%elif lang=='en'%}e.g. After yoga, Before presentation...{%else%}bijv. Na yoga, Voor presentatie...{%endif%}" style="width:100%;padding:12px;border:1.5px solid #ddd;border-radius:8px;font-size:.95rem;box-sizing:border-box;margin-bottom:12px">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
+      <button onclick="setBiofeedLabel('{%if lang=="de"%}Vor Aktivität{%elif lang=="en"%}Before activity{%else%}Voor activiteit{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Vor Aktivität{%elif lang=="en"%}Before activity{%else%}Voor activiteit{%endif%}</button>
+      <button onclick="setBiofeedLabel('{%if lang=="de"%}Nach Aktivität{%elif lang=="en"%}After activity{%else%}Na activiteit{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Nach Aktivität{%elif lang=="en"%}After activity{%else%}Na activiteit{%endif%}</button>
+      <button onclick="setBiofeedLabel('{%if lang=="de"%}Morgens{%elif lang=="en"%}Morning{%else%}Ochtend{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Morgens{%elif lang=="en"%}Morning{%else%}Ochtend{%endif%}</button>
+      <button onclick="setBiofeedLabel('{%if lang=="de"%}Abends{%elif lang=="en"%}Evening{%else%}Avond{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Abends{%elif lang=="en"%}Evening{%else%}Avond{%endif%}</button>
+      <button onclick="setBiofeedLabel('{%if lang=="de"%}Nach Sport{%elif lang=="en"%}After sport{%else%}Na sport{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Nach Sport{%elif lang=="en"%}After sport{%else%}Na sport{%endif%}</button>
+      <button onclick="setBiofeedLabel('{%if lang=="de"%}Nach Meditation{%elif lang=="en"%}After meditation{%else%}Na meditatie{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Nach Meditation{%elif lang=="en"%}After meditation{%else%}Na meditatie{%endif%}</button>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="saveBiofeedback(true)" style="flex:1;padding:12px;border:1.5px solid #ddd;border-radius:8px;background:#fff;color:#666;cursor:pointer;font-size:.9rem">{%if lang=="de"%}Ohne Label speichern{%elif lang=="en"%}Save without label{%else%}Opslaan zonder label{%endif%}</button>
+      <button onclick="saveBiofeedback(false)" style="flex:1;padding:12px;border:none;border-radius:8px;background:#E8344E;color:#fff;cursor:pointer;font-size:.9rem;font-weight:600">{%if lang=="de"%}Speichern{%elif lang=="en"%}Save{%else%}Opslaan{%endif%}</button>
+    </div>
+  </div>
+</div>
+{% endblock %}

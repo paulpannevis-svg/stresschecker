@@ -96,6 +96,33 @@ from hlm.routes import hlm as hlm_blueprint
 app.register_blueprint(hlm_blueprint)
 app.secret_key = os.environ.get('SC_SECRET_KEY', 'change-this-in-production')
 
+@app.template_filter('full_name')
+def _full_name_filter(obj, surname=None):
+    """Render 'voornaam achternaam' als achternaam aanwezig, anders alleen 'voornaam'.
+
+    Accepteert: sqlite3.Row, dict, object met .name/.surname-attrs, of een string
+    (in dat geval mag surname expliciet als 2e argument worden meegegeven)."""
+    if obj is None:
+        return ''
+    if isinstance(obj, str):
+        s = (surname or '').strip() if surname else ''
+        return (obj.strip() + ' ' + s).strip() if s else obj.strip()
+    name = ''
+    s = ''
+    try:
+        if hasattr(obj, 'keys'):
+            keys = list(obj.keys())
+            if 'name' in keys: name = obj['name']
+            if 'surname' in keys: s = obj['surname']
+        else:
+            name = getattr(obj, 'name', '') or ''
+            s = getattr(obj, 'surname', '') or ''
+    except Exception:
+        pass
+    name = (name or '').strip()
+    s = (s or '').strip()
+    return (name + ' ' + s).strip() if s else name
+
 DB_PATH        = os.environ.get('SC_DB_PATH', '/opt/ic-license-server/data/saas_licenses.db')
 METING_DB_PATH = os.environ.get('SC_METING_DB', '/opt/stresschecker/data/sc_measurements.db')
 PRO_DB_PATH    = os.environ.get('SC_PRO_DB', '/opt/stresschecker/data/sc_pro.db')
@@ -642,6 +669,8 @@ def activate():
                     else ('Dieser Lizenzcode gehört nicht zu dieser E-Mail-Adresse.' if lang=='de'
                     else 'This license code does not belong to this email address.'))))
             session['profile_name'] = existing['display_name']
+            try: session['profile_surname'] = existing['surname'] or ''
+            except (IndexError, KeyError): session['profile_surname'] = ''
             # Wachtwoord pas opslaan na succesvol 2FA (zie verify_2fa)
             session['2fa_pending_pw_hash'] = pw_hash
             # Vervaldatum check
@@ -703,7 +732,8 @@ def admin_bypass():
     session['logged_in'] = True
     session['license_type'] = 'pro'
     session['email'] = 'paulpannevis@gmail.com'
-    session['profile_name'] = 'Paul Pannevis'
+    session['profile_name'] = 'Paul'
+    session['profile_surname'] = 'Pannevis'
     session['lang'] = 'nl'
     session['user_key'] = 'aae4793deb05b378a68140eb40979c32'
     session['license_valid'] = True
@@ -851,9 +881,11 @@ def verify_2fa():
                     import sqlite3 as _sq3
                     _uc = _sq3.connect('/opt/ic-license-server/data/saas_licenses.db')
                     _uc.row_factory = _sq3.Row
-                    _ur = _uc.execute("SELECT display_name, birth_year, gender, sensor_pref, language FROM users WHERE email=?", (em,)).fetchone()
+                    _ur = _uc.execute("SELECT display_name, birth_year, gender, sensor_pref, language, surname FROM users WHERE email=?", (em,)).fetchone()
                     if _ur and _ur['display_name']:
                         nm = _ur['display_name']
+                        try: session['profile_surname'] = _ur['surname'] or ''
+                        except (IndexError, KeyError): session['profile_surname'] = ''
                     # Laad ook birth_year en gender
                     if _ur and _ur['birth_year']:
                         session['profile_birth_year'] = _ur['birth_year']
@@ -992,9 +1024,11 @@ def save_profile():
     if not session.get('license_valid') and not session.get('demo_mode'):
         return redirect(url_for('welcome'))
     _name = request.form.get('name', '').strip()
+    _surname = request.form.get('surname', '').strip() or None
     _by   = int(request.form.get('birth_year', 1970))
     _gen  = request.form.get('gender', 'male')
     session['profile_name']       = _name
+    session['profile_surname']    = _surname or ''
     session['profile_birth_year'] = _by
     session['profile_gender']     = _gen
     # Persisteer + zet activated_at/license_expires alleen bij eerste keer
@@ -1007,11 +1041,11 @@ def save_profile():
         _exp = _now + _dt2.timedelta(days=183)  # ~6 maanden
     _cn2.execute(
         "UPDATE users SET "
-        "display_name=?, birth_year=?, gender=?, "
+        "display_name=?, surname=?, birth_year=?, gender=?, "
         "activated_at=COALESCE(activated_at, ?), "
         "license_expires=COALESCE(license_expires, ?) "
         "WHERE email=?",
-        (_name, _by, _gen,
+        (_name, _surname, _by, _gen,
          _now.isoformat(), _exp.isoformat(),
          session.get('email',''))
     )
@@ -1168,10 +1202,12 @@ def sensor_en_meten():
             return redirect(url_for('profile_setup') + '?reason=meting_blocked')
     if _cid and _is_pro_or_demo_pro():
         profile = {"id": _cid, "name": session.get("client_name",""),
+                   "surname": session.get("client_surname","") or None,
                    "birth_year": session.get("client_birth_year", 1970),
                    "gender": session.get("client_gender","male")}
     else:
         profile = {"id": 1, "name": session.get("profile_name", "Paul"),
+                   "surname": session.get("profile_surname","") or None,
                    "birth_year": session.get("profile_birth_year", 1970),
                    "gender": session.get("profile_gender", "male")}
     _dur_arg = request.args.get("duration", type=int)
@@ -1227,8 +1263,11 @@ def kwadrant():
         _demo = session.get('demo_mode') and session.get('license_type') == 'pro'
         ci = db.execute("SELECT * FROM clients WHERE id=? AND (pro_key=? OR pro_key='DEMO')" if _demo else "SELECT * FROM clients WHERE id=? AND pro_key=?", (client_id, _pk)).fetchone()
         if ci:
-            client_name = ci['name']
-            client_info = {'name': ci['name'], 'birth_year': ci['birth_year'],
+            _sn = ''
+            try: _sn = (ci['surname'] or '').strip()
+            except (IndexError, KeyError): _sn = ''
+            client_name = (ci['name'] + ' ' + _sn).strip() if _sn else ci['name']
+            client_info = {'name': ci['name'], 'surname': _sn or None, 'birth_year': ci['birth_year'],
                           'gender': ci['gender'], 'client_code': ci['client_code']}
         db.close()
     return render_template('kwadrant.html', lang=session.get('lang', 'nl'),
@@ -1305,6 +1344,7 @@ def settings():
     _lang = session.get('lang', 'nl')
     return render_template('settings.html', lang=_lang, is_pro=session.get('license_type') in ('pro','pro_demo'),
                             profile_name=session.get('profile_name', ''),
+                            profile_surname=session.get('profile_surname', ''),
                             birth_year=_by,
                             gender=_gd,
                             subscription_info=get_subscription_info(email, _lang),
@@ -1335,7 +1375,8 @@ def mijn_metingen():
 def biofeedback():
     if not session.get("license_valid") and not session.get("demo_mode"):
         return redirect(url_for("welcome"))
-    profile = {"name": session.get("profile_name", ""), "birth_year": session.get("profile_birth_year", 1990),
+    profile = {"name": session.get("profile_name", ""), "surname": session.get("profile_surname","") or None,
+               "birth_year": session.get("profile_birth_year", 1990),
                "gender": session.get("profile_gender", "male"), "id": session.get("profile_id", 0)}
     response = make_response(render_template("measure.html", lang=session.get("lang", "nl"), profile=profile, duration=0, skip_subj="1", is_pro=is_pro(), meting_type="biofeedback"))
     response.headers["Cache-Control"] = "no-store"
@@ -1496,6 +1537,7 @@ def pro_client_add():
     lang = session.get('lang', 'nl')
     if request.method == 'POST':
         name = request.form.get('name','').strip()
+        surname = request.form.get('surname','').strip() or None
         birth_year = int(request.form.get('birth_year', 1970))
         gender = request.form.get('gender', 'male')
         email = request.form.get('email','').strip()
@@ -1506,8 +1548,8 @@ def pro_client_add():
         pro_key = get_user_key()
         client_code = generate_client_code()
         db = get_pro_db()
-        db.execute("INSERT INTO clients (pro_key,name,birth_year,gender,client_code,email,phone,notes) VALUES (?,?,?,?,?,?,?,?)",
-                   (pro_key, name, birth_year, gender, client_code, email, phone, notes))
+        db.execute("INSERT INTO clients (pro_key,name,surname,birth_year,gender,client_code,email,phone,notes) VALUES (?,?,?,?,?,?,?,?,?)",
+                   (pro_key, name, surname, birth_year, gender, client_code, email, phone, notes))
         db.commit()
         db.close()
         return redirect(url_for('pro_clients'))
@@ -1549,6 +1591,8 @@ def pro_client_measure(cid):
         return redirect(url_for('pro_clients'))
     session['measuring_for_client'] = cid
     session['client_name'] = client['name']
+    try: session['client_surname'] = client['surname'] or ''
+    except (IndexError, KeyError): session['client_surname'] = ''
     session['client_birth_year'] = client['birth_year']
     session['client_gender'] = client['gender']
     session['client_profile_id'] = client['id']
@@ -1575,6 +1619,9 @@ def api_save_settings():
     if not data:
         return jsonify({'error': 'Geen data'}), 400
     if 'name' in data:    session['profile_name'] = data['name']
+    if 'surname' in data:
+        _sn = (data.get('surname') or '').strip()
+        session['profile_surname'] = _sn  # leeg-string in session OK; DB krijgt NULL
     if 'birth_year' in data: session['profile_birth_year'] = int(data['birth_year'])
     if 'gender' in data:  session['profile_gender'] = data['gender']
     if 'lang' in data:    session['lang'] = data['lang']
@@ -1586,8 +1633,9 @@ def api_save_settings():
         try:
             import sqlite3 as _sq
             _cn = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
-            _cn.execute("UPDATE users SET display_name=?, birth_year=?, gender=?, language=?, sensor_pref=? WHERE email=?", (
+            _cn.execute("UPDATE users SET display_name=?, surname=?, birth_year=?, gender=?, language=?, sensor_pref=? WHERE email=?", (
                 session.get('profile_name',''),
+                (session.get('profile_surname','').strip() or None),
                 session.get('profile_birth_year', 1970),
                 session.get('profile_gender','male'),
                 session.get('lang','nl'),
@@ -3628,6 +3676,7 @@ def api_pro_client_update(cid):
     pro_db = get_pro_db()
     # Update allowed fields
     name = data.get('name', '').strip()
+    surname = (data.get('surname') or '').strip() or None
     birth_year = data.get('birth_year')
     gender = data.get('gender', '').strip()
     if not name:
@@ -3637,11 +3686,11 @@ def api_pro_client_update(cid):
     except (ValueError, TypeError):
         birth_year = None
     pro_db.execute(
-        'UPDATE clients SET name=?, birth_year=?, gender=? WHERE id=? AND pro_key=?',
-        (name, birth_year, gender, cid, get_user_key())
+        'UPDATE clients SET name=?, surname=?, birth_year=?, gender=? WHERE id=? AND pro_key=?',
+        (name, surname, birth_year, gender, cid, get_user_key())
     )
     pro_db.commit()
-    return jsonify({"ok": True, "name": name, "birth_year": birth_year, "gender": gender})
+    return jsonify({"ok": True, "name": name, "surname": surname, "birth_year": birth_year, "gender": gender})
 
 
 # ─── Koppeling (Pairing) API ────────────────────────────────────────────────
