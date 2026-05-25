@@ -1,5 +1,63 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-05-25 — Methodische rapport-tekst herzien (Sessie B.5 / Pass 3)
+
+Voor de KKH-propositie moet de naam **Verveen** uit alle klantzichtbare rapport-tekst verdwijnen (eigennaam wekt de indruk dat essentiële knowhow uit het bedrijf weg is). Vervangende tekst behoudt de wetenschappelijke onderbouwing via de gehanteerde **methode**: HRV/RMSSD per Task Force ESC (1996), Kubios-standaard voor artefactcorrectie, leeftijd/geslacht-genormaliseerde populatiereferenties.
+
+### Onderzoek vooraf (geen wijzigingen)
+
+Code-verificatie van wat de Relax Index feitelijk doet, vóór de tekst werd herschreven:
+
+- **Meting-duur**: Basismeting + Situatiemeting = hard 90 s (`app.py:1513`, DB-default in `app.py:158, 200`). Biofeedback = 180–1800 s, default 600 s (`app.py:1510`).
+- **Input**: alleen RR-intervallen via Bluetooth-borstsensor of USB-vingersensor. BPM/RMSSD/HRV% allemaal afgeleid (`sensor_en_meten.html:735–740`).
+- **Voorbewerking**: eerste 15 RR-intervallen weg (warm-up), hard-clamp 300–2000 ms (`hrv.js:20`).
+- **Filter**: Kubios "Strong+"-methode met adaptieve mediaan-drempel (`hrv.js:12–71`, comment regel 28). 100 ms drempel, geschaald naar `meanRR/1000`. Ongeldige samples → lineair geïnterpoleerd, niet weggegooid. Geen vast percentage.
+- **RMSSD**: `sqrt(mean(ΔRR²)) / 2.5` (sensor-correctie, `hrv.js:73`).
+- **HRV%**: `RMSSD / norm[age,gender] × 100`, clamp 0–220. Norm-tabel `N` (13 leeftijdsgroepen × man/vrouw, `hrv.js:8`).
+- **RI**: 2D-lookup in tabel `T` (16×42, `hrv.js:7`) op BPM-bucket × HRV%-bucket. **Stap-functie**, geen bilineaire interpolatie.
+- **Geslacht-paden** (`hrv.js:75`): `female`→f, `divers`/`unspecified`→(m+f)/2, overige (incl. leeg)→m.
+
+Referentie-meting in `tests/lib/references.json` bevestigt: BPM=65, RMSSD=34.67 ms, HRV%=124, RI=7.7 (age=50, male).
+
+### Tekstuele wijziging
+
+`templates/reports/base.html:217` — één regel met drie inline-taalvarianten (NL/DE/EN ternair via `lang`). Vervangt de hele "Methodik & Erläuterung" / "Methodische toelichting" / "Methodology" eerste-paragraaf. Geen wijziging aan de "Zonen:" / "Zones:"-regel daarna of aan de anonimiteits-disclaimer.
+
+**Definitieve formulering, drie talen:**
+
+- **NL**: "De Relax Index (RI) is een score van 0 tot 10, berekend uit een meting van 90 seconden waarbij de gemiddelde hartslag en de hartritmevariabiliteit (HRV/RMSSD) van het autonome zenuwstelsel worden vastgesteld. Artefactcorrectie volgens de Kubios-standaard zorgt voor robuuste meetwaarden. De score wordt genormaliseerd naar leeftijd en geslacht op basis van gepubliceerde populatiestudies, conform de HRV-richtlijnen van de Task Force ESC (1996)."
+- **DE**: "Der Relax Index (RI) ist ein Wert zwischen 0 und 10, berechnet aus einer 90-sekündigen Messung von durchschnittlicher Herzfrequenz und Herzratenvariabilität (HRV/RMSSD) des autonomen Nervensystems. Eine Artefaktkorrektur nach Kubios-Standard sorgt für robuste Messwerte. Die Normierung erfolgt nach Alter und Geschlecht auf Grundlage publizierter Populationsstudien, gemäß den HRV-Richtlinien der Task Force ESC (1996)."
+- **EN**: "The Relax Index (RI) is a score from 0 to 10, calculated from a 90-second measurement of average heart rate and heart rate variability (HRV/RMSSD) of the autonomic nervous system. Artifact correction according to the Kubios standard ensures robust measurement values. Normalization is performed by age and gender based on published population studies, in accordance with the HRV guidelines of the Task Force ESC (1996)."
+
+### Scope (bewust beperkt)
+
+Alleen rapport-templates (`templates/reports/`). NIET aangeraakt — bewust buiten scope:
+
+- `templates/kenniscentrum.html`, `templates/kenniscentrum_pro.html`, `templates/hlm/kenniscentrum.html`, `templates/hlm/meting_src.html` — kennis-pagina's en HLM-blueprint. Verveen-vermelding daar blijft staan (verschillende klant-context, separate decision).
+- Code-comments en `gen_context.py:65` — interne documentatie, niet klantzichtbaar.
+
+### Verificatie
+
+- `python3 -m py_compile app.py` — schoon
+- `systemctl restart stresschecker` — clean restart (workers 1410225/1410226 booten zonder warnings)
+- 5 Pass-3-PDFs gegenereerd in `/opt/stresschecker/reports/SC-KK-44F6-14A3/pass3/`:
+  - `kk_overall_nl.pdf` (50 520 B), `kk_overall_de.pdf` (51 043 B), `kk_office_hamburg_de.pdf` (49 585 B), `pro_portfolio_de.pdf` (50 437 B), `pro_client_anna_de.pdf` (46 952 B)
+- Verveen-check (via `pypdf`-tekstextractie; `pdftotext` ontbreekt op deze VPS): **0 hits in alle 5 PDFs** — `grep -l "Verveen" pass3/*.pdf` equivalent leeg.
+- Visuele controle van Methodik-sectie in `kk_overall_de.pdf` + `kk_overall_nl.pdf`: definitieve tekst correct gerenderd (Kubios-Standard / Kubios-standaard + Task Force ESC (1996) zichtbaar; pypdf-letter-spacing artefact "T ask Force" is alleen tekstextractie, niet visueel).
+- `tests/run_all.sh` — **18/18 groen** (cat A 6/6, B 4/4, C 8/8). Pass 1 + 2 + B.4 intact, geen regressie.
+
+### Open punten
+
+- **Verveen-vermelding intern blijft staan** in code-comments (`gen_context.py:65`) en kennis-pagina-templates voor methodologische traceerbaarheid. Niet klantzichtbaar in KKH-rapporten. Aparte beslissing nodig of de kennis-pagina's later ook herzien moeten worden (consumer-context, andere persona).
+
+### Geraakte bestanden
+
+- `templates/reports/base.html` — één regel vervangen (drie talen inline)
+- `CHANGELOG.md` — deze entry
+- `/opt/stresschecker/reports/SC-KK-44F6-14A3/pass3/*.pdf` — 5 PDFs hergegenereerd (niet in git — runtime-output)
+
+Pre-fix backup: `/opt/backups/*.20260525-1034`.
+
 ## 2026-05-25 — KKH Datenschutz-hardening (Sessie B.4)
 
 Twee Datenschutz-gaten dichten die door `schmidt_bijlage_brondoc.md` waren geïdentificeerd, vóór de KKH-mail. Geen scope-creep: alleen `app.py` (+ één hidden-input in `pro/locaties_import_preview.html` voor filename-doorgift). Pre-fix backup: `/opt/backups/*.20260525-0809`.
