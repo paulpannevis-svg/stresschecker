@@ -1,5 +1,49 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-05-25 — KKH-rapport visuele finishing Pass 2 (Sessie B.3.2)
+
+Pass 2 = visuele polish bovenop Pass 1-data-fixes. Pre-Pass2 backup: `/opt/backups/*.20260525-0656`. PDFs voor finale review in `/opt/stresschecker/reports/SC-KK-44F6-14A3/pass2/`.
+
+### Files aangepast
+
+- `templates/reports/base.html` — `#pageheader` toont nu Lifestyle Monitors-logo (`static/img/sc_logo_full.png`, 27 KB, 1000×220, hoogte 1cm) links, report-tag in midden, lege `.cobrand-slot` rechts (min 2.5cm gereserveerd voor KK-co-branding). Nieuwe CSS-klassen voor stacked-bar Zonenverteilung: `.zone-bar`, `.zone-seg`, `.zone-bg-{zone}`, `.zone-legend`, `.zone-swatch`.
+- `templates/reports/_macros.html` (nieuw) — `zone_stacked_bar(distribution, total, zone_order, zone_label, lang)`-macro. Bar-segmenten op proportionele width, %-label in segment alleen bij >5%. Legenda toont alle 5 zones zonder onderdrukking bij n=0.
+- `templates/reports/kk_overall.html` + `pro_portfolio.html` + `kk_office.html` — Zonenverteilung-tabel vervangen door stacked-bar-macro. Klientenbericht (`pro_client.html`) blijft tabel (spec: 1-cliënt-view).
+- `kk_overall.html` — kopjes "Pro Standort"/"Per kantoor" → "Standortübersicht"/"Kantooroverzicht"/"Locations overview". "Pro Region"/"Per regio" → "Regionalübersicht"/"Regio-overzicht"/"Regional overview". M/V-kolommen samengevoegd tot één compacte "M / W / D" (DE) / "M / V / D" (NL) / "M / F / D" (EN) kolom met waarden zoals "3 / 2 / 1" — Divers nu zichtbaar in overzicht (was eerder onzichtbaar).
+- `kk_office.html` — derde KPI-block: "M / V" → "M / W / D" (DE) / "M / V / D" (NL) / "M / F / D" (EN); waarde "3 / 2 / 1".
+- `pro_portfolio.html` — "Pro Klient"/"Per cliënt" kopje → "Klientenübersicht"/"Cliëntenoverzicht"/"Clients overview". Geslacht-kolom logic gefixt: female→W (DE)/V (NL)/F (EN); divers→D in alle talen; male→M.
+
+### Logo-keuze
+
+`sc_logo_full.png` (1000×220 PNG, 26.9 KB). SVG-variant (`sc_logo_full.svg`) afgewezen wegens malformed `@keyframes` (lines 7-19) en `var(--red)`-CSS-vars die WeasyPrint niet resolveert. PNG geeft consistente rendering ongeacht renderer.
+
+### Stacked-bar kleuren (uit spec, consistent met app-palet)
+
+- `zwaar_belast`: #c0392b · `belast`: #e67e22 · `licht_belast`: #f1c40f · `in_balans`: #6fcf7a · `veerkrachtig`: #27ae60
+
+### Bestandsgrootte
+
+Pass 1 PDFs: 18-21 KB. Pass 2 PDFs: 46-50 KB (logo embedded éénmalig in PDF-resource-pool). Onderkant van spec-verwachting (80-300 KB), klopt: WeasyPrint dedupliceert images. Geen impact op kwaliteit.
+
+### Eindverificatie checklist (pass2/)
+
+- [x] Logo zichtbaar bovenaan elke pagina van alle 5 rapporten
+- [x] Stacked-bar Zonenverteilung: KK-overall, Portfolio, Standort
+- [x] Klientenbericht blijft tabel (regressie ok)
+- [x] DE: W i.p.v. V; Divers (D) zichtbaar in Standortübersicht + KPI + Klientenübersicht
+- [x] Kopjes: Klientenübersicht / Standortübersicht (DE), Kantooroverzicht / Cliëntenoverzicht (NL)
+- [x] Pass 1 data-regressie: 18 metingen, RI 4.59, F2-M3-D1, geen 1970-01-01
+- [x] `tests/run_all.sh`: 18/18 groen
+
+### Niet gedaan (uit spec scope)
+
+- **Mobiel-rendering check via Chrome DevTools:** kan niet vanuit deze sessie (geen browser-toegang). PDFs zijn A4-formaat met print-CSS — natuurlijke mobiel-view is "pinch & zoom" op renderer-niveau, niet template-niveau. Verzoek aan Paul: open één PDF op iPhone-viewport en bevestig leesbaarheid; eventuele aanpassingen volgen in volgende sessie als nodig.
+
+### Open punten — meegenomen uit Pass 1
+
+- Tie-break voor modale zone-per-klant (Anna in 'zwaar' i.p.v. 'licht'); beslissing volgt na Schmidt-feedback. Neiging: meest recente meting.
+- KKH-Test-1779642625 fixture toevoegen aan `TEST_ACCOUNTS.md` na groen licht.
+
 ## 2026-05-25 — KKH-rapport data-fixes Pass 1 (Sessie B.3)
 
 Drie data-aggregatie-bugs gefixt in de KK/Pro-rapport-laag, vóór Schmidt-demo dinsdag. Pre-fix backup: `/opt/backups/*.20260525-0622`. PDFs voor Paul's review in `/opt/stresschecker/reports/SC-KK-44F6-14A3/pass1/`.

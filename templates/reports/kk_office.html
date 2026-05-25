@@ -1,4 +1,5 @@
 {% extends "reports/base.html" %}
+{% import "reports/_macros.html" as rmacros %}
 {% block title %}KK Bericht — {{ office_name }}{% endblock %}
 {% block content %}
 
@@ -17,8 +18,8 @@
     <span class="label">{% if lang=='de' %}Durchschn. RI{% elif lang=='en' %}Avg. RI{% else %}Gem. RI{% endif %}</span>
   </div>
   <div class="stat-block">
-    <span class="value">{{ overall.gender_distribution['M'] }} / {{ overall.gender_distribution['V'] }}</span>
-    <span class="label">{% if lang=='en' %}M / F{% else %}M / V{% endif %}</span>
+    <span class="value">{{ overall.gender_distribution['M'] }} / {{ overall.gender_distribution['V'] }} / {{ overall.gender_distribution['D'] }}</span>
+    <span class="label">{% if lang=='de' %}M / W / D{% elif lang=='en' %}M / F / D{% else %}M / V / D{% endif %}</span>
   </div>
 </div>
 
@@ -42,15 +43,6 @@
 </table>
 
 <h2>{% if lang=='de' %}Zonenverteilung{% elif lang=='en' %}Zone distribution{% else %}Zoneverdeling{% endif %}</h2>
-<table class="data">
-  <tr><th style="width:35%;">{% if lang=='de' %}Zone{% elif lang=='en' %}Zone{% else %}Zone{% endif %}</th><th>{% if lang=='de' %}Anzahl{% elif lang=='en' %}Count{% else %}Aantal{% endif %}</th><th>%</th></tr>
-  {% for z in zone_order %}
-  <tr class="zone-row">
-    <td class="label zone-{{ z }}">{{ zone_label(z, lang) }}</td>
-    <td>{{ overall.zone_distribution[z] }}</td>
-    <td>{{ pct(overall.zone_distribution[z], overall.total_metingen) }}</td>
-  </tr>
-  {% endfor %}
-</table>
+{{ rmacros.zone_stacked_bar(overall.zone_distribution, overall.total_metingen, zone_order, zone_label, lang) }}
 
 {% endblock %}

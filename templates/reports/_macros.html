@@ -1,0 +1,38 @@
+{# Macro's voor PDF-rapporten. Importeer via:
+   {% import 'reports/_macros.html' as rmacros %}
+#}
+
+{# Horizontale gekleurde stacked-bar voor Zonenverteilung.
+   distribution = dict met zone_key → count (alle ZONE_KEYS aanwezig)
+   total        = noemer (klanten OF metingen, afhankelijk van rapport)
+   lang         = 'nl' | 'de' | 'en' #}
+{% macro zone_stacked_bar(distribution, total, zone_order, zone_label, lang) %}
+{% if total %}
+<div class="zone-bar-wrap">
+  <div class="zone-bar">
+    {% for z in zone_order %}
+      {% set n = distribution[z] %}
+      {% if n %}
+        {% set pct_val = (100.0 * n / total) | round(0, 'common') | int %}
+        <div class="zone-seg zone-bg-{{ z }}" style="width: {{ (100.0 * n / total) }}%;">
+          {% if pct_val > 5 %}<span class="zone-seg-pct">{{ pct_val }}%</span>{% endif %}
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <div class="zone-legend">
+    {% for z in zone_order %}
+      {% set n = distribution[z] %}
+      {% set pct_val = (100.0 * n / total) | round(0, 'common') | int if total else 0 %}
+      <span class="zone-legend-item">
+        <span class="zone-swatch zone-bg-{{ z }}"></span>
+        <span class="zone-legend-label zone-{{ z }}">{{ zone_label(z, lang) }}</span>
+        <span class="zone-legend-count">{{ n }} · {{ pct_val }}%</span>
+      </span>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<p class="zone-bar-empty">{% if lang=='de' %}Keine Daten.{% elif lang=='en' %}No data.{% else %}Geen data.{% endif %}</p>
+{% endif %}
+{% endmacro %}

@@ -1,4 +1,5 @@
 {% extends "reports/base.html" %}
+{% import "reports/_macros.html" as rmacros %}
 {% block title %}Krankenkasse Bericht — {{ license_name }}{% endblock %}
 {% block content %}
 
@@ -42,27 +43,19 @@
 </table>
 
 <h2>{% if lang=='de' %}Zonenverteilung{% elif lang=='en' %}Zone distribution{% else %}Zoneverdeling{% endif %}</h2>
-<table class="data">
-  <tr><th style="width:35%;">{% if lang=='de' %}Zone{% elif lang=='en' %}Zone{% else %}Zone{% endif %}</th><th>{% if lang=='de' %}Anzahl{% elif lang=='en' %}Count{% else %}Aantal{% endif %}</th><th>%</th></tr>
-  {% for z in zone_order %}
-  <tr class="zone-row">
-    <td class="label zone-{{ z }}">{{ zone_label(z, lang) }}</td>
-    <td>{{ overall.zone_distribution_client[z] }}</td>
-    <td>{{ pct(overall.zone_distribution_client[z], overall.unique_clients) }}</td>
-  </tr>
-  {% endfor %}
-</table>
+{{ rmacros.zone_stacked_bar(overall.zone_distribution_client, overall.unique_clients, zone_order, zone_label, lang) }}
+
+{% set mwd_header_label = 'M / W / D' if lang=='de' else ('M / F / D' if lang=='en' else 'M / V / D') %}
 
 {% if office_groups %}
 <div class="page-break"></div>
-<h2>{% if lang=='de' %}Pro Standort{% elif lang=='en' %}Per location{% else %}Per kantoor{% endif %}</h2>
+<h2>{% if lang=='de' %}Standortübersicht{% elif lang=='en' %}Locations overview{% else %}Kantooroverzicht{% endif %}</h2>
 <table class="data">
   <tr>
     <th>{% if lang=='de' %}Standort{% elif lang=='en' %}Location{% else %}Kantoor{% endif %}</th>
     <th>{% if lang=='de' %}Region{% elif lang=='en' %}Region{% else %}Regio{% endif %}</th>
     <th style="text-align:right;">{% if lang=='de' %}Messungen{% elif lang=='en' %}Readings{% else %}Metingen{% endif %}</th>
-    <th style="text-align:right;">M</th>
-    <th style="text-align:right;">{% if lang=='en' %}F{% else %}V{% endif %}</th>
+    <th style="text-align:right;">{{ mwd_header_label }}</th>
     <th style="text-align:right;">{% if lang=='de' %}Durchschn. RI{% elif lang=='en' %}Avg. RI{% else %}Gem. RI{% endif %}</th>
   </tr>
   {% for g in office_groups %}
@@ -70,8 +63,7 @@
     <td>{{ g.key }}{% if not g.active %} <span style="color:#999;font-size:8pt;">(inactief)</span>{% endif %}</td>
     <td>{{ g.region or '—' }}</td>
     <td style="text-align:right;font-weight:600;">{{ g.total_metingen }}</td>
-    <td style="text-align:right;">{{ g.gender_distribution['M'] }}</td>
-    <td style="text-align:right;">{{ g.gender_distribution['V'] }}</td>
+    <td style="text-align:right;">{{ g.gender_distribution['M'] }} / {{ g.gender_distribution['V'] }} / {{ g.gender_distribution['D'] }}</td>
     <td style="text-align:right;">{{ g.ri_average if g.ri_average is not none else '–' }}</td>
   </tr>
   {% endfor %}
@@ -79,21 +71,19 @@
 {% endif %}
 
 {% if region_groups and region_groups|length > 1 %}
-<h2>{% if lang=='de' %}Pro Region{% elif lang=='en' %}Per region{% else %}Per regio{% endif %}</h2>
+<h2>{% if lang=='de' %}Regionalübersicht{% elif lang=='en' %}Regional overview{% else %}Regio-overzicht{% endif %}</h2>
 <table class="data">
   <tr>
     <th>{% if lang=='de' %}Region{% elif lang=='en' %}Region{% else %}Regio{% endif %}</th>
     <th style="text-align:right;">{% if lang=='de' %}Messungen{% elif lang=='en' %}Readings{% else %}Metingen{% endif %}</th>
-    <th style="text-align:right;">M</th>
-    <th style="text-align:right;">{% if lang=='en' %}F{% else %}V{% endif %}</th>
+    <th style="text-align:right;">{{ mwd_header_label }}</th>
     <th style="text-align:right;">{% if lang=='de' %}Durchschn. RI{% elif lang=='en' %}Avg. RI{% else %}Gem. RI{% endif %}</th>
   </tr>
   {% for g in region_groups %}
   <tr>
     <td><strong>{{ g.key }}</strong></td>
     <td style="text-align:right;font-weight:600;">{{ g.total_metingen }}</td>
-    <td style="text-align:right;">{{ g.gender_distribution['M'] }}</td>
-    <td style="text-align:right;">{{ g.gender_distribution['V'] }}</td>
+    <td style="text-align:right;">{{ g.gender_distribution['M'] }} / {{ g.gender_distribution['V'] }} / {{ g.gender_distribution['D'] }}</td>
     <td style="text-align:right;">{{ g.ri_average if g.ri_average is not none else '–' }}</td>
   </tr>
   {% endfor %}

@@ -37,15 +37,21 @@ body {
   padding-bottom: .3cm;
   margin-bottom: .2cm;
 }
-.brand-text {
-  font-size: 8pt;
-  color: #1565c0;
-  font-weight: 600;
-  letter-spacing: .04em;
+.brand-logo {
+  height: 1.0cm;
+  width: auto;
+  display: block;
 }
 .report-tag {
   font-size: 7.5pt;
   color: #888;
+  font-style: italic;
+}
+.cobrand-slot {
+  /* Gereserveerd voor KK-co-branding; nu leeg. */
+  min-width: 2.5cm;
+  min-height: 1.0cm;
+  display: block;
 }
 h1 { font-size: 18pt; color: #1565c0; margin: 0 0 .2cm 0; }
 h2 { font-size: 13pt; color: #333; border-bottom: 1px solid #e0e6ed; padding-bottom: .15cm; margin-top: .9cm; }
@@ -108,6 +114,67 @@ table.data tr:nth-child(even) td {
 .zone-licht_belast  { color: #f57f17; }
 .zone-belast        { color: #e65100; }
 .zone-zwaar_belast  { color: #b71c1c; }
+/* Stacked-bar zone-kleuren (gevulde achtergrond, consistent met app-palet). */
+.zone-bg-zwaar_belast { background: #c0392b; color: #fff; }
+.zone-bg-belast       { background: #e67e22; color: #fff; }
+.zone-bg-licht_belast { background: #f1c40f; color: #333; }
+.zone-bg-in_balans    { background: #6fcf7a; color: #fff; }
+.zone-bg-veerkrachtig { background: #27ae60; color: #fff; }
+.zone-bar-wrap {
+  margin: .3cm 0 .6cm 0;
+}
+.zone-bar {
+  display: flex;
+  width: 100%;
+  height: .65cm;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid #d8dee5;
+}
+.zone-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8.5pt;
+  font-weight: 600;
+  line-height: 1;
+  overflow: hidden;
+}
+.zone-seg-pct {
+  white-space: nowrap;
+}
+.zone-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35cm .55cm;
+  margin-top: .25cm;
+  font-size: 8.5pt;
+  color: #444;
+}
+.zone-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: .12cm;
+}
+.zone-swatch {
+  display: inline-block;
+  width: .35cm;
+  height: .35cm;
+  border-radius: 2px;
+  border: 1px solid rgba(0,0,0,.08);
+}
+.zone-legend-label {
+  font-weight: 600;
+}
+.zone-legend-count {
+  color: #777;
+  font-size: 8pt;
+}
+.zone-bar-empty {
+  color: #888;
+  font-style: italic;
+  margin: .3cm 0 .6cm 0;
+}
 .bar {
   display: inline-block;
   height: .25cm;
@@ -137,8 +204,9 @@ table.data tr:nth-child(even) td {
 <body>
 
 <div id="pageheader">
-  <span class="brand-text">StressChecker® — Lifestyle Monitors</span>
+  <img src="static/img/sc_logo_full.png" alt="StressChecker — Lifestyle Monitors" class="brand-logo">
   <span class="report-tag">{{ report_label }}</span>
+  <span class="cobrand-slot"></span>
 </div>
 
 {% block content %}{% endblock %}
