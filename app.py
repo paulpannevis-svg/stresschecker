@@ -1,12 +1,16 @@
 from flask import Flask, render_template, make_response, request, jsonify, session, redirect, url_for, Response, send_file, abort
-import sqlite3, os, hashlib, secrets, json, io
-from datetime import datetime
+import sqlite3, os, hashlib, secrets, json, io, time
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 load_dotenv()
 from eval_config import EVAL_DURATION_DAYS
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
+# Sessie-idle-timeout (Sessie B.4 — Datenschutz voor KK-context)
+# 30 min na laatste activiteit → automatische sessie-uitlog door before_request-hook.
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
+SESSION_IDLE_TIMEOUT_SECONDS = 30 * 60
 # SMTP configuratie voor 2FA verificatiecodes
 MAIL_SERVER   = 'mailout.hostnet.nl'
 MAIL_PORT     = 587
@@ -352,6 +356,48 @@ def require_kk_office_if_krankenkasse(view):
 def _inject_kk_flags():
     """Maakt `is_krankenkasse` in elke template beschikbaar zonder per-view-doorgift."""
     return {'is_krankenkasse': is_krankenkasse_session()}
+
+
+# ----------------------------------------------------------------------------
+# Sessie-idle-timeout (Sessie B.4)
+# Vervalt sessie automatisch na 30 minuten inactiviteit. Vereist voor
+# Datenschutz-compliance van het Krankenkasse-zelfbeheer.
+# ----------------------------------------------------------------------------
+
+# Pad-prefixen die NIET meetellen voor de idle-timeout. /login en /licentie zijn
+# de inlog-routes zelf; /verify_2fa heeft een eigen 10-min 2fa_expires; /static
+# bevat alleen assets; /api/licentie/check + /api/pairing/* zijn pre-login.
+_TIMEOUT_EXEMPT_PREFIXES = (
+    '/static/', '/login', '/licentie', '/verify',
+    '/wachtwoord-vergeten', '/wachtwoord-reset', '/wachtwoord_reset',
+    '/logout', '/api/licentie/', '/api/pairing/',
+)
+
+
+@app.before_request
+def _enforce_session_idle_timeout():
+    path = request.path or ''
+    if path == '/' or any(path.startswith(p) for p in _TIMEOUT_EXEMPT_PREFIXES):
+        return
+    if not session.get('license_valid'):
+        return
+    now = time.time()
+    last = session.get('_last_activity')
+    if last is None:
+        # Eerste hit na login (of session-cookie van vóór deze hook): initialiseer.
+        session['_last_activity'] = now
+        session.permanent = True
+        return
+    if now - last > SESSION_IDLE_TIMEOUT_SECONDS:
+        lang = session.get('lang', 'nl')
+        session.clear()
+        if path.startswith('/api/') or (request.accept_mimetypes.best == 'application/json'):
+            return jsonify({
+                'error': 'session_expired',
+                'message': 'Session expired after 30 minutes of inactivity. Please log in again.'
+            }), 401
+        return redirect(url_for('sc_login', timeout='1', lang=lang))
+    session['_last_activity'] = now
 
 
 def get_meting_count_for_current_context():
@@ -982,6 +1028,10 @@ def admin_bypass():
 def sc_login():
     lang = request.args.get('lang', session.get('lang', 'nl'))
     error = request.args.get('error')
+    if not error and request.args.get('timeout') == '1':
+        error = ('Sitzung nach 30 Minuten Inaktivität abgelaufen. Bitte erneut anmelden.' if lang == 'de'
+                 else 'Session expired after 30 minutes of inactivity. Please log in again.' if lang == 'en'
+                 else 'Sessie verlopen na 30 minuten inactiviteit, log opnieuw in.')
     if request.method == 'POST':
         import sqlite3 as _sq, hashlib, re
         email_raw = request.form.get('email', '')
@@ -1146,6 +1196,9 @@ def verify_2fa():
             session['plan_id']=plan_id_2fa
             session['license_code']=_lic_code
             session['email']=em; session['session_id']=em; session['lang']=lang
+            # Sessie-idle-timeout init (Sessie B.4)
+            session.permanent = True
+            session['_last_activity'] = time.time()
             # Link license to email and mark as activated
             import sqlite3 as _sq2; _ldb2=_sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
             if _lic_code:
@@ -1799,6 +1852,8 @@ def pro_locatie():
         db.close()
         if row:
             session['kk_office'] = row['office_name']
+            _log_kk_action(license_code, 'kk_session_office_select',
+                           f"office_name={row['office_name']}")
             return redirect(url_for('pro_menu'))
         return redirect(url_for('pro_locatie', error='invalid'))
     offices = [r['office_name'] for r in db.execute(
@@ -1869,6 +1924,25 @@ def _kk_office_stats(license_code, pro_user_key):
             'other':  s.get('other', 0) or 0,
         })
     return out
+
+
+def _log_kk_action(license_code, action, details):
+    """Schrijf KK-CRUD-event naar saas_licenses.db.activation_log (Sessie B.4).
+    Aanroepen NA succesvolle DB-write zodat we geen orphans loggen bij fail.
+    Best-effort: bij INSERT-fout wordt waarschuwing geprint maar het verzoek faalt niet."""
+    try:
+        ip = (request.remote_addr or '')[:64]
+        ua = (request.headers.get('User-Agent', '') or '')[:200]
+        db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+        db.execute(
+            "INSERT INTO activation_log (license_key, product, action, ip_address, user_agent, details) "
+            "VALUES (?, 'sc', ?, ?, ?, ?)",
+            (license_code, action, ip, ua, details))
+        db.commit()
+        db.close()
+    except Exception as e:
+        import logging
+        logging.getLogger().warning(f"[kk_audit] log fail action={action} lic={license_code}: {e}")
 
 
 def _parse_kk_csv(raw_bytes, max_rows=500):
@@ -1975,6 +2049,7 @@ def kk_locaties_toevoegen():
                (license_code, name, region or None))
     db.commit()
     db.close()
+    _log_kk_action(license_code, 'kk_office_create', f'name={name} region={region}')
     return redirect(url_for('kk_locaties_beheren', created='1'))
 
 
@@ -1987,7 +2062,7 @@ def kk_locaties_bewerken(oid):
     if not name:
         return redirect(url_for('kk_locaties_beheren', error='leeg'))
     db = _kk_db()
-    row = db.execute("SELECT id, office_name FROM krankenkasse_offices WHERE id=? AND license_code=?",
+    row = db.execute("SELECT id, office_name, region FROM krankenkasse_offices WHERE id=? AND license_code=?",
                      (oid, license_code)).fetchone()
     if not row:
         db.close()
@@ -1998,15 +2073,19 @@ def kk_locaties_bewerken(oid):
     if dup:
         db.close()
         return redirect(url_for('kk_locaties_beheren', error='dup'))
+    old_name = row['office_name']
+    old_region = row['region'] or ''
     db.execute("UPDATE krankenkasse_offices SET office_name=?, region=? WHERE id=? AND license_code=?",
                (name, region or None, oid, license_code))
     # Cascade: als naam wijzigt, kk_office in session refresh (toont nieuw label
     # in header bij volgende request); historische client_metingen blijven hangen
     # met oude office_name — bewust, want audit-trail.
-    if session.get('kk_office', '').lower() == (row['office_name'] or '').lower():
+    if session.get('kk_office', '').lower() == (old_name or '').lower():
         session['kk_office'] = name
     db.commit()
     db.close()
+    _log_kk_action(license_code, 'kk_office_update',
+                   f'id={oid} old_name={old_name} new_name={name} old_region={old_region} new_region={region}')
     return redirect(url_for('kk_locaties_beheren', updated='1'))
 
 
@@ -2015,10 +2094,15 @@ def kk_locaties_deactiveren(oid):
     _kk_require()
     license_code = session.get('license_code', '')
     db = _kk_db()
+    row = db.execute("SELECT office_name FROM krankenkasse_offices WHERE id=? AND license_code=?",
+                     (oid, license_code)).fetchone()
+    name = row['office_name'] if row else ''
     db.execute("UPDATE krankenkasse_offices SET active=0 WHERE id=? AND license_code=?",
                (oid, license_code))
     db.commit()
     db.close()
+    if name:
+        _log_kk_action(license_code, 'kk_office_deactivate', f'id={oid} name={name}')
     return redirect(url_for('kk_locaties_beheren', deactivated='1'))
 
 
@@ -2027,10 +2111,15 @@ def kk_locaties_reactiveren(oid):
     _kk_require()
     license_code = session.get('license_code', '')
     db = _kk_db()
+    row = db.execute("SELECT office_name FROM krankenkasse_offices WHERE id=? AND license_code=?",
+                     (oid, license_code)).fetchone()
+    name = row['office_name'] if row else ''
     db.execute("UPDATE krankenkasse_offices SET active=1 WHERE id=? AND license_code=?",
                (oid, license_code))
     db.commit()
     db.close()
+    if name:
+        _log_kk_action(license_code, 'kk_office_reactivate', f'id={oid} name={name}')
     return redirect(url_for('kk_locaties_beheren', reactivated='1'))
 
 
@@ -2044,6 +2133,7 @@ def kk_locaties_import():
         # Confirm-fase: hidden csv_text + confirm=1 wordt opnieuw geparsed en in DB gezet
         if request.form.get('confirm') == '1':
             csv_text = request.form.get('csv_text', '') or ''
+            csv_filename = (request.form.get('csv_filename', '') or '')[:120]
             rows, errors = _parse_kk_csv(csv_text.encode('utf-8'))
             if not rows:
                 return render_template('pro/locaties_import.html', lang=lang, errors=errors)
@@ -2064,6 +2154,8 @@ def kk_locaties_import():
                 new_count += 1
             db.commit()
             db.close()
+            _log_kk_action(license_code, 'kk_office_import',
+                           f'imported={new_count} dups={dup_count} total_rows={len(rows)} filename={csv_filename}')
             return redirect(url_for('kk_locaties_overzicht', imported=new_count, dups=dup_count))
 
         # Preview-fase: file upload → parse → toon preview met csv_text in hidden field
@@ -2072,6 +2164,7 @@ def kk_locaties_import():
             return render_template('pro/locaties_import.html', lang=lang,
                                    errors=['Geen bestand geüpload.'])
         raw = f.read(2 * 1024 * 1024)  # 2MB cap
+        csv_filename = (f.filename or '')[:120]
         rows, errors = _parse_kk_csv(raw)
         if not rows:
             return render_template('pro/locaties_import.html', lang=lang, errors=errors)
@@ -2091,6 +2184,7 @@ def kk_locaties_import():
                                preview=preview, total_new=len(new_rows),
                                total_dup=len(dup_rows), total_rows=len(rows),
                                errors=errors, csv_text=csv_text,
+                               csv_filename=csv_filename,
                                dup_preview=dup_rows[:10])
 
     return render_template('pro/locaties_import.html', lang=lang, errors=[])

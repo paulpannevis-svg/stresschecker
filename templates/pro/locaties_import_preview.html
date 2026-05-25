@@ -89,6 +89,7 @@
   <form method="POST" action="{{ url_for('kk_locaties_import') }}" class="actions">
     <input type="hidden" name="confirm" value="1">
     <input type="hidden" name="csv_text" value="{{ csv_text|e }}">
+    <input type="hidden" name="csv_filename" value="{{ csv_filename|e if csv_filename else '' }}">
     <button type="submit" class="btn-action">
       {% if lang=='de' %}{{ total_new }} Standort(e) jetzt importieren{% elif lang=='en' %}Import {{ total_new }} location(s) now{% else %}{{ total_new }} locatie(s) nu importeren{% endif %} ▶
     </button>

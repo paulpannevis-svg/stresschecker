@@ -1,5 +1,74 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-05-25 — KKH Datenschutz-hardening (Sessie B.4)
+
+Twee Datenschutz-gaten dichten die door `schmidt_bijlage_brondoc.md` waren geïdentificeerd, vóór de KKH-mail. Geen scope-creep: alleen `app.py` (+ één hidden-input in `pro/locaties_import_preview.html` voor filename-doorgift). Pre-fix backup: `/opt/backups/*.20260525-0809`.
+
+### Fix 1 — Sessie-idle-timeout (30 minuten)
+
+`app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)` + nieuwe `before_request`-hook `_enforce_session_idle_timeout`. Hook draait alleen voor authenticated sessies (`session.get('license_valid')`), skipt de exempt-prefixen (`/static/`, `/login`, `/licentie`, `/verify`, `/wachtwoord-*`, `/logout`, `/api/licentie/`, `/api/pairing/`), refresht `_last_activity` bij elke hit, en clearet de sessie + redirect naar `/login?timeout=1&lang=…` zodra `now - _last_activity > 1800s`. JSON/API-requests krijgen `401 {error: session_expired}` ipv HTML-redirect.
+
+Login-completion (`verify_2fa`-success-pad) zet expliciet `session.permanent = True` + `session['_last_activity'] = time.time()`. Hook initialiseert deze velden ook bij eerste hit (defensive fallback voor login-paden die buiten `verify_2fa` om license_valid zetten — bv. `demo()`).
+
+`sc_login` rendert NL/DE/EN-flash uit `?timeout=1` via bestaande `error`-mechaniek (geen template-edit nodig).
+
+2FA-expiry (`session['2fa_expires']`, 10 min) blijft volledig onafhankelijk — de hook raakt het verify-pad niet aan.
+
+### Fix 2 — KK-CRUD audit-logging
+
+Nieuwe helper `_log_kk_action(license_code, action, details)` (`app.py` direct vóór `_parse_kk_csv`). INSERT in `saas_licenses.db.activation_log` met `license_key`, `product='sc'`, `action`, `ip_address` (uit `request.remote_addr`), `user_agent` (uit `request.headers.get('User-Agent')[:200]` — `request.user_agent.string` gaf lege string op deze Werkzeug-versie), `details`. Best-effort: bij INSERT-fout logging.warning, geen HTTP-fail.
+
+Aanroep NA succesvolle DB-write in zes KK-routes:
+
+| Route | action | details-format |
+|---|---|---|
+| `POST /pro/locaties/toevoegen` | `kk_office_create` | `name=… region=…` |
+| `POST /pro/locaties/<id>/bewerken` | `kk_office_update` | `id=… old_name=… new_name=… old_region=… new_region=…` |
+| `POST /pro/locaties/<id>/deactiveren` | `kk_office_deactivate` | `id=… name=…` |
+| `POST /pro/locaties/<id>/reactiveren` | `kk_office_reactivate` | `id=… name=…` |
+| `POST /pro/locaties/import` (confirm) | `kk_office_import` | `imported=N dups=X total_rows=Y filename=…` |
+| `POST /pro/locatie` (kantoor-keuze) | `kk_session_office_select` | `office_name=…` |
+
+Filename-doorgift import: `pro/locaties_import_preview.html` kreeg één extra `<input type="hidden" name="csv_filename">` zodat de confirm-POST de originele bestandsnaam meekrijgt voor het log-record. Preview-render geeft `csv_filename` mee aan template.
+
+`bewerken` neemt nu ook `region` mee in de SELECT-pre-read zodat oude waarden voor het log beschikbaar zijn (was eerder alleen `office_name`).
+
+### Verificatie
+
+- `python3 -m py_compile app.py` — schoon
+- `systemctl restart stresschecker` — clean restart, workers booten zonder warnings (journalctl)
+- `tests/run_all.sh` — 18/18 groen, geen regressie (cat A 6/6, B 4/4, C 8/8, in 2s)
+- `tests/test_session_timeout.py` — **5/5 groen** in 0.1s:
+  - T1 active_under_30min, T2 expired_after_30min, T3 activity_refreshes, T4 login_endpoint_excluded, T5 2fa_flow_independent
+- `tests/test_kk_audit_log.py` — **6/6 groen** in 0.1s:
+  - T1 create_logs_action, T2 update_logs_old_and_new, T3 deactivate_logs, T4 import_logs_with_counts, T5 failed_create_no_log, T6 log_includes_ip_and_ua
+- Smoke: `GET /login?timeout=1` rendert NL-flash "Sessie verlopen na 30 minuten inactiviteit, log opnieuw in." correct.
+
+Tests gebruiken eigen mint-helper (Flask `SecureCookieSessionInterface` met SC_SECRET_KEY uit gunicorn-proces), fictieve `license_code='__TEST_TIMEOUT_KK__'`/`'__TEST_AUDIT_KK__'`, en cleanup-block dat eigen rijen verwijdert uit `krankenkasse_offices` + `activation_log`. Geen impact op productie-fixtures (SC-KK-44F6-14A3 onaangeroerd).
+
+### Niet gedaan (manueel-only)
+
+- Live KKH-Test-login + kantoor toevoegen — kan niet zonder echte 2FA-mail; codepad volledig gedekt door T1–T6.
+- 31-min wait op /pro/locaties + refresh — niet praktisch in geautomatiseerde test, gedekt door T2 met geforceerde `_last_activity`-timestamp.
+
+### B.1-open-issues gesloten
+
+- **Sessie-timeout (Datenschutz-gap uit brondocument)** — gesloten in Fix 1.
+- **B.1 #4 (CRUD-audit-logging ontbreekt)** — gesloten in Fix 2.
+
+### Nieuwe open issues
+
+- **Per-medewerker-login** — KK-account blijft één gedeelde sessie; audit-log toont licentie + IP + UA maar niet welke medewerker. Vereist sub-account-model onder hoofdlicentie (DB-migratie + login-flow + beheer-UI). Geschat **12–20 uur**, alleen oppakken als KKH dit contractueel eist.
+- **2FA-code in journalctl plaintext** — bestaand probleem (`logging.warning(f"2FA CODE: ...")` op regels ~745, 768, 1037). Niet in B.4-scope; apart project. Datenschutz-impact: 2FA-codes in systemd-journal zichtbaar voor root+adm.
+
+### Geraakte bestanden
+
+- `app.py` — top-imports (`time`, `timedelta`), `PERMANENT_SESSION_LIFETIME`, `_TIMEOUT_EXEMPT_PREFIXES`, `_enforce_session_idle_timeout` hook, `_log_kk_action` helper, 6 audit-aanroepen, `sc_login` flash-handling, `verify_2fa` session-init, `bewerken`-SELECT-uitbreiding, `import`-filename-doorgift
+- `templates/pro/locaties_import_preview.html` — één hidden input `csv_filename`
+- `tests/test_session_timeout.py` (nieuw, 5 tests)
+- `tests/test_kk_audit_log.py` (nieuw, 6 tests)
+- `CHANGELOG.md` — deze entry
+
 ## 2026-05-25 — KKH-rapport visuele finishing Pass 2 (Sessie B.3.2)
 
 Pass 2 = visuele polish bovenop Pass 1-data-fixes. Pre-Pass2 backup: `/opt/backups/*.20260525-0656`. PDFs voor finale review in `/opt/stresschecker/reports/SC-KK-44F6-14A3/pass2/`.
@@ -255,7 +324,7 @@ Helpers vlak na `pro_locatie`-route:
 1. **Cross-DB `_kk_office_stats` is O(licentie-omvang)** — twee queries per render. Voor 80+ kantoren is dit nog OK; bij honderden actieve KK-licenties met elk veel kantoren kan caching nuttig zijn. Out-of-scope voor B.1.
 2. **Soft-delete vs hard-delete**: alleen soft (active=0). Historische metingen blijven gekoppeld aan de oude `office_label`-string. Bij hernoeming wordt de nieuwe naam in `session['kk_office']` gezet; nieuwe metingen krijgen nieuwe naam, oude metingen blijven onder oude naam (audit-trail). Geen overschrijving van bestaande `client_metingen.office_label`.
 3. **CSV-confirm-flow stuurt `csv_text` via hidden field** — voor 500 rijen × ~50 chars ≈ 25 KB POST-body. Acceptabel; bij groter volume zou je server-side temp-storage of session-based draft willen.
-4. **Geen audit-log voor kantoor-wijzigingen** — INSERT/UPDATE/DELETE acties worden niet gelogd in `activation_log` (zoals admin-routes wel doen). Overweeg bij privacy/compliance-eisen vanuit KKH. Out-of-scope nu.
+4. **Geen audit-log voor kantoor-wijzigingen** — INSERT/UPDATE/DELETE acties worden niet gelogd in `activation_log` (zoals admin-routes wel doen). Overweeg bij privacy/compliance-eisen vanuit KKH. Out-of-scope nu. → **GESLOTEN in Sessie B.4 (2026-05-25): `_log_kk_action` helper + 6 aanroepen.**
 5. **Browser-end-to-end-check** door Paul (zoals Sessie A) — alle paden via Flask-test-client bewezen.
 
 ## 2026-05-24 — Krankenkasse-UI-verfijningen (Sessie A.1)
