@@ -1,5 +1,49 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-05-25 — KKH-rapport data-fixes Pass 1 (Sessie B.3)
+
+Drie data-aggregatie-bugs gefixt in de KK/Pro-rapport-laag, vóór Schmidt-demo dinsdag. Pre-fix backup: `/opt/backups/*.20260525-0622`. PDFs voor Paul's review in `/opt/stresschecker/reports/SC-KK-44F6-14A3/pass1/`.
+
+### Files aangepast
+- `analytics.py:124-188` — `_aggregate_rows()` levert nu zowel meting- als cliënt-niveau aggregaties. `_empty_aggregate()` uitgebreid met `unique_clients`, `gender_distribution_client`, `age_categories_client`, `zone_distribution_client`. Zone-per-klant gebruikt MODALE zone over al hun metingen (max-count met tie-break op `ZONE_KEYS`-volgorde zwaar→vital).
+- `app.py:2219-2241` — `_render_report_async` detecteert `period_start.startswith('1970-01-01')` en vervangt door taal-afhankelijk label ("Alle metingen" / "Alle Messungen" / "All measurements"). Andere periodes (maand/kwartaal/jaar) blijven datum-formaat.
+- `templates/reports/kk_overall.html` — Geslacht-, Leeftijd- en Zoneverdeling-tabellen lezen nu `*_distribution_client` met `unique_clients` als noemer. Per-office-tabel (M/V-counts) blijft per-meting (telt verbruik per kantoor).
+- `templates/reports/pro_portfolio.html` — idem voor Geslacht- en Zone-tabellen. "(alle Klienten)" notitie achter Zonenverteilung verwijderd; titel nu enkel "Zonenverteilung".
+- `scripts/seed_kk_test.py` (nieuw) — idempotente fixture voor 6 SMOKE_-cliënten met 18 metingen, 1 per kantoor, gem RI 4.59.
+- `scripts/run_pass1_reports.py` (nieuw) — synchrone PDF-generator-helper voor verificatie (omzeilt UI/2FA/threading/mailbezorging).
+
+### Root cause BUG 1 (NL toont 0 metingen waar DE 18 toont)
+
+Spec-hypothese (vertaalde zone-namen in WHERE/GROUP BY) **niet bevestigd**. `analytics.aggregate_period` neemt geen `lang`-parameter en gebruikt alleen interne keys (`zwaar_belast`/`belast`/.../`veerkrachtig`, `M`/`V`/`D`/`unknown`, `<30`/.../`>60`/`unknown`). Geen taal-afhankelijke SQL.
+
+Wat wél gebeurde: f3f3793 (DE, 20:41:10) en d2126979 (NL, 20:42:52) van 24-05 hadden verschillende `params_json` (`kwartaal` resp. `alles`) en — bevestigd door backup-snapshots `sc_pro.db.20260524-{1939,2006,2031}` — de KK-pro_key had op het moment van NL-run géén rij in `client_metingen`. Tijdens DE-run waren de 18 SMOKE_-metingen er nog (of via test-injectie aanwezig); ze waren verdwenen tegen NL-run. De NL-uitkomst was dus correct gegeven de DB-state op dat moment.
+
+Verificatie met verse seed (`scripts/seed_kk_test.py`): NL- en DE-kk_overall produceren **identieke kerncijfers** (18 metingen, gem. RI 4.59, F2/M3/D1, age <30:1/30-45:2/45-60:1/>60:2, zone-per-klant zwaar:2 belast:1 licht:3).
+
+### Aggregatie-keuze Zone-per-klant
+
+Modale zone over al hun metingen. Bij gelijkspel (bv. SMOKE_Anna [balans, zwaar, belast] elk 1×) valt de eerste zone in `ZONE_KEYS`-volgorde (zwaar→belast→licht→balans→vital). Toegelicht in code-comment `analytics.py:_aggregate_rows`. Alternatief 'meest recente meting' afgewezen omdat één outlier dan een klant's zone bepaalt voor het hele rapport.
+
+Consistentie: zelfde modale-methode in KK-overall en Portfolio-Bericht. Standort-Bericht is niet aangepast (per-office is intrinsiek per-meting; spec adresseerde dit niet expliciet). Klientenbericht (`pro_client.html`) blijft per-meting (één cliënt — verdelingstabel telt zijn eigen metingen, niet zinvol om als 1 modale zone weer te geven).
+
+### Eindverificatie checklist (pass1/)
+
+- [x] NL en DE KK-overall identieke kerncijfers (18 metingen, RI 4.59)
+- [x] Som Geslechtsverteilung Portfolio = 6 (F2+M3+D1)
+- [x] Som Zonenverteilung Portfolio = 6 (zwaar2+belast1+licht3+balans0+vital0)
+- [x] Klientenbericht SMOKE_Anna: 3 metingen, RI 4.0, verloop 14/15/16-mei
+- [x] Geen "1970-01-01" in headers (alle 5 PDFs tonen "Alle metingen"/"Alle Messungen")
+- [x] Regressietests: `tests/run_all.sh` 18/18 groen
+
+### Open punten
+
+- KKH-Test-1779642625 fixture nog niet in `TEST_ACCOUNTS.md` — toevoegen na Paul's groen licht.
+- Pass 2 (visueel: logo, kleuren, charts) wacht op Paul's review van pass1-PDFs.
+
+### Open beslissingen
+
+- **Tie-break voor modale zone-per-klant.** Huidige implementatie (`analytics.py:_aggregate_rows`) kiest bij gelijkspel de eerste zone in `ZONE_KEYS`-volgorde (zwaar→belast→licht→balans→vital). Bijwerking: SMOKE_Anna's metingen [balans, zwaar, belast] (elk 1×) → modal valt op 'zwaar', terwijl haar gem. RI = 4.0 'licht_belast' is. Niet kritiek voor demo (1 cliënt op 6). Beslissing volgt na Schmidt-feedback. Paul's neiging: tie-break = **meest recente meting** (gebruikt de laatste zone bij gelijke counts). Eventuele alternatieven: zone-dichtbij-avg-RI, of zone uit avg-RI direct.
+
 ## 2026-05-24 — Rapportage-laag Krankenkasse + Pro (Sessie B.2)
 
 Vier PDF-rapport-types via WeasyPrint, async generatie via threading, mail-bezorging met download-link. Hergebruikbare `analytics.py`-module voor aggregatie. Audit-trail in `report_jobs`-tabel.

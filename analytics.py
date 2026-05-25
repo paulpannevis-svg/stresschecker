@@ -128,6 +128,14 @@ def _empty_aggregate():
         'age_categories':      {k: 0 for k in AGE_CATS},
         'ri_average': None,
         'zone_distribution':   {k: 0 for k in ZONE_KEYS},
+        # Per-klant verdelingen — tellen unieke cliënten, niet metingen.
+        # Voor klant-georiënteerde rapporten (KK-overall + Portfolio).
+        'unique_clients': 0,
+        'gender_distribution_client': {k: 0 for k in GENDER_KEYS},
+        'age_categories_client':      {k: 0 for k in AGE_CATS},
+        # Zone-per-klant gebruikt de MODALE zone over al hun metingen
+        # (bij gelijkspel: best-of-RI-avg, tie-break op zone_order).
+        'zone_distribution_client':   {k: 0 for k in ZONE_KEYS},
     }
 
 
@@ -164,13 +172,22 @@ def _fetch_metingen(pro_key, period_start_ms, period_end_ms, filter=None):
 
 
 def _aggregate_rows(rows):
-    """Bereken aggregatie-dict voor een lijst meting-rows."""
+    """Bereken aggregatie-dict voor een lijst meting-rows.
+
+    Levert zowel meting-gebaseerde tellingen (total_metingen, zone_distribution etc.)
+    als klant-gebaseerde tellingen (unique_clients, *_distribution_client). Voor
+    klant-tellingen geldt: één rij per uniek client_id (NULL → één 'onbekende klant'-
+    bucket per pro_key). Zone-per-klant gebruikt de MODALE zone over al hun
+    metingen — zo blijft het rapport robuust voor outliers en uitschieters.
+    """
     out = _empty_aggregate()
     if not rows:
         return out
     out['total_metingen'] = len(rows)
     ri_sum = 0.0
     ri_count = 0
+    # Per-klant accumulator: client_id → {gender, birth_year, zone_counts: {zone:n}}
+    per_client = {}
     for r in rows:
         # Gender
         out['gender_distribution'][_gender_bucket(r.get('gender'))] += 1
@@ -184,7 +201,25 @@ def _aggregate_rows(rows):
             ri_count += 1
         except (TypeError, ValueError, KeyError):
             pass
+        # Per-klant index — None client_id → één bucket
+        cid = r.get('client_id')
+        if cid not in per_client:
+            per_client[cid] = {
+                'gender': r.get('gender'),
+                'birth_year': r.get('birth_year'),
+                'zone_counts': {k: 0 for k in ZONE_KEYS},
+            }
+        per_client[cid]['zone_counts'][zone_for_ri(r.get('ri'))] += 1
     out['ri_average'] = round(ri_sum / ri_count, 2) if ri_count else None
+
+    # Klant-aggregatie afronden
+    out['unique_clients'] = len(per_client)
+    for cid, info in per_client.items():
+        out['gender_distribution_client'][_gender_bucket(info['gender'])] += 1
+        out['age_categories_client'][age_category(info['birth_year'])] += 1
+        # Modale zone — bij gelijkspel valt de eerste in ZONE_KEYS-volgorde (van zwaar→vital).
+        modal_zone = max(ZONE_KEYS, key=lambda z: info['zone_counts'][z])
+        out['zone_distribution_client'][modal_zone] += 1
     return out
 
 

@@ -2222,12 +2222,22 @@ def _render_report_async(uuid_str, license_code, user_email, lang, report_type, 
         license_name = (lic.get('notes') or '').replace('Krankenkasse: ', '').strip() \
                        or lic.get('product_name') or license_code
 
+        # BUG 3: 'alles'-periode begint op 1970-01-01 → niet als datum tonen.
+        # Vervang door taal-afhankelijk label zodat de header niet "1970-01-01 →"
+        # toont op een KK-deliverable.
+        if period_start.startswith('1970-01-01'):
+            period_start_date = {'de': 'Alle Messungen',
+                                 'en': 'All measurements',
+                                 'nl': 'Alle metingen'}.get(lang, 'Alle metingen')
+        else:
+            period_start_date = period_start[:10]
+
         zone_order = analytics.ZONE_KEYS
         common_ctx = {
             'lang': lang,
             'license_code': license_code,
             'license_name': license_name,
-            'period_start_date': period_start[:10],
+            'period_start_date': period_start_date,
             'period_end_date':   period_end[:10],
             'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
             'generated_label': {'de':'Generiert','en':'Generated','nl':'Gegenereerd'}.get(lang,'Gegenereerd'),
