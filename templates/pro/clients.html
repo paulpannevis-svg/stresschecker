@@ -19,17 +19,69 @@
 .trend-flat { color:#999; font-size:.88rem; }
 .trend-nodata { color:#ccc; font-size:.88rem; }
 .cl-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; }
-.cl-add { background:#c0392b; color:#fff; padding:.5rem 1.1rem; border-radius:6px; text-decoration:none; font-weight:600; font-size:.93rem; }
+.cl-add { background:#c0392b; color:#fff; padding:.5rem 1.1rem; border-radius:6px; text-decoration:none; font-weight:600; font-size:.93rem; cursor:pointer; border:none; font-family:inherit; }
 .cl-add:hover { background:#a93226; }
 .back-link { display:inline-block; margin-top:1.5rem; color:#c0392b; text-decoration:none; font-size:.9rem; }
+
+/* Profielen-quota widget */
+.quota-widget { background:#fafbfc; border:1px solid #e3e6ea; border-radius:8px; padding:.85rem 1.1rem; margin-bottom:1.2rem; }
+.quota-row { display:flex; justify-content:space-between; align-items:baseline; gap:1rem; margin-bottom:.55rem; flex-wrap:wrap; }
+.quota-label { font-size:.92rem; color:#444; }
+.quota-label strong { color:#222; }
+.quota-tier-chip { display:inline-block; background:#eef2f6; color:#555; font-size:.72rem; font-weight:600; padding:.15rem .55rem; border-radius:10px; margin-right:.4rem; vertical-align:middle; }
+.quota-tier-chip.founder { background:#1f6f4a; color:#fff; }
+.quota-count { font-weight:600; color:#222; font-size:.95rem; }
+.quota-count.over { color:#b71c1c; }
+.quota-bar { width:100%; height:8px; background:#e9ecef; border-radius:4px; overflow:hidden; }
+.quota-bar-fill { height:100%; transition:width .25s ease; border-radius:4px; }
+.quota-bar-fill.green { background:#2e7d32; }
+.quota-bar-fill.yellow { background:#f9a825; }
+.quota-bar-fill.red { background:#c62828; }
+
+/* Quota-modal */
+.quota-modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center; padding:1rem; }
+.quota-modal-backdrop.open { display:flex; }
+.quota-modal { background:#fff; border-radius:10px; max-width:440px; width:100%; padding:1.6rem 1.5rem; box-shadow:0 12px 40px rgba(0,0,0,.25); }
+.quota-modal h3 { margin:0 0 .6rem 0; font-size:1.1rem; color:#222; }
+.quota-modal p { margin:.4rem 0; color:#444; font-size:.93rem; line-height:1.5; }
+.quota-modal .qm-actions { display:flex; gap:.6rem; margin-top:1.3rem; flex-wrap:wrap; }
+.quota-modal .qm-btn { flex:1; min-width:120px; padding:.65rem 1rem; border-radius:6px; font-weight:600; font-size:.92rem; text-align:center; text-decoration:none; cursor:pointer; border:none; font-family:inherit; }
+.quota-modal .qm-primary { background:#c0392b; color:#fff; }
+.quota-modal .qm-primary:hover { background:#a93226; }
+.quota-modal .qm-secondary { background:#eef2f6; color:#444; }
+.quota-modal .qm-secondary:hover { background:#dde3ea; }
 </style>
 <div style="max-width:820px;margin:0 auto;padding:1rem;">
+
+  {% if quota and not is_krankenkasse %}
+  {% set bar_cls = 'green' if quota.pct < 80 else ('yellow' if quota.pct < 100 else 'red') %}
+  <div class="quota-widget">
+    <div class="quota-row">
+      <div class="quota-label">
+        <span class="quota-tier-chip {% if quota.unlimited %}founder{% endif %}">{{ quota.tier_short }}</span>
+        {% if quota.unlimited %}
+          <span class="quota-count">{% if lang=="de" %}∞ Profile ({{ quota.current }} aktiv){% elif lang=="en" %}∞ profiles ({{ quota.current }} active){% else %}∞ profielen ({{ quota.current }} actief){% endif %}</span>
+        {% else %}
+          <span class="quota-count {% if quota.over_limit %}over{% endif %}">{{ quota.current }} {% if lang=="de" %}von{% elif lang=="en" %}of{% else %}van{% endif %} {{ quota.max }} {% if lang=="de" %}Profile{% elif lang=="en" %}profiles{% else %}profielen{% endif %}</span>
+        {% endif %}
+      </div>
+    </div>
+    {% if not quota.unlimited %}
+    <div class="quota-bar"><div class="quota-bar-fill {{ bar_cls }}" style="width:{{ quota.pct if quota.pct <= 100 else 100 }}%;"></div></div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div class="cl-header">
     <h2 style="margin:0;">
       {% if not is_krankenkasse %}<span style="background:#c0392b;color:#fff;font-size:.7rem;padding:.2rem .5rem;border-radius:4px;vertical-align:middle;margin-right:.4rem;">PRO</span>{% endif %}
       {% if lang=="de" %}Meine Klienten{% elif lang=="en" %}My clients{% else %}Mijn cliënten{% endif %}
     </h2>
-    <a href="{{ url_for("pro_client_add") }}" class="cl-add">+ {% if lang=="de" %}Neuer Klient{% elif lang=="en" %}New client{% else %}Nieuwe cliënt{% endif %}</a>
+    {% if quota and quota.over_limit and not quota.unlimited %}
+      <button type="button" class="cl-add" onclick="openQuotaModal()">+ {% if lang=="de" %}Neuer Klient{% elif lang=="en" %}New client{% else %}Nieuwe cliënt{% endif %}</button>
+    {% else %}
+      <a href="{{ url_for('pro_client_add') }}" class="cl-add">+ {% if lang=="de" %}Neuer Klient{% elif lang=="en" %}New client{% else %}Nieuwe cliënt{% endif %}</a>
+    {% endif %}
   </div>
   {% if clients %}
   <div class="dashboard-table-wrap">
@@ -59,9 +111,51 @@
   {% else %}
   <div style="text-align:center;padding:3rem 1rem;color:#888;">
     <p>{% if lang=="de" %}Noch keine Klienten.{% elif lang=="en" %}No clients yet.{% else %}Nog geen cliënten.{% endif %}</p>
-    <a href="{{ url_for("pro_client_add") }}" class="cl-add">+ {% if lang=="de" %}Ersten Klienten{% elif lang=="en" %}Add first client{% else %}Eerste cliënt toevoegen{% endif %}</a>
+    {% if quota and quota.over_limit and not quota.unlimited %}
+      <button type="button" class="cl-add" onclick="openQuotaModal()">+ {% if lang=="de" %}Ersten Klienten{% elif lang=="en" %}Add first client{% else %}Eerste cliënt toevoegen{% endif %}</button>
+    {% else %}
+      <a href="{{ url_for('pro_client_add') }}" class="cl-add">+ {% if lang=="de" %}Ersten Klienten{% elif lang=="en" %}Add first client{% else %}Eerste cliënt toevoegen{% endif %}</a>
+    {% endif %}
   </div>
   {% endif %}
   <a href="{{ url_for("pro_menu") }}" class="back-link">&#8592; {% if lang=="de" %}Zurück zum Dashboard{% elif lang=="en" %}Back to dashboard{% else %}Terug naar dashboard{% endif %}</a>
 </div>
+
+{% if quota and not quota.unlimited and not is_krankenkasse %}
+<div class="quota-modal-backdrop" id="quotaModal" onclick="if(event.target===this)closeQuotaModal()">
+  <div class="quota-modal" role="dialog" aria-modal="true" aria-labelledby="qmTitle">
+    <h3 id="qmTitle">{% if lang=="de" %}Limit erreicht{% elif lang=="en" %}Limit reached{% else %}Limiet bereikt{% endif %}</h3>
+    <p>
+      {% if lang=="de" %}Du nutzt aktuell <strong>{{ quota.current }} von {{ quota.max }}</strong> Profilen in <strong>{{ quota.tier_short }}</strong>.{% elif lang=="en" %}You are currently using <strong>{{ quota.current }} of {{ quota.max }}</strong> profiles on <strong>{{ quota.tier_short }}</strong>.{% else %}Je gebruikt nu <strong>{{ quota.current }} van {{ quota.max }}</strong> profielen op <strong>{{ quota.tier_short }}</strong>.{% endif %}
+    </p>
+    {% if quota.next_tier %}
+    <p>
+      {% if lang=="de" %}Mit einem Upgrade auf <strong>{{ quota.next_tier.next_tier_short }}</strong> kannst du bis zu <strong>{{ quota.next_tier.next_max_clients }} Profile</strong> verwalten.{% elif lang=="en" %}Upgrading to <strong>{{ quota.next_tier.next_tier_short }}</strong> lets you manage up to <strong>{{ quota.next_tier.next_max_clients }} profiles</strong>.{% else %}Met een upgrade naar <strong>{{ quota.next_tier.next_tier_short }}</strong> kun je tot <strong>{{ quota.next_tier.next_max_clients }} profielen</strong> beheren.{% endif %}
+    </p>
+    <div class="qm-actions">
+      {% if quota.has_stripe %}
+        <a href="{{ quota.manage_url }}" class="qm-btn qm-primary">{% if lang=="de" %}Upgrade auf {{ quota.next_tier.next_tier_short }}{% elif lang=="en" %}Upgrade to {{ quota.next_tier.next_tier_short }}{% else %}Upgrade naar {{ quota.next_tier.next_tier_short }}{% endif %}</a>
+      {% else %}
+        <a href="mailto:info@lifestylemonitors.com?subject=Upgrade%20Pro-abonnement" class="qm-btn qm-primary">{% if lang=="de" %}Kontakt aufnehmen{% elif lang=="en" %}Contact us{% else %}Neem contact op{% endif %}</a>
+      {% endif %}
+      <button type="button" class="qm-btn qm-secondary" onclick="closeQuotaModal()">{% if lang=="de" %}Abbrechen{% elif lang=="en" %}Cancel{% else %}Annuleren{% endif %}</button>
+    </div>
+    {% else %}
+    <p>
+      {% if lang=="de" %}Du hast unser höchstes Paket. Für mehr Profile nimm bitte Kontakt mit uns auf.{% elif lang=="en" %}You're on our top tier. For more profiles, please get in touch.{% else %}Je zit op ons hoogste pakket. Voor meer profielen, neem contact met ons op.{% endif %}
+    </p>
+    <div class="qm-actions">
+      <a href="mailto:info@lifestylemonitors.com?subject=Meer%20profielen%20op%20Pro%20L" class="qm-btn qm-primary">{% if lang=="de" %}Kontakt aufnehmen{% elif lang=="en" %}Contact us{% else %}Neem contact op{% endif %}</a>
+      <button type="button" class="qm-btn qm-secondary" onclick="closeQuotaModal()">{% if lang=="de" %}Abbrechen{% elif lang=="en" %}Cancel{% else %}Annuleren{% endif %}</button>
+    </div>
+    {% endif %}
+  </div>
+</div>
+<script>
+function openQuotaModal(){document.getElementById('quotaModal').classList.add('open');}
+function closeQuotaModal(){document.getElementById('quotaModal').classList.remove('open');}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeQuotaModal();});
+{% if limit_reached_flag %}window.addEventListener('DOMContentLoaded',openQuotaModal);{% endif %}
+</script>
+{% endif %}
 {% endblock %}

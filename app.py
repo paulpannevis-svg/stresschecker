@@ -1785,7 +1785,11 @@ def pro_clients():
                 'top_dimensie': (lambda r: r[0] if r else None)(db.execute("SELECT ctx_dimensie FROM client_metingen WHERE client_id=? AND ctx_dimensie IS NOT NULL AND ctx_dimensie != '' GROUP BY ctx_dimensie ORDER BY COUNT(*) DESC LIMIT 1", (c['id'],)).fetchone())
         })
     db.close()
-    return render_template('pro/clients.html', lang=lang, clients=client_list)
+    quota = build_pro_client_quota(pro_key, session.get('email', '')) if not _demo else None
+    limit_reached_flag = request.args.get('limit_reached') == '1'
+    return render_template('pro/clients.html', lang=lang, clients=client_list,
+                           quota=quota, is_krankenkasse=is_krankenkasse_session(),
+                           limit_reached_flag=limit_reached_flag)
 
 @app.route('/pro/dashboard')
 @require_kk_office_if_krankenkasse
@@ -2560,6 +2564,14 @@ def pro_client_add():
         if not name:
             return render_template('pro/client_add.html', lang=lang, error='Vul een naam in.', is_krankenkasse=is_kk)
         pro_key = get_user_key()
+        # Quota-guard: blokkeer aanmaak bij volle of overschrijdende Pro. demo_mode en is_krankenkasse
+        # gebruiken andere modellen (resp. fixture-DEMO en kantoor-allocatie) en omzeilen de profielen-quota.
+        if not session.get('demo_mode') and not is_kk:
+            quota = build_pro_client_quota(pro_key, session.get('email', ''))
+            if not quota['unlimited'] and quota['over_limit']:
+                app.logger.info('CLIENT_ADD_QUOTA_BLOCK pro_key=%s current=%s max=%s',
+                                pro_key, quota['current'], quota['max'])
+                return redirect(url_for('pro_clients', limit_reached=1))
         client_code = generate_client_code()
         db = get_pro_db()
         db.execute("INSERT INTO clients (pro_key,name,surname,birth_year,gender,client_code,email,phone,notes) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -4746,6 +4758,44 @@ def get_pro_plan_info():
     return dict(plan) if plan else None
 
 
+# Founder-bypass: pro_keys met onbeperkte cliënt-aanmaak.
+# Hardcoded i.p.v. aparte 'sc-pro-founder'-tier: geen DB-migratie nodig, één regel om uit te breiden.
+UNLIMITED_PRO_KEYS = {
+    '5eabaeb11283e8a847bfcb7f90918ec1',  # WellVit / Peter van de Boom
+}
+
+
+def _pro_client_count(pro_key):
+    """Telt actieve cliënt-profielen voor deze pro_key. Tegenhanger van de
+    listing-query op /pro/clienten (active=1, exclusief soft-deleted)."""
+    if not pro_key:
+        return 0
+    db = get_pro_db()
+    try:
+        return db.execute(
+            "SELECT COUNT(*) FROM clients WHERE active=1 AND pro_key=?",
+            (pro_key,)
+        ).fetchone()[0]
+    finally:
+        db.close()
+
+
+_PRO_TIER_LADDER = {
+    'pro-s': {'next_plan_id': 'sc-pro-m', 'next_tier_short': 'Pro M', 'next_max_clients': 30},
+    'pro-m': {'next_plan_id': 'sc-pro-l', 'next_tier_short': 'Pro L', 'next_max_clients': 50},
+    'pro-l': None,  # top-tier: contact-pad i.p.v. upgrade
+}
+
+
+def _pro_next_tier(tier_short):
+    """Voor 'Pro S'/'Pro M'/'Pro L' (of lowercase varianten) → dict met next-tier info,
+    of None voor de top-tier."""
+    if not tier_short:
+        return None
+    key = tier_short.lower().replace(' ', '-')  # 'Pro S' → 'pro-s'
+    return _PRO_TIER_LADDER.get(key)
+
+
 def _pro_max_clients(pro_key=None, default_baseline=10):
     """Bepaal max_clients-quota voor ingelogde Pro.
     Probeert eerst session.license_code (via get_pro_plan_info), dan
@@ -4773,6 +4823,54 @@ def _pro_max_clients(pro_key=None, default_baseline=10):
         pro_key or '', em
     )
     return default_baseline
+
+
+def build_pro_client_quota(pro_key, email):
+    """Bouwt het quota-dict voor de /pro/clienten widget en /pro/client/toevoegen guard.
+
+    Returns:
+        {
+          'current': int,           # actieve cliënten
+          'max': int|None,          # None = unlimited
+          'unlimited': bool,
+          'tier_short': str,        # 'Pro S' | 'Pro M' | 'Pro L' | 'Pro' (fallback)
+          'pct': int,               # 0–999 voor progress-bar; 999 als unlimited
+          'over_limit': bool,
+          'next_tier': dict|None,   # van _pro_next_tier
+          'has_stripe': bool,       # bepaalt of upgrade-knop naar portal of contact-mail wijst
+          'manage_url': str,        # Stripe Customer Portal endpoint
+        }
+    """
+    unlimited = pro_key in UNLIMITED_PRO_KEYS
+    current = _pro_client_count(pro_key)
+    summary = get_pro_tier_summary(email) if email else None
+    tier_short = (summary or {}).get('tier_short') or 'Pro'
+    has_stripe = bool(get_stripe_customer_id(pro_key, email)) if email else False
+    if unlimited:
+        return {
+            'current': current,
+            'max': None,
+            'unlimited': True,
+            'tier_short': 'Founder',
+            'pct': 0,
+            'over_limit': False,
+            'next_tier': None,
+            'has_stripe': has_stripe,
+            'manage_url': url_for('manage_subscription'),
+        }
+    max_clients = _pro_max_clients(pro_key)
+    pct = int(round((current / max_clients) * 100)) if max_clients else 0
+    return {
+        'current': current,
+        'max': max_clients,
+        'unlimited': False,
+        'tier_short': tier_short,
+        'pct': pct,
+        'over_limit': current >= max_clients,
+        'next_tier': _pro_next_tier(tier_short),
+        'has_stripe': has_stripe,
+        'manage_url': url_for('manage_subscription'),
+    }
 
 
 @app.route('/api/pairing/generate', methods=['POST'])
