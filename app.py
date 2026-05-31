@@ -2841,15 +2841,40 @@ def _generate_question(dim, lang, meting_type='basismeting'):
              'de': f'Was wirst du heute tun, um herauszufinden, wie dein {target} auf verschiedene Situationen reagiert?',
              'en': f'What will you do today to discover how your {target} responds to different situations?'}
     else:
-        q = {'nl': f'Wat ga jij vandaag doen om te ontdekken wat jouw {target} nodig heeft?',
-             'de': f'Was wirst du heute tun, um herauszufinden, was dein {target} braucht?',
-             'en': f'What will you do today to discover what your {target} needs?'}
+        q = {'nl': f'Wat ga jij doen om te ontdekken wat jouw {target} nodig heeft?',
+             'de': f'Was wirst du tun, um herauszufinden, was dein {target} braucht?',
+             'en': f'What will you do to discover what your {target} needs?'}
     return q.get(lang, q['nl'])
 
 def _check_forbidden(text):
     """Check of de tekst verboden woorden bevat."""
     text_lower = text.lower()
     return any(w.lower() in text_lower for w in _FORBIDDEN_WORDS)
+
+# Harde dag-ankers: woorden die aan een specifieke, verschuivende dag binden en daardoor
+# fout worden zodra de gecachte tekst later wordt teruggelezen. Zachte ankers ("op dit
+# moment", "gerade", "right now") binden aan het leesmoment en blijven kloppen — die staan
+# hier bewust NIET in.
+_DAY_ANCHORS = {
+    'nl': ['vandaag', 'gisteren', 'eergisteren', 'morgen', 'overmorgen',
+           'deze week', 'vorige week', 'komende week', 'volgende week'],
+    'de': ['heute', 'gestern', 'vorgestern', 'morgen', 'übermorgen',
+           'diese woche', 'letzte woche', 'kommende woche', 'nächste woche'],
+    'en': ['today', 'yesterday', 'tomorrow',
+           'this week', 'last week', 'next week', 'coming week'],
+}
+
+def _has_day_anchor(text, lang):
+    """True als de tekst een hard dag-anker bevat (woordgrens-match, hoofdletterongevoelig).
+    Zachte ankers (op dit moment / gerade / right now) tellen bewust NIET mee."""
+    if not text:
+        return False
+    import re
+    low = text.lower()
+    for t in _DAY_ANCHORS.get(lang, _DAY_ANCHORS['nl']):
+        if re.search(r'(?<!\w)' + re.escape(t) + r'(?!\w)', low):
+            return True
+    return False
 
 def _truncate_to_sentences(text, max_sentences=2):
     """Hard truncate text to exactly max_sentences sentences."""
@@ -3349,10 +3374,10 @@ Patroon D — Hoge RI, hoge BPM (>85):
 Kan wijzen op actieve rust (na inspanning, na koffie, na emotie). Als ctx_vrije_tekst dit bevestigt → bevestigen. Zo niet → benoemen dat het lichaam actief is en rust nog mogelijk.
 
 DISCREPANTIE-REGEL (INNERLIJK KOMPAS):
-Bereken zone-verschil tussen subjectief_score-zone (0-10, zelfde zones als RI) en actuele RI-zone.
-- Verschil 0-1: kleine nuance mogelijk, niet vooraanstaand
-- Verschil 2: merkbaar verschil, als observatie benoemen
-- Verschil 3+: opvallende discrepantie, expliciet als kernuitspraak voor zin 2
+Het FEITEN-blok zegt al of zelfinschatting en RI dicht bij elkaar liggen of merkbaar
+verschillen ("Lichaam versus gevoel"). Reken dit niet zelf na. Vertaal de gegeven uitkomst:
+- Liggen ze dicht bij elkaar: hooguit een kleine nuance, niet vooraanstaand.
+- Verschillen ze merkbaar: benoem dat als kernuitspraak voor zin 2.
 
 BIJ DISCREPANTIE:
 - Gevoel HOGER dan lichaam: persoon voelt zich beter dan lichaam toont. "Je lichaam toont nog druk, terwijl je je al beter voelt".
@@ -3373,10 +3398,15 @@ BASISMETING_SYSTEM_PROMPT = (
     "Je bent geen coach, geen therapeut, geen diagnosticus. "
     "Je observeert wat je ziet, in de tweede persoon (je in NL, du in DE, you in EN), "
     "nuchter en zonder alarmisme of geruststelling die niet is onderbouwd.\n\n"
-    "Vergelijk current.ri tegen het gemiddelde van recent_basis. "
-    "Benoem ook het verschil tussen current.ri en current.subjectief_score als dat opvalt "
-    "(lichaam versus gevoel). Als phase == 'phase1': noem geen trend, zeg dat er nog meer "
-    "metingen nodig zijn voor een patroon.\n\n"
+    "FEITEN-BLOK (cruciaal): het user_message begint met een blok 'FEITEN' dat het systeem "
+    "deterministisch heeft berekend — de vergelijking met de vorige meting, het gemiddelde "
+    "van de recente basismetingen en de richting/het verschil daartegen, de zone, het "
+    "samenspel lichaam-versus-gevoel, de periode mét datums en de fase. Deze feiten zijn "
+    "leidend en al juist. Jouw enige taak is ze in warme, begrijpelijke mensentaal te "
+    "verwoorden. Reken, vergelijk, middel, dateer of bepaal zones NOOIT zelf en spreek de "
+    "feiten nooit tegen. Verzin geen getallen, datums of richtingen die niet in het FEITEN-blok "
+    "staan. De richtingswoorden ('lager dan', 'hoger dan', 'vergelijkbaar met' / hun DE/EN-"
+    "equivalenten) en de datums neem je letterlijk over zoals ze in FEITEN staan.\n\n"
     "Geef geen advies. Sluit af met een open reflectievraag die de persoon nieuwsgierig maakt "
     "naar het eigen patroon.\n\n"
     "INPUT-VELDEN (wat je in user_message krijgt):\n"
@@ -3391,6 +3421,12 @@ BASISMETING_SYSTEM_PROMPT = (
     "- baseline_ri_history — gemiddelde RI van basismetingen 8-14 terug, of null\n"
     "- phase — phase1 / phase2 / phase3\n"
     "NULL-waarden negeer je: schrijf er niet over, gebruik ze niet als leeg signaal.\n\n"
+    "TIJD/DATUM (belangrijk):\n"
+    "Als je een datum noemt, gebruik dan UITSLUITEND de absolute datums zoals ze "
+    "letterlijk in het FEITEN-blok staan (bijv. '21 april 2026'). Verzin of herbereken "
+    "geen datums. Gebruik NOOIT relatieve termen als 'gisteren', 'vandaag', 'deze week', "
+    "'vorige week', 'recent'. De gegenereerde tekst wordt gecached en moet ook "
+    "over weken/maanden nog kloppen.\n\n"
     "SCHRIJFSTIJL-EISEN (belangrijk):\n"
     "- Schrijf alsof je praat met iemand zonder medische achtergrond. "
     "Vermijd 'systeem' als metafoor voor het lichaam - gebruik 'lichaam', 'hart', "
@@ -3407,7 +3443,9 @@ BASISMETING_SYSTEM_PROMPT = (
     "VELDEN (verplicht):\n"
     "- sentence1: observatie/kop\n"
     "- sentence2: toelichting\n"
-    "- question: max 20 woorden, een reflectievraag\n\n"
+    "- question: max 20 woorden, een reflectievraag. Formuleer de vraag TIJDLOOS: "
+    "gebruik GEEN relatieve tijdwoorden ('vandaag', 'gisteren', 'morgen', 'nu', "
+    "'deze week', 'vorige week') — ook de vraag wordt gecached en moet later nog kloppen.\n\n"
     "Schrijf volledige zinnen — gebruik GEEN weglatingstekens (geen \u2026 en geen ...). Output: strikt JSON met keys sentence1, sentence2, question. "
     "Geen preamble, geen markdown, geen uitleg buiten de JSON."
 ) + KOMPAS_COMMON_GUIDE + KOMPAS_BASISMETING_GUIDE
@@ -3768,6 +3806,173 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
     return ctx
 
 
+# Maandnamen voor absolute datum-formattering in de Innerlijk-Kompas-feiten.
+# Bewust een eigen dict (NIET locale): locale is onbetrouwbaar/onvolledig onder gunicorn.
+_MONTH_NAMES = {
+    'nl': ['januari', 'februari', 'maart', 'april', 'mei', 'juni',
+           'juli', 'augustus', 'september', 'oktober', 'november', 'december'],
+    'de': ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+           'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'],
+    'en': ['January', 'February', 'March', 'April', 'May', 'June',
+           'July', 'August', 'September', 'October', 'November', 'December'],
+}
+
+
+def _fmt_abs_date(y, m, d, lang):
+    """(jaar, maand, dag) → absolute datum mét jaartal, gelokaliseerd.
+    NL '31 mei 2026' · DE '31. Mai 2026' · EN '31 May 2026'. Jaartal altijd,
+    zodat gecachte tekst over maanden/jaren ondubbelzinnig blijft kloppen."""
+    months = _MONTH_NAMES.get(lang if lang in _MONTH_NAMES else 'nl')
+    name = months[m - 1] if 1 <= m <= 12 else str(m)
+    return f"{d}. {name} {y}" if lang == 'de' else f"{d} {name} {y}"
+
+
+def _parse_iso_ymd(s):
+    """'YYYY-MM-DD' (evt. met tijd erachter) → (y, m, d) ints, of None."""
+    try:
+        y, m, d = s.split(' ')[0].split('-')
+        return int(y), int(m), int(d)
+    except Exception:
+        return None
+
+
+# Richtingswoorden per taal (door de CODE bepaald — het model neemt ze letterlijk over).
+_RICHTING = {
+    'nl': {'up': 'hoger dan', 'down': 'lager dan', 'flat': 'vergelijkbaar met'},
+    'de': {'up': 'höher als', 'down': 'niedriger als', 'flat': 'ähnlich wie'},
+    'en': {'up': 'higher than', 'down': 'lower than', 'flat': 'comparable to'},
+}
+
+
+def _richting(diff, lang):
+    """Deterministische richting met dezelfde drempel als de bestaande trend-logica
+    (|diff| <= 0.5 → vergelijkbaar). Retourneert (woord, signed_delta_str)."""
+    r = _RICHTING.get(lang if lang in _RICHTING else 'nl')
+    delta = round(diff, 1)
+    if diff > 0.5:
+        key = 'up'
+    elif diff < -0.5:
+        key = 'down'
+    else:
+        key = 'flat'
+    sign = '+' if delta > 0 else ('−' if delta < 0 else '±')
+    return r[key], f"{sign}{abs(delta)}"
+
+
+def _basismeting_feiten(cur, recent_basis, phase, lang):
+    """Bereken ALLE vergelijkings-, gemiddelde- en datum-feiten deterministisch en
+    lever ze als kant-en-klaar FEITEN-blok (platte tekst). Het model verwoordt deze
+    feiten uitsluitend — het rekent, vergelijkt en dateert niets meer zelf.
+
+    cur: dict met ri, ts, subjectief_score. recent_basis: lijst (nieuwste eerst) met
+    ri, datum ('YYYY-MM-DD'). phase: phase1/2/3. lang: nl/de/en.
+    """
+    import analytics as _an
+    from datetime import datetime as _dt
+    L = lang if lang in ('nl', 'de', 'en') else 'nl'
+
+    T = {
+        'nl': {
+            'hdr': 'FEITEN (door het systeem berekend — neem letterlijk over, reken of dateer NIETS zelf):',
+            'cur': '- Huidige meting: RI {ri} op {date}. Zone: "{zone}".',
+            'first': '- Dit is je eerste basismeting — er is nog geen eerdere meting om mee te vergelijken.',
+            'prev': '- Vorige meting: RI {ri} op {date}. De huidige meting is {dir} de vorige ({delta}).',
+            'avg': '- Gemiddelde van je laatste {n} basismetingen ({period}): RI {avg}. De huidige meting is {dir} dat gemiddelde ({delta}).',
+            'one': '- Gebaseerd op 1 eerdere basismeting (op {date}): RI {avg}. (Nog te weinig metingen voor een trend.)',
+            'body_sim': '- Lichaam versus gevoel: je zelfinschatting ({subj}) en je RI ({ri}) liggen dicht bij elkaar.',
+            'body_diff': '- Lichaam versus gevoel: je zelfinschatting is {subj}, je RI is {ri} — die verschillen merkbaar.',
+            'fase': {'phase1': '- Fase: nog weinig metingen — nog geen betrouwbaar patroon.',
+                     'phase2': '- Fase: een eerste patroon wordt zichtbaar.',
+                     'phase3': '- Fase: genoeg metingen voor een patroon.'},
+            'sep': ' t/m ',
+        },
+        'de': {
+            'hdr': 'FAKTEN (vom System berechnet — wörtlich übernehmen, NICHTS selbst rechnen oder datieren):',
+            'cur': '- Aktuelle Messung: RI {ri} am {date}. Zone: "{zone}".',
+            'first': '- Dies ist deine erste Basismessung — es gibt noch keine frühere Messung zum Vergleich.',
+            'prev': '- Vorige Messung: RI {ri} am {date}. Die aktuelle Messung ist {dir} die vorige ({delta}).',
+            'avg': '- Durchschnitt deiner letzten {n} Basismessungen ({period}): RI {avg}. Die aktuelle Messung ist {dir} dieser Durchschnitt ({delta}).',
+            'one': '- Basierend auf 1 früheren Basismessung (am {date}): RI {avg}. (Noch zu wenige Messungen für einen Trend.)',
+            'body_sim': '- Körper versus Gefühl: deine Selbsteinschätzung ({subj}) und dein RI ({ri}) liegen nah beieinander.',
+            'body_diff': '- Körper versus Gefühl: deine Selbsteinschätzung ist {subj}, dein RI ist {ri} — das unterscheidet sich merklich.',
+            'fase': {'phase1': '- Phase: noch wenige Messungen — noch kein verlässliches Muster.',
+                     'phase2': '- Phase: ein erstes Muster wird sichtbar.',
+                     'phase3': '- Phase: genug Messungen für ein Muster.'},
+            'sep': ' bis ',
+        },
+        'en': {
+            'hdr': 'FACTS (computed by the system — use verbatim, do NOT calculate or date anything yourself):',
+            'cur': '- Current reading: RI {ri} on {date}. Zone: "{zone}".',
+            'first': '- This is your first baseline reading — there is no earlier reading to compare with yet.',
+            'prev': '- Previous reading: RI {ri} on {date}. The current reading is {dir} the previous one ({delta}).',
+            'avg': '- Average of your last {n} baseline readings ({period}): RI {avg}. The current reading is {dir} that average ({delta}).',
+            'one': '- Based on 1 earlier baseline reading (on {date}): RI {avg}. (Still too few readings for a trend.)',
+            'body_sim': '- Body versus feeling: your self-assessment ({subj}) and your RI ({ri}) are close together.',
+            'body_diff': '- Body versus feeling: your self-assessment is {subj}, your RI is {ri} — these differ noticeably.',
+            'fase': {'phase1': '- Phase: still few readings — no reliable pattern yet.',
+                     'phase2': '- Phase: a first pattern is becoming visible.',
+                     'phase3': '- Phase: enough readings for a pattern.'},
+            'sep': ' to ',
+        },
+    }[L]
+
+    lines = [T['hdr']]
+
+    cur_ri = cur.get('ri')
+    cur_ri_s = 'n/a' if cur_ri is None else round(float(cur_ri), 1)
+    ts_cur = cur.get('ts') or 0
+    if ts_cur:
+        cd = _dt.fromtimestamp(ts_cur / 1000)
+        cur_date = _fmt_abs_date(cd.year, cd.month, cd.day, L)
+    else:
+        cur_date = '?'
+    zone_label = _an.zone_label(_an.zone_for_ri(cur_ri), L) if cur_ri is not None else '?'
+    lines.append(T['cur'].format(ri=cur_ri_s, date=cur_date, zone=zone_label))
+
+    rb = [r for r in (recent_basis or []) if r.get('ri') is not None]
+
+    if not rb:
+        lines.append(T['first'])
+    else:
+        # Vorige meting (1-op-1)
+        prev = rb[0]
+        pv = _parse_iso_ymd(prev.get('datum') or '')
+        prev_date = _fmt_abs_date(*pv, L) if pv else '?'
+        if cur_ri is not None:
+            pdir, pdelta = _richting(float(cur_ri) - float(prev['ri']), L)
+            lines.append(T['prev'].format(ri=round(float(prev['ri']), 1), date=prev_date, dir=pdir, delta=pdelta))
+
+        if len(rb) >= 2:
+            vals = [float(r['ri']) for r in rb]
+            avg = round(sum(vals) / len(vals), 1)
+            # Periode: oudste t/m nieuwste in het venster
+            newest = _parse_iso_ymd(rb[0].get('datum') or '')
+            oldest = _parse_iso_ymd(rb[-1].get('datum') or '')
+            period = '?'
+            if oldest and newest:
+                period = _fmt_abs_date(*oldest, L) + T['sep'] + _fmt_abs_date(*newest, L)
+            if cur_ri is not None:
+                adir, adelta = _richting(float(cur_ri) - avg, L)
+                lines.append(T['avg'].format(n=len(rb), period=period, avg=avg, dir=adir, delta=adelta))
+        else:
+            # Precies één eerdere meting: geen trend suggereren
+            lines.append(T['one'].format(date=prev_date, avg=round(float(prev['ri']), 1)))
+
+    # Lichaam versus gevoel
+    subj = cur.get('subjectief_score')
+    if subj is not None and cur_ri is not None:
+        if abs(float(cur_ri) - float(subj)) <= 1.5:
+            lines.append(T['body_sim'].format(subj=subj, ri=cur_ri_s))
+        else:
+            lines.append(T['body_diff'].format(subj=subj, ri=cur_ri_s))
+
+    # Fase
+    ph = phase if phase in ('phase1', 'phase2', 'phase3') else 'phase1'
+    lines.append(T['fase'][ph])
+
+    return '\n'.join(lines)
+
+
 def _build_kompas_prompt(cur, lang, context, session_data=None, baseline_avg=None):
     """Router: kiest prompt-template op basis van meting_type.
     Retourneert (system_prompt, user_message) tuple.
@@ -3878,8 +4083,7 @@ def _build_kompas_prompt(cur, lang, context, session_data=None, baseline_avg=Non
         fallback_note = '\n(Intern: biofeedback zonder pre-referentie binnen 30min - basismeting-interpretatie.)'
     elif mt == 'situatiemeting':
         fallback_note = '\n(Intern: situatiemeting zonder label - basismeting-interpretatie.)'
-    user = (
-        "BASISMETING data:\n"
+    data_blok = (
         f"current: RI={cur.get('ri')}, BPM={cur.get('bpm')}, HRV%={cur.get('hrv_pct')}, "
         f"RMSSD={cur.get('rmssd')}, subjectief_score={cur.get('subjectief_score')}, "
         f"ctx_dimensie={cur.get('ctx_dimensie') or 'null'}, datetime={context.get('datetime_iso') or ''}\n"
@@ -3890,6 +4094,19 @@ def _build_kompas_prompt(cur, lang, context, session_data=None, baseline_avg=Non
         f"{context.get('baseline_ri_history') if context.get('baseline_ri_history') is not None else 'null'}\n"
         f"phase: {phase}{fallback_note}"
     )
+    if mt == 'basismeting':
+        # Alleen échte basismetingen: FEITEN-blok (vergelijkingen, gemiddelden, datums, zone,
+        # lichaam-versus-gevoel, fase al deterministisch berekend — het model verwoordt enkel).
+        # Fallback-randgevallen (bio-zonder-pre / situ-zonder-label) blijven bewust ongemoeid.
+        feiten_blok = _basismeting_feiten(cur, recent, phase, lang)
+        user = (
+            f"{feiten_blok}\n\n"
+            "RUWE DATA (uitsluitend als context voor je duiding/toon — NIET om mee te rekenen, "
+            "te vergelijken of te dateren; daarvoor geldt enkel het FEITEN-blok hierboven):\n"
+            f"{data_blok}"
+        )
+    else:
+        user = "BASISMETING data:\n" + data_blok
     return BASISMETING_SYSTEM_PROMPT + suffix, user
 
 
@@ -4154,7 +4371,8 @@ def api_feedback():
             # Question komt nu uit AI-response; fallback op server-side _generate_question
             # Biofeedback v3 heeft per definitie geen question — override blokkeren.
             ai_question = parsed.get('question', '').strip()
-            if ai_question and not _is_bf_v3:
+            # Dag-anker in AI-vraag (basismeting) → val terug op de schone _generate_question.
+            if ai_question and not _is_bf_v3 and not (meting_type == 'basismeting' and _has_day_anchor(ai_question, lang)):
                 question = ai_question
         except (json.JSONDecodeError, ValueError):
             # Fallback: probeer INSIGHT:/REFLECTION: formaat
@@ -4175,6 +4393,46 @@ def api_feedback():
         # Strip ellipsis-chars (Claude gebruikt ze soms stilistisch; niet wenselijk hier)
         insight = (insight or '').replace('\u2026', '').replace('...', '').strip()
         reflection = (reflection or '').replace('\u2026', '').replace('...', '').strip()
+
+        # Dag-anker-guard (alleen basismeting): gecachte proza moet tijdloos blijven.
+        # E\u00e9n retry met strengere instructie (lagere temp); blijft het anker \u2192 schone lokale fallback.
+        if meting_type == 'basismeting' and (_has_day_anchor(insight, lang) or _has_day_anchor(reflection, lang)):
+            try:
+                retry_system = system_prompt + (
+                    "\n\nSTRIKT-HERSCHRIJVEN: je vorige antwoord bevatte een verboden dag-anker "
+                    "('vandaag'/'heute'/'today', 'gisteren', 'morgen', 'deze week', 'vorige week' e.d.). "
+                    "Herschrijf sentence1 en sentence2 VOLLEDIG tijdloos: gebruik geen enkel woord dat aan "
+                    "een specifieke dag bindt. Datums uitsluitend letterlijk uit het FEITEN-blok. Behoud "
+                    "betekenis en toon. Output opnieuw strikt JSON met sentence1, sentence2, question."
+                )
+                msg2 = client.messages.create(
+                    model="claude-haiku-4-5-20251001", max_tokens=400, temperature=0.2,
+                    system=retry_system, messages=[{"role": "user", "content": user_msg}])
+                t2 = msg2.content[0].text.strip()
+                if t2.startswith('```'): t2 = t2.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+                p2 = json.loads(t2)
+                i2 = (p2.get('sentence1') or p2.get('insight') or '').replace('\u2026', '').replace('...', '').strip()
+                r2 = _hard_truncate((p2.get('sentence2') or p2.get('reflection') or ''), 250).replace('\u2026', '').replace('...', '').strip()
+                q2 = (p2.get('question') or '').strip()
+                if i2 and r2 and not _has_day_anchor(i2, lang) and not _has_day_anchor(r2, lang):
+                    insight, reflection = i2, r2
+                    if q2 and not _is_bf_v3 and not _has_day_anchor(q2, lang):
+                        question = q2
+                else:
+                    raise ValueError('retry bevat nog steeds een dag-anker')
+            except Exception:
+                result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline)
+                result['reflection'] = _hard_truncate(result['reflection'], 250)
+                _store_feedback_cache(meting_id, result['insight'], result['reflection'], is_client=_is_client_query, lang=lang)
+                result['question'] = question
+                result['trend_hint'] = (trend_data.get('trend_hint', '') if meting_type == 'basismeting' else '')
+                _fb_payload = {**result, 'source': 'local_dayanchor'}
+                import logging as _lg2; _lg2.getLogger().warning(f"[REFLECTION FINAL] mid={cur.get('id') if 'cur' in dir() and cur else 'n/a'} source={_fb_payload.get('source','?')} reflection_len={len(_fb_payload.get('reflection',''))} reflection={_fb_payload.get('reflection','')!r}")
+                resp = jsonify(_fb_payload)
+                resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+                resp.headers['Pragma'] = 'no-cache'
+                resp.headers['Expires'] = '0'
+                return resp
 
         # Language mixing check — discard and use local fallback if wrong language detected
         if _check_language_mixing(insight, lang) or _check_language_mixing(reflection, lang):
@@ -4363,25 +4621,25 @@ def _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=False, basis
 
     dim_tips = {
         'nl': {
-            'lichamelijk': 'Probeer vandaag even een korte wandeling te maken of 5 minuten te stretchen — je lichaam vraagt om beweging en ontlading.',
-            'mentaal': 'Probeer vandaag eens 5 minuten niets te doen — geen scherm, geen takenlijst. Laat je gedachten even met rust.',
-            'emotioneel': 'Gun jezelf vandaag een moment om te voelen wat er speelt, zonder het op te lossen. Soms is erkennen genoeg.',
-            'spiritueel': 'Sta vandaag even stil bij wat je echt belangrijk vindt. Eén bewuste keuze vanuit je kern maakt verschil.',
-            '': 'Probeer vandaag 5 minuten rustig te ademen: 4 tellen in, 6 tellen uit. Geef je lijf een moment van herstel.',
+            'lichamelijk': 'Probeer even een korte wandeling te maken of 5 minuten te stretchen — je lichaam vraagt om beweging en ontlading.',
+            'mentaal': 'Probeer eens 5 minuten niets te doen — geen scherm, geen takenlijst. Laat je gedachten even met rust.',
+            'emotioneel': 'Gun jezelf een moment om te voelen wat er speelt, zonder het op te lossen. Soms is erkennen genoeg.',
+            'spiritueel': 'Sta even stil bij wat je echt belangrijk vindt. Eén bewuste keuze vanuit je kern maakt verschil.',
+            '': 'Probeer 5 minuten rustig te ademen: 4 tellen in, 6 tellen uit. Geef je lijf een moment van herstel.',
         },
         'de': {
-            'lichamelijk': 'Versuche heute einen kurzen Spaziergang oder 5 Minuten Dehnung — dein Körper braucht Bewegung und Entlastung.',
-            'mentaal': 'Versuche heute 5 Minuten nichts zu tun — kein Bildschirm, keine To-do-Liste. Lass deine Gedanken ruhen.',
-            'emotioneel': 'Gönne dir heute einen Moment, um zu fühlen, was da ist, ohne es lösen zu müssen. Manchmal reicht Anerkennung.',
-            'spiritueel': 'Halte heute kurz inne bei dem, was dir wirklich wichtig ist. Eine bewusste Entscheidung aus deiner Mitte macht den Unterschied.',
-            '': 'Versuche heute 5 Minuten ruhig zu atmen: 4 Sekunden ein, 6 Sekunden aus. Gib deinem Körper einen Moment der Erholung.',
+            'lichamelijk': 'Versuche einen kurzen Spaziergang oder 5 Minuten Dehnung — dein Körper braucht Bewegung und Entlastung.',
+            'mentaal': 'Versuche 5 Minuten nichts zu tun — kein Bildschirm, keine To-do-Liste. Lass deine Gedanken ruhen.',
+            'emotioneel': 'Gönne dir einen Moment, um zu fühlen, was da ist, ohne es lösen zu müssen. Manchmal reicht Anerkennung.',
+            'spiritueel': 'Halte kurz inne bei dem, was dir wirklich wichtig ist. Eine bewusste Entscheidung aus deiner Mitte macht den Unterschied.',
+            '': 'Versuche 5 Minuten ruhig zu atmen: 4 Sekunden ein, 6 Sekunden aus. Gib deinem Körper einen Moment der Erholung.',
         },
         'en': {
-            'lichamelijk': 'Try taking a short walk or 5 minutes of stretching today — your body is asking for movement and release.',
-            'mentaal': 'Try doing nothing for 5 minutes today — no screen, no to-do list. Let your thoughts rest.',
-            'emotioneel': 'Give yourself a moment today to feel what\'s there, without trying to fix it. Sometimes acknowledgment is enough.',
-            'spiritueel': 'Pause today to reflect on what truly matters to you. One conscious choice from your core makes a difference.',
-            '': 'Try 5 minutes of calm breathing today: inhale for 4 counts, exhale for 6. Give your body a moment to recover.',
+            'lichamelijk': 'Try taking a short walk or 5 minutes of stretching — your body is asking for movement and release.',
+            'mentaal': 'Try doing nothing for 5 minutes — no screen, no to-do list. Let your thoughts rest.',
+            'emotioneel': 'Give yourself a moment to feel what\'s there, without trying to fix it. Sometimes acknowledgment is enough.',
+            'spiritueel': 'Pause to reflect on what truly matters to you. One conscious choice from your core makes a difference.',
+            '': 'Try 5 minutes of calm breathing: inhale for 4 counts, exhale for 6. Give your body a moment to recover.',
         }
     }
 
