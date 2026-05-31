@@ -203,7 +203,7 @@ function showConsumerMetingen(cid){
       <button onclick="verlSetPeriod('3jaar')" id="vbAlles" style="font-size:.75rem;padding:.25rem .6rem;border-radius:6px;border:1px solid #ddd;cursor:pointer;background:#fff;color:#666;">{% if lang=="de" %}Alles{% elif lang=="en" %}All{% else %}Alles{% endif %}</button>
     </div>
   </div>
-  <div style="width:100%;max-width:100%;overflow:hidden;"><canvas id="proVerlChart" style="display:block;width:100% !important;max-width:100% !important;height:200px;"></canvas></div><div id="verlChartHint" style="display:none;text-align:center;font-size:.78rem;color:#999;font-style:italic;margin-top:.4rem;">{%if lang=="de"%}Fügen Sie weitere Messungen hinzu, um den Verlauf zu sehen{%elif lang=="en"%}Add more readings to see the trend{%else%}Voeg meer metingen toe om het verloop te zien{%endif%}</div><div style="display:flex;gap:1.5rem;margin-top:.5rem;font-size:.78rem;color:#555;"><span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#fff;border:1px solid rgba(0,0,0,.3);margin-right:.3rem;"></span>Relax Index</span></div>
+  <div style="width:100%;max-width:100%;overflow:hidden;"><canvas id="proVerlChart" style="display:block;width:100% !important;max-width:100% !important;height:200px;"></canvas></div><div id="verlChartHint" style="display:none;text-align:center;font-size:.78rem;color:#999;font-style:italic;margin-top:.4rem;">{%if lang=="de"%}Mit weiteren Messungen erscheint hier der Verlauf{%elif lang=="en"%}More readings will reveal the trend here{%else%}Met meer metingen verschijnt hier de trend{%endif%}</div><div style="display:flex;gap:1.5rem;margin-top:.5rem;font-size:.78rem;color:#555;"><span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#fff;border:1px solid rgba(0,0,0,.3);margin-right:.3rem;"></span>Relax Index</span></div>
 </div>
 <script>
 var lang = lang || "{{ lang }}";
@@ -222,12 +222,20 @@ window.verlSetPeriod = function(p){
 window.verlDraw = function(){
   console.log('[verlDraw] called, VERL_ALL=', VERL_ALL, 'VERL_PERIOD=', VERL_PERIOD);
   var now=Date.now(), msDay=86400000;
+  // Anker voor relatieve vensters (week/maand): dag van de laatste meting i.p.v.
+  // vandaag (fix 2026-05-30) — voorkomt leeg venster bij oudere metingen.
+  // Fallback op vandaag wanneer er geen metingen zijn.
+  var anchorMid=(function(){
+    var base=VERL_ALL.length?new Date(VERL_ALL[VERL_ALL.length-1].ts):new Date();
+    base.setHours(0,0,0,0);
+    return base.getTime();
+  })();
   var data=[], labels=[], szV=[];
   var dn=lang==='de'?['So','Mo','Di','Mi','Do','Fr','Sa']:lang==='en'?['Sun','Mon','Tue','Wed','Thu','Fri','Sat']:['Zo','Ma','Di','Wo','Do','Vr','Za'];
   var mn=lang==='de'?['Jan','Feb','Mrz','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']:lang==='en'?['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']:['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
   if(VERL_PERIOD==='week'){
     for(var i=6;i>=0;i--){
-      var ds=new Date();ds.setHours(0,0,0,0);ds=ds.getTime()-i*msDay;
+      var ds=anchorMid-i*msDay;
       var pts=VERL_ALL.filter(function(d){return d.ts>=ds&&d.ts<ds+msDay;});
       var dd=new Date(ds);
       labels.push(dn[dd.getDay()]+' '+dd.getDate()+'/'+(dd.getMonth()+1));
@@ -235,7 +243,7 @@ window.verlDraw = function(){
     }
   } else if(VERL_PERIOD==='maand'){
     for(var i=29;i>=0;i--){
-      var ds=new Date();ds.setHours(0,0,0,0);ds=ds.getTime()-i*msDay;
+      var ds=anchorMid-i*msDay;
       var pts=VERL_ALL.filter(function(d){return d.ts>=ds&&d.ts<ds+msDay;});
       var dd=new Date(ds);
       labels.push(dd.getDate()+'/'+(dd.getMonth()+1));
