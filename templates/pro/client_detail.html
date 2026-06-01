@@ -47,6 +47,14 @@
   <a href="{{ url_for('pro_menu') }}">≡ Pro Menu</a>
 </div>
 
+{% if request.args.get('reason') == 'profiel_incompleet' %}
+<div style="background:#fff3cd;border-left:4px solid #f0ad4e;border-radius:6px;padding:10px 14px;margin-bottom:1rem;font-size:0.9rem;color:#664d03;">
+  {% if lang == 'de' %}Bitte zuerst Geburtsjahr und Geschlecht dieses Klienten eingeben — diese sind für eine zuverlässige Messung nötig.
+  {% elif lang == 'en' %}Please enter this client's year of birth and gender first — they are needed for a reliable measurement.
+  {% else %}Vul eerst geboortejaar en geslacht van deze cliënt in — die zijn nodig voor een betrouwbare meting.{% endif %}
+</div>
+{% endif %}
+
 <!-- Client Header -->
 <div class="client-header">
   <div class="client-avatar">{{ client.name[0] }}</div>
@@ -66,8 +74,10 @@
   </div>
   <label>{% if lang=="de" %}Geschlecht{% elif lang=="en" %}Gender{% else %}Geslacht{% endif %}</label>
   <select id="editGender">
-    <option value="male" {{ 'selected' if client.gender == 'male' }}>Man</option>
+    <option value="" {{ 'selected' if client.gender not in ['male','female','divers'] }}>{% if lang=="de" %}— wählen —{% elif lang=="en" %}— choose —{% else %}— kies —{% endif %}</option>
     <option value="female" {{ 'selected' if client.gender == 'female' }}>Vrouw</option>
+    <option value="male" {{ 'selected' if client.gender == 'male' }}>Man</option>
+    <option value="divers" {{ 'selected' if client.gender == 'divers' }}>{% if lang=="de" %}Divers / keine Angabe{% elif lang=="en" %}Non-binary / prefer not to say{% else %}Divers / zeg ik liever niet{% endif %}</option>
   </select>
   <div style="margin-top:1rem">
     <button class="btn-save" onclick="saveClient()">{% if lang=="de" %}Speichern{% elif lang=="en" %}Save{% else %}Opslaan{% endif %}</button>

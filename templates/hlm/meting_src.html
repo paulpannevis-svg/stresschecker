@@ -3048,18 +3048,20 @@ body.demo-active .app { padding-top: 44px !important; }
         <div style="display:flex;gap:10px;margin-bottom:16px">
           <div style="flex:1">
             <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px" id="relax-birthyear-label">Geboortejaar</label>
-            <input type="number" id="relax-birthyear" min="1920" max="2010" value="1970" style="width:100%;padding:8px 12px;border:1.5px solid #E0DDD8;border-radius:8px;font-size:14px;background:var(--bg-card);color:var(--text-primary)">
+            <input type="number" id="relax-birthyear" min="1920" max="2010" placeholder="1985" style="width:100%;padding:8px 12px;border:1.5px solid #E0DDD8;border-radius:8px;font-size:14px;background:var(--bg-card);color:var(--text-primary)">
           </div>
           <div style="flex:1">
             <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px" id="relax-gender-label">Geslacht</label>
-            <select id="relax-gender" style="width:100%;padding:8px 12px;border:1.5px solid #E0DDD8;border-radius:8px;font-size:14px;background:var(--bg-card);color:var(--text-primary)">
-              <option value="m" id="relax-gender-m">Man</option>
-              <option value="v" id="relax-gender-v">Vrouw</option>
-            </select>
+            <div id="relax-gender" style="display:flex;flex-direction:column;gap:4px;font-size:13px;padding-top:2px">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="relax-gender" value="v" style="accent-color:var(--hlm-primary)"> <span id="relax-gender-v">Vrouw</span></label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="relax-gender" value="m" style="accent-color:var(--hlm-primary)"> <span id="relax-gender-m">Man</span></label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="relax-gender" value="x" style="accent-color:var(--hlm-primary)"> <span id="relax-gender-x">Divers / zeg ik liever niet</span></label>
+            </div>
           </div>
         </div>
+        <div id="relax-profile-error" style="display:none;margin-top:4px;padding:10px 12px;background:#FDECEA;border:1px solid #F5C6C0;border-radius:8px;color:#B3261E;font-size:13px;line-height:1.4"></div>
       </div>
-      
+
       <div style="padding:0 20px 20px;display:flex;flex-direction:column;gap:10px">
         
         <!-- iOS Bluefy banner (shown only on iOS without Web Bluetooth) -->
@@ -5134,6 +5136,7 @@ function updateUI() {
   (document.getElementById('relax-gender-label') || {}).textContent = t('relaxGender');
   (document.getElementById('relax-gender-m') || {}).textContent = t('relaxGenderM');
   (document.getElementById('relax-gender-v') || {}).textContent = t('relaxGenderV');
+  (document.getElementById('relax-gender-x') || {}).textContent = (currentLang==='de'?'Divers / keine Angabe':currentLang==='en'?'Diverse / prefer not to say':'Divers / zeg ik liever niet');
   (document.getElementById('relax-bt-title') || {}).textContent = t('relaxBtTitle');
   (document.getElementById('relax-bt-desc') || {}).textContent = t('relaxBtDesc');
   (document.getElementById('relax-usb-title') || {}).textContent = t('relaxUsbTitle');
@@ -6105,30 +6108,50 @@ let relaxPendingResult = null;
 function getRelaxProfile() {
   try {
     const s = localStorage.getItem('hlm_relax_profile');
-    return s ? JSON.parse(s) : { birthYear: 1970, gender: 'm' };
-  } catch(e) { return { birthYear: 1970, gender: 'm' }; }
+    return s ? JSON.parse(s) : { birthYear: null, gender: '' };
+  } catch(e) { return { birthYear: null, gender: '' }; }
+}
+function _relaxGetGenderInput() {
+  const el = document.querySelector('input[name="relax-gender"]:checked');
+  return el ? el.value : '';
+}
+function _relaxSetGenderInput(g) {
+  document.querySelectorAll('input[name="relax-gender"]').forEach(function(r){ r.checked = (r.value === g); });
+}
+// leeftijd ongeldig = leeg / NaN / 0 / <=1900. HLM-veld start leeg (geen stille default),
+// dus een bewust getypt 1970/1990 is een geldige invoer — geen sentinel/lus nodig.
+function _relaxBirthInvalid(by) {
+  return !by || isNaN(by) || by <= 1900;
 }
 function saveRelaxProfile() {
-  const by = parseInt(document.getElementById('relax-birthyear').value) || 1970;
-  const g = document.getElementById('relax-gender').value || 'm';
+  const by = parseInt(document.getElementById('relax-birthyear').value, 10);
+  const g = _relaxGetGenderInput();
   localStorage.setItem('hlm_relax_profile', JSON.stringify({ birthYear: by, gender: g }));
   return { birthYear: by, gender: g };
 }
 
-// ===== RMSSD REFERENCE VALUES (Lifelines Cohort, n=84.772) =====
+// RMSSD reference = healthy median per age/sex. Source: Tegegne et al. 2020,
+// Lifelines Cohort (n=84.772), Eur J Prev Cardiol. Median = 100%.
+// Values in ms, ECG-scale (PPG ÷2.5 applied upstream).
 const rmssdReference = {
-  '18-24': [46, 48], '25-34': [41, 43], '35-44': [34, 36],
-  '45-54': [28, 30], '55-64': [24, 25], '65-74': [22, 23], '75+': [24, 24]
+  '18-24': [47.6, 52.1], '25-29': [42.3, 47.5], '30-34': [36.9, 42.3], '35-39': [32.8, 37.9],
+  '40-44': [29.0, 33.9], '45-49': [26.0, 29.2], '50-54': [23.7, 26.6], '55-59': [21.0, 22.5],
+  '60-64': [19.1, 20.5], '65-69': [17.7, 17.8], '70-74': [16.0, 18.3], '75+': [14.9, 16.1]
 };
 function getAgeCategory(birthYear) {
   const age = new Date().getFullYear() - birthYear;
-  if (age < 25) return '18-24'; if (age < 35) return '25-34'; if (age < 45) return '35-44';
-  if (age < 55) return '45-54'; if (age < 65) return '55-64'; if (age < 75) return '65-74';
+  if (age < 25) return '18-24'; if (age < 30) return '25-29'; if (age < 35) return '30-34';
+  if (age < 40) return '35-39'; if (age < 45) return '40-44'; if (age < 50) return '45-49';
+  if (age < 55) return '50-54'; if (age < 60) return '55-59'; if (age < 65) return '60-64';
+  if (age < 70) return '65-69'; if (age < 75) return '70-74';
   return '75+';
 }
 function getReferenceRMSSD(birthYear, gender) {
   const ref = rmssdReference[getAgeCategory(birthYear)];
-  return gender === 'v' ? ref[1] : ref[0];
+  // v = vrouwnorm, m = mannorm, x/divers/onbekend = gemiddelde (geen verborgen man-fallback)
+  if (gender === 'v') return ref[1];
+  if (gender === 'm') return ref[0];
+  return (ref[0] + ref[1]) / 2;
 }
 
 // ===== CALCULATION FUNCTIONS =====
@@ -6375,11 +6398,12 @@ function hasWebBluetooth() {
 }
 
 function openRelaxMeasurement() {
-  // Load saved profile
+  // Load saved profile (alleen voorvullen als eerder geldig opgeslagen; anders leeg laten — geen stille default)
   const profile = getRelaxProfile();
-  document.getElementById('relax-birthyear').value = profile.birthYear;
-  document.getElementById('relax-gender').value = profile.gender;
-  
+  document.getElementById('relax-birthyear').value = _relaxBirthInvalid(profile.birthYear) ? '' : profile.birthYear;
+  _relaxSetGenderInput(profile.gender);
+  const _relErr = document.getElementById('relax-profile-error'); if (_relErr) _relErr.style.display = 'none';
+
   // Update overlay labels
   document.getElementById('relax-sensor-title').textContent = t('relaxSensorTitle');
   document.getElementById('relax-profile-label').textContent = t('relaxProfileLabel');
@@ -6387,6 +6411,7 @@ function openRelaxMeasurement() {
   document.getElementById('relax-gender-label').textContent = t('relaxGender');
   document.getElementById('relax-gender-m').textContent = t('relaxGenderM');
   document.getElementById('relax-gender-v').textContent = t('relaxGenderV');
+  document.getElementById('relax-gender-x').textContent = (currentLang==='de'?'Divers / keine Angabe':currentLang==='en'?'Diverse / prefer not to say':'Divers / zeg ik liever niet');
   document.getElementById('relax-bt-title').textContent = t('relaxBtTitle');
   document.getElementById('relax-bt-desc').textContent = t('relaxBtDesc');
   document.getElementById('relax-usb-title').textContent = t('relaxUsbTitle');
@@ -6450,7 +6475,27 @@ function closeRelaxMeasurement() {
 
 function startRelaxCountdown() {
   const profile = saveRelaxProfile();
-  
+
+  // ===== Verplicht-profiel-gate: leeftijd + geslacht + 18+ (geen stille default, geen oordeel <18) =====
+  const _ageMissing = _relaxBirthInvalid(profile.birthYear);
+  const _genderMissing = !profile.gender;
+  const _age = _ageMissing ? null : (new Date().getFullYear() - profile.birthYear);
+  if (_ageMissing || _genderMissing || (_age !== null && _age < 18)) {
+    const _L = currentLang;
+    let _msg;
+    if (_ageMissing) _msg = (_L==='de'?'Bitte zuerst dein Geburtsjahr eingeben. Das ist für eine zuverlässige Bewertung nötig.':_L==='en'?'Please enter your year of birth first. It is needed for a reliable assessment.':'Vul eerst je geboortejaar in. Dat is nodig voor een betrouwbaar oordeel.');
+    else if (_genderMissing) _msg = (_L==='de'?'Bitte zuerst dein Geschlecht wählen. Das ist für den richtigen Referenzwert nötig.':_L==='en'?'Please select your gender first. It is needed for the correct reference value.':'Kies eerst je geslacht. Dat is nodig voor de juiste referentiewaarde.');
+    else _msg = (_L==='de'?'StressChecker ist für Nutzer ab 18 Jahren gedacht. Für Jüngere zeigen wir keine Belastbarkeitsbewertung — die verwendeten HRV-Normen basieren auf Erwachsenen.':_L==='en'?'StressChecker is intended for users aged 18 and over. For younger users we do not show a strain assessment — the HRV reference values are based on adults.':'StressChecker is bedoeld voor gebruikers vanaf 18 jaar. Voor jongeren tonen we geen belastbaarheidsoordeel — de gebruikte HRV-normen zijn op volwassenen gebaseerd.');
+    const _e = document.getElementById('relax-profile-error');
+    if (_e) { _e.textContent = _msg; _e.style.display = 'block'; }
+    relaxMeasuring = false;
+    const _ps = document.getElementById('relax-phase-sensor'); if (_ps) _ps.style.display = 'block';
+    const _pm = document.getElementById('relax-phase-measure'); if (_pm) _pm.style.display = 'none';
+    const _stat = document.getElementById('relax-sensor-status'); if (_stat) _stat.style.display = 'none';
+    return;
+  }
+  const _okErr = document.getElementById('relax-profile-error'); if (_okErr) _okErr.style.display = 'none';
+
   // Reset measurement state
   relaxTimeLeft = 90;
   relaxRR = []; relaxHrHistory = []; relaxHrvHistory = []; relaxRiHistory = [];

@@ -1171,7 +1171,7 @@ def verify_2fa():
                     import sqlite3 as _sq3
                     _uc = _sq3.connect('/opt/ic-license-server/data/saas_licenses.db')
                     _uc.row_factory = _sq3.Row
-                    _ur = _uc.execute("SELECT display_name, birth_year, gender, sensor_pref, language, surname FROM users WHERE email=?", (em,)).fetchone()
+                    _ur = _uc.execute("SELECT display_name, birth_year, gender, sensor_pref, language, surname, profile_completed FROM users WHERE email=?", (em,)).fetchone()
                     if _ur and _ur['display_name']:
                         nm = _ur['display_name']
                         try: session['profile_surname'] = _ur['surname'] or ''
@@ -1181,6 +1181,7 @@ def verify_2fa():
                         session['profile_birth_year'] = _ur['birth_year']
                     if _ur and _ur['gender']:
                         session['profile_gender'] = _ur['gender']
+                    session['profile_completed'] = (_ur['profile_completed'] if _ur and _ur['profile_completed'] else 0)
                     session['sensor_pref'] = _ur['sensor_pref'] if _ur['sensor_pref'] else 'bluetooth'
                     _uc.close()
                 except Exception:
@@ -1188,6 +1189,7 @@ def verify_2fa():
             # Bewaar velden die we nodig hebben, dan sessie schoonvegen
             _birth = session.get('profile_birth_year', 1970)
             _gender = session.get('profile_gender', 'male')
+            _completed = session.get('profile_completed', 0)
             _sensor = session.get('sensor_pref', 'bluetooth')
             _lic_code = session.get('2fa_license_code', '')
             session.clear()
@@ -1205,12 +1207,12 @@ def verify_2fa():
                 _ldb2.execute("UPDATE licenses SET email=?, status='activated' WHERE license_key=? AND status='available'", (em, _lic_code))
                 _ldb2.commit()
             _lr2=_ldb2.execute("SELECT user_key FROM licenses WHERE email=? AND product='sc' ORDER BY rowid DESC LIMIT 1",(em,)).fetchone(); _ldb2.close(); session['user_key']=_paired_user_key if _paired_user_key else (_lr2[0] if _lr2 else None)
-            session['profile_name']=nm; session['profile_birth_year']=_birth; session['profile_gender']=_gender; session['sensor_pref']=_sensor
+            session['profile_name']=nm; session['profile_birth_year']=_birth; session['profile_gender']=_gender; session['profile_completed']=_completed; session['sensor_pref']=_sensor
             if _paired_pro_id:
                 session['paired_with_pro']  = _paired_pro_id
                 session['paired_client_id'] = _paired_client_id
-            # Verplicht profile_setup vóór menu als birth_year ontbreekt/default
-            if not _birth or _birth == 1970:
+            # Verplicht profile_setup vóór menu zolang profiel niet voltooid is (vlag, niet de 1970-sentinel)
+            if not _completed:
                 return redirect(url_for('profile_setup'))
             return redirect(url_for('pro_menu') if lt=='pro' else url_for('menu'))
         else:
@@ -1323,10 +1325,14 @@ def save_profile():
     _surname = request.form.get('surname', '').strip() or None
     _by   = int(request.form.get('birth_year', 1970))
     _gen  = request.form.get('gender', 'male')
+    # Profiel-compleet-vlag: 1 zodra geldig geboortejaar + geslacht zijn ingevuld
+    # (een déliberaat ingevuld 1970/1990 telt hier als geldig — de lus-fix).
+    _completed = 0 if _profiel_incompleet(_by, _gen) else 1
     session['profile_name']       = _name
     session['profile_surname']    = _surname or ''
     session['profile_birth_year'] = _by
     session['profile_gender']     = _gen
+    session['profile_completed']  = _completed
     # Persisteer + zet activated_at/license_expires alleen bij eerste keer
     import sqlite3 as _sq2, datetime as _dt2
     _cn2 = _sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
@@ -1337,11 +1343,11 @@ def save_profile():
         _exp = _now + _dt2.timedelta(days=183)  # ~6 maanden
     _cn2.execute(
         "UPDATE users SET "
-        "display_name=?, surname=?, birth_year=?, gender=?, "
+        "display_name=?, surname=?, birth_year=?, gender=?, profile_completed=?, "
         "activated_at=COALESCE(activated_at, ?), "
         "license_expires=COALESCE(license_expires, ?) "
         "WHERE email=?",
-        (_name, _surname, _by, _gen,
+        (_name, _surname, _by, _gen, _completed,
          _now.isoformat(), _exp.isoformat(),
          session.get('email',''))
     )
@@ -1479,37 +1485,73 @@ def logout():
     session.clear()
     return redirect('/welkom')
 
+# ── Verplicht-profiel-handhaving (leeftijd + geslacht) ─────────────────────────
+# Geen enkele meet-ingang mag een stille default-leeftijd/geslacht doorlaten.
+# "Nooit ingevuld" wordt afgedwongen via de profile_completed-vlag (users/clients),
+# NIET meer via de 1970/1990-sentinelwaarde — zo loopt een écht in 1970/1990 geboren
+# gebruiker/cliënt niet vast: na invullen gaat de vlag op 1 en mag de meting wél.
+# Deze helper is de defensieve WAARDE-check (None/0/<=1900/ongeldig geslacht); ze is
+# ook de basis voor het ZETTEN van de vlag: vlag=1  ⇔  not _profiel_incompleet(...).
+def _profiel_incompleet(birth_year, gender):
+    try:
+        by = int(birth_year) if birth_year not in (None, '') else None
+    except (TypeError, ValueError):
+        by = None
+    by_invalid = by is None or by <= 1900
+    g = (gender or '').strip().lower()
+    g_invalid = g not in ('male', 'female', 'divers', 'unspecified')
+    return by_invalid or g_invalid
+
 @app.route('/sensor-en-meten')
 def sensor_en_meten():
     if not session.get("license_valid") and not session.get("demo_mode"):
         return redirect(url_for("welcome"))
     _cid = int(request.args.get("cid", 0)) or session.get("measuring_for_client") or 0
-    # Block-check: eigen-meting zonder ingevulde birth_year → profile_setup
-    if _cid == 0 and not session.get("demo_mode"):
-        import sqlite3 as _sq_blk
-        _cn_blk = _sq_blk.connect('/opt/ic-license-server/data/saas_licenses.db')
-        _by_row = _cn_blk.execute(
-            "SELECT birth_year FROM users WHERE email=?",
-            (session.get('email',''),)
-        ).fetchone()
-        _cn_blk.close()
-        _by = _by_row[0] if _by_row else None
-        if _by is None or _by == 1970:
-            return redirect(url_for('profile_setup') + '?reason=meting_blocked')
+    # Verplicht-profiel-handhaving: geen meting bij ontbrekend/ongeldig geboortejaar óf geslacht.
+    # Eigen meting → users-DB; pro-cliëntmeting → clients-DB (DB-waarheid). Demo gebruikt fixtures → overslaan.
+    _cli_by, _cli_gen = session.get("client_birth_year"), session.get("client_gender")
+    _own_by, _own_gen = session.get("profile_birth_year"), session.get("profile_gender")
+    _profile_ok = True
+    if not session.get("demo_mode"):
+        if _cid and _is_pro_or_demo_pro():
+            _pdb = get_pro_db()
+            _crow = _pdb.execute("SELECT birth_year, gender, profile_completed FROM clients WHERE id=? AND pro_key=?",
+                                 (_cid, get_user_key())).fetchone()
+            _pdb.close()
+            if _crow is not None:
+                _cli_by, _cli_gen = _crow["birth_year"], _crow["gender"]
+                _profile_ok = bool(_crow["profile_completed"]) and not _profiel_incompleet(_cli_by, _cli_gen)
+            else:
+                _profile_ok = False
+            if not _profile_ok:
+                return redirect(url_for('pro_client_detail', cid=_cid) + '?reason=profiel_incompleet')
+        else:
+            import sqlite3 as _sq_blk
+            _cn_blk = _sq_blk.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _by_row = _cn_blk.execute("SELECT birth_year, gender, profile_completed FROM users WHERE email=?",
+                                      (session.get('email',''),)).fetchone()
+            _cn_blk.close()
+            if _by_row is not None:
+                _own_by, _own_gen = _by_row[0], _by_row[1]
+                _profile_ok = bool(_by_row[2]) and not _profiel_incompleet(_own_by, _own_gen)
+            else:
+                _profile_ok = False
+            if not _profile_ok:
+                return redirect(url_for('profile_setup') + '?reason=meting_blocked')
     if _cid and _is_pro_or_demo_pro():
         profile = {"id": _cid, "name": session.get("client_name",""),
                    "surname": session.get("client_surname","") or None,
-                   "birth_year": session.get("client_birth_year", 1970),
-                   "gender": session.get("client_gender","male")}
+                   "birth_year": _cli_by if _cli_by is not None else session.get("client_birth_year", 1970),
+                   "gender": _cli_gen or session.get("client_gender","male")}
     else:
         profile = {"id": 1, "name": session.get("profile_name", "Paul"),
                    "surname": session.get("profile_surname","") or None,
-                   "birth_year": session.get("profile_birth_year", 1970),
-                   "gender": session.get("profile_gender", "male")}
+                   "birth_year": _own_by if _own_by is not None else session.get("profile_birth_year", 1970),
+                   "gender": _own_gen or session.get("profile_gender", "male")}
     _dur_arg = request.args.get("duration", type=int)
     _biofeed_dur = _dur_arg if (_dur_arg is not None and 180 <= _dur_arg <= 1800) else 600
     return render_template("sensor_en_meten.html",
-        lang=session.get("lang", "nl"), profile=profile,
+        lang=session.get("lang", "nl"), profile=profile, profile_ok=_profile_ok,
         duration=_biofeed_dur if request.args.get("type")=="biofeedback" else 90,
         skip_subj=request.args.get("skip_subj","0"), is_pro=is_pro(),
         meting_type=request.args.get("type","basismeting"),
@@ -1672,10 +1714,26 @@ def mijn_metingen():
 def biofeedback():
     if not session.get("license_valid") and not session.get("demo_mode"):
         return redirect(url_for("welcome"))
+    # Verplicht-profiel-handhaving: ook biofeedback berekent HRV%/RI → geen meting bij onvolledig profiel.
+    _bf_by, _bf_gen = session.get("profile_birth_year"), session.get("profile_gender")
+    _bf_ok = True
+    if not session.get("demo_mode"):
+        import sqlite3 as _sq_bf
+        _cn_bf = _sq_bf.connect('/opt/ic-license-server/data/saas_licenses.db')
+        _r_bf = _cn_bf.execute("SELECT birth_year, gender, profile_completed FROM users WHERE email=?",
+                               (session.get('email',''),)).fetchone()
+        _cn_bf.close()
+        if _r_bf is not None:
+            _bf_by, _bf_gen = _r_bf[0], _r_bf[1]
+            _bf_ok = bool(_r_bf[2]) and not _profiel_incompleet(_bf_by, _bf_gen)
+        else:
+            _bf_ok = False
+        if not _bf_ok:
+            return redirect(url_for('profile_setup') + '?reason=meting_blocked')
     profile = {"name": session.get("profile_name", ""), "surname": session.get("profile_surname","") or None,
-               "birth_year": session.get("profile_birth_year", 1990),
-               "gender": session.get("profile_gender", "male"), "id": session.get("profile_id", 0)}
-    response = make_response(render_template("measure.html", lang=session.get("lang", "nl"), profile=profile, duration=0, skip_subj="1", is_pro=is_pro(), meting_type="biofeedback"))
+               "birth_year": _bf_by if _bf_by is not None else session.get("profile_birth_year", 1990),
+               "gender": _bf_gen or session.get("profile_gender", "male"), "id": session.get("profile_id", 0)}
+    response = make_response(render_template("measure.html", lang=session.get("lang", "nl"), profile=profile, profile_ok=_bf_ok, duration=0, skip_subj="1", is_pro=is_pro(), meting_type="biofeedback", is_demo=session.get("is_demo") or session.get("demo_mode", False)))
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -2555,8 +2613,12 @@ def pro_client_add():
     if request.method == 'POST':
         name = request.form.get('name','').strip()
         surname = request.form.get('surname','').strip() or None
-        birth_year = int(request.form.get('birth_year', 1970))
-        gender = request.form.get('gender', 'male')
+        _by_raw = (request.form.get('birth_year') or '').strip()
+        birth_year = int(_by_raw) if _by_raw.isdigit() else 1970
+        gender = request.form.get('gender', '')
+        # Profiel-compleet-vlag: alleen 1 als geboortejaar én geslacht écht/geldig zijn ingevuld
+        # (de opslag-fallback 1970/'' telt NIET als ingevuld → vlag 0 → meting geblokkeerd tot aanvulling).
+        _cli_completed = 0 if _profiel_incompleet(int(_by_raw) if _by_raw.isdigit() else None, gender) else 1
         # Krankenkasse-flow: e-mail/telefoon/notities niet uitgevraagd
         email = '' if is_kk else request.form.get('email','').strip()
         phone = '' if is_kk else request.form.get('phone','').strip()
@@ -2574,8 +2636,8 @@ def pro_client_add():
                 return redirect(url_for('pro_clients', limit_reached=1))
         client_code = generate_client_code()
         db = get_pro_db()
-        db.execute("INSERT INTO clients (pro_key,name,surname,birth_year,gender,client_code,email,phone,notes) VALUES (?,?,?,?,?,?,?,?,?)",
-                   (pro_key, name, surname, birth_year, gender, client_code, email, phone, notes))
+        db.execute("INSERT INTO clients (pro_key,name,surname,birth_year,gender,client_code,email,phone,notes,profile_completed) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                   (pro_key, name, surname, birth_year, gender, client_code, email, phone, notes, _cli_completed))
         db.commit()
         db.close()
         return redirect(url_for('pro_clients'))
@@ -2617,6 +2679,10 @@ def pro_client_measure(cid):
     db.close()
     if not client:
         return redirect(url_for('pro_clients'))
+    # Verplicht-profiel-handhaving: geen cliëntmeting tot het profiel voltooid is (vlag).
+    # Demo-cliënten zijn fixtures → overslaan.
+    if not _demo and (not client['profile_completed'] or _profiel_incompleet(client['birth_year'], client['gender'])):
+        return redirect(url_for('pro_client_detail', cid=cid) + '?reason=profiel_incompleet')
     session['measuring_for_client'] = cid
     session['client_name'] = client['name']
     try: session['client_surname'] = client['surname'] or ''
@@ -4973,12 +5039,14 @@ def api_pro_client_update(cid):
         birth_year = int(birth_year) if birth_year else None
     except (ValueError, TypeError):
         birth_year = None
+    # Profiel-compleet-vlag meeschrijven: 1 zodra geldig geboortejaar + geslacht zijn ingevuld.
+    _upd_completed = 0 if _profiel_incompleet(birth_year, gender) else 1
     pro_db.execute(
-        'UPDATE clients SET name=?, surname=?, birth_year=?, gender=? WHERE id=? AND pro_key=?',
-        (name, surname, birth_year, gender, cid, get_user_key())
+        'UPDATE clients SET name=?, surname=?, birth_year=?, gender=?, profile_completed=? WHERE id=? AND pro_key=?',
+        (name, surname, birth_year, gender, _upd_completed, cid, get_user_key())
     )
     pro_db.commit()
-    return jsonify({"ok": True, "name": name, "surname": surname, "birth_year": birth_year, "gender": gender})
+    return jsonify({"ok": True, "name": name, "surname": surname, "birth_year": birth_year, "gender": gender, "profile_completed": _upd_completed})
 
 
 # ─── Koppeling (Pairing) API ────────────────────────────────────────────────

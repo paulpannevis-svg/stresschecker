@@ -266,8 +266,8 @@
 .bs-hint { font-size:.68rem; color:#999; font-style:italic; margin-top:.35rem; text-align:center; }
 </style>
 
-<script>window.SC_LANG="{{lang}}";</script>
-<script src="/static/js/hrv.js?v=3"></script>
+<script>window.SC_LANG="{{lang}}";window.SC_DEMO={{ 'true' if is_demo else 'false' }};window.SC_PROFILE_OK={{ 'true' if profile_ok else 'false' }};</script>
+<script src="/static/js/hrv.js?v=4"></script>
 <script src="/static/js/sensor.js"></script>
 <script>
 const DURATION = {{ duration }};
@@ -276,6 +276,35 @@ const DURATION = {{ duration }};
   var GENDER = '{{ profile.gender }}';
   var AGE = new Date().getFullYear() - BIRTH_YEAR;
 const PROFILE_ID = {{ profile.id }};
+
+// ===== Verplicht-profiel-gate: leeftijd + geslacht + 18+ (geen stille default, geen oordeel <18) =====
+function _scBirthInvalid(by){ return !by || isNaN(by) || by<=1900 || by===1970 || by===1990; }
+function _scProfileBlockReason(){
+  if(window.SC_DEMO) return null; // demo gebruikt fixtures → niet blokkeren
+  if(!window.SC_PROFILE_OK){
+    // server-vlag zegt: profiel niet voltooid → bepaal nette reden (waarden enkel voor de boodschapkeuze)
+    if(_scBirthInvalid(BIRTH_YEAR)) return 'age';
+    var vg=['male','female','divers','unspecified'];
+    if(vg.indexOf((GENDER||'').toLowerCase())===-1) return 'gender';
+    return 'age';
+  }
+  if(AGE<18) return 'under18'; // voltooid profiel: alleen nog leeftijdsgrens
+  return null;
+}
+function _scBlockMsg(r){
+  var L=window.SC_LANG||'nl';
+  if(r==='age') return L==='de'?'Bitte zuerst dein Geburtsjahr eingeben. Das ist für eine zuverlässige Bewertung nötig.':L==='en'?'Please enter your year of birth first. It is needed for a reliable assessment.':'Vul eerst je geboortejaar in. Dat is nodig voor een betrouwbaar oordeel.';
+  if(r==='gender') return L==='de'?'Bitte zuerst dein Geschlecht wählen. Das ist für den richtigen Referenzwert nötig.':L==='en'?'Please select your gender first. It is needed for the correct reference value.':'Kies eerst je geslacht. Dat is nodig voor de juiste referentiewaarde.';
+  return L==='de'?'StressChecker ist für Nutzer ab 18 Jahren gedacht. Für Jüngere zeigen wir keine Belastbarkeitsbewertung — die verwendeten HRV-Normen basieren auf Erwachsenen.':L==='en'?'StressChecker is intended for users aged 18 and over. For younger users we do not show a strain assessment — the HRV reference values are based on adults.':'StressChecker is bedoeld voor gebruikers vanaf 18 jaar. Voor jongeren tonen we geen belastbaarheidsoordeel — de gebruikte HRV-normen zijn op volwassenen gebaseerd.';
+}
+function _scShowBlock(r){
+  var c=document.querySelector('.measure-container'); if(c) c.style.display='none';
+  var box=document.getElementById('sc-profile-block');
+  if(!box){ box=document.createElement('div'); box.id='sc-profile-block'; box.style.cssText='max-width:520px;margin:32px auto;padding:18px 22px;background:#fff3cd;border-left:4px solid #f0ad4e;border-radius:8px;color:#664d03;font-size:0.95rem;line-height:1.5'; document.body.appendChild(box); }
+  box.innerHTML=''; var p=document.createElement('div'); p.textContent=_scBlockMsg(r); box.appendChild(p);
+  if(r!=='under18'){ var a=document.createElement('a'); a.href='/profiel'; a.textContent=(window.SC_LANG==='de'?'Profil vervollständigen ▶':window.SC_LANG==='en'?'Complete profile ▶':'Profiel aanvullen ▶'); a.style.cssText='display:inline-block;margin-top:12px;color:#E8344E;font-weight:600;text-decoration:none'; box.appendChild(a); }
+}
+document.addEventListener('DOMContentLoaded', function(){ var r=_scProfileBlockReason(); if(r) _scShowBlock(r); });
 
 let rrIntervals = [];
 let beatCount = 0;
@@ -729,6 +758,7 @@ function cancelMeasure() {
 }
 
 function finishMeasure() {
+  var _blk=_scProfileBlockReason(); if(_blk){ try{Sensor.stop();}catch(e){} _scShowBlock(_blk); return; }
   Sensor.stop();
   stopBreath(); stopNoise(); _killAudioNow();
 

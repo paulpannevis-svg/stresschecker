@@ -20,9 +20,9 @@
 
       {% if request.args.get('reason') == 'meting_blocked' %}
       <div style="background:#fff3cd;border-left:4px solid #f0ad4e;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:0.9rem;color:#664d03;">
-        {% if lang == 'de' %}Bitte ergänzen Sie diese Angaben, bevor Sie eine Messung durchführen.
-        {% elif lang == 'en' %}Please complete these details before taking a measurement.
-        {% else %}Vul deze gegevens aan voordat je een meting doet.{% endif %}
+        {% if lang == 'de' %}Bitte zuerst Geburtsjahr und Geschlecht eingeben — diese sind für eine zuverlässige Bewertung nötig.
+        {% elif lang == 'en' %}Please enter your year of birth and gender first — they are needed for a reliable assessment.
+        {% else %}Vul eerst je geboortejaar en geslacht in — die zijn nodig voor een betrouwbaar oordeel.{% endif %}
       </div>
       {% endif %}
 
@@ -58,20 +58,16 @@
         </label>
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.95rem;">
-            <input type="radio" name="gender" value="male" required style="accent-color:var(--red);width:18px;height:18px;">
-            {% if lang == 'de' %}Mann{% elif lang == 'en' %}Male{% else %}Man{% endif %}
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.95rem;">
             <input type="radio" name="gender" value="female" required style="accent-color:var(--red);width:18px;height:18px;">
             {% if lang == 'de' %}Frau{% elif lang == 'en' %}Female{% else %}Vrouw{% endif %}
           </label>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.95rem;">
-            <input type="radio" name="gender" value="divers" required style="accent-color:var(--red);width:18px;height:18px;">
-            {% if lang == 'de' %}Divers{% elif lang == 'en' %}Non-binary{% else %}Divers{% endif %}
+            <input type="radio" name="gender" value="male" required style="accent-color:var(--red);width:18px;height:18px;">
+            {% if lang == 'de' %}Mann{% elif lang == 'en' %}Male{% else %}Man{% endif %}
           </label>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.95rem;">
-            <input type="radio" name="gender" value="unspecified" required style="accent-color:var(--red);width:18px;height:18px;">
-            {% if lang == 'de' %}Möchte ich nicht angeben{% elif lang == 'en' %}Prefer not to say{% else %}Zeg ik liever niet{% endif %}
+            <input type="radio" name="gender" value="divers" required style="accent-color:var(--red);width:18px;height:18px;">
+            {% if lang == 'de' %}Divers / keine Angabe{% elif lang == 'en' %}Non-binary / prefer not to say{% else %}Divers / zeg ik liever niet{% endif %}
           </label>
         </div>
       </div>

@@ -29,18 +29,21 @@
       {% endif %}
 
       <div class="form-group" style="margin-bottom:14px;">
-        <label class="form-label" for="birth_year">{%if lang=='de'%}Geburtsjahr{%elif lang=='en'%}Birth year{%else%}Geboortejaar{%endif%}{% if is_krankenkasse %} *{% endif %}</label>
-        <input type="number" id="birth_year" name="birth_year" class="form-input" {% if is_krankenkasse %}placeholder="1985" required{% else %}value="1970"{% endif %} min="1920" max="2020">
+        <label class="form-label" for="birth_year">{%if lang=='de'%}Geburtsjahr{%elif lang=='en'%}Birth year{%else%}Geboortejaar{%endif%} *</label>
+        <input type="number" id="birth_year" name="birth_year" class="form-input" placeholder="1985" required min="1920" max="2020">
       </div>
 
       <div class="form-group" style="margin-bottom:14px;">
-        <label class="form-label">{%if lang=='de'%}Geschlecht{%elif lang=='en'%}Gender{%else%}Geslacht{%endif%}{% if is_krankenkasse %} *{% endif %}</label>
-        <div style="display:flex;gap:1.5rem;margin-top:.3rem;">
+        <label class="form-label">{%if lang=='de'%}Geschlecht{%elif lang=='en'%}Gender{%else%}Geslacht{%endif%} *</label>
+        <div style="display:flex;gap:1.5rem;margin-top:.3rem;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;">
-            <input type="radio" name="gender" value="male" {% if not is_krankenkasse %}checked{% else %}required{% endif %}> {%if lang=='de'%}Männlich{%elif lang=='en'%}Male{%else%}Man{%endif%}
+            <input type="radio" name="gender" value="female" required> {%if lang=='de'%}Weiblich{%elif lang=='en'%}Female{%else%}Vrouw{%endif%}
           </label>
           <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;">
-            <input type="radio" name="gender" value="female"> {%if lang=='de'%}Weiblich{%elif lang=='en'%}Female{%else%}Vrouw{%endif%}
+            <input type="radio" name="gender" value="male" required> {%if lang=='de'%}Männlich{%elif lang=='en'%}Male{%else%}Man{%endif%}
+          </label>
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;">
+            <input type="radio" name="gender" value="divers" required> {%if lang=='de'%}Divers / keine Angabe{%elif lang=='en'%}Non-binary / prefer not to say{%else%}Divers / zeg ik liever niet{%endif%}
           </label>
         </div>
       </div>
