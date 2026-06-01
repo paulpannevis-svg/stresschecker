@@ -302,10 +302,11 @@ var vit=5;
 
   // Subjectief marker op gauge
   var preSubj=cur&&cur.subj!=null?parseFloat(cur.subj):parseFloat(sessionStorage.getItem('sc_subjectief_pre'));
+  // Onaangeraakte slider = bewuste instemming met de getoonde stand (5/neutraal).
+  if(isNaN(preSubj)) preSubj = 5;
 
-  // Auto-POST subjectief score — GEEN stille 5: onaangeraakte zelfinschatting (NaN) wordt NIET gepost,
-  // zodat subjectief_score NULL blijft i.p.v. een phantom-5.
-  if(!isNaN(preSubj) && !sessionStorage.getItem('sc_subj_posted')){
+  // Auto-POST subjectief score
+  if(!sessionStorage.getItem('sc_subj_posted')){
     fetch('/api/set_subjectief',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({score:Math.round(preSubj)})})
       .then(function(){sessionStorage.setItem('sc_subj_posted','1');})
       .catch(function(){});
@@ -486,7 +487,7 @@ function kwOpslaan(){
   if(KW_METING_TYPE === 'basismeting' && pcid>0){window.location.href='/pro/client/'+pcid;return;}if(KW_METING_TYPE === 'biofeedback' || KW_METING_TYPE === 'situatiemeting'){
     document.getElementById('kwLabelModal').style.display='flex';
   } else {
-    fetch('/api/meting/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({meting_id:PENDING_ID,subjectief_pre:sessionStorage.getItem('sc_subjectief_pre')})})
+    fetch('/api/meting/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({meting_id:PENDING_ID,subjectief_pre:sessionStorage.getItem('sc_subjectief_pre')||'5'})})
     .then(function(){window.location.href=pcid>0?'/pro/client/'+pcid:'/resultaten';})
     .catch(function(){window.location.href=pcid>0?'/pro/client/'+pcid:'/resultaten';});
   }
@@ -500,8 +501,8 @@ function saveKwLabel(skip){
   if(KW_METING_TYPE==='basismeting'){skip=true;}
   var label = skip ? '' : document.getElementById('kwLabelInput').value;
   document.getElementById('kwLabelModal').style.display='none';
-  if(pcid>0){fetch('/api/meting/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({meting_id:PENDING_ID,label:label,subjectief_pre:sessionStorage.getItem('sc_subjectief_pre')})});setTimeout(function(){window.location.href='/pro/client/'+pcid;},300);return;}
-  fetch('/api/meting/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({meting_id:PENDING_ID,label:label,subjectief_pre:sessionStorage.getItem('sc_subjectief_pre')})})
+  if(pcid>0){fetch('/api/meting/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({meting_id:PENDING_ID,label:label,subjectief_pre:sessionStorage.getItem('sc_subjectief_pre')||'5'})});setTimeout(function(){window.location.href='/pro/client/'+pcid;},300);return;}
+  fetch('/api/meting/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({meting_id:PENDING_ID,label:label,subjectief_pre:sessionStorage.getItem('sc_subjectief_pre')||'5'})})
   .then(function(){window.location.href=pcid>0?'/pro/client/'+pcid:'/resultaten';})
   .catch(function(){window.location.href=pcid>0?'/pro/client/'+pcid:'/resultaten';});
 }

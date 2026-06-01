@@ -571,7 +571,7 @@ circle[fill="#fdecea"] { fill: #e8f5f0 !important; }
 })();
 function setDim(val,btn){document.querySelectorAll(".ctx-dim-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");sessionStorage.setItem("sc_ctx_dimensie",val);var c=document.getElementById("btnContinue");if(c)c.removeAttribute("aria-disabled");}
 sessionStorage.setItem("sc_ctx_vitaliteit","5");
-sessionStorage.removeItem("sc_subjectief_pre");
+sessionStorage.setItem("sc_subjectief_pre","5");
 sessionStorage.setItem("sc_ctx_ongemak","5");
 sessionStorage.removeItem("sc_ctx_dimensie");
 sessionStorage.removeItem("sc_ctx_vrije_tekst");

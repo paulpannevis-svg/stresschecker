@@ -2759,16 +2759,13 @@ def api_save_meting():
         client_id = int(client_id) if client_id else 0
         session['last_meting_type'] = data.get('meting_type', 'basismeting')
         _sp = data.get('subjectief_pre')
-        # Geen stille 5: onaangeraakte/ontbrekende zelfinschatting → NULL (niet ingevuld),
-        # zodat de AI er geen lichaam-vs-gevoel-tegenstelling op kan baseren.
-        if _sp in (None, ''):
-            _subj_score = None
-        else:
-            try:
-                _subj_score = int(float(str(_sp)))
-                if not (0 <= _subj_score <= 10): _subj_score = None
-            except Exception:
-                _subj_score = None
+        # Onaangeraakte slider = bewuste instemming met de getoonde stand (5/neutraal).
+        # Ontbrekend/leeg/ongeldig → 5; geen NULL-onderscheid tussen "bewust 5" en "overgeslagen".
+        try:
+            _subj_score = int(float(str(_sp))) if _sp not in (None, '') else 5
+            if not (0 <= _subj_score <= 10): _subj_score = 5
+        except Exception:
+            _subj_score = 5
         def _ctx_int(v):
             try:
                 n = int(float(str(v))) if v not in (None, '') else None
@@ -3447,9 +3444,11 @@ Kan wijzen op actieve rust (na inspanning, na koffie, na emotie). Als ctx_vrije_
 DISCREPANTIE-REGEL (INNERLIJK KOMPAS):
 Het FEITEN-blok zegt al of zelfinschatting en RI dicht bij elkaar liggen of merkbaar
 verschillen ("Lichaam versus gevoel"). Reken dit niet zelf na. Vertaal de gegeven uitkomst:
+Schaal de toon aan de grootte van het verschil zoals het FEITEN-blok het formuleert:
 - Liggen ze dicht bij elkaar: hooguit een kleine nuance, niet vooraanstaand. Lichaam en gevoel die dezelfde kant op wijzen is een geldige, positieve uitkomst.
-- Verschillen ze merkbaar: benoem dat als kernuitspraak voor zin 2.
-- Ontbreekt de regel "Lichaam versus gevoel" in het FEITEN-blok? Dan heeft de persoon GEEN zelfinschatting ingevuld: benoem dan GEEN verschil of overeenkomst tussen lichaam en gevoel, en gebruik het ontbreken niet als signaal. Construeer nooit een tegenstelling die er niet is.
+- Een MILD verschil ("liggen iets uit elkaar"): benoem licht en terloops, NIET als opvallende tegenstelling. Bijvoorbeeld "je lichaam is iets meer ontspannen dan je je bewust voelt — dat is niet ongewoon". Geen drama, geen alarmtoon, niet vooraanstaand.
+- Verschillen ze merkbaar (groot): benoem dat expliciet als kernuitspraak voor zin 2.
+- Ontbreekt de regel "Lichaam versus gevoel" (oudere meting zonder zelfinschatting)? Benoem dan geen verschil; gebruik het ontbreken niet als signaal.
 
 BIJ DISCREPANTIE:
 - Gevoel HOGER dan lichaam: persoon voelt zich beter dan lichaam toont. "Je lichaam toont nog druk, terwijl je je al beter voelt".
@@ -3483,8 +3482,8 @@ BASISMETING_SYSTEM_PROMPT = (
     "naar het eigen patroon.\n\n"
     "INPUT-VELDEN (wat je in user_message krijgt):\n"
     "- current.ri, current.bpm, current.hrv_pct, current.rmssd — fysiologische ruggengraat\n"
-    "- current.subjectief_score (0-10) of null — zelfrapportage rust/gespannen; null = NIET ingevuld: "
-    "benoem dan geen gevoel/zelfinschatting en construeer geen lichaam-vs-gevoel-verschil\n"
+    "- current.subjectief_score (0-10) — zelfrapportage rust/gespannen; een onaangeraakte slider "
+    "telt als bewuste instemming met 5 (neutraal)\n"
     "- current.ctx_dimensie — 'lichamelijk' / 'mentaal' / 'emotioneel' / 'spiritueel' / 'weet_niet' / null\n"
     "- current.ctx_vitaliteit (0-10) — hoger = meer afstemming op wat bij de persoon past\n"
     "- current.ctx_ongemak (0-10) — hoger = meer fysiek ongemak\n"
@@ -3621,9 +3620,8 @@ SITUATIEMETING_SYSTEM_PROMPT = (
     "'Voor vergadering' met lage RI zegt iets over anticipatie. "
     "'Tijdens pauze' met lage RI zegt iets anders.\n"
     "- Benoem of current.ri binnen, onder, of boven de baseline_range valt.\n"
-    "- Lichaam-versus-gevoel-discrepantie (RI versus subjectief_score) alleen benoemen als "
-    "subjectief_gezet=true (zelfinschatting expliciet ingevuld) ÉN het verschil groot is. "
-    "Is subjectief_score null / niet gezet, benoem dan GEEN gevoel en GEEN tegenstelling. "
+    "- Lichaam-versus-gevoel (RI versus subjectief_score): schaal de duiding aan de grootte van het "
+    "verschil — klein/mild verschil terloops en neutraal benoemen (geen drama), groot verschil expliciet. "
     "Lichaam en gevoel die dezelfde kant op wijzen is een geldige, positieve uitkomst.\n\n"
     "Geef geen advies. Sluit af met een reflectievraag die over deze specifieke situatie gaat "
     "- niet over patronen.\n\n"
@@ -3955,6 +3953,7 @@ def _basismeting_feiten(cur, recent_basis, phase, lang):
             'avg': '- Gemiddelde van je laatste {n} basismetingen ({period}): RI {avg}. De huidige meting is {dir} dat gemiddelde ({delta}).',
             'one': '- Gebaseerd op 1 eerdere basismeting (op {date}): RI {avg}. (Nog te weinig metingen voor een trend.)',
             'body_sim': '- Lichaam versus gevoel: je zelfinschatting ({subj}) en je RI ({ri}) liggen dicht bij elkaar.',
+            'body_mild': '- Lichaam versus gevoel: je zelfinschatting ({subj}) en je RI ({ri}) liggen iets uit elkaar — een mild verschil.',
             'body_diff': '- Lichaam versus gevoel: je zelfinschatting is {subj}, je RI is {ri} — die verschillen merkbaar.',
             'fase': {'phase1': '- Fase: nog weinig metingen — nog geen betrouwbaar patroon.',
                      'phase2': '- Fase: een eerste patroon wordt zichtbaar.',
@@ -3969,6 +3968,7 @@ def _basismeting_feiten(cur, recent_basis, phase, lang):
             'avg': '- Durchschnitt deiner letzten {n} Basismessungen ({period}): RI {avg}. Die aktuelle Messung ist {dir} dieser Durchschnitt ({delta}).',
             'one': '- Basierend auf 1 früheren Basismessung (am {date}): RI {avg}. (Noch zu wenige Messungen für einen Trend.)',
             'body_sim': '- Körper versus Gefühl: deine Selbsteinschätzung ({subj}) und dein RI ({ri}) liegen nah beieinander.',
+            'body_mild': '- Körper versus Gefühl: deine Selbsteinschätzung ({subj}) und dein RI ({ri}) liegen etwas auseinander — ein milder Unterschied.',
             'body_diff': '- Körper versus Gefühl: deine Selbsteinschätzung ist {subj}, dein RI ist {ri} — das unterscheidet sich merklich.',
             'fase': {'phase1': '- Phase: noch wenige Messungen — noch kein verlässliches Muster.',
                      'phase2': '- Phase: ein erstes Muster wird sichtbar.',
@@ -3983,6 +3983,7 @@ def _basismeting_feiten(cur, recent_basis, phase, lang):
             'avg': '- Average of your last {n} baseline readings ({period}): RI {avg}. The current reading is {dir} that average ({delta}).',
             'one': '- Based on 1 earlier baseline reading (on {date}): RI {avg}. (Still too few readings for a trend.)',
             'body_sim': '- Body versus feeling: your self-assessment ({subj}) and your RI ({ri}) are close together.',
+            'body_mild': '- Body versus feeling: your self-assessment ({subj}) and your RI ({ri}) are slightly apart — a mild difference.',
             'body_diff': '- Body versus feeling: your self-assessment is {subj}, your RI is {ri} — these differ noticeably.',
             'fase': {'phase1': '- Phase: still few readings — no reliable pattern yet.',
                      'phase2': '- Phase: a first pattern is becoming visible.',
@@ -4036,8 +4037,11 @@ def _basismeting_feiten(cur, recent_basis, phase, lang):
     # Lichaam versus gevoel
     subj = cur.get('subjectief_score')
     if subj is not None and cur_ri is not None:
-        if abs(float(cur_ri) - float(subj)) <= 1.5:
+        _vg = abs(float(cur_ri) - float(subj))
+        if _vg <= 1.5:
             lines.append(T['body_sim'].format(subj=subj, ri=cur_ri_s))
+        elif _vg <= 3.0:
+            lines.append(T['body_mild'].format(subj=subj, ri=cur_ri_s))
         else:
             lines.append(T['body_diff'].format(subj=subj, ri=cur_ri_s))
 

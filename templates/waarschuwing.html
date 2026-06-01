@@ -328,7 +328,7 @@ function toggleHrvInfo(btn){
   body.style.maxHeight=open?'0':body.scrollHeight+'px';
 }
 sessionStorage.setItem("sc_ctx_vitaliteit","5");
-sessionStorage.removeItem("sc_subjectief_pre");
+sessionStorage.setItem("sc_subjectief_pre","5");
 /* Dimensie-init: als sessionStorage al een keuze heeft (back-navigatie), markeer button + enable knop */
 (function(){var prev=sessionStorage.getItem("sc_ctx_dimensie");if(prev){var b=document.querySelector('.ctx-dim-btn[onclick*="\''+prev+'\'"]');if(b)b.classList.add("active");var c=document.getElementById("btnContinue");if(c)c.removeAttribute("aria-disabled");}})();
 /* Click-intercept: blokkeer navigatie wanneer knop nog disabled is */
