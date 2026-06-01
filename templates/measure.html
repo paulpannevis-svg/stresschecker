@@ -716,7 +716,7 @@ function saveBiofeedback(skip){
         notes: biofeedLabel,
             ctx_vitaliteit: sessionStorage.getItem("sc_ctx_vitaliteit") || "5",
             ctx_dimensie: sessionStorage.getItem("sc_ctx_dimensie") || "",
-          subjectief_pre: sessionStorage.getItem('sc_subjectief_pre') || '5',
+          subjectief_pre: sessionStorage.getItem('sc_subjectief_pre'),
             timeseries: JSON.stringify(timeseriesData),
             rr_intervals: JSON.stringify(rrIntervals),
         rmssd: rmssdFinal,

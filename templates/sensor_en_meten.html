@@ -735,7 +735,7 @@ function saveBiofeedback(skip){
             ctx_dimensie: sessionStorage.getItem("sc_ctx_dimensie") || "",
             ctx_ongemak: parseInt(sessionStorage.getItem("sc_ctx_ongemak") || "5", 10),
             ctx_vrije_tekst: (sessionStorage.getItem("sc_ctx_vrije_tekst") || "").slice(0, 100),
-          subjectief_pre: sessionStorage.getItem('sc_subjectief_pre') || '5',
+          subjectief_pre: sessionStorage.getItem('sc_subjectief_pre'),
             timeseries: JSON.stringify(timeseriesData),
             rr_intervals: JSON.stringify(rrIntervals),
         rmssd: rmssdFinal,

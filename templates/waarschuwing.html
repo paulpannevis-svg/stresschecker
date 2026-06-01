@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+{% block content %}
+<style>.ctx-dim-btn{background:#f5f0eb;border:2px solid #d4ccc4;color:#555;padding:.5rem .3rem;border-radius:.5rem;font-size:.8rem;cursor:pointer;transition:.2s;width:100%;}.ctx-dim-btn.active{border-color:#E8344E;color:#E8344E;background:#fff5f5;font-weight:600;}</style>
+
+<style>
+.ww-wrap{max-width:480px;margin:0 auto;padding:1.5rem 1rem 2rem;}
+.ww-title{text-align:center;font-size:1.1rem;font-weight:700;color:#4B3629;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.3rem;}
+.ww-sub{text-align:center;font-size:.8rem;color:#999;margin-bottom:1.6rem;}
+.ww-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem 1rem;margin-bottom:1.6rem;}
+.ww-item{display:flex;flex-direction:column;align-items:center;gap:.45rem;position:relative;cursor:default;}
+.ww-icon{width:68px;height:68px;position:relative;display:flex;align-items:center;justify-content:center;}
+.ww-icon svg{width:68px;height:68px;}
+.ww-label{font-size:.68rem;color:#777;text-align:center;line-height:1.3;}
+/* Tooltip */
+.ww-item .ww-tooltip{
+  display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  background:#333;color:#fff;font-size:.7rem;padding:.4rem .65rem;border-radius:6px;
+  white-space:nowrap;z-index:99;pointer-events:none;line-height:1.4;text-align:center;
+  max-width:160px;white-space:normal;
+}
+.ww-item .ww-tooltip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:5px solid transparent;border-top-color:#333;}
+.ww-item:hover .ww-tooltip{display:block;}
+.ww-btn{display:block;width:100%;background:#E8344E;color:#fff;border:none;border-radius:20px;
+  padding:.9rem;font-size:.95rem;font-weight:700;cursor:pointer;text-align:center;
+  text-decoration:none;letter-spacing:.03em;margin-top:.5rem;}
+.ww-btn:hover{background:#c8283e;}
+.ww-btn[aria-disabled="true"]{background:#ccc;cursor:not-allowed;opacity:.75;}
+.ww-btn[aria-disabled="true"]:hover{background:#ccc;}
+.ww-back{display:block;text-align:center;margin-top:.8rem;font-size:.78rem;color:#aaa;text-decoration:none;}
+.ww-back:hover{color:#E8344E;}
+.hrv-info{margin:1.2rem 0 .8rem;background:#faf6f1;border:1px solid #ece4d8;border-radius:12px;overflow:hidden;}
+.hrv-info-toggle{width:100%;background:none;border:none;padding:.85rem 1rem;font-size:.9rem;font-weight:600;color:#4B3629;display:flex;justify-content:space-between;align-items:center;cursor:pointer;text-align:left;font-family:inherit;letter-spacing:.02em;}
+.hrv-info-toggle:hover{background:#f3ebdd;}
+.hrv-info-chevron{transition:transform .25s ease;font-size:.8rem;color:#9A8F8A;}
+.hrv-info-toggle[aria-expanded="true"] .hrv-info-chevron{transform:rotate(180deg);}
+.hrv-info-body{max-height:0;overflow:hidden;transition:max-height .35s ease;}
+.hrv-info-inner{padding:.2rem 1rem 1rem;font-size:.88rem;color:#555;line-height:1.6;}
+.hrv-info-inner h4{font-size:.95rem;color:#4B3629;margin:.9rem 0 .35rem;font-weight:700;}
+.hrv-info-inner h4:first-child{margin-top:.3rem;}
+.hrv-info-inner p{margin:0 0 .55rem;}
+.hrv-info-inner ul{margin:0 0 .6rem;padding-left:1.2rem;}
+.hrv-info-inner li{margin-bottom:.25rem;}
+</style>
+
+{% if request.args.get('next') == 'hlmmeting' %}
+<style>
+
+circle[fill="#fdecea"] { fill: #e8f5f0 !important; }
+
+circle[fill="#fdecea"] { fill: #e8f5f0 !important; }
+</style>
+{% endif %}
+<div class="ww-wrap">
+  <div class="ww-title">
+    {% if lang=='de' %}Vor der Messung{% elif lang=='en' %}Before Your Reading{% else %}Voor de meting{% endif %}
+  </div>
+  <div class="ww-sub">
+    {% if lang=='de' %}Für zuverlässige Ergebnisse — bitte beachten{% elif lang=='en' %}For reliable results — please observe{% else %}Voor betrouwbare resultaten — houd dit aan{% endif %}
+  </div>
+
+  <div class="ww-grid">
+
+    <!-- 1. Niet eten -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Nicht essen (mind. 2 Std. vorher){% elif lang=='en' %}No eating (at least 2 hrs before){% else %}Niet eten (minimaal 2 uur van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- vork en mes -->
+          <line x1="27" y1="18" x2="27" y2="30" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M24 18 Q24 26 27 28" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <path d="M30 18 Q30 26 27 28" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <line x1="27" y1="28" x2="27" y2="50" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M38 18 C38 18 41 22 41 26 C41 29 39.5 30 38 30.5 L38 50" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <!-- verbodslijn -->
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Nicht essen{% elif lang=='en' %}No eating{% else %}Niet eten{% endif %}</div>
+    </div>
+
+    <!-- 2. Niet sporten -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Kein Sport (mind. 30 Min. vorher){% elif lang=='en' %}No exercise (at least 30 min before){% else %}Niet sporten (minimaal 30 min van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- hardloper -->
+          <circle cx="36" cy="20" r="3.5" fill="#E8344E"/>
+          <path d="M36 24 L32 35 L25 42" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <path d="M32 35 L38 42 L44 38" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <path d="M36 24 L42 30 L46 28" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <!-- verbodslijn -->
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Kein Sport{% elif lang=='en' %}No exercise{% else %}Niet sporten{% endif %}</div>
+    </div>
+
+    <!-- 3. Niet roken -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Nicht rauchen (mind. 1 Std. vorher){% elif lang=='en' %}No smoking (at least 1 hr before){% else %}Niet roken (minimaal 1 uur van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- sigaret -->
+          <rect x="18" y="31" width="28" height="7" rx="1.5" stroke="#E8344E" stroke-width="2.2"/>
+          <line x1="40" y1="31" x2="40" y2="38" stroke="#E8344E" stroke-width="2.5"/>
+          <path d="M44 28 Q46 25 44 22" stroke="#E8344E" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <path d="M47 30 Q50 26 47 22" stroke="#E8344E" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <!-- verbodslijn -->
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Nicht rauchen{% elif lang=='en' %}No smoking{% else %}Niet roken{% endif %}</div>
+    </div>
+
+    <!-- 4. Geen alcohol -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Kein Alkohol (mind. 12 Std. vorher){% elif lang=='en' %}No alcohol (at least 12 hrs before){% else %}Geen alcohol (minimaal 12 uur van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- wijnglas -->
+          <path d="M25 18 L43 18 L39 32 C39 37 34 40 34 40 C34 40 29 37 29 32 Z" stroke="#E8344E" stroke-width="2.2" stroke-linejoin="round" fill="none"/>
+          <line x1="34" y1="40" x2="34" y2="50" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="28" y1="50" x2="40" y2="50" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <!-- verbodslijn -->
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Kein Alkohol{% elif lang=='en' %}No alcohol{% else %}Geen alcohol{% endif %}</div>
+    </div>
+
+    <!-- 5. Geen koffie -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Kein Kaffee/Tee (mind. 1 Std. vorher){% elif lang=='en' %}No coffee/tea (at least 1 hr before){% else %}Geen koffie/thee (minimaal 1 uur van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- koffiekop -->
+          <path d="M20 28 L20 44 Q20 48 24 48 L42 48 Q46 48 46 44 L46 28 Z" stroke="#E8344E" stroke-width="2.2" fill="none"/>
+          <path d="M46 32 Q52 32 52 38 Q52 44 46 44" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <path d="M28 22 Q28 18 30 20 Q30 24 28 22" stroke="#E8344E" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <path d="M34 20 Q34 16 36 18 Q36 22 34 20" stroke="#E8344E" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <!-- verbodslijn -->
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Kein Kaffee{% elif lang=='en' %}No coffee{% else %}Geen koffie{% endif %}</div>
+    </div>
+
+    <!-- 6. Geen telefoon -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Handy weglegen während der Messung{% elif lang=='en' %}Put phone away during the reading{% else %}Telefoon wegleggen tijdens de meting{% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- smartphone -->
+          <rect x="24" y="16" width="20" height="36" rx="3" stroke="#E8344E" stroke-width="2.2"/>
+          <line x1="31" y1="47" x2="37" y2="47" stroke="#E8344E" stroke-width="2" stroke-linecap="round"/>
+          <!-- verbodslijn -->
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Kein Handy{% elif lang=='en' %}No phone{% else %}Geen telefoon{% endif %}</div>
+    </div>
+
+    <!-- 7. Rechtop zitten (groen) -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Aufrecht sitzen, entspannen{% elif lang=='en' %}Sit upright and relax{% else %}Rechtop zitten en ontspannen{% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="none" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- stoel/persoon zittend -->
+          <circle cx="34" cy="20" r="4" fill="#E8344E"/>
+          <path d="M34 24 L34 38" stroke="#E8344E" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M26 30 L34 30 L42 30" stroke="#E8344E" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M28 38 L34 38 L40 38" stroke="#E8344E" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M28 38 L26 48" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M40 38 L42 48" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Aufrecht sitzen{% elif lang=='en' %}Sit upright{% else %}Rechtop zitten{% endif %}</div>
+    </div>
+
+    <!-- 8. Sensor bevestigen (groen) -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Sensor am Ohr oder Finger anlegen{% elif lang=='en' %}Attach sensor to ear or finger{% else %}Sensor aan oor of vinger bevestigen{% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="none" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- oor met sensor clip -->
+          <path d="M28 22 C28 16 40 16 40 24 C40 30 36 32 36 38 L32 38 C32 32 28 30 28 24 Z" stroke="#E8344E" stroke-width="2.2" fill="none" stroke-linejoin="round"/>
+          <path d="M32 38 L32 42 C32 44 34 46 36 46 C38 46 40 44 40 42" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <circle cx="44" cy="36" r="5" fill="#E8344E"/>
+          <polyline points="41,36 43,38 47,34" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Sensor anlegen{% elif lang=='en' %}Attach sensor{% else %}Sensor bevestigen{% endif %}</div>
+    </div>
+
+    <!-- 9. 90 seconden (groen) -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Die Messung dauert 90 Sekunden{% elif lang=='en' %}The reading takes 90 seconds{% else %}De meting duurt 90 seconden{% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="none" stroke="#E8344E" stroke-width="2.5"/>
+          <circle cx="34" cy="36" r="14" stroke="#E8344E" stroke-width="2.2"/>
+          <line x1="34" y1="36" x2="34" y2="26" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="34" y1="36" x2="41" y2="40" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="30" y1="20" x2="38" y2="20" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="34" y1="20" x2="34" y2="22" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <text x="34" y="54" text-anchor="middle" font-size="8" fill="#E8344E" font-weight="700">90s</text>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}90 Sekunden{% elif lang=='en' %}90 seconds{% else %}90 seconden{% endif %}</div>
+    </div>
+
+  </div>
+
+
+{% if request.args.get('next') == 'basismeting' %}
+<!-- Zelfinschatting voor meting -->
+<div style="margin:1.5rem 0 1rem;background:#fff;border-radius:12px;padding:1.2rem 1rem;">
+  <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.6rem;">
+    {%if lang=='de'%}Wie entspannt fühlen Sie sich gerade?{%elif lang=='en'%}How relaxed do you feel right now?{%else%}Hoe ontspannen voel je je op dit moment?{%endif%}
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-bottom:.3rem;">
+    <span>{%if lang=='de'%}Sehr gestresst{%elif lang=='en'%}Very stressed{%else%}Zeer gespannen{%endif%}</span>
+    <span>{%if lang=='de'%}Völlig entspannt{%elif lang=='en'%}Fully relaxed{%else%}Volledig ontspannen{%endif%}</span>
+  </div>
+  <input type="range" id="subjSlider" min="0" max="10" value="5"
+    style="width:100%;accent-color:#E8344E;cursor:pointer;"
+    oninput="document.getElementById('subjVal').textContent=this.value;sessionStorage.setItem('sc_subjectief_pre',this.value)">
+  <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-top:.2rem;margin-bottom:0;"><span>{%if lang=="de"%}Erschoepft / Kopf voll{%elif lang=="en"%}Exhausted / mind full{%else%}Uitgeput / hoofd vol{%endif%}</span><span>{%if lang=="de"%}Es geht{%elif lang=="en"%}Doing OK{%else%}Gaat wel{%endif%}</span><span>{%if lang=="de"%}Fit und wohl{%elif lang=="en"%}Feeling good{%else%}Lekker in mijn vel{%endif%}</span></div>
+<div style="text-align:center;font-size:1.4rem;font-weight:700;color:#E8344E;margin-top:.4rem;">
+    <span id="subjVal">5</span><span style="font-size:.85rem;font-weight:400;color:#aaa"> / 10</span>
+  </div>
+  <div style="text-align:center;font-size:.72rem;font-style:italic;color:#b0a8a0;margin-top:.3rem;">{%if lang=='de'%}Geben Sie Ihr erstes, ehrliches Gefühl.{%elif lang=='en'%}Give your first, honest feeling.{%else%}Geef je eerste, eerlijke gevoel.{%endif%}</div>
+<div style="margin:1rem 0;background:#fff;border-radius:12px;padding:1.2rem 1rem;">
+  <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.6rem;">{%if lang=="de"%}Inwieweit tun Sie heute Dinge, die wirklich zu Ihnen passen?{%elif lang=="en"%}To what extent are you doing things today that truly suit you?{%else%}In hoeverre doe jij vandaag dingen die echt bij jou passen?{%endif%}</div>
+  <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-bottom:.3rem;"><span>{%if lang=="de"%}Gar nicht{%elif lang=="en"%}Not at all{%else%}Helemaal niet{%endif%}</span><span>{%if lang=="de"%}Voll und ganz{%elif lang=="en"%}Completely{%else%}Helemaal{%endif%}</span></div>
+  <input type="range" id="ctxVitalSlider" min="0" max="10" value="5" style="width:100%;accent-color:#E8A020;cursor:pointer;" oninput="document.getElementById('ctxVitalVal').textContent=this.value;sessionStorage.setItem('sc_ctx_vitaliteit',this.value)">
+  <div style="text-align:center;font-size:1.2rem;font-weight:700;color:#E8A020;margin-top:.3rem;"><span id="ctxVitalVal">5</span><span style="font-size:.85rem;font-weight:400;color:#aaa"> / 10</span></div>
+</div>
+<div style="margin:1rem 0;background:#fff;border-radius:12px;padding:1.2rem 1rem;">
+  <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.5rem;">{%if lang=="de"%}Was steht im Vordergrund?{%elif lang=="en"%}What is most prominent?{%else%}Wat speelt er vooral?{%endif%}</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;">
+    <button type="button" onclick="setDim('lichamelijk',this)" class="ctx-dim-btn">{%if lang=="de"%}Koerperlich{%elif lang=="en"%}Physical{%else%}Lichamelijk{%endif%}</button>
+    <button type="button" onclick="setDim('mentaal',this)" class="ctx-dim-btn">{%if lang=="de"%}Mental{%elif lang=="en"%}Mental{%else%}Mentaal{%endif%}</button>
+    <button type="button" onclick="setDim('emotioneel',this)" class="ctx-dim-btn">{%if lang=="de"%}Emotional{%elif lang=="en"%}Emotional{%else%}Emotioneel{%endif%}</button>
+    <button type="button" onclick="setDim('spiritueel',this)" class="ctx-dim-btn">{%if lang=="de"%}Spirituell{%elif lang=="en"%}Spiritual{%else%}Spiritueel{%endif%}</button>
+    <button type="button" onclick="setDim('weet_niet',this)" class="ctx-dim-btn" style="grid-column:1/-1;">{%if lang=="de"%}Weiss nicht{%elif lang=="en"%}Not sure{%else%}Weet ik niet{%endif%}</button>
+  </div>
+</div>
+{% endif %}
+</div>
+  <div class="hrv-info">
+    <button type="button" class="hrv-info-toggle" onclick="toggleHrvInfo(this)" aria-expanded="false">
+      <span>💡 {% if lang=='de' %}Wie funktioniert HRV?{% elif lang=='en' %}How does HRV work?{% else %}Hoe werkt HRV?{% endif %}</span>
+      <span class="hrv-info-chevron">▾</span>
+    </button>
+    <div class="hrv-info-body">
+      <div class="hrv-info-inner">
+        {% if lang=='de' %}
+        <h4>Was gerade passiert</h4>
+        <p>Ihr K&ouml;rper hat einen stillen Motor, der immer l&auml;uft &mdash; das autonome Nervensystem. Es regelt unter anderem Ihren Herzschlag, Ihre Atmung, Ihre Erholung. Ohne dass Sie etwas daf&uuml;r tun müssen.</p>
+        <p>Wir messen zwei Dinge gleichzeitig: Ihren Herzschlag und die Variation dazwischen. Diese Variation &mdash; HRV &mdash; sagt mehr als der Herzschlag allein. Je gr&ouml;&szlig;er die Variation, desto widerstandsf&auml;higer Ihr System.</p>
+        <h4>Das Geheimnis liegt im Ausatmen</h4>
+        <p>Langes und ruhiges Ausatmen bewahrt Kohlendioxid &mdash; das nat&uuml;rliche Beruhigungsmittel Ihres K&ouml;rpers. Ihr Atemzentrum reagiert nicht auf Sauerstoff, sondern auf CO2. Atmen Sie zu schnell oder zu tief, wird dieser Vorrat ersch&ouml;pft und Ihr System wird unruhiger statt ruhiger.</p>
+        <p>Eine gute Atmung ist dreifach niedrig: niedrig in der Anstrengung, niedrig im Ort &mdash; der Bauch bewegt sich am meisten &mdash; und niedrig im Tempo.</p>
+        <h4>Folgen Sie dem Kreis</h4>
+        <p>Während der Messung sehen Sie einen Atemkreis, der Ihnen beim richtigen Rhythmus hilft. <strong>Sie können den Rhythmus an Ihr Niveau anpassen:</strong></p>
+        <ul>
+          <li><strong>Anf&auml;nger:</strong> Starten Sie mit einem ruhigeren Tempo (3s ein, 4s aus)</li>
+          <li><strong>Fortgeschritten:</strong> Nutze einen tieferen Rhythmus (6s ein, 8s aus)</li>
+          <li><strong>Regel:</strong> Ausatmung immer l&auml;nger als Einatmung + kurze Pause</li>
+        </ul>
+        <p>Ihr K&ouml;rper lernt das Muster automatisch. Auch nach der Messung atmen Sie ruhiger weiter &mdash; ohne bewusst daran zu denken.</p>
+        {% elif lang=='en' %}
+        <h4>What is happening now</h4>
+        <p>Your body has a silent motor that is always running &mdash; the autonomic nervous system. It regulates, among other things, your heartbeat, your breathing, your recovery. Without you having to do anything for it.</p>
+        <p>We measure two things simultaneously: your heartbeat and the variation between beats. That variation &mdash; HRV &mdash; tells more than the heartbeat alone. The greater the variation, the more resilient your system.</p>
+        <h4>The secret is in the exhale</h4>
+        <p>Long and gentle exhaling preserves carbon dioxide &mdash; your body&apos;s natural calming agent. Your breathing centre does not respond to oxygen but to CO2. If you breathe too fast or too deep, that reserve is depleted and your system becomes more restless instead of calmer.</p>
+        <p>Good breathing is three times low: low in effort, low in location &mdash; the belly moves most &mdash; and low in pace.</p>
+        <h4>Follow the circle</h4>
+        <p>During the reading you see a breathing circle that guides you to the right rhythm. <strong>You can adjust the rhythm to your level:</strong></p>
+        <ul>
+          <li><strong>Beginners:</strong> Start with a gentler pace (3s in, 4s out)</li>
+          <li><strong>Experienced:</strong> Use a deeper rhythm (6s in, 8s out)</li>
+          <li><strong>Rule:</strong> Exhale always longer than inhale + a short pause</li>
+        </ul>
+        <p>Your body learns the pattern automatically. Even after the reading you keep breathing more calmly &mdash; without consciously thinking about it.</p>
+        {% else %}
+        <h4>Wat er nu gebeurt</h4>
+        <p>Je lichaam heeft een stille motor die altijd aan staat &mdash; het autonoom zenuwstelsel. Het regelt onder meer je hartslag, je ademhaling, je herstel. Zonder dat je er iets voor hoeft te doen.</p>
+        <p>We meten twee dingen tegelijk: je hartslag en de variatie ertussen. Die variatie &mdash; HRV &mdash; vertelt meer dan de hartslag alleen. Hoe groter de variatie, hoe veerkrachtiger je systeem.</p>
+        <h4>Het geheim zit in de uitademing</h4>
+        <p>Lang en rustig uitademen bewaart koolzuurgas &mdash; het natuurlijke kalmeringsmiddel van je lichaam. Je ademhalingscentrum reageert niet op zuurstof maar op CO2. Adem je te snel of te diep, dan raakt die voorraad uitgeput en wordt je systeem onrustiger in plaats van rustiger.</p>
+        <p>Een goede ademhaling is drie keer laag: laag in inspanning, laag in plaats &mdash; de buik beweegt het meest &mdash; en laag in tempo.</p>
+        <h4>Volg de cirkel</h4>
+        <p>Je ziet tijdens de meting een ademcirkel die je helpt bij het juiste ritme. <strong>Je kunt het ritme aanpassen aan jouw niveau:</strong></p>
+        <ul>
+          <li><strong>Beginners:</strong> Start met een rustiger tempo (3s in, 4s uit)</li>
+          <li><strong>Ervaren:</strong> Gebruik een dieper ritme (6s in, 8s uit)</li>
+          <li><strong>Regel:</strong> Uitademing altijd langer dan inademing + korte pauze</li>
+        </ul>
+        <p>Dit patroon leert je lichaam automatisch. Ook na de meting blijf je rustiger ademen &mdash; zonder er bewust aan te denken.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <a href="{{ (sensor_url + '&skip_subj=1&type=biofeedback' if '?' in sensor_url else sensor_url + '?skip_subj=1&type=biofeedback') if request.args.get('next') == 'biofeedback' else url_for('measure') + '?type=' + request.args.get('next') + '&skip_subj=1' + ('&cid=' + request.args.get('cid') if request.args.get('cid') else '') if request.args.get('next') in ['basismeting','situatiemeting'] else '/hlm/sensor-keuze' if request.args.get('next') == 'hlmmeting' else '/meten?skip_subj=1' }}" class="ww-btn" id="btnContinue"{% if request.args.get('next') == 'basismeting' %} aria-disabled="true"{% endif %}>
+    {% if lang=='de' %}Weiter zum Sensor →{% elif lang=='en' %}Continue to sensor →{% else %}Verder naar sensor →{% endif %}
+  </a>
+  <a href="/menu" class="ww-back">← {% if lang=='de' %}Zurück{% elif lang=='en' %}Back{% else %}Terug{% endif %}</a>
+</div>
+<script>
+function setDim(val,btn){document.querySelectorAll(".ctx-dim-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");sessionStorage.setItem("sc_ctx_dimensie",val);var c=document.getElementById("btnContinue");if(c)c.removeAttribute("aria-disabled");}
+function toggleHrvInfo(btn){
+  var open=btn.getAttribute('aria-expanded')==='true';
+  var body=btn.nextElementSibling;
+  btn.setAttribute('aria-expanded',open?'false':'true');
+  body.style.maxHeight=open?'0':body.scrollHeight+'px';
+}
+sessionStorage.setItem("sc_ctx_vitaliteit","5");
+sessionStorage.removeItem("sc_subjectief_pre");
+/* Dimensie-init: als sessionStorage al een keuze heeft (back-navigatie), markeer button + enable knop */
+(function(){var prev=sessionStorage.getItem("sc_ctx_dimensie");if(prev){var b=document.querySelector('.ctx-dim-btn[onclick*="\''+prev+'\'"]');if(b)b.classList.add("active");var c=document.getElementById("btnContinue");if(c)c.removeAttribute("aria-disabled");}})();
+/* Click-intercept: blokkeer navigatie wanneer knop nog disabled is */
+(function(){var c=document.getElementById("btnContinue");if(c)c.addEventListener("click",function(e){if(this.getAttribute("aria-disabled")==="true")e.preventDefault();});})();
+</script>
+{% endblock %}

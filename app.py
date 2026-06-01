@@ -2759,11 +2759,16 @@ def api_save_meting():
         client_id = int(client_id) if client_id else 0
         session['last_meting_type'] = data.get('meting_type', 'basismeting')
         _sp = data.get('subjectief_pre')
-        try:
-            _subj_score = int(float(str(_sp))) if _sp not in (None, '') else 5
-            if not (0 <= _subj_score <= 10): _subj_score = 5
-        except Exception:
-            _subj_score = 5
+        # Geen stille 5: onaangeraakte/ontbrekende zelfinschatting → NULL (niet ingevuld),
+        # zodat de AI er geen lichaam-vs-gevoel-tegenstelling op kan baseren.
+        if _sp in (None, ''):
+            _subj_score = None
+        else:
+            try:
+                _subj_score = int(float(str(_sp)))
+                if not (0 <= _subj_score <= 10): _subj_score = None
+            except Exception:
+                _subj_score = None
         def _ctx_int(v):
             try:
                 n = int(float(str(v))) if v not in (None, '') else None
@@ -3442,8 +3447,9 @@ Kan wijzen op actieve rust (na inspanning, na koffie, na emotie). Als ctx_vrije_
 DISCREPANTIE-REGEL (INNERLIJK KOMPAS):
 Het FEITEN-blok zegt al of zelfinschatting en RI dicht bij elkaar liggen of merkbaar
 verschillen ("Lichaam versus gevoel"). Reken dit niet zelf na. Vertaal de gegeven uitkomst:
-- Liggen ze dicht bij elkaar: hooguit een kleine nuance, niet vooraanstaand.
+- Liggen ze dicht bij elkaar: hooguit een kleine nuance, niet vooraanstaand. Lichaam en gevoel die dezelfde kant op wijzen is een geldige, positieve uitkomst.
 - Verschillen ze merkbaar: benoem dat als kernuitspraak voor zin 2.
+- Ontbreekt de regel "Lichaam versus gevoel" in het FEITEN-blok? Dan heeft de persoon GEEN zelfinschatting ingevuld: benoem dan GEEN verschil of overeenkomst tussen lichaam en gevoel, en gebruik het ontbreken niet als signaal. Construeer nooit een tegenstelling die er niet is.
 
 BIJ DISCREPANTIE:
 - Gevoel HOGER dan lichaam: persoon voelt zich beter dan lichaam toont. "Je lichaam toont nog druk, terwijl je je al beter voelt".
@@ -3477,7 +3483,8 @@ BASISMETING_SYSTEM_PROMPT = (
     "naar het eigen patroon.\n\n"
     "INPUT-VELDEN (wat je in user_message krijgt):\n"
     "- current.ri, current.bpm, current.hrv_pct, current.rmssd — fysiologische ruggengraat\n"
-    "- current.subjectief_score (0-10) — zelfrapportage rust/gespannen; 5 is slider-default\n"
+    "- current.subjectief_score (0-10) of null — zelfrapportage rust/gespannen; null = NIET ingevuld: "
+    "benoem dan geen gevoel/zelfinschatting en construeer geen lichaam-vs-gevoel-verschil\n"
     "- current.ctx_dimensie — 'lichamelijk' / 'mentaal' / 'emotioneel' / 'spiritueel' / 'weet_niet' / null\n"
     "- current.ctx_vitaliteit (0-10) — hoger = meer afstemming op wat bij de persoon past\n"
     "- current.ctx_ongemak (0-10) — hoger = meer fysiek ongemak\n"
@@ -3614,8 +3621,10 @@ SITUATIEMETING_SYSTEM_PROMPT = (
     "'Voor vergadering' met lage RI zegt iets over anticipatie. "
     "'Tijdens pauze' met lage RI zegt iets anders.\n"
     "- Benoem of current.ri binnen, onder, of boven de baseline_range valt.\n"
-    "- Lichaam-versus-gevoel-discrepantie (RI versus subjectief_score) is interessant om te "
-    "benoemen als hij groot is.\n\n"
+    "- Lichaam-versus-gevoel-discrepantie (RI versus subjectief_score) alleen benoemen als "
+    "subjectief_gezet=true (zelfinschatting expliciet ingevuld) ÉN het verschil groot is. "
+    "Is subjectief_score null / niet gezet, benoem dan GEEN gevoel en GEEN tegenstelling. "
+    "Lichaam en gevoel die dezelfde kant op wijzen is een geldige, positieve uitkomst.\n\n"
     "Geef geen advies. Sluit af met een reflectievraag die over deze specifieke situatie gaat "
     "- niet over patronen.\n\n"
     "\n\n"
@@ -4118,7 +4127,7 @@ def _build_kompas_prompt(cur, lang, context, session_data=None, baseline_avg=Non
         user = (
             "SITUATIEMETING data:\n"
             f"current: RI={cur.get('ri')}, BPM={cur.get('bpm')}, HRV%={cur.get('hrv_pct')}, "
-            f"RMSSD={cur.get('rmssd')}, subjectief_score={cur.get('subjectief_score')}, "
+            f"RMSSD={cur.get('rmssd')}, subjectief_score={cur.get('subjectief_score')}, subjectief_gezet={cur.get('subjectief_score') is not None}, "
             f"ctx_dimensie={cur.get('ctx_dimensie') or 'null'}, datetime={context.get('datetime_iso') or ''}\n"
             f"label: {cur.get('notes')}\n"
             f"baseline_ri: {context.get('baseline_ri') if context.get('baseline_ri') is not None else 'null'}\n"
@@ -4151,7 +4160,7 @@ def _build_kompas_prompt(cur, lang, context, session_data=None, baseline_avg=Non
         fallback_note = '\n(Intern: situatiemeting zonder label - basismeting-interpretatie.)'
     data_blok = (
         f"current: RI={cur.get('ri')}, BPM={cur.get('bpm')}, HRV%={cur.get('hrv_pct')}, "
-        f"RMSSD={cur.get('rmssd')}, subjectief_score={cur.get('subjectief_score')}, "
+        f"RMSSD={cur.get('rmssd')}, subjectief_score={cur.get('subjectief_score')}, subjectief_gezet={cur.get('subjectief_score') is not None}, "
         f"ctx_dimensie={cur.get('ctx_dimensie') or 'null'}, datetime={context.get('datetime_iso') or ''}\n"
         f"ctx_vitaliteit={_fmt_int(cur.get('ctx_vitaliteit'))}, ctx_ongemak={_fmt_int(cur.get('ctx_ongemak'))}, ctx_vrije_tekst={_fmt_text(cur.get('ctx_vrije_tekst'))}\n"
         f"label: {cur.get('notes') or 'null'}\n"

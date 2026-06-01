@@ -1,0 +1,681 @@
+{% extends "base.html" %}
+{% block content %}
+<style>.ctx-dim-btn{background:#f5f0eb;border:2px solid #d4ccc4;color:#555;padding:.5rem .3rem;border-radius:.5rem;font-size:.8rem;cursor:pointer;transition:.2s;width:100%;}.ctx-dim-btn.active{border-color:#E8344E;color:#E8344E;background:#fff5f5;font-weight:600;}</style>
+
+<style>
+.ww-wrap{max-width:480px;margin:0 auto;padding:1.5rem 1rem 2rem;}
+.ww-title{text-align:center;font-size:1.1rem;font-weight:700;color:#4B3629;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.3rem;}
+.ww-sub{text-align:center;font-size:.8rem;color:#999;margin-bottom:1.6rem;}
+.section-hdr{font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:#9A8F8A;font-weight:700;margin:1.6rem 0 .6rem;padding-left:.2rem;}
+.section-hdr:first-of-type{margin-top:0;}
+.ww-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem 1rem;margin-bottom:.6rem;}
+.ww-item{display:flex;flex-direction:column;align-items:center;gap:.45rem;position:relative;cursor:default;}
+.ww-icon{width:68px;height:68px;position:relative;display:flex;align-items:center;justify-content:center;}
+.ww-icon svg{width:68px;height:68px;}
+.ww-label{font-size:.68rem;color:#777;text-align:center;line-height:1.3;}
+/* Tooltip */
+.ww-item .ww-tooltip{
+  display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  background:#333;color:#fff;font-size:.7rem;padding:.4rem .65rem;border-radius:6px;
+  white-space:nowrap;z-index:99;pointer-events:none;line-height:1.4;text-align:center;
+  max-width:160px;white-space:normal;
+}
+.ww-item .ww-tooltip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:5px solid transparent;border-top-color:#333;}
+.ww-item:hover .ww-tooltip{display:block;}
+.ww-btn{display:block;width:100%;background:#E8344E;color:#fff;border:none;border-radius:20px;
+  padding:.9rem;font-size:.95rem;font-weight:700;cursor:pointer;text-align:center;
+  text-decoration:none;letter-spacing:.03em;margin-top:.8rem;}
+.ww-btn:hover{background:#c8283e;}
+.ww-btn[aria-disabled="true"]{background:#ccc;cursor:not-allowed;opacity:.75;}
+.ww-btn[aria-disabled="true"]:hover{background:#ccc;}
+.ww-back{display:block;text-align:center;margin-top:.8rem;font-size:.78rem;color:#aaa;text-decoration:none;}
+.ww-back:hover{color:#E8344E;}
+
+/* BEGRIJPEN — inklapbaar via <details> */
+.edu-block{margin:0 0 .4rem;background:#faf6f1;border:1px solid #ece4d8;border-radius:12px;overflow:hidden;}
+.edu-block > summary{list-style:none;cursor:pointer;padding:.85rem 1rem;font-size:.9rem;font-weight:600;color:#4B3629;display:flex;justify-content:space-between;align-items:center;letter-spacing:.02em;gap:.5rem;}
+.edu-block > summary::-webkit-details-marker{display:none;}
+.summary-cue{display:inline-flex;align-items:center;gap:.35rem;flex-shrink:0;}
+.summary-cue .cue-txt{font-size:.78rem;font-weight:500;color:#E8344E;letter-spacing:.02em;text-transform:lowercase;}
+.summary-cue .cue-arrow{font-size:1.12rem;color:#E8344E;transition:transform .25s ease;line-height:1;}
+.edu-block .summary-cue .cue-open,.mset-rhythm .summary-cue .cue-open{display:none;}
+.edu-block[open] .summary-cue .cue-closed,.mset-rhythm[open] .summary-cue .cue-closed{display:none;}
+.edu-block[open] .summary-cue .cue-open,.mset-rhythm[open] .summary-cue .cue-open{display:inline;}
+.edu-block[open] .summary-cue .cue-arrow,.mset-rhythm[open] .summary-cue .cue-arrow{transform:rotate(180deg);}
+.edu-block > summary:hover{background:#f3ebdd;}
+.edu-body{padding:.2rem 1rem 1rem;font-size:.88rem;color:#555;line-height:1.6;}
+.edu-body h4{font-size:.95rem;color:#4B3629;margin:.9rem 0 .35rem;font-weight:700;}
+.edu-body h4:first-child{margin-top:.3rem;}
+.edu-body p{margin:0 0 .55rem;}
+.edu-body ul{margin:0 0 .6rem;padding-left:1.2rem;}
+.edu-body li{margin-bottom:.25rem;}
+
+/* INSTELLINGEN — toggles + ademritme */
+.mset-card{margin:0 0 .8rem;background:#fff;border-radius:12px;padding:1rem;}
+.mset-toggles{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;align-items:flex-start;}
+.mtoggle-wrap{display:flex;flex-direction:column;align-items:center;gap:.35rem;min-width:7rem;}
+.mtoggle-hint{font-size:.7rem;color:#9A8F8A;font-style:italic;text-align:center;max-width:11rem;line-height:1.35;}
+.mtoggle{display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .85rem;border:1.5px solid #E8344E;border-radius:999px;background:#E8344E;color:#fff;font-family:inherit;font-size:.82rem;font-weight:600;cursor:pointer;transition:background .15s,color .15s;}
+.mtoggle[aria-pressed="false"]{background:#fff;color:#E8344E;}
+.mtoggle-ico{font-size:1rem;line-height:1;}
+.mset-rhythm{background:#fff;border:1px solid #ece4d8;border-radius:12px;overflow:hidden;}
+.mset-rhythm > summary{list-style:none;cursor:pointer;padding:.85rem 1rem;font-size:.82rem;font-weight:600;color:#4B3629;display:flex;flex-direction:column;gap:.3rem;}
+.mset-rhythm > summary::-webkit-details-marker{display:none;}
+.mset-rhythm > summary .summary-main{display:flex;justify-content:space-between;align-items:center;gap:.5rem;}
+.mset-rhythm > summary .summary-hint{font-size:.72rem;color:#9A8F8A;font-style:italic;font-weight:400;line-height:1.35;}
+.mset-rhythm > summary:hover{background:#faf6f1;}
+.mset-rhythm-body{padding:.3rem 1rem .8rem;}
+.bs-row{margin:.45rem 0;}
+.bs-row label{font-size:.78rem;color:#555;display:flex;justify-content:space-between;align-items:baseline;gap:.4rem;}
+.bs-row label strong{color:#4B3629;font-weight:600;}
+.bs-row input[type=range]{width:100%;accent-color:#E8344E;margin-top:.15rem;cursor:pointer;}
+.bs-info{font-size:.7rem;color:#E8344E;cursor:help;border:1px solid #E8344E;border-radius:50%;width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;line-height:1;}
+.bs-hint{font-size:.72rem;color:#999;font-style:italic;margin-top:.4rem;text-align:center;}
+
+/* CTX vrije tekst */
+.ctx-freetext-block{margin:0 0 1rem;background:#fff;border-radius:12px;padding:1.2rem 1rem;}
+.ctx-freetext-label{display:block;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.6rem;font-weight:600;}
+.ctx-freetext-wrapper{position:relative;}
+.ctx-freetext-wrapper input{width:100%;padding:.7rem 3.5rem .7rem .8rem;border:1px solid #d4ccc4;border-radius:8px;font-size:.9rem;background:#fff;box-sizing:border-box;font-family:inherit;}
+.ctx-freetext-wrapper input:focus{outline:none;border-color:#E8344E;}
+.ctx-freetext-counter{position:absolute;right:.8rem;top:50%;transform:translateY(-50%);font-size:.72rem;color:#aaa;pointer-events:none;}
+.ctx-freetext-hint{margin-top:.5rem;font-size:.72rem;color:#b0a8a0;font-style:italic;line-height:1.4;}
+</style>
+
+{% if request.args.get('next') == 'hlmmeting' %}
+<style>
+circle[fill="#fdecea"] { fill: #e8f5f0 !important; }
+circle[fill="#fdecea"] { fill: #e8f5f0 !important; }
+</style>
+{% endif %}
+
+<div class="ww-wrap">
+  <div class="ww-title">
+    {% if lang=='de' %}Vor der Messung{% elif lang=='en' %}Before Your Reading{% else %}Voor de meting{% endif %}
+  </div>
+  <div class="ww-sub">
+    {% if lang=='de' %}Für zuverlässige Ergebnisse — bitte beachten{% elif lang=='en' %}For reliable results — please observe{% else %}Voor betrouwbare resultaten — houd dit aan{% endif %}
+  </div>
+
+  <!-- BEGRIJPEN (conditioneel open op basis van show_edu) -->
+  <details class="edu-block"{% if show_edu %} open{% endif %}>
+    <summary>
+      <span>💡 {% if lang=='de' %}Begreifen{% elif lang=='en' %}Understand{% else %}Begrijpen{% endif %}</span>
+      <span class="summary-cue">
+        <span class="cue-txt cue-closed">{% if lang=='de' %}mehr lesen{% elif lang=='en' %}read more{% else %}meer lezen{% endif %}</span>
+        <span class="cue-txt cue-open">{% if lang=='de' %}einklappen{% elif lang=='en' %}collapse{% else %}inklappen{% endif %}</span>
+        <span class="cue-arrow">▾</span>
+      </span>
+    </summary>
+    <div class="edu-body">
+      {% if lang=='de' %}
+      <p><em>Nehmen Sie sich kurz einen ruhigen Moment, bevor Sie mit der Messung beginnen. Mindestens einmal zu lesen lohnt sich — danach wissen Sie, was geschieht und warum es aussagekräftig ist.</em></p>
+
+      <h4>Warum messen?</h4>
+      <p>In Ihrem Leben bewegen sich vier Arten von Bedürfnissen fortlaufend: körperliche, mentale, emotionale und spirituelle. Ihr Körper braucht Ruhe und Bewegung. Ihr Denken braucht Herausforderung, aber auch Momente, in denen nichts muss. Ihr Empfinden braucht Raum, um da sein zu dürfen. Und es gibt das Bedürfnis, dem Aufmerksamkeit zu schenken, was für Sie wirklich von Bedeutung ist.</p>
+      <p>In jedem dieser Bereiche kann etwas aus dem Gleichgewicht geraten — auf zwei Arten. Manchmal gibt es einen Mangel: Sie kommen zu wenig zur Bewegung, zur Ruhe, zu bedeutungsvollen Beziehungen, zu Dingen, die Sie berühren. Manchmal gibt es gerade ein Überangebot: mehr Reize, Verpflichtungen oder Anforderungen, als Sie in diesem Moment tragen können.</p>
+      <p>Beides schafft Belastung. In der Praxis laufen sie oft ineinander: ein Überangebot im einen Bereich geht mit einem Mangel im anderen einher. Zu viel Arbeit, zu wenig Ruhe. Viel zu tun, wenig Aufmerksamkeit für das, was wirklich zählt.</p>
+      <p>Dafür gibt es kein allgemeingültiges Rezept. Was für Sie zu viel oder zu wenig ist, unterscheidet sich von Mensch zu Mensch. Und selbst für Sie ändert es sich je nach Tag, Phase, Lebensabschnitt. Der einzige Weg, hier zu steuern, besteht darin, ausreichend Selbstkenntnis aufzubauen, um das, was an Sie herangetragen wird, und das, was Sie geben können, aktiv zu dosieren. Dafür ist StressChecker gedacht. Lernen zu tun, was Sie wirklich wollen, was Sie bewältigen können und was für Sie wirkt.</p>
+
+      <h4>Was leistet StressChecker?</h4>
+      <p>StressChecker bietet Ihnen einen Spiegel. Er macht sichtbar, wie Ihr autonomes Nervensystem in diesem Moment zwischen Belastung und Erholung steht — ein Hinweis, der nicht davon abhängt, was Sie denken oder fühlen, sondern davon, wie Ihr Körper tatsächlich reagiert.</p>
+      <p>Das geht auf drei Arten, jede mit eigenem Zweck.</p>
+      <p>Die <strong>Basismessung</strong> lässt Sie Ihren Zustand an einem festen Moment festhalten — zum Beispiel morgens nach dem Aufstehen und vor dem Frühstück. Tun Sie das regelmäßig, erkennen Sie Muster: was für Sie normal ist, wann es abweicht, welche Phasen Aufmerksamkeit verdienen. Hier beginnen Sie jetzt.</p>
+      <p>Die <strong>Situationsmessung</strong> führen Sie zwischendurch durch — nach einem Gespräch, während eines Arbeitstages, nach einem Spaziergang. So sehen Sie, wie bestimmte Situationen Sie berühren.</p>
+      <p>Die <strong>Biofeedback-Messung</strong> macht die Wirkung von Übungen sichtbar, in denen Sie aktiv versuchen zu entspannen und sich zu erholen.</p>
+      <p>Zusammen helfen sie Ihnen, ein eigenes Bild davon aufzubauen, was bei Ihnen wirkt, wofür Sie empfänglich sind, und wie Sie mit dem Gleichgewicht zwischen Angebot und Bedarf umgehen können.</p>
+
+      <h4>Was misst eine Messung eigentlich?</h4>
+      <p>Ihr Herz schlägt nicht wie ein Metronom. Die Zeit zwischen zwei Herzschlägen ist nie genau gleich — jedes Mal unterscheidet sie sich um ein paar Millisekunden. Diese feine Variation heißt Herzratenvariabilität, abgekürzt HRV. Sie ist ein Parameter, der in der Kardiologie seit Jahrzehnten verwendet wird, um zu erkennen, wie das autonome Nervensystem funktioniert: der Teil Ihres Nervensystems, der regelt, was Sie nicht bewusst steuern.</p>
+      <p>Steht Ihr Nervensystem im Gleichgewicht, reagiert Ihr Herz feinfühlig auf jeden Atemzug und jede kleine Veränderung der Situation. Die Variation ist dann groß. Steht Ihr System unter Druck, erstarrt der Rhythmus und die Variation wird klein.</p>
+      <p>StressChecker übersetzt diese Information in eine übersichtliche Zahl: den Relax Index, auf einer Skala von 0 bis 10. Daneben sehen Sie Ihre Position in einem Quadranten, in dem die Herzfrequenz (horizontal) und die HRV (vertikal) gemeinsam zeigen, wo Sie jetzt zwischen Belastung und Erholung stehen — von Schwerem Stress bis Widerstandsfähig.</p>
+      <p>Eine einzelne Messung ist eine Momentaufnahme. Der Wert kommt aus der Wiederholung: eine Reihe von Messungen im Zeitverlauf sagt mehr aus als jede einzelne Messung.</p>
+
+      <h4>Wie läuft die Messung ab?</h4>
+      <p>Sie befestigen den Sensor eines Herzfrequenzmessers an Ihrem Ohrläppchen oder Finger, oder Sie tragen einen Herzfrequenzgurt um die Brust — zum Beispiel einen Polar H7, H9 oder H10 oder ein vergleichbares Bluetooth-Band. Der Herzfrequenzmesser verbindet sich mit Ihrem Computer, Telefon oder Tablet per USB oder drahtlos über Bluetooth. Die Messung dauert 90 Sekunden. In dieser anderthalben Minute sitzen Sie still, entspannt, und folgen dem Atemkreis auf dem Bildschirm — dieser führt Sie in einen ruhigen, gleichmäßigen Atemrhythmus.</p>
+      <p>Während der Messung sehen Sie Ihre Herzfrequenz, den HRV-Prozentsatz und einen Zwischenstand des Relax Index. Wenn die Messung abgeschlossen ist, erhalten Sie das Ergebnis: die Zahl, die Zone, in die Sie fallen, und eine kurze Deutung.</p>
+      <p>Es klingt minimal — 90 Sekunden, ein Sensor, ein Atemkreis. Das ist bewusst so. Je weniger Sie dafür tun müssen, desto leichter halten Sie es durch. Und gerade die Wiederholung macht diese Messung wertvoll.</p>
+
+      <h4>Warum die Fragen vorab?</h4>
+      <p>Bevor Sie beginnen, fragen wir Sie drei Dinge: wie entspannt Sie sich im Moment fühlen, inwieweit Sie heute Dinge tun werden, die wirklich zu Ihnen passen, und welcher der vier Bereiche für Sie in diesem Moment im Vordergrund steht — körperlich, mental, emotional oder spirituell.</p>
+      <p>Diese Antworten ändern nichts an der Messung selbst. Sie helfen bei der Deutung des Ergebnisses. Es kann vorkommen, dass Ihre Messung niedrig ausfällt, obwohl Sie sich nicht schlecht fühlen. Oder umgekehrt: eine gute Messung, während Sie sich nicht wohlfühlen. Dieser Unterschied ist bedeutsam — er zeigt, wie Ihr Gefühl und Ihr Körper in diesem Moment zusammen oder gerade auseinanderlaufen.</p>
+      <p>Indem Sie beide Seiten festhalten — was die Messung zeigt und was Sie selbst angeben — bauen Sie im Laufe der Zeit ein Bild von Ihrem eigenen Inneren Kompass auf: dem Zusammenspiel zwischen Ihrem Körper, Ihrem Gefühl, Ihrem Denken und Ihrer Intuition.</p>
+
+      {% elif lang=='en' %}
+      <p><em>Take a quiet moment to line up a few things before you start measuring. Worth reading at least once — afterwards you know what happens and why it matters.</em></p>
+
+      <h4>Why measure?</h4>
+      <p>In your life four kinds of needs are always in motion: physical, mental, emotional and spiritual. Your body needs rest and movement. Your mind needs challenge, but also moments when nothing has to happen. Your feelings need space to simply be. And there is the need to pay attention to what truly matters to you.</p>
+      <p>In each of these domains something can fall out of balance — in two ways. Sometimes there is a shortage: you don&apos;t get enough movement, enough rest, enough meaningful relationships, enough of what touches you. Sometimes there is an excess: more stimulation, obligations, or demands than you can carry at that moment.</p>
+      <p>Both create load. And in practice they often run together: an excess in one domain pairs with a shortage in another. Too much work, too little rest. Plenty to do, little attention for what really matters.</p>
+      <p>There is no universal prescription for this. What counts as too much or too little for you is different from someone else. And even for you it changes day by day, period by period, stage by stage. The only way to steer this is to build enough self-knowledge to actively dose what life asks of you and what you have to give. That is what StressChecker is for. Learning to do what you truly want, what you can handle, and what works for you.</p>
+
+      <h4>What does StressChecker do?</h4>
+      <p>StressChecker gives you a mirror. It makes visible how your autonomic nervous system stands between load and recovery at this moment — an indication that does not depend on what you think or feel, but on how your body actually responds.</p>
+      <p>This can happen in three ways, each with its own purpose.</p>
+      <p>The <strong>baseline measurement</strong> lets you capture your state at a fixed moment — for instance first thing in the morning, before breakfast. Do this regularly and you start seeing patterns: what is normal for you, when it deviates, which periods call for attention. That is what you are beginning now.</p>
+      <p>The <strong>situational measurement</strong> you take in between — after a conversation, during a working day, after a walk. This shows you how specific situations touch you.</p>
+      <p>The <strong>biofeedback measurement</strong> makes visible the effect of exercises in which you actively try to relax and recover.</p>
+      <p>Together they help you build your own picture of what works for you, what you are sensitive to, and how to handle that balance.</p>
+
+      <h4>What does a measurement actually measure?</h4>
+      <p>Your heart does not beat like a metronome. The time between two heartbeats is never exactly equal — each time it differs by a few milliseconds. That fine variation is called heart rate variability, abbreviated HRV. It is a parameter that has been used in cardiology for decades to see how the autonomic nervous system is functioning: the part of your nervous system that regulates what you do not consciously do.</p>
+      <p>When your nervous system is in balance, your heart responds sensitively to every breath and every small change in your situation. The variation is then large. When your system is under pressure, the rhythm stiffens and the variation becomes small.</p>
+      <p>StressChecker translates that information into one clear number: the Relax Index, on a scale from 0 to 10. Alongside it you see your position in a quadrant, where heart rate (horizontal) and HRV (vertical) together show where you now stand between load and recovery — from Severe stress to Resilient.</p>
+      <p>A single measurement is a snapshot. The value comes from repetition: a series of measurements over time tells more than any single reading.</p>
+
+      <h4>How does the measurement work?</h4>
+      <p>You attach the sensor of a heart rate monitor to your earlobe or finger, or you wear a heart rate chest strap — for example a Polar H7, H9 or H10, or a comparable Bluetooth strap. The heart rate monitor connects to your computer, phone or tablet by USB or wirelessly via Bluetooth. The measurement takes 90 seconds. During that minute and a half you sit still, relaxed, and follow the breathing circle on the screen — which guides you into a calm, regular breathing pattern.</p>
+      <p>During the reading you see your heart rate, HRV percentage, and a running estimate of the Relax Index. When the measurement finishes, you get the result: the number, the zone you fall into, and a short interpretation.</p>
+      <p>It sounds minimal — 90 seconds, a sensor, a breathing circle. That is by design. The less you have to do, the easier it is to keep up. And it is exactly the repetition that makes this reading valuable.</p>
+
+      <h4>Why the questions up front?</h4>
+      <p>Before you start, we ask you three things: how relaxed you feel right now, to what extent you are going to do things today that truly suit you, and which of the four domains is most prominent for you at this moment — physical, mental, emotional or spiritual.</p>
+      <p>These answers do not change the measurement itself. They help with interpreting the result. It can happen that your reading comes out low while you don&apos;t feel bad. Or the other way around: a good reading while you feel out of sorts. That distinction is meaningful — it shows how your feeling and your body align or diverge at that moment.</p>
+      <p>By recording both sides — what the measurement shows and what you indicate yourself — you build, over time, a picture of your own Inner Compass: the interplay between your body, your feeling, your thinking, and your intuition.</p>
+
+      {% else %}
+      <p><em>Even rustig een paar dingen op een rij voordat je gaat meten. De moeite waard om minimaal één keer te lezen — daarna weet je wat er gebeurt en waarom het betekenisvol is.</em></p>
+
+      <h4>Waarom meten?</h4>
+      <p>In je leven bewegen vier soorten behoeften voortdurend mee: lichamelijke, mentale, emotionele en spirituele. Je lichaam heeft rust en beweging nodig. Je denken heeft uitdaging nodig, maar ook momenten dat niets hoeft. Je gevoel heeft ruimte nodig om er te mogen zijn. En er is de behoefte om aandacht te geven aan wat voor jou werkelijk betekenis heeft.</p>
+      <p>In elk van deze domeinen kan iets uit balans raken — op twee manieren. Soms is er een tekort: je komt te weinig toe aan beweging, aan rust, aan betekenisvolle relaties, aan dingen die je raken. Soms is er juist een overaanbod: meer prikkels, verplichtingen of eisen dan waar je tegen bestand bent op dat moment.</p>
+      <p>Beide scheppen belasting. En in de praktijk loopt het vaak door elkaar: een overaanbod in het ene domein gaat samen met een tekort in het andere. Te veel werk, te weinig rust. Veel te doen, weinig aandacht voor wat er werkelijk toe doet.</p>
+      <p>Daarvoor is geen universeel recept. Wat voor jou te veel of te weinig is, is anders dan voor een ander. En zelfs voor jou verandert het per dag, per periode, per levensfase. De enige manier om hierop te sturen is voldoende zelfkennis opbouwen om vraag en aanbod actief te kunnen doseren. Daar is StressChecker voor bedoeld. Leren doen wat je echt wilt, wat je (aan)kan en wat werkt voor jou.</p>
+
+      <h4>Wat doet StressChecker?</h4>
+      <p>StressChecker geeft je een spiegel. Het maakt zichtbaar hoe je autonome zenuwstelsel op dit moment staat tussen belasting en herstel — een indicatie die niet afhangt van wat je denkt of voelt, maar van hoe je lichaam daadwerkelijk reageert.</p>
+      <p>Dat kan op drie manieren, elk met een eigen doel.</p>
+      <p>De <strong>basismeting</strong> laat je jouw toestand op een vast moment vastleggen — bijvoorbeeld &apos;s ochtends na het opstaan en voor je ontbijt. Doe je dat regelmatig, dan zie je patronen: wat is voor jou normaal, wanneer wijkt het af, welke periodes vragen aandacht. Dit is waar je nu aan begint.</p>
+      <p>De <strong>situatiemeting</strong> doe je tussendoor — na een gesprek, tijdens een werkdag, na een wandeling. Zo zie je hoe specifieke situaties jou raken.</p>
+      <p>De <strong>biofeedback-meting</strong> maakt het effect zichtbaar van oefeningen waarin je actief probeert te ontspannen en herstellen.</p>
+      <p>Samen helpen ze je een eigen beeld op te bouwen van wat bij jou werkt, waar je gevoelig voor bent, en hoe je met de balans van vraag en aanbod kunt omgaan.</p>
+
+      <h4>Wat meet een meting eigenlijk?</h4>
+      <p>Je hart klopt niet als een metronoom. De tijd tussen twee hartslagen is nooit precies gelijk — telkens verschilt het een paar milliseconden. Die fijne variatie heet hartritmevariabiliteit, afgekort HRV. Het is een parameter die in de cardiologie al decennia wordt gebruikt om te zien hoe het autonome zenuwstelsel functioneert: het deel van je zenuwstelsel dat regelt wat je niet bewust doet.</p>
+      <p>Als je zenuwstelsel in balans is, reageert je hart gevoelig op elke ademhaling en elke kleine verandering in je situatie. De variatie is dan groot. Staat je systeem onder druk, dan verstart het ritme en wordt de variatie klein.</p>
+      <p>StressChecker vertaalt dat gegeven in één overzichtelijk getal: de Relax Index, op een schaal van 0 tot 10. Daarnaast zie je jouw positie in een kwadrant, waarin de hartslag (horizontaal) en de HRV (verticaal) samen laten zien waar jij nu staat tussen belasting en herstel — van Zware stress tot Veerkrachtig.</p>
+      <p>Eén meting is een momentopname. De waarde komt van de herhaling: een reeks metingen in de tijd vertelt meer dan welke losse meting dan ook.</p>
+
+      <h4>Hoe gaat de meting in zijn werk?</h4>
+      <p>Je bevestigt de sensor van een hartslagmeter aan je oorlel of vinger, of je draagt een hartslagband om je borst — bijvoorbeeld een Polar H7, H9 of H10 of een vergelijkbare Bluetooth-hartslagband. De hartslagmeter verbindt je met je computer, telefoon of tablet via USB of draadloos via Bluetooth. De meting duurt 90 seconden. In die anderhalve minuut zit je stil, ontspannen, en volg je de ademcirkel op het scherm — die helpt je in een rustig, regelmatig adempatroon.</p>
+      <p>Tijdens het meten zie je je hartslag, het percentage HRV, en een tussenstand van de Relax Index. Als de meting klaar is, krijg je het resultaat: het cijfer, de zone waarin je valt, en een korte duiding.</p>
+      <p>Het klinkt minimaal — 90 seconden, een sensor, een ademcirkel. Dat is bewust. Hoe minder je ervoor hoeft te doen, hoe makkelijker je het volhoudt. En juist de herhaling maakt deze meting waardevol.</p>
+
+      <h4>Waarom de vragen vooraf?</h4>
+      <p>Voor je begint vragen we je drie dingen: hoe ontspannen voel je je op dit moment, in hoeverre ga je vandaag dingen doen die echt bij jou passen, en welk van de vier domeinen op dit moment voor jou voorop staat — lichamelijk, mentaal, emotioneel of spiritueel.</p>
+      <p>Deze antwoorden veranderen niets aan de meting zelf. Ze helpen bij het duiden van het resultaat. Het kan zijn dat je meting laag uitvalt terwijl je je niet slecht voelt. Of omgekeerd: een goede meting terwijl je je niet lekker voelt. Dat onderscheid is betekenisvol — het laat zien hoe jouw gevoel en jouw lichaam op dat moment samen of juist uit elkaar lopen.</p>
+      <p>Door beide kanten vast te leggen — wat de meting laat zien, en wat jij zelf aangeeft — bouw je in de loop van de tijd een beeld op van jouw eigen Innerlijk Kompas: het samenspel tussen je lichaam, je gevoel, je denken en je intuïtie.</p>
+      {% endif %}
+    </div>
+  </details>
+
+  <!-- GOEDE METING — altijd zichtbaar -->
+  <div class="section-hdr">
+    {% if lang=='de' %}Gute Messung — bitte beachten{% elif lang=='en' %}Good reading — please observe{% else %}Goede meting — houd dit aan{% endif %}
+  </div>
+  <div class="ww-grid">
+
+    <!-- 1. Niet eten -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Nicht essen (mind. 2 Std. vorher){% elif lang=='en' %}No eating (at least 2 hrs before){% else %}Niet eten (minimaal 2 uur van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <line x1="27" y1="18" x2="27" y2="30" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M24 18 Q24 26 27 28" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <path d="M30 18 Q30 26 27 28" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <line x1="27" y1="28" x2="27" y2="50" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M38 18 C38 18 41 22 41 26 C41 29 39.5 30 38 30.5 L38 50" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Nicht essen{% elif lang=='en' %}No eating{% else %}Niet eten{% endif %}</div>
+    </div>
+
+    <!-- 2. Niet sporten -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Kein Sport (mind. 30 Min. vorher){% elif lang=='en' %}No exercise (at least 30 min before){% else %}Niet sporten (minimaal 30 min van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <circle cx="36" cy="20" r="3.5" fill="#E8344E"/>
+          <path d="M36 24 L32 35 L25 42" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <path d="M32 35 L38 42 L44 38" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Kein Sport{% elif lang=='en' %}No exercise{% else %}Niet sporten{% endif %}</div>
+    </div>
+
+    <!-- 3. Niet roken -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Nicht rauchen (mind. 1 Std. vorher){% elif lang=='en' %}No smoking (at least 1 hr before){% else %}Niet roken (minimaal 1 uur van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <rect x="18" y="32" width="28" height="6" rx="1.5" fill="#E8344E"/>
+          <path d="M44 18 Q44 22 42 26 Q40 30 42 34" stroke="#E8344E" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <path d="M48 16 Q48 20 46 24 Q44 28 46 32" stroke="#E8344E" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Nicht rauchen{% elif lang=='en' %}No smoking{% else %}Niet roken{% endif %}</div>
+    </div>
+
+    <!-- 4. Geen alcohol -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Kein Alkohol (mind. 12 Std. vorher){% elif lang=='en' %}No alcohol (at least 12 hrs before){% else %}Geen alcohol (minimaal 12 uur van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <path d="M26 18 L42 18 L40 30 Q34 36 28 30 Z" stroke="#E8344E" stroke-width="2.2" stroke-linejoin="round" fill="none"/>
+          <line x1="34" y1="36" x2="34" y2="48" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="28" y1="50" x2="40" y2="50" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Kein Alkohol{% elif lang=='en' %}No alcohol{% else %}Geen alcohol{% endif %}</div>
+    </div>
+
+    <!-- 5. Geen koffie/thee -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Kein Kaffee/Tee (mind. 1 Std. vorher){% elif lang=='en' %}No coffee/tea (at least 1 hr before){% else %}Geen koffie/thee (minimaal 1 uur van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <path d="M22 26 L22 42 Q22 48 28 48 L36 48 Q42 48 42 42 L42 26 Z" stroke="#E8344E" stroke-width="2.2" stroke-linejoin="round" fill="none"/>
+          <path d="M42 30 Q48 30 48 35 Q48 40 42 40" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <path d="M28 18 Q28 22 30 24" stroke="#E8344E" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+          <path d="M34 18 Q34 22 36 24" stroke="#E8344E" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Kein Kaffee/Tee{% elif lang=='en' %}No coffee/tea{% else %}Geen koffie/thee{% endif %}</div>
+    </div>
+
+    <!-- 6. Telefoon weg -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Handy weglegen während der Messung{% elif lang=='en' %}Put phone away during the reading{% else %}Telefoon wegleggen tijdens de meting{% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <rect x="24" y="18" width="20" height="32" rx="3" stroke="#E8344E" stroke-width="2.2" fill="none"/>
+          <line x1="32" y1="46" x2="36" y2="46" stroke="#E8344E" stroke-width="2" stroke-linecap="round"/>
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Handy weg{% elif lang=='en' %}Phone away{% else %}Telefoon weg{% endif %}</div>
+    </div>
+
+    <!-- 7. Rechtop zitten -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Aufrecht sitzen, entspannen{% elif lang=='en' %}Sit upright and relax{% else %}Rechtop zitten en ontspannen{% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#e8f5f0" stroke="#2ecc71" stroke-width="2.5"/>
+          <circle cx="34" cy="22" r="4" stroke="#2ecc71" stroke-width="2" fill="none"/>
+          <line x1="34" y1="26" x2="34" y2="40" stroke="#2ecc71" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="34" y1="40" x2="26" y2="50" stroke="#2ecc71" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="34" y1="40" x2="42" y2="50" stroke="#2ecc71" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="28" y1="32" x2="40" y2="32" stroke="#2ecc71" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Aufrecht sitzen{% elif lang=='en' %}Sit upright{% else %}Rechtop zitten{% endif %}</div>
+    </div>
+
+    <!-- 8. Sensor aansluiten -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Sensor am Ohr oder Finger anlegen{% elif lang=='en' %}Attach sensor to ear or finger{% else %}Sensor aan oor of vinger bevestigen{% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#e8f5f0" stroke="#2ecc71" stroke-width="2.5"/>
+          <path d="M22 30 Q22 22 30 22 Q38 22 38 30 Q38 38 32 40 Q28 42 28 46" stroke="#2ecc71" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <circle cx="28" cy="48" r="2" fill="#2ecc71"/>
+          <rect x="40" y="30" width="10" height="6" rx="1" stroke="#2ecc71" stroke-width="2" fill="none"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Sensor anlegen{% elif lang=='en' %}Attach sensor{% else %}Sensor aan{% endif %}</div>
+    </div>
+
+    <!-- 9. 90 seconden -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Die Messung dauert 90 Sekunden{% elif lang=='en' %}The reading takes 90 seconds{% else %}De meting duurt 90 seconden{% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#e8f5f0" stroke="#2ecc71" stroke-width="2.5"/>
+          <circle cx="34" cy="36" r="16" stroke="#2ecc71" stroke-width="2.2" fill="none"/>
+          <line x1="34" y1="36" x2="34" y2="24" stroke="#2ecc71" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="34" y1="36" x2="42" y2="40" stroke="#2ecc71" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="30" y1="16" x2="38" y2="16" stroke="#2ecc71" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}90 Sekunden{% elif lang=='en' %}90 seconds{% else %}90 seconden{% endif %}</div>
+    </div>
+
+  </div>
+
+  <!-- INSTELLINGEN — voor alle meting-types -->
+  <div class="section-hdr">
+    {% if lang=='de' %}Einstellungen{% elif lang=='en' %}Settings{% else %}Instellingen{% endif %}
+  </div>
+
+  <!-- FUNCTIE VAN DE BOL — verplaatst vanuit sensor_en_meten, altijd closed -->
+  <details class="edu-block">
+    <summary>
+      <span>💡
+        {% if lang=='de' %}Funktion des Atemkreises{% elif lang=='en' %}Function of the breathing circle{% else %}Functie van de ademcirkel{% endif %}
+      </span>
+      <span class="summary-cue">
+        <span class="cue-txt cue-closed">{% if lang=='de' %}mehr lesen{% elif lang=='en' %}read more{% else %}meer lezen{% endif %}</span>
+        <span class="cue-txt cue-open">{% if lang=='de' %}einklappen{% elif lang=='en' %}collapse{% else %}inklappen{% endif %}</span>
+        <span class="cue-arrow">▾</span>
+      </span>
+    </summary>
+    <div class="edu-body">
+      {% if lang=='de' %}
+      <p>Während der Messung sehen Sie unten einen Atemkreis. Er dehnt sich beim Einatmen aus und zieht sich beim Ausatmen zusammen — so sehen Sie direkt, wann Sie ein- und ausatmen sollen.</p>
+      <p><strong>Sie können das Tempo an Ihr Niveau anpassen</strong> (Zahnrad-Symbol unter dem Kreis):</p>
+      <ul>
+        <li><strong>Anfänger:</strong> ruhigeres Tempo (3s ein, 4s aus)</li>
+        <li><strong>Fortgeschritten:</strong> tieferer Rhythmus (6s ein, 8s aus)</li>
+        <li><strong>Regel:</strong> Ausatmung immer länger als Einatmung + kurze Pause</li>
+      </ul>
+      <p>Ihr Körper lernt das Muster automatisch. Auch nach der Messung atmen Sie ruhiger weiter — ohne bewusst daran zu denken.</p>
+      {% elif lang=='en' %}
+      <p>During the measurement you see a breathing circle below. It expands as you inhale and contracts as you exhale — so you can see directly when to breathe in and out.</p>
+      <p><strong>You can adjust the pace to your level</strong> (gear icon under the circle):</p>
+      <ul>
+        <li><strong>Beginner:</strong> gentler pace (3s in, 4s out)</li>
+        <li><strong>Experienced:</strong> deeper rhythm (6s in, 8s out)</li>
+        <li><strong>Rule:</strong> exhale always longer than inhale + a short pause</li>
+      </ul>
+      <p>Your body learns the pattern automatically. Even after the measurement you keep breathing more calmly — without consciously thinking about it.</p>
+      {% else %}
+      <p>Tijdens de meting zie je onderin een ademcirkel. Hij zet uit bij inademen en trekt samen bij uitademen — zo zie je direct wanneer in- en uit te ademen.</p>
+      <p><strong>Je kunt het tempo aanpassen aan jouw niveau</strong> (tandwiel-icoon onder de cirkel):</p>
+      <ul>
+        <li><strong>Beginners:</strong> rustiger tempo (3s in, 4s uit)</li>
+        <li><strong>Ervaren:</strong> dieper ritme (6s in, 8s uit)</li>
+        <li><strong>Regel:</strong> uitademing altijd langer dan inademing + korte pauze</li>
+      </ul>
+      <p>Je lichaam leert het patroon automatisch. Ook na de meting blijf je rustiger ademen — zonder er bewust aan te denken.</p>
+      {% endif %}
+    </div>
+  </details>
+
+  <!-- Toggles: ademcirkel + geluid -->
+  <div class="mset-card">
+    <div class="mset-toggles">
+      <div class="mtoggle-wrap">
+        <button type="button" id="tglBreath" class="mtoggle" onclick="toggleBreathPref()" aria-pressed="true">
+          <span class="mtoggle-ico">&#127777;</span>
+          <span>{% if lang=='de' %}Atemkreis{% elif lang=='en' %}Breathing circle{% else %}Ademcirkel{% endif %}</span>
+        </button>
+        <div class="mtoggle-hint">{% if lang=='de' %}Visuelle Begleitung Ihrer Atmung während der Messung.{% elif lang=='en' %}Visual guide for your breathing during the reading.{% else %}Visuele begeleiding van je ademhaling tijdens de meting.{% endif %}</div>
+      </div>
+      <div class="mtoggle-wrap">
+        <button type="button" id="tglNoise" class="mtoggle" onclick="toggleNoisePref()" aria-pressed="true">
+          <span class="mtoggle-ico">&#127925;</span>
+          <span>{% if lang=='de' %}Ton{% elif lang=='en' %}Sound{% else %}Geluid{% endif %}</span>
+        </button>
+        <div class="mtoggle-hint">{% if lang=='de' %}Leiser Ton bei jedem Herzschlag.{% elif lang=='en' %}Soft tone with each heartbeat.{% else %}Zachte toon bij elke hartslag.{% endif %}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ademritme inklapbaar -->
+  <details class="mset-rhythm">
+    <summary>
+      <div class="summary-main">
+        <span>&#9881; {% if lang=='de' %}Atemrhythmus{% elif lang=='en' %}Breathing rhythm{% else %}Ademritme{% endif %}</span>
+        <span class="summary-cue">
+          <span class="cue-txt cue-closed">{% if lang=='de' %}Einstellungen zeigen{% elif lang=='en' %}show settings{% else %}instellingen tonen{% endif %}</span>
+          <span class="cue-txt cue-open">{% if lang=='de' %}ausblenden{% elif lang=='en' %}hide settings{% else %}instellingen verbergen{% endif %}</span>
+          <span class="cue-arrow">▾</span>
+        </span>
+      </div>
+      <div class="summary-hint">{% if lang=='de' %}Tempo anpassen (Standard 4-6-2 Sekunden).{% elif lang=='en' %}Adjust the pace (default 4-6-2 seconds).{% else %}Tempo aanpassen (standaard 4-6-2 seconden).{% endif %}</div>
+    </summary>
+    <div class="mset-rhythm-body">
+      <div class="bs-row">
+        <label><strong>{% if lang=='de' %}Einatmen{% elif lang=='en' %}Inhale{% else %}Inademing{% endif %}</strong><span><span id="bsInVal">4</span>s</span></label>
+        <input type="range" id="bsIn" min="3" max="8" step="1" value="4">
+      </div>
+      <div class="bs-row">
+        <label><strong>{% if lang=='de' %}Ausatmen{% elif lang=='en' %}Exhale{% else %}Uitademing{% endif %}</strong> <span class="bs-info" title="{% if lang=='de' %}Ausatmen aktiviert Entspannung{% elif lang=='en' %}Exhale activates relaxation{% else %}Uitademing activeert ontspanning{% endif %}">i</span><span><span id="bsOutVal">6</span>s</span></label>
+        <input type="range" id="bsOut" min="2" max="12" step="1" value="6">
+      </div>
+      <div class="bs-row">
+        <label><strong>{% if lang=='de' %}Pause{% elif lang=='en' %}Pause{% else %}Pauze{% endif %}</strong><span><span id="bsHoldVal">2</span>s</span></label>
+        <input type="range" id="bsHold" min="1" max="6" step="1" value="2">
+      </div>
+      <div class="bs-hint">{% if lang=='de' %}Ausatmung immer länger als Einatmung{% elif lang=='en' %}Exhale always longer than inhale{% else %}Uitademing altijd langer dan inademing{% endif %}</div>
+    </div>
+  </details>
+
+  {% if request.args.get('next') == 'biofeedback' %}
+  <!-- Duur inklapbaar — alleen bij biofeedback -->
+  <details class="mset-rhythm">
+    <summary>
+      <div class="summary-main">
+        <span>&#9881; {% if lang=='de' %}Dauer{% elif lang=='en' %}Duration{% else %}Duur{% endif %}</span>
+        <span class="summary-cue">
+          <span class="cue-txt cue-closed">{% if lang=='de' %}Einstellungen zeigen{% elif lang=='en' %}show settings{% else %}instellingen tonen{% endif %}</span>
+          <span class="cue-txt cue-open">{% if lang=='de' %}ausblenden{% elif lang=='en' %}hide settings{% else %}instellingen verbergen{% endif %}</span>
+          <span class="cue-arrow">▾</span>
+        </span>
+      </div>
+      <div class="summary-hint">{% if lang=='de' %}Dauer wählen (3-30 Minuten, Standard 10).{% elif lang=='en' %}Choose duration (3-30 minutes, default 10).{% else %}Duur kiezen (3-30 minuten, standaard 10).{% endif %}</div>
+    </summary>
+    <div class="mset-rhythm-body">
+      <div class="bs-row">
+        <label><strong>{% if lang=='de' %}Dauer{% elif lang=='en' %}Duration{% else %}Duur{% endif %}</strong><span><span id="bsDurVal">10</span> {% if lang=='de' %}Minuten{% elif lang=='en' %}minutes{% else %}minuten{% endif %}</span></label>
+        <input type="range" id="bsDur" min="3" max="30" step="1" value="10">
+      </div>
+    </div>
+  </details>
+  {% endif %}
+
+  {% if request.args.get('next') == 'basismeting' %}
+  <!-- VOORAF DOEN — alleen bij basismeting -->
+  <div class="section-hdr">
+    {% if lang=='de' %}Vorher ausfüllen{% elif lang=='en' %}Before you start{% else %}Vooraf invullen{% endif %}
+  </div>
+
+  <!-- Zelfinschatting -->
+  <div style="margin:0 0 1rem;background:#fff;border-radius:12px;padding:1.2rem 1rem;">
+    <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.6rem;">
+      {%if lang=='de'%}Wie entspannt fühlen Sie sich gerade?{%elif lang=='en'%}How relaxed do you feel right now?{%else%}Hoe ontspannen voel je je op dit moment?{%endif%}
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-bottom:.3rem;">
+      <span>{%if lang=='de'%}Sehr angespannt{%elif lang=='en'%}Very stressed{%else%}Zeer gespannen{%endif%}</span>
+      <span>{%if lang=='de'%}Völlig entspannt{%elif lang=='en'%}Fully relaxed{%else%}Volledig ontspannen{%endif%}</span>
+    </div>
+    <input type="range" id="subjSlider" min="0" max="10" value="5"
+      style="width:100%;accent-color:#E8344E;cursor:pointer;"
+      oninput="document.getElementById('subjVal').textContent=this.value;sessionStorage.setItem('sc_subjectief_pre',this.value)">
+    <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-top:.2rem;margin-bottom:0;"><span>{%if lang=="de"%}Erschöpft / Kopf voll{%elif lang=="en"%}Exhausted / mind full{%else%}Uitgeput / hoofd vol{%endif%}</span><span>{%if lang=="de"%}Es geht{%elif lang=="en"%}Doing OK{%else%}Gaat wel{%endif%}</span><span>{%if lang=="de"%}Fit und wohl{%elif lang=="en"%}Feeling good{%else%}Lekker in mijn vel{%endif%}</span></div>
+    <div style="text-align:center;font-size:1.4rem;font-weight:700;color:#E8344E;margin-top:.4rem;">
+      <span id="subjVal">5</span><span style="font-size:.85rem;font-weight:400;color:#aaa"> / 10</span>
+    </div>
+    <div style="text-align:center;font-size:.72rem;font-style:italic;color:#b0a8a0;margin-top:.3rem;">{%if lang=='de'%}Geben Sie Ihr erstes, ehrliches Gefühl an.{%elif lang=='en'%}Give your first, honest feeling.{%else%}Geef je eerste, eerlijke gevoel.{%endif%}</div>
+  </div>
+
+  <!-- Ctx vitaliteit -->
+  <div style="margin:0 0 1rem;background:#fff;border-radius:12px;padding:1.2rem 1rem;">
+    <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.6rem;">{%if lang=="de"%}Inwieweit tun Sie heute Dinge, die wirklich zu Ihnen passen?{%elif lang=="en"%}To what extent are you doing things today that truly suit you?{%else%}In hoeverre doe jij vandaag dingen die echt bij jou passen?{%endif%}</div>
+    <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-bottom:.3rem;"><span>{%if lang=="de"%}Gar nicht{%elif lang=="en"%}Not at all{%else%}Helemaal niet{%endif%}</span><span>{%if lang=="de"%}Völlig{%elif lang=="en"%}Completely{%else%}Helemaal{%endif%}</span></div>
+    <input type="range" id="ctxVitalSlider" min="0" max="10" value="5" style="width:100%;accent-color:#E8A020;cursor:pointer;" oninput="document.getElementById('ctxVitalVal').textContent=this.value;sessionStorage.setItem('sc_ctx_vitaliteit',this.value)">
+    <div style="text-align:center;font-size:1.2rem;font-weight:700;color:#E8A020;margin-top:.3rem;"><span id="ctxVitalVal">5</span><span style="font-size:.85rem;font-weight:400;color:#aaa"> / 10</span></div>
+  </div>
+
+  <!-- Ctx ongemak -->
+  <div style="margin:0 0 1rem;background:#fff;border-radius:12px;padding:1.2rem 1rem;">
+    <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.6rem;">{%if lang=="de"%}Wie viel Unbehagen spüren Sie?{%elif lang=="en"%}How much discomfort do you feel?{%else%}Hoeveel ongemak voel je?{%endif%}</div>
+    <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-bottom:.3rem;"><span>{%if lang=="de"%}keines{%elif lang=="en"%}none{%else%}geen{%endif%}</span><span>{%if lang=="de"%}viel{%elif lang=="en"%}much{%else%}veel{%endif%}</span></div>
+    <input type="range" id="ctxOngemakSlider" min="0" max="10" value="5" style="width:100%;accent-color:#C66A3D;cursor:pointer;" oninput="document.getElementById('ctxOngemakVal').textContent=this.value;sessionStorage.setItem('sc_ctx_ongemak',this.value)">
+    <div style="text-align:center;font-size:1.2rem;font-weight:700;color:#C66A3D;margin-top:.3rem;"><span id="ctxOngemakVal">5</span><span style="font-size:.85rem;font-weight:400;color:#aaa"> / 10</span></div>
+  </div>
+
+  <!-- Ctx dimensie -->
+  <div style="margin:0 0 1rem;background:#fff;border-radius:12px;padding:1.2rem 1rem;">
+    <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.5rem;">{%if lang=="de"%}Was steht im Vordergrund?{%elif lang=="en"%}What is most prominent?{%else%}Wat speelt er vooral?{%endif%}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;">
+      <button type="button" onclick="setDim('lichamelijk',this)" class="ctx-dim-btn">{%if lang=="de"%}Körperlich{%elif lang=="en"%}Physical{%else%}Lichamelijk{%endif%}</button>
+      <button type="button" onclick="setDim('mentaal',this)" class="ctx-dim-btn">{%if lang=="de"%}Mental{%elif lang=="en"%}Mental{%else%}Mentaal{%endif%}</button>
+      <button type="button" onclick="setDim('emotioneel',this)" class="ctx-dim-btn">{%if lang=="de"%}Emotional{%elif lang=="en"%}Emotional{%else%}Emotioneel{%endif%}</button>
+      <button type="button" onclick="setDim('spiritueel',this)" class="ctx-dim-btn">{%if lang=="de"%}Spirituell{%elif lang=="en"%}Spiritual{%else%}Spiritueel{%endif%}</button>
+      <button type="button" onclick="setDim('weet_niet',this)" class="ctx-dim-btn" style="grid-column:1/-1;">{%if lang=="de"%}Weiß nicht{%elif lang=="en"%}Not sure{%else%}Weet ik niet{%endif%}</button>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if request.args.get('next') in ['basismeting','biofeedback','situatiemeting'] %}
+  <!-- Ctx vrije tekst — optioneel, alle drie meettypes -->
+  <div class="ctx-freetext-block">
+    <label for="ctxVrijeTekst" class="ctx-freetext-label">{%if lang=="de"%}Möchten Sie etwas erläutern? (optional){%elif lang=="en"%}Would you like to add anything? (optional){%else%}Wil je iets toelichten? (optioneel){%endif%}</label>
+    <div class="ctx-freetext-wrapper">
+      <input type="text" id="ctxVrijeTekst" maxlength="100"
+             autocomplete="off"
+             placeholder=""
+             oninput="sessionStorage.setItem('sc_ctx_vrije_tekst', this.value); updateCharCount();">
+      <span class="ctx-freetext-counter" id="ctxCharCounter"></span>
+    </div>
+    {% if show_edu %}
+    <div class="ctx-freetext-hint">{%if lang=="de"%}Alles darf — körperlich, mental, emotional, etwas was in Ihrem Leben spielt.{%elif lang=="en"%}Anything goes — physical, mental, emotional, something that matters in your life.{%else%}Alles mag — fysiek, mentaal, emotioneel, iets wat speelt in je leven.{%endif%}</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <a href="{{ (sensor_url + '&skip_subj=1&type=biofeedback' if '?' in sensor_url else sensor_url + '?skip_subj=1&type=biofeedback') if request.args.get('next') == 'biofeedback' else url_for('sensor_en_meten') + '?type=' + request.args.get('next') + '&skip_subj=1' + ('&cid=' + request.args.get('cid') if request.args.get('cid') else '') if request.args.get('next') in ['basismeting','situatiemeting'] else '/hlm/sensor-keuze' if request.args.get('next') == 'hlmmeting' else '/sensor-en-meten?skip_subj=1' }}" class="ww-btn" id="btnContinue"{% if request.args.get('next') == 'basismeting' %} aria-disabled="true"{% endif %}>
+    {% if lang=='de' %}Weiter zum Sensor →{% elif lang=='en' %}Continue to sensor →{% else %}Verder naar sensor →{% endif %}
+  </a>
+  <a href="/menu" class="ww-back">← {% if lang=='de' %}Zurück{% elif lang=='en' %}Back{% else %}Terug{% endif %}</a>
+</div>
+
+<script>
+/* Context-isolatie: reset ctx-state-keys bij wissel tussen eigen-meting en cliënt-meting (of tussen cliënten). Voorkomt dat tekst/dimensie/ongemak van vorige meet-context lekken. */
+(function(){
+  var ctxKey='self';
+  var cid=new URLSearchParams(window.location.search).get('cid');
+  if(cid)ctxKey='client_'+cid;
+  var prevCtxKey=sessionStorage.getItem('sc_ctx_owner');
+  if(prevCtxKey!==ctxKey){
+    sessionStorage.removeItem('sc_ctx_vrije_tekst');
+    sessionStorage.removeItem('sc_ctx_dimensie');
+    sessionStorage.removeItem('sc_ctx_ongemak');
+    sessionStorage.setItem('sc_ctx_owner',ctxKey);
+  }
+})();
+function setDim(val,btn){document.querySelectorAll(".ctx-dim-btn").forEach(b=>b.classList.remove("active"));btn.classList.add("active");sessionStorage.setItem("sc_ctx_dimensie",val);var c=document.getElementById("btnContinue");if(c)c.removeAttribute("aria-disabled");}
+sessionStorage.setItem("sc_ctx_vitaliteit","5");
+sessionStorage.removeItem("sc_subjectief_pre");
+sessionStorage.setItem("sc_ctx_ongemak","5");
+sessionStorage.removeItem("sc_ctx_dimensie");
+sessionStorage.removeItem("sc_ctx_vrije_tekst");
+/* Dimensie-init: als sessionStorage al een keuze heeft (back-navigatie), markeer button + enable knop */
+(function(){var prev=sessionStorage.getItem("sc_ctx_dimensie");if(prev){var b=document.querySelector('.ctx-dim-btn[onclick*="\''+prev+'\'"]');if(b)b.classList.add("active");var c=document.getElementById("btnContinue");if(c)c.removeAttribute("aria-disabled");}})();
+/* Click-intercept: blokkeer navigatie wanneer knop nog disabled is */
+(function(){var c=document.getElementById("btnContinue");if(c)c.addEventListener("click",function(e){if(this.getAttribute("aria-disabled")==="true")e.preventDefault();});})();
+
+/* Slider-init: herstel eerder ingestelde waarden uit sessionStorage (back-navigatie) */
+(function(){
+  var map=[["sc_subjectief_pre","subjSlider","subjVal"],["sc_ctx_vitaliteit","ctxVitalSlider","ctxVitalVal"],["sc_ctx_ongemak","ctxOngemakSlider","ctxOngemakVal"]];
+  map.forEach(function(m){var v=sessionStorage.getItem(m[0]);var s=document.getElementById(m[1]);var d=document.getElementById(m[2]);if(v&&s){s.value=v;if(d)d.textContent=v;}});
+})();
+
+/* Roterende placeholder — live rotate binnen pagina (elke 4s), pauzeert bij focus */
+(function(){
+  var input=document.getElementById('ctxVrijeTekst');
+  if(!input)return;
+  var lang=(document.documentElement.lang||'{{ lang }}'||'nl').toLowerCase().slice(0,2);
+  var examples={
+    nl:['bijv. slecht geslapen','bijv. fijne wandeling gehad','bijv. deadline op het werk','bijv. net goed nieuws','bijv. mis iemand','bijv. goed gesprek over wat er echt toe doet'],
+    de:['z.B. schlecht geschlafen','z.B. schöner Spaziergang','z.B. Deadline bei der Arbeit','z.B. gerade gute Nachrichten','z.B. vermisse jemanden','z.B. gutes Gespräch über das Wesentliche'],
+    en:['e.g. slept badly','e.g. had a nice walk','e.g. deadline at work','e.g. just got good news','e.g. missing someone','e.g. good conversation about what really matters']
+  };
+  var list=examples[lang]||examples.nl;
+  /* Start-offset uit sessionStorage: zo beginnen opeenvolgende pagina-bezoeken niet altijd bij #0 */
+  var idx=(parseInt(sessionStorage.getItem('sc_ctx_placeholder_counter')||'0',10))%list.length;
+  function rotate(){
+    if(document.activeElement===input)return;
+    input.placeholder=list[idx];
+    idx=(idx+1)%list.length;
+    sessionStorage.setItem('sc_ctx_placeholder_counter',String(idx));
+  }
+  rotate();
+  setInterval(rotate,4000);
+  /* Herstel eerder ingevulde tekst */
+  var prev=sessionStorage.getItem('sc_ctx_vrije_tekst')||'';
+  if(prev)input.value=prev;
+})();
+
+/* Character-counter (zichtbaar vanaf 50 tekens) */
+function updateCharCount(){
+  var input=document.getElementById('ctxVrijeTekst');
+  var counter=document.getElementById('ctxCharCounter');
+  if(!input||!counter)return;
+  var remaining=100-input.value.length;
+  if(input.value.length>=50){
+    var lang=(document.documentElement.lang||'{{ lang }}'||'nl').toLowerCase().slice(0,2);
+    counter.textContent=(lang==='de'?'noch ':'')+remaining;
+  }else{
+    counter.textContent='';
+  }
+}
+document.addEventListener('DOMContentLoaded',updateCharCount);
+
+/* ---------- Meting-instellingen (localStorage, persistent) ---------- */
+(function(){
+  var LS={breath:'sc_measure_breathing_on',noise:'sc_measure_noise_on',brIn:'sc_breath_in',brOut:'sc_breath_out',brHold:'sc_breath_hold',dur:'sc_biofeedback_duration_min'};
+  function getPref(k,def){try{var v=localStorage.getItem(k);return v===null?def:(v==='true');}catch(e){return def;}}
+  function setPref(k,v){try{localStorage.setItem(k,v?'true':'false');}catch(e){}}
+  function getNum(k,def){try{var v=parseInt(localStorage.getItem(k),10);return isNaN(v)?def:v;}catch(e){return def;}}
+  function setNum(k,v){try{localStorage.setItem(k,String(v));}catch(e){}}
+
+  function renderToggle(id,on){var b=document.getElementById(id);if(b)b.setAttribute('aria-pressed',on?'true':'false');}
+  window.toggleBreathPref=function(){var cur=getPref(LS.breath,true);setPref(LS.breath,!cur);renderToggle('tglBreath',!cur);};
+  window.toggleNoisePref=function(){var cur=getPref(LS.noise,true);setPref(LS.noise,!cur);renderToggle('tglNoise',!cur);};
+
+  /* init toggle-states uit localStorage */
+  renderToggle('tglBreath',getPref(LS.breath,true));
+  renderToggle('tglNoise',getPref(LS.noise,true));
+
+  /* init sliders met gevalideerde waarden */
+  var iIn=document.getElementById('bsIn'),iOut=document.getElementById('bsOut'),iHold=document.getElementById('bsHold');
+  if(iIn&&iOut&&iHold){
+    var vIn=4, vHold=2, vOut=6;
+    setNum(LS.brIn, vIn); setNum(LS.brHold, vHold); setNum(LS.brOut, vOut);
+    iIn.value=vIn;iOut.value=vOut;iHold.value=vHold;
+    iOut.min=vIn+1;iOut.max=vIn*2;
+    document.getElementById('bsInVal').textContent=vIn;
+    document.getElementById('bsOutVal').textContent=vOut;
+    document.getElementById('bsHoldVal').textContent=vHold;
+    function clampOut(){var i=parseInt(iIn.value,10);var v=parseInt(iOut.value,10);if(v<i+1)iOut.value=i+1;document.getElementById('bsOutVal').textContent=iOut.value;}
+    iIn.addEventListener('input',function(){document.getElementById('bsInVal').textContent=iIn.value;setNum(LS.brIn,iIn.value);clampOut();setNum(LS.brOut,iOut.value);});
+    iOut.addEventListener('input',function(){clampOut();setNum(LS.brOut,iOut.value);});
+    iHold.addEventListener('input',function(){document.getElementById('bsHoldVal').textContent=iHold.value;setNum(LS.brHold,iHold.value);});
+  }
+
+  /* init Duur-slider (alleen bij biofeedback aanwezig) + href-update */
+  function updateBiofeedDurationInHref(){
+    var btn=document.getElementById('btnContinue');if(!btn)return;
+    var href=btn.getAttribute('href')||'';if(href.indexOf('type=biofeedback')<0)return;
+    var durSec=Math.max(180,Math.min(1800,getNum(LS.dur,10)*60));
+    href=href.replace(/([?&])duration=\d+/g,'$1').replace(/\?&/,'?').replace(/&&+/g,'&').replace(/[?&]$/,'');
+    var sep=href.indexOf('?')>=0?'&':'?';
+    btn.setAttribute('href',href+sep+'duration='+durSec);
+  }
+  var iDur=document.getElementById('bsDur');
+  if(iDur){
+    var vDur=Math.max(3,Math.min(30,getNum(LS.dur,10)));
+    iDur.value=vDur;
+    document.getElementById('bsDurVal').textContent=vDur;
+    iDur.addEventListener('input',function(){document.getElementById('bsDurVal').textContent=iDur.value;setNum(LS.dur,iDur.value);updateBiofeedDurationInHref();});
+  }
+  updateBiofeedDurationInHref();
+})();
+</script>
+{% endblock %}

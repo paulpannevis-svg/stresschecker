@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+{% block content %}
+<!-- Pro context bar -->
+{% if client_id and client_id > 0 and is_pro %}
+<div id="pro-context-bar" style="max-width:820px;margin:0 auto;border-radius:8px 8px 0 0;background:linear-gradient(135deg,#E8344E,#c72a40);color:#fff;padding:.7rem 1.2rem;font-size:.85rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+  <div style="display:flex;align-items:center;gap:.8rem;">
+    <span style="background:rgba(255,255,255,.25);padding:2px 10px;border-radius:10px;font-size:.65rem;font-weight:700;letter-spacing:.08em;">PRO</span>
+    <span style="font-weight:700;font-size:1rem;">{{ client_name }}</span>
+    {% if client_info %}
+    <span style="opacity:.85;font-size:.78rem;">
+      {{ client_info.birth_year }} &middot;
+      {%if client_info.gender=='male'%}{%if lang=='de'%}M&auml;nnlich{%elif lang=='en'%}Male{%else%}Man{%endif%}{%elif client_info.gender=='female'%}{%if lang=='de'%}Weiblich{%elif lang=='en'%}Female{%else%}Vrouw{%endif%}{%else%}{{client_info.gender}}{%endif%}
+     
+    </span>
+    {% endif %}
+  <a href="/pro/client/{{ client_id }}" style="color:#fff;background:rgba(255,255,255,.2);padding:4px 14px;border-radius:16px;text-decoration:none;font-size:.8rem;font-weight:600;">{%if lang=='de'%}&larr; Klient{%elif lang=='en'%}&larr; Client{%else%}&larr; Cli&euml;nt{%endif%}</a>
+</div>
+{% endif %}
+
+<style>
+html,body{background:#f5f5f5;margin:0;padding:0;}
+.pro-bar{max-width:820px;margin:0 auto;border-radius:8px;}
+body{background:#f5f5f5;margin:0;}
+*{box-sizing:border-box;}
+.kw-wrap{max-width:820px;margin:0 auto;padding:1rem;display:flex;gap:1rem;align-items:stretch;background:#f5f5f5;border-radius:12px;}
+.kw-left{flex:0 0 260px;min-width:0;background:#6e6e6e;border-radius:12px;padding:1.2rem;color:#fff;}
+.kw-left-title{text-align:center;font-size:.7rem;letter-spacing:.1em;color:#aaa;text-transform:uppercase;margin-bottom:.75rem;}
+.kw-gauge-wrap{position:relative;width:100%;max-width:180px;aspect-ratio:160/115;height:auto;margin:0 auto;}
+.kw-gauge-ri{font-size:1.8rem;font-weight:900;text-align:center;line-height:1;margin-top:8px;display:block;}
+.kw-zone-label{text-align:center;font-size:.9rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem;}
+.kw-metrics-row{display:flex;gap:1rem;margin-bottom:.75rem;}
+.kw-m{text-align:center;flex:1;}
+.kw-m-val{font-size:1.4rem;font-weight:900;}
+.kw-m-lbl{font-size:.65rem;color:#aaa;letter-spacing:.05em;text-transform:uppercase;}
+.kw-m.bpm .kw-m-val{color:#e74c3c;}
+.kw-m.hrv .kw-m-val{color:#3498db;}
+.kw-quality-badge{display:flex;align-items:center;gap:.5rem;background:rgba(255,255,255,.1);border-radius:6px;padding:.4rem .75rem;margin-bottom:.75rem;font-size:.75rem;}
+.kw-meta{font-size:.72rem;color:#bbb;margin-bottom:.75rem;line-height:1.6;}
+.kw-meta strong{color:#fff;}
+.kw-delta-row{text-align:center;font-size:.75rem;color:#aaa;margin-bottom:.75rem;}
+.kw-right{flex:1;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 8px rgba(0,0,0,.08);}
+.kw-tabs{display:flex;border-bottom:1px solid #eee;}
+.kw-tab{flex:1;text-align:center;padding:.6rem;font-size:.8rem;font-weight:600;cursor:pointer;color:#999;border-bottom:2px solid transparent;}
+.kw-tab.active{color:#27ae60;border-bottom-color:#27ae60;}
+.kw-tab-content{padding:1rem;}
+.kw-tab-content.hidden{display:none;}
+.kw-legend{display:flex;gap:1.5rem;margin-top:.5rem;justify-content:center;font-size:.72rem;color:#666;}
+.kw-legend-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;vertical-align:middle;}
+.kw-detail-row{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid #f5f5f5;font-size:.82rem;}
+.kw-detail-row strong{color:#333;}
+@media(max-width:767px){.kw-wrap{flex-direction:column;}.kw-left{flex:1 1 auto;width:100%;}.kw-gauge-wrap{max-width:220px;}}
+/* === LICHTE KOLOM OVERRIDE - 28-04-2026 === */
+.kw-left{background:#FFFFFF !important;color:#4B3629 !important;border:1px solid #EDE5D9;box-shadow:0 2px 12px rgba(75,54,41,0.06);}
+.kw-left-title{color:#888 !important;}
+.kw-left .kw-metrics-row div[style*="color:#bbb"]{color:#888 !important;}
+.kw-left #qualityBadge{background:#E8F4F0 !important;border-color:#B0E5D5 !important;}
+.kw-left #qualityBadge > span{color:#5F5E5A !important;}
+.kw-left #qualityPct,.kw-left #qualityStars,.kw-left #qualityLabel{color:#0F6E56 !important;}
+
+</style>
+</div>
+<div class="kw-wrap">
+<div class="kw-left">
+  <div class="kw-left-title">Relax Index</div>
+    <div class="kw-gauge-wrap"><canvas id="gaugeCanvas" style="width:100%;display:block;"></canvas></div>
+  <div class="kw-metrics-row" style="justify-content:space-between;align-items:center;">
+    <div class="kw-m bpm"><div class="kw-m-val" id="bpmVal">-</div><div class="kw-m-lbl">{% if lang=="de" %}Herzschlag{% elif lang=="en" %}Heart rate{% else %}Hartslag{% endif %}</div></div>
+    <div style="text-align:center;"><div id="gaugeRI" style="font-size:1.8rem;font-weight:900;line-height:1;">-</div><div id="zoneLabel" style="font-size:.7rem;font-weight:700;letter-spacing:.05em;">-</div><div style="font-size:.6rem;color:#bbb;">Relax Index</div></div>
+    <div class="kw-m hrv"><div class="kw-m-val" id="hrvVal">-</div><div class="kw-m-lbl">HRV %</div></div>
+  </div>
+  <div class="kw-delta-row" id="deltaRow"></div>
+  <div id="ctxBlock" style="display:none;margin-top:.8rem;padding:.8rem 1rem;background:#f9f6f3;border-radius:8px;border-left:3px solid #E8344E;">
+    <div id="ctxDim" style="font-size:.75rem;font-weight:700;letter-spacing:.08em;color:#E8344E;margin-bottom:.4rem;"></div>
+    <div id="ctxVraag" style="font-size:.9rem;color:#2C2C2C;line-height:1.5;"></div>
+  </div>
+    <div id="qualityBadge" style="display:flex;align-items:center;justify-content:center;gap:.3rem;margin-top:.6rem;padding:.4rem .4rem;background:rgba(0,255,255,0.12);border:1px solid rgba(0,255,255,0.3);border-radius:6px;position:relative;width:100%;box-sizing:border-box;">
+      <span style="font-size:.68rem;color:#ccc;">{%if lang=="de"%}Messqualit&auml;t:{%elif lang=="en"%}Reading quality:{%else%}Meetkwaliteit:{%endif%}</span>
+      <span id="qualityPct" style="display:none;font-weight:700;color:#00ffff;font-size:.78rem;">--</span>
+      <span id="qualityStars" style="color:#00ffff;font-size:.75rem;"></span>
+      <span id="qualityLabel" style="font-size:.68rem;color:#00ffff;"></span>
+      <span style="cursor:pointer;font-size:.8rem;color:#ffd700;margin-left:.3rem;opacity:1;" onclick="var t=document.getElementById('qualityTip');t.style.display=t.style.display==='block'?'none':'block';">&#9432;</span>
+      <div id="qualityTip" style="display:none;position:absolute;bottom:110%;left:50%;transform:translateX(-50%);background:#333;color:#ccc;padding:.5rem .7rem;border-radius:6px;font-size:.68rem;line-height:1.5;width:240px;box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:10;text-align:left;">{%if lang=="de"%}Wie viele Herzschläge für die Messung brauchbar waren. Unter 70% ist das Ergebnis weniger zuverlässig — erwäge eine neue Messung.{%elif lang=="en"%}How many heartbeats were usable for the reading. Below 70% the result is less reliable — consider a new reading.{%else%}Hoeveel hartslagen bruikbaar waren voor de meting. Onder 70% is het resultaat minder betrouwbaar — overweeg een nieuwe meting.{%endif%}</div>
+    </div>
+    <div id="qualityAdvice" style="display:none;margin-top:.4rem;padding:.4rem .6rem;background:rgba(255,100,100,0.12);border:1px solid rgba(255,100,100,0.3);border-radius:6px;font-size:.7rem;line-height:1.5;color:#ffaaaa;">
+      <strong style="color:#ff6666;">{%if lang=="de"%}Hinweis:{%elif lang=="en"%}Note:{%else%}Let op:{%endif%}</strong>
+      {%if lang=="de"%}Die Messqualit&auml;t ist ungen&uuml;gend. Dies kann durch Bewegung, schlechten Sensorkontakt oder eine vor&uuml;bergehende Herzrhythmusst&ouml;rung verursacht werden. Wiederholen Sie die Messung unter ruhigen Bedingungen. Wenn die Qualit&auml;t wiederholt niedrig bleibt, konsultieren Sie einen Arzt.{%elif lang=="en"%}Reading quality is insufficient. This may be caused by movement, poor sensor contact, or a temporary heart rhythm irregularity. Repeat the reading under calm conditions. If quality remains consistently low, consult a doctor.{%else%}De meetkwaliteit is onvoldoende. Dit kan komen door beweging, slecht sensorcontact of een incidentele hartritmestoornis. Herhaal de meting onder rustige omstandigheden. Als de kwaliteit herhaaldelijk laag blijft, overleg dan met een arts.{%endif%}
+    </div>
+    
+</div>
+<div class="kw-right">
+  <div class="kw-tabs">
+    <div class="kw-tab active" onclick="showTab('quadrant',this)">{%if lang=="de"%}Quadrant{%elif lang=="en"%}Quadrant{%else%}Kwadrant{%endif%}</div>
+    <div class="kw-tab" onclick="showTab('details',this)">{%if lang=="de"%}Details{%elif lang=="en"%}Details{%else%}Details{%endif%}</div>
+  </div>
+  <div id="tab-quadrant" class="kw-tab-content">
+    <canvas id="quadrantCanvas" width="420" height="360" style="width:100%;height:auto;display:block;"></canvas>
+    <div class="kw-legend"><span id="curLegend"><span class="kw-legend-dot" style="background:#222"></span>{%if lang=="de"%}Aktuell{%elif lang=="en"%}Current{%else%}Huidig{%endif%}</span><span id="prevLegend" style="display:inline"><span class="kw-legend-dot" style="background:#aaa"></span>{%if lang=="de"%}Vorherig{%elif lang=="en"%}Previous{%else%}Vorig{%endif%}</span><span id="subjLegend" style="margin-left:.8rem;"><span class="kw-legend-dot" style="background:#0078ff;border:2px solid white;box-sizing:border-box;"></span>{%if lang=="de"%}Selbsteinschätzung{%elif lang=="en"%}Self-assessment{%else%}Zelfinschatting{%endif%}</span></div>
+    <div style="max-width:820px;margin:.4rem auto 0;padding:0 1rem;font-size:.72rem;color:#888;font-style:italic;text-align:center;line-height:1.35;">{%if lang=="de"%}Ein belastetes System kann auf Stress, Müdigkeit, Krankheit, Schmerz oder Erholung hinweisen. Die Messung sagt das nicht.{%elif lang=="en"%}A strained system can indicate stress, fatigue, illness, pain, or recovery. The reading does not say which.{%else%}Een belast systeem kan wijzen op stress, vermoeidheid, ziekte, pijn of herstel. De meting zegt dat niet.{%endif%}</div>
+  </div>
+  <div id="tab-details" class="kw-tab-content hidden"><div id="detailsContent"></div></div>
+</div>
+</div>
+<div id="baselineInfo" style="display:none;max-width:820px;margin:.5rem auto 0;padding:0 1rem">
+  <p style="font-size:.75rem;color:#9A8F8A;line-height:1.5;margin:0;font-style:italic">
+    {%if lang=="de"%}Die gestrichelte Linie in den Detailgrafiken zeigt Ihre Baseline: den Durchschnitt Ihrer ersten 7 Messungen. Messpunkte oberhalb der Linie deuten auf eine Verbesserung hin.
+    {%elif lang=="en"%}The dashed line in the detail charts shows your Baseline: the average of your first 7 readings. Data points above the line indicate improvement.
+    {%else%}De stippellijn in de detailgrafieken toont je Baseline: het gemiddelde van je eerste 7 metingen. Meetpunten boven de lijn duiden op verbetering.{%endif%}
+  </p>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;max-width:820px;margin:.75rem auto 0;padding:0 1rem;"><a href="{% if request.args.get("from") == "hlm" %}/hlm/consumer{% elif client_id and client_id > 0 and is_pro %}/pro/clienten{% else %}/menu{% endif %}" style="display:inline-flex;align-items:center;gap:.4rem;background:#eee;color:#555;padding:.5rem 1.2rem;border-radius:8px;text-decoration:none;font-size:.85rem;font-weight:600;">&#8592; {% if client_id and client_id > 0 and is_pro %}CLIËNTEN{% else %}{%if lang=="de"%}MENÜ{%elif lang=="en"%}MENU{%else%}MENU{%endif%}{% endif %}</a><button onclick="discardAndGo('{% if client_id and client_id > 0 and is_pro %}/pro/meting?cid={{ client_id }}{% else %}/meetkeuze{% endif %}')" style="background:#E8344E;color:#fff;padding:.5rem 1.4rem;border-radius:8px;border:none;cursor:pointer;font-size:.85rem;font-weight:700;">{%if lang=="de"%}NEUE MESSUNG{%elif lang=="en"%}NEW MEASUREMENT{%else%}NIEUWE METING{%endif%}</button><button onclick="kwOpslaan()"" style="background:#E8344E;color:#fff;padding:.5rem 1.4rem;border-radius:8px;border:none;cursor:pointer;font-size:.85rem;font-weight:700;"><span id="kwOpslaanTekst">Opslaan</span></button></div>
+
+<script>
+function showTab(n,el){document.querySelectorAll('.kw-tab-content').forEach(t=>t.classList.add('hidden'));document.querySelectorAll('.kw-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+n).classList.remove('hidden');el.classList.add('active');if(n==='details'&&typeof tsData!=='undefined'&&tsData&&tsData.length>1){setTimeout(function(){['RI','HRV','BPM'].forEach(function(key,ki){var cv=document.getElementById('chart'+['RI','HRV','BPM'][ki]);if(!cv)return;var ctx2=cv.getContext('2d');var dpr=window.devicePixelRatio||1;cv.width=cv.clientWidth*dpr||160*dpr;cv.height=55*dpr;var W2=cv.width,H2=cv.height;ctx2.scale(dpr,dpr);var cW=cv.clientWidth||160,cH=55;var vals=tsData.map(function(p){return ki===0?(p.rmssd>0?p.rmssd:null):ki===1?p.hrv:p.bpm;}).filter(function(v){return v!==undefined&&v!==null&&v>0;});if(vals.length===0)return;var mn=ki===0?0:ki===1?0:40,mx=ki===0?50:ki===1?100:120;var rng=mx-mn||1;ctx2.clearRect(0,0,W2,H2);ctx2.strokeStyle=ki===0?'#00ffff':ki===1?'#27ae60':'#e74c3c';ctx2.lineWidth=1.5;ctx2.beginPath();vals.forEach(function(v,i){var x=i/(vals.length-1)*W2;var y=H2-(v-mn)/rng*(H2-4)-2;i===0?ctx2.moveTo(x,y):ctx2.lineTo(x,y);});ctx2.stroke();});},100);}}
+const ZC=['#c0392b','#e67e22','#f1c40f','#82d228','#27ae60'];
+var lang='{{lang}}';
+const ZL=('{{ lang }}'==='de')?['Schwer belastet','Belastet','Leicht belastet','Im Gleichgewicht','Vital']:('{{ lang }}'==='en')?['Heavily strained','Strained','Lightly strained','In balance','Resilient']:['Zwaar belast','Belast','Licht belast','In balans','Veerkrachtig'];
+function drawGauge(cv,ri){
+  const H=cv.height,W=cv.width,ctx=cv.getContext("2d");
+  const cx=W/2,cy=H,r=H-12;
+  ctx.clearRect(0,0,W,H);
+  const stops=[
+      [Math.PI,Math.PI*1.2,'#c0392b'],
+      [Math.PI*1.2,Math.PI*1.4,'#e67e22'],
+      [Math.PI*1.4,Math.PI*1.6,'#f1c40f'],
+      [Math.PI*1.6,Math.PI*1.8,'#82d228'],
+      [Math.PI*1.8,Math.PI*2,'#27ae60']
+    ];
+  stops.forEach(function(s){
+    ctx.beginPath();ctx.arc(cx,cy,r,s[0],s[1]);
+    ctx.strokeStyle=s[2];ctx.lineWidth=Math.round(r*0.18);ctx.stroke();
+  });
+  const pct=Math.min(10,Math.max(0,ri))/10;
+  const ang=Math.PI+pct*Math.PI;
+  ctx.beginPath();
+  ctx.moveTo(cx-Math.cos(ang)*12,cy-Math.sin(ang)*12);
+  ctx.lineTo(cx+Math.cos(ang)*(r-8),cy+Math.sin(ang)*(r-8));ctx.strokeStyle="#333";ctx.lineWidth=3;ctx.stroke();
+  
+  ctx.beginPath();ctx.arc(cx,cy,6,0,2*Math.PI);ctx.fillStyle="#fff";ctx.fill();
+}
+function drawQuadrant(cv,cur,prev){
+var ctx=cv.getContext('2d');var W=cv.width,H=cv.height;
+var P={l:40,t:10,r:20,b:40};var CW=W-P.l-P.r,CH=H-P.t-P.b;
+var C=[-20,-10,0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100,105,110,115,120,125,130,135,140,145,150,155,160,165,170,175,180,185,190,220];
+var B=[40,50,55,60,65,70,75,80,85,90,95,100,105,110,115,120];
+var T=[[0, 0, 0, 0, 0, 0, 1, 2, 3, 5, 7, 9, 10, 20, 30, 40, 50, 60, 80, 85, 92, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122, 125, 127, 130, 132, 135, 137, 140, 142, 145, 150, 160], [0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 15, 22, 30, 37, 45, 52, 57, 77, 82, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122, 125, 127, 130, 132, 135, 137, 140, 150], [0, 0, 1, 2, 4, 5, 6, 7, 15, 22, 30, 37, 45, 50, 55, 60, 65, 75, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122, 125, 127, 130, 132, 135, 140], [0, 0, 1, 3, 5, 7, 12, 20, 27, 35, 42, 50, 52, 55, 60, 65, 67, 70, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122, 125, 127, 130, 135], [0, 2, 3, 5, 7, 12, 17, 25, 30, 37, 45, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122, 125, 130], [0, 3, 5, 7, 12, 17, 25, 32, 37, 42, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122, 125], [0, 5, 7, 8, 11, 15, 22, 30, 35, 40, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122], [0, 4, 6, 7, 8, 12, 15, 22, 30, 37, 42, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120], [0, 2, 4, 5, 7, 10, 12, 20, 27, 35, 40, 42, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117], [0, 1, 3, 4, 6, 8, 11, 15, 22, 30, 35, 40, 42, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115], [0, 1, 2, 3, 5, 7, 10, 12, 20, 27, 32, 35, 37, 40, 42, 45, 47, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112], [0, 1, 2, 2, 4, 6, 8, 9, 10, 17, 22, 27, 32, 35, 37, 40, 42, 47, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110], [0, 0, 1, 2, 3, 4, 6, 8, 9, 10, 15, 20, 25, 30, 32, 35, 37, 42, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105], [0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 7, 12, 15, 17, 22, 25, 27, 32, 37, 40, 42, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95], [0, 0, 1, 1, 1, 1, 1, 2, 3, 4, 5, 7, 10, 12, 15, 17, 20, 22, 27, 30, 32, 35, 37, 40, 42, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85], [0, 0, 1, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17, 20, 22, 25, 27, 30, 32, 35, 37, 40, 42, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75]];
+window.getRaw=function getRaw(bpm,hrv){
+  bpm=Math.max(40,Math.min(120,bpm));hrv=Math.max(0,Math.min(220,hrv));
+  var br=0;for(var i=0;i<B.length-1;i++){if(bpm<=B[i+1]){br=i;break;}}
+  br=Math.min(br,T.length-2);
+  var ci=0;for(var j=0;j<C.length-1;j++){if(hrv<=C[j+1]){ci=j;break;}}ci=Math.min(ci,T[Math.min(br,T.length-1)].length-2);
+  ci=Math.min(ci,(T[0]||T[br]).length-2);
+  var bt=(bpm-B[br])/(B[br+1]-B[br]);
+  var ct=(hrv-C[ci])/(C[ci+1]-C[ci]);
+  return T[br][ci]*(1-bt)*(1-ct)+T[br][ci+1]*(1-bt)*ct+T[br+1][ci]*bt*(1-ct)+T[br+1][ci+1]*bt*ct;
+}
+
+// Color stops stepped per zone (B11): dubbele stops rond elke RI-grens zodat kleur
+// binnen een zone vrijwel constant blijft en exact op de grens omklapt. Kleuren = ZC array.
+// ZC[0]=#c0392b(192,57,43) RI0-2 | ZC[1]=#e67e22(230,126,34) RI2-4 | ZC[2]=#f1c40f(241,196,15) RI4-6 | ZC[3]=#82d228(130,210,40) RI6-8 | ZC[4]=#27ae60(39,174,96) RI8-10
+function rawToRGB(v,gray){if(gray)return[160,160,160];var s=[[0,192,57,43],[23.99,192,57,43],[24.01,230,126,34],[47.99,230,126,34],[48.01,241,196,15],[71.99,241,196,15],[72.01,130,210,40],[95.99,130,210,40],[96.01,39,174,96],[120,39,174,96]];if(v<=s[0][0])return[s[0][1],s[0][2],s[0][3]];if(v>=s[s.length-1][0]){var l=s[s.length-1];return[l[1],l[2],l[3]];}for(var i=0;i<s.length-1;i++){if(v>=s[i][0]&&v<=s[i+1][0]){var t=(v-s[i][0])/(s[i+1][0]-s[i][0]);return[Math.round(s[i][1]*(1-t)+s[i+1][1]*t),Math.round(s[i][2]*(1-t)+s[i+1][2]*t),Math.round(s[i][3]*(1-t)+s[i+1][3]*t)];}}return[160,160,160];}
+var SCALE=2,offW=CW*SCALE,offH=CH*SCALE;
+var off=document.createElement('canvas');off.width=offW;off.height=offH;
+var octx=off.getContext('2d');var id=octx.createImageData(offW,offH),dd=id.data;
+for(var y=0;y<offH;y++){for(var x=0;x<offW;x++){
+  var bpm=40+((x/(offW-1))*80),hrv=220-((y/(offH-1))*220);
+    var raw=getRaw(bpm,hrv);
+    var gray=((bpm-70)*(hrv-60)>3200&&bpm>=80&&hrv>=100);
+    var col=rawToRGB(raw,gray);
+  var idx=(y*offW+x)*4;
+  dd[idx]=col[0];dd[idx+1]=col[1];dd[idx+2]=col[2];dd[idx+3]=255;
+}}
+octx.putImageData(id,0,0);
+ctx.clearRect(0,0,W,H);ctx.save();
+var r=8;ctx.beginPath();ctx.moveTo(P.l+r,P.t);ctx.lineTo(P.l+CW-r,P.t);ctx.arcTo(P.l+CW,P.t,P.l+CW,P.t+r,r);ctx.lineTo(P.l+CW,P.t+CH-r);ctx.arcTo(P.l+CW,P.t+CH,P.l+CW-r,P.t+CH,r);ctx.lineTo(P.l+r,P.t+CH);ctx.arcTo(P.l,P.t+CH,P.l,P.t+CH-r,r);ctx.lineTo(P.l,P.t+r);ctx.arcTo(P.l,P.t,P.l+r,P.t,r);ctx.closePath();ctx.clip();
+ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+ctx.drawImage(off,P.l,P.t,CW,CH);
+ctx.restore();
+ctx.fillStyle='#666';ctx.font='11px sans-serif';ctx.textAlign='center';
+[40,60,80,100,120].forEach(function(b){ctx.fillText(b,P.l+((b-40)/80)*CW,H-P.b+15);});
+ctx.fillText('BPM',P.l+CW/2,H-P.b+28);
+ctx.textAlign='right';
+[0,50,100,150,200].forEach(function(h){ctx.fillText(h+'%',P.l-4,P.t+CH-((h)/220)*CH+4);});
+ctx.save();ctx.translate(8,P.t+CH*0.43);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.fillStyle='#555';ctx.font='11px sans-serif';ctx.fillText('HRV',0,0);ctx.restore();
+
+// === Zone labels ===
+(function(){
+  var zones = {
+    nl:[
+      {t:'VEERKRACHTIG',bpm:75,hrv:170,s:11,c:'#ffffff'},
+      {t:'IN BALANS',bpm:75,hrv:110,s:11,c:'#ffffff'},
+      {t:'LICHT BELAST',bpm:80,hrv:70,s:10,c:'#ffffff'},
+      {t:'BELAST',bpm:85,hrv:45,s:10,c:'#ffffff'},
+      {t:'ACTIEF BELAST',bpm:100,hrv:175,s:10,c:'#ffffff'},
+      {t:'ZWAAR BELAST',bpm:60,hrv:25,s:10,c:'#ffffff'},
+      {t:'ZWAAR BELAST',bpm:100,hrv:25,s:10,c:'#ffffff'}
+    ],
+    de:[
+      {t:'VITAL',bpm:75,hrv:170,s:11,c:'#ffffff'},
+      {t:'IM GLEICHGEWICHT',bpm:75,hrv:110,s:10,c:'#ffffff'},
+      {t:'LEICHT BELASTET',bpm:80,hrv:70,s:10,c:'#ffffff'},
+      {t:'BELASTET',bpm:85,hrv:45,s:10,c:'#ffffff'},
+      {t:'AKTIV BELASTET',bpm:100,hrv:175,s:10,c:'#ffffff'},
+      {t:'SCHWER BELASTET',bpm:60,hrv:25,s:10,c:'#ffffff'},
+      {t:'SCHWER BELASTET',bpm:100,hrv:25,s:10,c:'#ffffff'}
+    ],
+    en:[
+      {t:'RESILIENT',bpm:75,hrv:170,s:11,c:'#ffffff'},
+      {t:'IN BALANCE',bpm:75,hrv:110,s:11,c:'#ffffff'},
+      {t:'LIGHTLY STRAINED',bpm:80,hrv:70,s:10,c:'#ffffff'},
+      {t:'STRAINED',bpm:85,hrv:45,s:10,c:'#ffffff'},
+      {t:'ACTIVELY LOADED',bpm:100,hrv:175,s:10,c:'#ffffff'},
+      {t:'HEAVILY STRAINED',bpm:60,hrv:25,s:10,c:'#ffffff'},
+      {t:'HEAVILY STRAINED',bpm:100,hrv:25,s:10,c:'#ffffff'}
+    ]
+  };
+  var zz=zones[lang]||zones.nl;
+  ctx.save();
+  ctx.textAlign='center';
+  zz.forEach(function(z){
+    var x=P.l+((z.bpm-40)/80)*CW;
+    var y=P.t+CH-(z.hrv/220)*CH;
+    ctx.font='bold '+z.s+'px sans-serif';
+    ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=3;ctx.shadowOffsetX=1;ctx.shadowOffsetY=1;
+    ctx.fillStyle=z.c;
+    ctx.fillText(z.t,x,y);
+  });
+  ctx.shadowBlur=0;ctx.shadowOffsetX=0;ctx.shadowOffsetY=0;
+  ctx.restore();
+})();
+
+function drawDot(x,y,main){
+    ctx.save();
+    ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=8;
+    ctx.beginPath();ctx.arc(x,y,11,0,2*Math.PI);
+    ctx.fillStyle=main?'#1a1a1a':'rgba(160,160,40,0.95)';ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.strokeStyle='#ffffff';ctx.lineWidth=3;ctx.stroke();
+    ctx.beginPath();ctx.arc(x,y,5,0,2*Math.PI);
+    ctx.fillStyle='rgba(255,255,255,0.9)';ctx.fill();
+    ctx.restore();
+}
+if(cur.meting_type!=='biofeedback'&&prev&&prev.bpm&&prev.hrv_pct!=null){drawDot(P.l+((prev.bpm-40)/80)*CW,P.t+CH-((prev.hrv_pct)/220)*CH,false);}
+if(cur&&cur.bpm&&cur.hrv_pct!=null){drawDot(P.l+((cur.bpm-40)/80)*CW,P.t+CH-((cur.hrv_pct)/220)*CH,true);}
+if(cur.meting_type!=='biofeedback'&&cur&&(cur.subj||cur.subjectief_score)!=null){var szX=P.l+((cur.bpm-40)/80)*CW;var szY=P.t+CH-((cur.subj||cur.subjectief_score)/10)*CH;ctx.save();ctx.beginPath();ctx.arc(szX,szY,9,0,2*Math.PI);ctx.fillStyle='rgba(0,120,255,0.85)';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();ctx.restore();}
+}
+
+function getZone(ri){return ri<2?0:ri<4?1:ri<6?2:ri<8?3:4;}
+var dim="";
+var vit=5;
+
+
+(function(){
+    var pcid = parseInt('{{ client_id|default(0) }}') || 0;
+    var url = pcid > 0 ? '/api/pro/client/'+pcid+'/metingen' : '/api/metingen?limit=10';
+    return fetch(url);
+  })().then(r=>r.json()).then(data=>{
+  if(!data||!data.length){return;}
+  const cur=data[0];const prev=data[1]||null;
+    var vit=parseFloat((cur.ctx_vitaliteit||sessionStorage.getItem('sc_ctx_vitaliteit'))||'5');
+    var dimCtx=(cur.ctx_dimensie||sessionStorage.getItem('sc_ctx_dimensie'))||'';
+    var dim=dimCtx;
+  const ri=cur.ri||0,bpm=cur.bpm||70,hrv=cur.hrv_pct||0,delta=cur.delta,baseline=cur.baseline,kw=cur.kwaliteit||100;
+  try{drawQuadrant(document.getElementById('quadrantCanvas'),cur,prev);}catch(e){console.error('Kwadrant fout:',e);}
+  // LAAG 1: stip-zone consistent met achtergrondkleur onder de stip (getRaw op bpm/hrv_pct)
+  var _zoneRi=(typeof window.getRaw==='function')?Math.min(10,Math.round((window.getRaw(bpm,hrv)/12)*10)/10):ri;
+  // LAAG 2: biofeedback toont eindwaarde (getRaw op opgeslagen bpm/hrv) i.p.v. tijdsgemiddelde cur.ri
+  var displayRi=(cur.meting_type==='biofeedback'&&typeof window.getRaw==='function')?Math.min(10,Math.round((window.getRaw(bpm,hrv)/12)*10)/10):ri;
+  const zi=getZone(_zoneRi);
+  drawGauge(document.getElementById('gaugeCanvas'),displayRi);
+
+  var _lng='{{lang}}';
+  var _d=typeof dimCtx!=='undefined'?dimCtx:(cur&&cur.ctx_dimensie?cur.ctx_dimensie:'');
+  var _v=cur&&cur.ctx_vitaliteit?parseFloat(cur.ctx_vitaliteit):5;
+  if(_d&&_d!=='weet_niet'){
+    var _ctx=getCtxDuiding(ri,_d,_v,_lng);
+    if(_ctx){
+      var _dl={'nl':'WAT SPEELT ER:','de':'WAS SPIELT EINE ROLLE:','en':'WHAT IS AT PLAY:'}[_lng]||'WAT SPEELT ER:';
+      var _eD=document.getElementById('ctxDim');
+      var _eV=document.getElementById('ctxVraag');
+      var _eB=document.getElementById('ctxBlock');
+      if(_eD)_eD.textContent=_dl+' '+_ctx.dimLabel;
+      if(_eV)_eV.textContent=_ctx.spiegel+' — '+_ctx.vraag;
+      if(_eB)_eB.style.display='block';
+    }
+  }
+
+  var _lng='{{lang}}';
+  var _d=typeof dimCtx!=='undefined'?dimCtx:(cur&&cur.ctx_dimensie?cur.ctx_dimensie:'');
+  var _v=cur&&cur.ctx_vitaliteit?parseFloat(cur.ctx_vitaliteit):5;
+  if(_d&&_d!=='weet_niet'){
+    var _ctx=getCtxDuiding(ri,_d,_v,_lng);
+    if(_ctx){
+      var _dl={'nl':'WAT SPEELT ER:','de':'WAS SPIELT EINE ROLLE:','en':'WHAT IS AT PLAY:'}[_lng]||'WAT SPEELT ER:';
+      var _eD=document.getElementById('ctxDim');
+      var _eV=document.getElementById('ctxVraag');
+      var _eB=document.getElementById('ctxBlock');
+      if(_eD)_eD.textContent=_dl+' '+_ctx.dimLabel;
+      if(_eV)_eV.textContent=_ctx.spiegel+' — '+_ctx.vraag;
+      if(_eB)_eB.style.display='block';
+    }
+  }
+
+  // Subjectief marker op gauge
+  var preSubj=cur&&cur.subj!=null?parseFloat(cur.subj):parseFloat(sessionStorage.getItem('sc_subjectief_pre'));
+
+  // Auto-POST subjectief score — GEEN stille 5: onaangeraakte zelfinschatting (NaN) wordt NIET gepost,
+  // zodat subjectief_score NULL blijft i.p.v. een phantom-5.
+  if(!isNaN(preSubj) && !sessionStorage.getItem('sc_subj_posted')){
+    fetch('/api/set_subjectief',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({score:Math.round(preSubj)})})
+      .then(function(){sessionStorage.setItem('sc_subj_posted','1');})
+      .catch(function(){});
+  }
+  document.getElementById('gaugeRI').textContent=displayRi;document.getElementById('gaugeRI').style.color=ZC[zi];
+  document.getElementById('zoneLabel').textContent=ZL[zi];document.getElementById('zoneLabel').style.color=ZC[zi];
+  document.getElementById('bpmVal').textContent=bpm;document.getElementById('hrvVal').textContent=hrv+'%';
+  if(document.getElementById('qualityPct'))document.getElementById('qualityPct').textContent=kw+'%';
+  if(document.getElementById('qualityStars'))document.getElementById('qualityStars').textContent=kw>=90?'★★★':kw>=70?'★★☆':'★☆☆';
+    if(document.getElementById('qualityLabel')){var ql=document.getElementById('qualityLabel');var lng='{{lang}}';if(kw>=90){ql.textContent=lng==='de'?'Ausgezeichnet':lng==='en'?'Excellent':'Uitstekend';ql.style.color='#00ffff';}else if(kw>=70){ql.textContent=lng==='de'?'Gut':lng==='en'?'Good':'Goed';ql.style.color='#ffcc00';}else if(kw>=50){ql.textContent=lng==='de'?'Mäßig':lng==='en'?'Fair':'Matig';ql.style.color='#f1c40f';}else{ql.textContent=lng==='de'?'Ungen\u00fcgend':lng==='en'?'Poor':'Onvoldoende';ql.style.color='#ff6666';}}
+    if(document.getElementById('qualityAdvice')){document.getElementById('qualityAdvice').style.display=kw<70?'block':'none';}
+  const tsDatum=new Date(cur.ts);
+  const ds=!isNaN(tsDatum)?tsDatum.toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'}):'';
+  const dur=cur.duration||0;const mm=Math.floor(dur/60);const ss=String(dur%60).padStart(2,'0');
+  if(document.getElementById('metaInfo'))document.getElementById('metaInfo').innerHTML='<span style="background:#E8344E;color:#fff;font-size:.65rem;padding:2px 6px;border-radius:3px;font-weight:700;margin-right:.4rem;">BIOFEEDBACK-METING</span><strong>'+ds+'</strong><br>Duur: '+(mm+':'+ss)+' &middot; Gem. hartslag: <strong>'+bpm+'</strong> BPM &middot; HRV: <strong>'+hrv+'%</strong>';
+  if(cur.meting_type==='biofeedback'){if(document.getElementById('deltaRow'))document.getElementById('deltaRow').style.display='none';if(document.getElementById('baselineInfo'))document.getElementById('baselineInfo').style.display='none';if(document.getElementById('ctxBlock'))document.getElementById('ctxBlock').style.display='none';if(document.getElementById('prevLegend'))document.getElementById('prevLegend').style.display='none';if(document.getElementById('subjLegend'))document.getElementById('subjLegend').style.display='none';}else if(delta!=null&&baseline!=null){if(document.getElementById('baselineInfo'))document.getElementById('baselineInfo').style.display='block';if(document.getElementById('deltaRow'))document.getElementById('deltaRow').innerHTML='{%if lang=="de"%}Basis{%elif lang=="en"%}Baseline{%else%}Baseline{%endif%}: <strong>'+baseline+'</strong> &nbsp; {%if lang=="de"%}Delta{%elif lang=="en"%}Delta{%else%}Delta{%endif%}: <strong style="color:'+(delta>=0?'#00ffff':'#00ffff')+'">'+(delta>=0?'+':'')+delta+'</strong>';}
+
+  var _lng='{{lang}}';
+  var _d=typeof dimCtx!=='undefined'?dimCtx:(cur&&cur.ctx_dimensie?cur.ctx_dimensie:'');
+  var _v=cur&&cur.ctx_vitaliteit?parseFloat(cur.ctx_vitaliteit):5;
+  if(_d&&_d!=='weet_niet'){
+    var _ctx=getCtxDuiding(ri,_d,_v,_lng);
+    if(_ctx){
+      var _dl={'nl':'WAT SPEELT ER:','de':'WAS SPIELT EINE ROLLE:','en':'WHAT IS AT PLAY:'}[_lng]||'WAT SPEELT ER:';
+      var _eD=document.getElementById('ctxDim');
+      var _eV=document.getElementById('ctxVraag');
+      var _eB=document.getElementById('ctxBlock');
+      if(_eD)_eD.textContent=_dl+' '+_ctx.dimLabel;
+      if(_eV)_eV.textContent=_ctx.spiegel+' — '+_ctx.vraag;
+      if(_eB)_eB.style.display='block';
+    }
+  }
+  const rmssdVal=(cur.rmssd||0).toFixed(1);
+  const sdnnVal=(cur.sdnn||0).toFixed(1);
+  const pnn50Val=(cur.pnn50||0).toFixed(1);
+  // norm is now calculated dynamically above
+  var _kAge = new Date().getFullYear() - ({{ client_info.birth_year|default(session.get('profile_birth_year', 1970)) }});
+  var _kGender = '{{ client_info.gender|default(session.get("profile_gender", "male")) }}';
+  var _norms = [{a:19,m:62,f:64},{a:24,m:55,f:58},{a:29,m:50,f:53},{a:34,m:45,f:48},{a:39,m:40,f:44},{a:44,m:36,f:40},{a:49,m:32,f:36},{a:54,m:28,f:32},{a:59,m:25,f:28},{a:64,m:22,f:24},{a:69,m:20,f:22},{a:74,m:18,f:20},{a:999,m:18,f:18}];
+  var _normVal=_norms[_norms.length-1]; var ageRange='75+';
+  for(var _i=0;_i<_norms.length;_i++){if(_kAge<=_norms[_i].a){_normVal=_norms[_i]; var _lo=_i>0?_norms[_i-1].a+1:0; ageRange=_lo+'-'+_norms[_i].a; break;}}
+  var norm = _kGender==='female'?_normVal.f:_normVal.m;
+  function detColor(v,low,high){return v>=high?'#27ae60':v>=low?'#6fcf7a':'#e74c3c';}
+  const detRows=[
+        [('{{ lang }}'==='de'?'Erholungskapazität':'{{ lang }}'==='en'?'Recovery capacity':'Herstelcapaciteit'),'RMSSD',rmssdVal+' ms',detColor(cur.rmssd||0,10,20),('{{ lang }}'==='de'?'Wie flexibel Ihr Herzrhythmus von Schlag zu Schlag ist. Höherer Wert = mehr Resilienz. Niedrigerer Wert kann auf ein belastetes autonomes Nervensystem hinweisen.':'{{ lang }}'==='en'?'How responsive your heart rhythm is from beat to beat. Higher value = more resilience. Lower value can indicate a strained autonomic nervous system.':'Hoe soepel je hartritme is van slag tot slag. Hogere waarde = meer veerkracht. Lagere waarde kan wijzen op een belast autonoom zenuwstelsel.')],
+        [('{{ lang }}'==='de'?'Referenzwert':'{{ lang }}'==='en'?'Reference value':'Referentiewaarde'),'',norm+' ms ('+ageRange+')','#333',('{{ lang }}'==='de'?'Die durchschnittliche Erholungskapazität für Menschen Ihres Alters und Geschlechts. Ihr eigener Wert wird damit verglichen.':'{{ lang }}'==='en'?'The average recovery capacity for people of your age and gender. Your own value is compared against this.':'De gemiddelde herstelcapaciteit voor mensen van jouw leeftijd en geslacht. Je eigen waarde wordt hier tegen vergeleken.')],
+        ['HRV percentage','HRV%',hrv+'%',detColor(hrv,40,70),('{{ lang }}'==='de'?'Wie Sie im Vergleich zum Durchschnitt für Ihr Alter abschneidest. Über 100% = besser als der Durchschnitt. Unter 100% kann auf Müdigkeit, Stress, Krankheit oder Schmerzen hinweisen.':'{{ lang }}'==='en'?'How you compare to the average for your age. Above 100% = better than average. Below 100% can indicate fatigue, stress, illness or pain.':'Hoe je vergelijkt met de gemiddelde voor jouw leeftijd. Boven 100% = beter dan gemiddeld. Onder 100% kan wijzen op vermoeidheid, stress, ziekte of pijn.')],
+        [('{{ lang }}'==='de'?'Herzrhythmusstabilität':'{{ lang }}'==='en'?'Heart rate stability':'Stabiliteit hartritme'),'SDNN',sdnnVal+' ms',detColor(cur.sdnn||0,20,40),('{{ lang }}'==='de'?'Wie vielseitig Ihr Herz auf das reagieren kann, was passiert. Höherer Wert = mehr Resilienz und Anpassungsfähigkeit.':'{{ lang }}'==='en'?'How adaptably your heart can respond to what\'s happening. Higher value = more resilience and adaptability.':'Hoe veelzijdig je hart kan reageren op wat er gebeurt. Hogere waarde = meer veerkracht en aanpassingsvermogen.')],
+        [('{{ lang }}'==='de'?'Große Variationen':'{{ lang }}'==='en'?'Large variations':'Grote variaties'),'pNN50',pnn50Val+'%',detColor(cur.pnn50||0,5,15),('{{ lang }}'==='de'?'Wie oft Ihr Herz große Sprünge zwischen den Schlägen macht. Höherer Wert = mehr Entspannung. Niedrigerer Wert = Ihr autonomes Nervensystem ist angespannter.':'{{ lang }}'==='en'?'How often your heart makes large jumps between beats. Higher value = more relaxation. Lower value = your autonomic nervous system is more tense.':'Hoe vaak je hart grote sprongen maakt tussen slagen. Hogere waarde = meer ontspanning. Lagere waarde = je autonome zenuwstelsel is meer gespannen.')],
+  ];
+  const duur2=cur.duration||0;const mm2=Math.floor(duur2/60);const ss2=String(duur2%60).padStart(2,'0');
+  if(document.getElementById('detailsContent'))document.getElementById('detailsContent').innerHTML=
+    '<div style="font-size:.72rem;color:#999;margin-bottom:.75rem;">'+('{{ lang }}'==='de'?'Dauer: ':'{{ lang }}'==='en'?'Duration: ':'Duur: ')+(mm2+':'+ss2)+'</div>'+'<div style="display:grid;gap:.4rem;margin:.5rem 0">'+['RMSSD','HRV%','BPM'].map(function(l,k){return '<div style="display:flex;align-items:center;gap:.5rem"><span style="font-size:.65rem;color:#aaa;width:2rem">'+l+'</span><canvas id="chart'+['RI','HRV','BPM'][k]+'" width="150" height="55" style="flex:1;background:#5e5e5e;border-radius:3px"></canvas></div>';}).join('')+'</div>'+
+    detRows.map((r,ri)=>{var did='di'+ri;return '<div class="kw-detail-row" style="flex-wrap:wrap;position:relative"><span style="display:flex;align-items:center;gap:.3rem">'+r[0]+' <em style="font-size:.65rem;color:#bbb;">'+r[1]+'</em><span onclick="var e=document.getElementById(\''+did+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\';" style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:#2a9d8f;color:#fff;font-size:.6rem;font-weight:700;border-radius:50%;font-style:normal;touch-action:manipulation;">i</span></span><strong style="color:'+r[3]+'">'+r[2]+'</strong><div id="'+did+'" style="display:none;position:absolute;left:0;right:0;z-index:99;font-size:.78rem;color:#ccc;background:#2a2a2a;color:#fff;padding:.6rem .8rem;border-radius:6px;margin-top:.3rem;border-left:3px solid #2a9d8f;box-shadow:0 2px 8px rgba(0,0,0,0.4);font-size:.78rem;line-height:1.4;max-width:280px;word-wrap:break-word">'+r[4]+'</div></div>';}).join('');
+
+  const tsData=cur.timeseries?JSON.parse(cur.timeseries):[];
+  if(tsData&&tsData.length>1&&document.getElementById('chartRI')){
+    ['RI','HRV','BPM'].forEach(function(key,ki){
+      const cv=document.getElementById('chart'+['RI','HRV','BPM'][ki]);
+      const ctx2=cv.getContext('2d');
+      const dpr=window.devicePixelRatio||1;cv.width=cv.clientWidth*dpr||160*dpr;cv.height=55*dpr;const W2=cv.width,H2=cv.height;ctx2.scale(dpr,dpr);const cW=cv.clientWidth||160,cH=55;
+      let vals=tsData.map(function(p){return ki===0?(p.rmssd>0?p.rmssd:null):ki===1?p.hrv:p.bpm;}).filter(function(v){return v!==undefined&&v!==null&&v>0;});if(ki===0&&cur.ri>0){vals=vals.map(function(v,idx){return idx===vals.length-1?cur.ri:v;});if(vals.length===0)vals=[cur.ri];}
+      const mn=ki===0?0:ki===1?0:40,mx=ki===0?50:ki===1?100:120;
+      const rng=mx-mn||1;
+      ctx2.clearRect(0,0,W2,H2);
+      ctx2.strokeStyle=ki===0?'#00ffff':ki===1?'#27ae60':'#e74c3c';
+      ctx2.lineWidth=1.5;
+      ctx2.beginPath();
+      vals.forEach(function(v,i){
+        const x=i/(vals.length-1)*W2;
+        const y=H2-(v-mn)/rng*(H2-4)-2;
+        i===0?ctx2.moveTo(x,y):ctx2.lineTo(x,y);
+      });
+      ctx2.stroke();
+      // Baseline lijn
+      var bval=ki===0?(cur.baseline||0):ki===1?(vals.length>0?vals.reduce(function(a,b){return a+b;},0)/vals.length:0):0;
+      if(bval>0&&mn<bval&&bval<mx){
+        var by=cH-(bval-mn)/rng*(cH-4)-2;
+        ctx2.save();
+        ctx2.strokeStyle='rgba(255,255,255,0.35)';
+        ctx2.lineWidth=1;
+        ctx2.setLineDash([4,3]);
+        ctx2.beginPath();ctx2.moveTo(0,by);ctx2.lineTo(cW,by);ctx2.stroke();
+        ctx2.restore();
+      }
+      ctx2.fillStyle='rgba(255,255,255,0.5)';
+      ctx2.font='9px sans-serif';
+      ctx2.fillStyle="rgba(255,255,255,0.85)";ctx2.font="bold 10px sans-serif";ctx2.textAlign="right";if(vals.length>0)ctx2.fillText((vals.reduce(function(a,b){return a+b;},0)/vals.length).toFixed(ki===0?1:0),W2/window.devicePixelRatio-3,13);
+    });
+  }
+}).catch((err)=>{console.error('kwadrant fetch error:', err);});
+// setTimeout default verwijderd
+
+function getCtxDuiding(ri, dim, vit, lang) {
+  if (!dim || dim === 'weet_niet') return null;
+  var dimNL={lichamelijk:'Lichamelijk',mentaal:'Mentaal',emotioneel:'Emotioneel',spiritueel:'Spiritueel'};
+  var dimDE={lichamelijk:'Körperlich',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spirituell'};
+  var dimEN={lichamelijk:'Physical',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spiritual'};
+  var dNL=dimNL[dim]||dim,dDE=dimDE[dim]||dim,dEN=dimEN[dim]||dim;
+  var spiegels={
+    lichamelijk:{
+      laag:{nl:'Je lichaam geeft een duidelijk signaal — en je geeft aan dat het lichamelijk speelt. Luister daarnaar.',de:'Ihr Körper sendet ein klares Signal — und Sie spüren es körperlich. Hören Sie darauf.',en:'Your body is sending a clear signal — and you feel it physically. Listen to it.'},
+      midden:{nl:'Je ANS laat iets zien. Je geeft aan dat het lichamelijk zit. Dat verdient aandacht.',de:'Ihr ANS zeigt etwas. Sie spüren es körperlich. Das verdient Aufmerksamkeit.',en:'Your ANS is showing something. You feel it physically. That deserves attention.'},
+      hoog:{nl:'Je lichaam veert terug — en je voelt je lichamelijk goed. Dat is een mooie combinatie.',de:'Ihr Körper erholt sich — und Sie fühlen sich körperlich gut. Eine schöne Kombination.',en:'Your body is bouncing back — and you feel physically well. A great combination.'}
+    },
+    mentaal:{
+      laag:{nl:'Je hoofd staat waarschijnlijk niet uit. Je ANS reageert op gedachtendruk — niet op lichamelijke uitputting.',de:'Ihr Kopf schaltet wahrscheinlich nicht ab. Ihr ANS reagiert auf Gedankendruck — nicht auf körperliche Erschöpfung.',en:'Your mind probably is not switching off. Your ANS is responding to mental pressure — not physical exhaustion.'},
+      midden:{nl:'Je geeft aan dat het mentaal speelt. Je lichaam reageert daar al subtiel op.',de:'Sie geben an, dass es mental ist. Ihr Körper reagiert bereits subtil darauf.',en:'You indicate it is mental. Your body is already responding subtly.'},
+      hoog:{nl:'Je lichaam is in balans, maar mentaal speelt er iets. Dat verdient aandacht voordat het lichamelijk voelbaar wordt.',de:'Ihr Körper ist ausgeglichen, aber mental ist etwas im Gange. Das verdient Aufmerksamkeit.',en:'Your body is balanced, but something is happening mentally. Worth addressing before it becomes physical.'}
+    },
+    emotioneel:{
+      laag:{nl:'Emotionele belasting is lichamelijk voelbaar — je ANS bevestigt dat. Dit is geen zwakte, dit is informatie.',de:'Emotionale Belastung ist körperlich spürbar — Ihr ANS bestätigt das. Das ist keine Schwäche, das sind Informationen.',en:'Emotional load is physically felt — your ANS confirms it. This is not weakness, it is information.'},
+      midden:{nl:'Je voelt iets emotioneel. Je lichaam registreert het — ook al is het niet altijd in woorden te vangen.',de:'Sie spüren etwas emotional. Ihr Körper registriert es — auch wenn es sich nicht immer in Worte fassen lassen.',en:'You feel something emotionally. Your body registers it — even if it is not always easy to put into words.'},
+      hoog:{nl:'Je lichaam is in balans, maar er speelt iets emotioneel. Dat verdient ruimte.',de:'Ihr Körper ist ausgeglichen, aber emotional ist etwas im Gange. Das verdient Raum.',en:'Your body is balanced, but something is happening emotionally. That deserves space.'}
+    },
+    spiritueel:{
+      laag:{nl:'Je lichaam is vermoeid en er speelt iets op een dieper niveau. Doe je op dit moment wat bij je past?',de:'Ihr Körper ist erschöpft und etwas spielt sich auf einer tieferen Ebene ab. Tun Sie gerade das, was zu Ihnen passt?',en:'Your body is tired and something is happening at a deeper level. Are you doing what truly fits you right now?'},
+      midden:{nl:'Er speelt iets op een dieper niveau. Je lichaam fluistert — luister je al?',de:'Etwas spielt sich auf einer tieferen Ebene ab. Ihr Körper flüstert — hören Sie schon hin?',en:'Something is happening at a deeper level. Your body is whispering — are you listening?'},
+      hoog:{nl:'Je lichaam is in balans en je voelt iets op een dieper niveau. Een goed moment om te luisteren.',de:'Ihr Körper ist ausgeglichen und Sie spüren etwas auf einer tieferen Ebene. Ein guter Moment zum Zuhören.',en:'Your body is balanced and you feel something at a deeper level. A good moment to listen.'}
+    }
+  };
+  var vragen={
+    lichamelijk:{nl:'Wanneer heb je je lichaam voor het laatst echt rust gegund?',de:'Wann haben Sie Ihrem Körper zuletzt wirklich Ruhe vergönnt?',en:'When did you last truly give your body the rest it needs?'},
+    mentaal:{nl:'Wat staat er op je lijst dat je eigenlijk kunt schrappen?',de:'Was steht auf Ihrer Liste, das Sie eigentlich streichen könnten?',en:'What is on your list that you could actually cross off?'},
+    emotioneel:{nl:'Wat zou je willen zeggen als je wist dat het gehoord werd?',de:'Was würden Sie sagen, wenn Sie wüssten, dass es gehört wird?',en:'What would you say if you knew it would be heard?'},
+    spiritueel:{nl:'Doe je op dit moment wat bij je past?',de:'Tun Sie gerade das, was zu Ihnen passt?',en:'Are you doing what truly fits you right now?'}
+  };
+  var niveau=ri<3?'laag':ri<6?'midden':'hoog';
+  var s=spiegels[dim]&&spiegels[dim][niveau]?spiegels[dim][niveau]:null;
+  var v=vragen[dim]||null;
+  if(!s||!v)return null;
+  return{spiegel:lang==='de'?s.de:lang==='en'?s.en:s.nl,vraag:lang==='de'?v.de:lang==='en'?v.en:v.nl,dimLabel:lang==='de'?dDE:lang==='en'?dEN:dNL};
+}
+
+</script>
+<script>
+function downloadKubius(){
+  fetch('/api/kubios/download').then(r=>{
+    if(r.ok){window.location.href='/api/kubios/download'}
+    else{alert('{%if lang=="de"%}Keine RR-Daten verfügbar{%elif lang=="en"%}No RR data available{%else%}Geen RR-data beschikbaar{%endif%}')}
+  });
+}
+</script>
+
+<div id="kwLabelModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:28px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
+    <h3 style="margin:0 0 8px;color:#333">{%if lang=="de"%}Label hinzufügen{%elif lang=="en"%}Add label{%else%}Label toevoegen{%endif%}</h3>
+    <input id="kwLabelInput" type="text" placeholder="{%if lang=='de'%}z.B. Nach Yoga{%elif lang=='en'%}e.g. After yoga{%else%}bijv. Na yoga{%endif%}" style="width:100%;padding:12px;border:1.5px solid #ddd;border-radius:8px;font-size:.95rem;box-sizing:border-box;margin-bottom:12px">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
+      <button onclick="setKwLabel('{%if lang=="de"%}Vor Aktivität{%elif lang=="en"%}Before activity{%else%}Voor activiteit{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Vor Aktivität{%elif lang=="en"%}Before activity{%else%}Voor activiteit{%endif%}</button>
+      <button onclick="setKwLabel('{%if lang=="de"%}Nach Aktivität{%elif lang=="en"%}After activity{%else%}Na activiteit{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Nach Aktivität{%elif lang=="en"%}After activity{%else%}Na activiteit{%endif%}</button>
+      <button onclick="setKwLabel('{%if lang=="de"%}Morgens{%elif lang=="en"%}Morning{%else%}Ochtend{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Morgens{%elif lang=="en"%}Morning{%else%}Ochtend{%endif%}</button>
+      <button onclick="setKwLabel('{%if lang=="de"%}Abends{%elif lang=="en"%}Evening{%else%}Avond{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Abends{%elif lang=="en"%}Evening{%else%}Avond{%endif%}</button>
+      <button onclick="setKwLabel('{%if lang=="de"%}Nach Sport{%elif lang=="en"%}After sport{%else%}Na sport{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Nach Sport{%elif lang=="en"%}After sport{%else%}Na sport{%endif%}</button>
+      <button onclick="setKwLabel('{%if lang=="de"%}Nach Meditation{%elif lang=="en"%}After meditation{%else%}Na meditatie{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Nach Meditation{%elif lang=="en"%}After meditation{%else%}Na meditatie{%endif%}</button>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="saveKwLabel(true)" style="flex:1;padding:12px;border:1.5px solid #ddd;border-radius:8px;background:#fff;color:#666;cursor:pointer;font-size:.9rem">{%if lang=="de"%}Ohne Label{%elif lang=="en"%}Without label{%else%}Zonder label{%endif%}</button>
+      <button onclick="saveKwLabel(false)" style="flex:1;padding:12px;border:none;border-radius:8px;background:#E8344E;color:#fff;cursor:pointer;font-size:.9rem;font-weight:600">{%if lang=="de"%}Speichern{%elif lang=="en"%}Save{%else%}Opslaan{%endif%}</button>
+    </div>
+  </div>
+</div>
+<script>
+var KW_METING_TYPE = "{{ last_meting_type }}";
+
+window.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("kwOpslaanTekst");if(b){b.textContent=KW_METING_TYPE==="basismeting"?({%if lang=="de"%}"Verlauf Relax Index"{%elif lang=="en"%}"Trend & Overview"{%else%}"Verloop & Overzicht"{%endif%}):({%if lang=="de"%}"Label wählen"{%elif lang=="en"%}"Choose label"{%else%}"Label kiezen"{%endif%});}});
+if(KW_METING_TYPE==='basismeting'){
+  document.addEventListener('DOMContentLoaded',function(){
+    var modal=document.getElementById('kwLabelModal');
+    if(modal){modal.style.display='none';}
+  });
+}
+var PENDING_ID = {{ pending_meting_id|default(0) }};
+
+function kwOpslaan(){
+  const fromHlm = new URLSearchParams(window.location.search).get('from') === 'hlm';
+  if(fromHlm){ window.location.href='/hlm/meting?done=1'; return; }
+  if(KW_METING_TYPE === 'basismeting' && pcid>0){window.location.href='/pro/client/'+pcid;return;}if(KW_METING_TYPE === 'biofeedback' || KW_METING_TYPE === 'situatiemeting'){
+    document.getElementById('kwLabelModal').style.display='flex';
+  } else {
+    fetch('/api/meting/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({meting_id:PENDING_ID,subjectief_pre:sessionStorage.getItem('sc_subjectief_pre')})})
+    .then(function(){window.location.href=pcid>0?'/pro/client/'+pcid:'/resultaten';})
+    .catch(function(){window.location.href=pcid>0?'/pro/client/'+pcid:'/resultaten';});
+  }
+}
+var pcid = parseInt(new URLSearchParams(window.location.search).get("cid") || "0");
+function setKwLabel(lbl){document.getElementById('kwLabelInput').value=lbl;}
+function discardAndGo(url){
+    window.location.href=url;
+}
+function saveKwLabel(skip){
+  if(KW_METING_TYPE==='basismeting'){skip=true;}
+  var label = skip ? '' : document.getElementById('kwLabelInput').value;
+  document.getElementById('kwLabelModal').style.display='none';
+  if(pcid>0){fetch('/api/meting/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({meting_id:PENDING_ID,label:label,subjectief_pre:sessionStorage.getItem('sc_subjectief_pre')})});setTimeout(function(){window.location.href='/pro/client/'+pcid;},300);return;}
+  fetch('/api/meting/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({meting_id:PENDING_ID,label:label,subjectief_pre:sessionStorage.getItem('sc_subjectief_pre')})})
+  .then(function(){window.location.href=pcid>0?'/pro/client/'+pcid:'/resultaten';})
+  .catch(function(){window.location.href=pcid>0?'/pro/client/'+pcid:'/resultaten';});
+}
+</script>
+{% endblock %}
