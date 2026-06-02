@@ -764,8 +764,8 @@ function finishMeasure() {
 
   var rrWarm = rrIntervals.length>15?rrIntervals.slice(15):rrIntervals; var rrFiltered=HRV.filterRR(rrWarm).filtered; var bpmVals = rrFiltered.map(function(rr) { return Math.round(60000 / rr); });
   avgBpm = Math.round(bpmVals.reduce(function(a,b){return a+b;}, 0) / bpmVals.length);
-  hrv = HRV.calculateHRVPercent(rrFiltered, AGE, GENDER);
-  rmssdFinal = HRV.calculateRMSSD(rrFiltered);
+  hrv = HRV.calculateHRVPercent(rrIntervals, AGE, GENDER);
+  rmssdFinal = HRV.calculateRMSSD(rrIntervals);
   kwaliteit = HRV.getMeetKwaliteit(rrIntervals);
     ri = HRV.lookupRelaxIndex(avgBpm, hrv);
   var label = HRV.getLabel(ri);
