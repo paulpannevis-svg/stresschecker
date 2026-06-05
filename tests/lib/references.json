@@ -1,0 +1,178 @@
+{
+  "_meta": {
+    "generated_date": "2026-04-21",
+    "seed": 42,
+    "synthetic_profile": {
+      "target_bpm": 65,
+      "target_rmssd_range_ms": [
+        30,
+        45
+      ]
+    },
+    "hrv_percent_assumptions": {
+      "age": 50,
+      "sex": "male",
+      "norm_ms": 28,
+      "source": "hrv.js default voor 50+ male"
+    },
+    "sensor_correction_factor": 2.5,
+    "note": "Als norm-tabel of correction factor in productie wijzigt, moet references.json opnieuw worden gegenereerd.",
+    "generator": {
+      "method": "random.Random(seed).gauss + RSA-sinusoïde",
+      "formula": "RR_i = 923.0769230769231 + 95.0·sin(2π·i/4.3) + N(0,10.0)",
+      "amplitude_ms": 95.0,
+      "period_samples": 4.3,
+      "noise_sigma_ms": 10.0,
+      "count": 90
+    }
+  },
+  "rr_intervals_ms": [
+    921.64,
+    1015.78,
+    942.62,
+    840.18,
+    881.48,
+    989.19,
+    984.46,
+    852.01,
+    847.89,
+    976.65,
+    1009.89,
+    900.78,
+    837.73,
+    938.01,
+    1010.63,
+    919.86,
+    832.12,
+    908.82,
+    1010.93,
+    968.51,
+    851.13,
+    845.15,
+    983.35,
+    1005.24,
+    885.32,
+    833.24,
+    954.21,
+    1018.98,
+    923.97,
+    817.01,
+    914.93,
+    999.84,
+    930.81,
+    832.52,
+    861.5,
+    1004.86,
+    998.11,
+    852.82,
+    850.46,
+    953.38,
+    1012.13,
+    899.48,
+    829.79,
+    931.26,
+    1023.89,
+    947.23,
+    839.66,
+    887.54,
+    997.9,
+    973.96,
+    849.99,
+    855.05,
+    972.99,
+    1030.92,
+    880.95,
+    820.18,
+    944.59,
+    1032.23,
+    935.07,
+    838.02,
+    909.97,
+    1009.57,
+    955.34,
+    840.49,
+    869.21,
+    972.04,
+    1000.67,
+    879.11,
+    832.49,
+    957.68,
+    1022.3,
+    939.36,
+    834.34,
+    903.15,
+    1009.37,
+    948.7,
+    848.11,
+    864.99,
+    995.4,
+    998.96,
+    857.78,
+    839.05,
+    944.99,
+    1002.16,
+    896.74,
+    832.8,
+    935.01,
+    1017.32,
+    946.35,
+    834.84
+  ],
+  "expected": {
+    "bpm": 65,
+    "rmssd_ms": 34.66925191625041,
+    "hrv_percent": 124,
+    "ri": 7.7,
+    "zone_label_nl": "In balans",
+    "zone_name": "In balans"
+  },
+  "zone_boundaries": {
+    "_comment": "Grenswaarden conform Pauls spec (B13b-1 + B13b-2). Production NL-label = nieuwe zin-stijl uit hrv.js getLabel en kwadrant.html ZL.",
+    "Zwaar belast": {
+      "range": [
+        0.0,
+        1.9
+      ],
+      "production_label_nl": "Zwaar belast"
+    },
+    "Belast": {
+      "range": [
+        2.0,
+        3.9
+      ],
+      "production_label_nl": "Belast"
+    },
+    "Licht belast": {
+      "range": [
+        4.0,
+        5.9
+      ],
+      "production_label_nl": "Licht belast"
+    },
+    "In balans": {
+      "range": [
+        6.0,
+        7.9
+      ],
+      "production_label_nl": "In balans"
+    },
+    "Veerkrachtig": {
+      "range": [
+        8.0,
+        10.0
+      ],
+      "production_label_nl": "Veerkrachtig"
+    }
+  },
+  "boundary_tests": {
+    "_comment": "Exacte grens-input → verwachte zone-naam (Pauls taal)",
+    "1.9": "Zwaar belast",
+    "2.0": "Belast",
+    "3.9": "Belast",
+    "4.0": "Licht belast",
+    "5.9": "Licht belast",
+    "6.0": "In balans",
+    "7.9": "In balans",
+    "8.0": "Veerkrachtig"
+  }
+}

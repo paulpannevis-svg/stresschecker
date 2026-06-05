@@ -1,0 +1,66 @@
+{
+  "_meta": {
+    "created": "2026-04-22",
+    "type": "ai_feedback_regression",
+    "meting_type": "basismeting",
+    "lang": "nl",
+    "demo_sensor": true,
+    "context": "Prompt v2 faalde op deze input op twee punten: (1) interpreteerde lage RI als 'lage BPM' en paste daardoor de verkeerde kwadrant-regel toe (verstarring/uitputting i.p.v. stress); (2) miste de maximale discrepantie tussen zelfinschatting-bol (VEERKRACHTIG) en meting-bol (RISICO) en zei zelfs bevestigend 'je herkent je signalen goed'. Test is bedoeld om na prompt-herziening opnieuw te draaien en te verifiëren dat beide fouten niet meer optreden."
+  },
+
+  "input": {
+    "meting_type": "basismeting",
+    "lang": "nl",
+    "current": {
+      "ri": 1.6,
+      "bpm": 76,
+      "hrv_pct": 19,
+      "rmssd": 5.3,
+      "subjectief_score": 10,
+      "ctx_dimensie": "lichamelijk",
+      "ctx_vitaliteit": 8
+    },
+    "label": null,
+    "recent_basis": [],
+    "baseline_ri_history": null,
+    "phase": "phase1"
+  },
+
+  "zone_analysis": {
+    "ri_zone": "RISICO (zone-index 0)",
+    "subjectief_zone": "VEERKRACHTIG (zone-index 4)",
+    "zone_gap_absolute": 4,
+    "bpm_band": "midden (60-85)",
+    "correct_kwadrant_reading": "Midden BPM (76) + lage HRV (19%) = verhoogde sympathicus met weinig parasympathische rem → stress-signaal, GEEN uitputting."
+  },
+
+  "observed_failure_prompt_v2": {
+    "aanbeveling": "Je lichaam en energieniveau zijn beide laag. Dit wijst op uitputting, geen stress. Prioriteit: rust en herstel.",
+    "innerlijk_kompas": "Je lichaam laat spanning zien, vooral lichamelijk — maar je herkent je signalen goed.",
+    "waarom_fout": [
+      "BPM 76 is midden (60-85), niet laag (<60). Regel 'lage BPM + lage HRV = verstarring/uitputting' werd foutief toegepast op lage RI i.p.v. lage BPM.",
+      "Zelfinschatting-bol (VEERKRACHTIG, subjectief_score=10) en meting-bol (RISICO, RI=1.6) staan maximaal uit elkaar (4 zones verschil). 'Je herkent je signalen goed' is het omgekeerde van wat er had moeten staan."
+    ]
+  },
+
+  "required_in_output": [
+    "Benoemt expliciet het verschil tussen hoe de persoon zich voelt (subjectief_score=10, veerkrachtig) en wat het lichaam laat zien (RI=1.6, risico).",
+    "Interpreteert de fysiologie als stress-signaal (midden BPM + lage HRV), niet als uitputting.",
+    "Discrepantie-framing in zowel sentence1 als sentence2."
+  ],
+
+  "forbidden_in_output": [
+    "je herkent je signalen goed",
+    "het klopt wat je voelt",
+    "klopt bij de meting",
+    "uitputting",
+    "lage BPM (terwijl BPM=76)",
+    "'beide laag' (lichaam + energie)"
+  ],
+
+  "reference_output": {
+    "sentence1": "Je voelt je veerkrachtig, maar je lichaam laat een heel ander signaal zien.",
+    "sentence2": "De RI van 1.6 zit diep in het risico-bereik: je hart klopt met 76 rustig genoeg, maar de variatie is klein (HRV 19%). Dat is geen rust — het is weinig speelruimte, een stress-signaal, terwijl jij dat zo niet voelt.",
+    "question": "Wat maakt dat je jezelf veerkrachtig ervaart terwijl je lichaam iets anders aangeeft?"
+  }
+}
