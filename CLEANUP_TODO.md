@@ -52,6 +52,8 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
 
     Tot die sessie blijven `weekly_email.py` en `license_notifications.py` untracked; geen acute git-leak-risico.
 
+    **Update 2026-06-05:** `license_notifications.py:get_lang` is op schijf gefixt (EN-abonnees kregen NL-vervalmails — zie I18N_TODO.md / CHANGELOG). Het bestand blijft **untracked** wegens de hardcoded key op regel 12; de get_lang-fix wordt pas mee-gecommit zodra deze secret-rotatie-sessie de key naar `os.environ` verhuist. Tot dan leeft de fix alleen op schijf (cron draait het schijf-bestand, dus productie is correct).
+
 ### Toegevoegd 22-05-2026 na RI birth_year/gender uitvraag-sessie
 
 - [ ] **2FA-codes plaintext in journalctl** *(HIGH PRIORITY)*: herbevestigd 22-05; oorspronkelijk gemeld 12-05 in gen_context.py follow-ups. Voorbeeld vandaag: `gunicorn[1369644]: 2FA CODE for test-rifix@lifestylemonitors.com: 902758`. Log-redactie of verwijderen van de print-statement nodig (`app.py:671`, `app.py:692`). Productie-security-issue. Eerstvolgende cleanup-sessie aanpakken.

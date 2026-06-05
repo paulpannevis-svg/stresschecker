@@ -1,5 +1,42 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-05 — Vervalmail-taal: get_lang gebruikt opgeslagen voorkeur (EN-bug) + i18n-inventarisatie
+
+### Bug — EN-abonnees kregen NL-vervalmails
+`license_notifications.py:get_lang` (dagelijkse cron) koos de mailtaal puur op
+e-maildomein: `'.de' in email` → de, anders nl. Daardoor kon het **nooit 'en'
+teruggeven** — alle niet-`.de` adressen (gmail/.com/.eu…) kregen NL voor de
+30-dagen-, 7-dagen- en verwijder-mails, ook al staan er volledige EN-takken klaar.
+Een DE-keuzer op een niet-`.de` adres kreeg eveneens NL. De `main()`-query
+selecteerde `users.language` bovendien niet, dus de opgeslagen voorkeur was niet
+eens beschikbaar.
+
+**Fix:** `get_lang` gebruikt nu opgeslagen voorkeur (`users.language` ∈ nl/de/en)
+> domein-heuristiek (`domain.endswith('.de')`, geen substring meer → '.dev' lekt
+niet langer naar 'de') > nl als default. `language` toegevoegd aan de SELECT.
+Test: `tests/test_license_notifications_lang.py` (6 tests, groen): voorkeur nl/de/en,
+fallback-heuristiek, voorkeur>domein, '.dev'-regressie, 3 mailtypes × NL/DE/EN,
+end-to-end EN.
+
+**Niet gecommit:** `license_notifications.py` bevat een hardcoded SendGrid-key
+(regel 12) en blijft untracked tot de secret-rotatie-sessie (CLEANUP_TODO). De fix
+leeft op schijf; cron draait het schijf-bestand, dus productie is correct.
+
+### i18n-inventarisatie
+`I18N_TODO.md` toegevoegd: systematische read-only sweep van alle templates
+(excl. `hlm/`) + mailcode op NL-strings buiten lang-condities. ~58 bevindingen,
+gestructureerd per tier (Tier 1 consument-zichtbaar … Tier 4 admin/intern) met
+bestand:regel. Grootste losse lek: `begrippen.html:17` (woordenlijst altijd NL,
+DE/EN-vertalingen dode code). Twee patronen: bare-NL JS-strings en de EN-gap
+(`de`/`else` zonder `en`-tak). Rest geparkeerd voor een fixsessie vóór Machtfit-livegang.
+
+### Geraakte bestanden
+- `license_notifications.py` (op schijf, untracked) — `get_lang` + SELECT
+- `tests/test_license_notifications_lang.py` (nieuw)
+- `I18N_TODO.md` (nieuw), `CLEANUP_TODO.md` (get_lang-status), `CHANGELOG.md`
+
+Pre-fix backup: `/opt/backups/license_notifications.py.20260605-1626`.
+
 ## 2026-06-05 — Dashboard-welkomstkaart: zone-label render-time vertaald (NL/DE/EN, rebrand)
 
 De kaart "Letzte Basismessung" op het consumer-dashboard (`templates/menu.html`)
