@@ -66,6 +66,8 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
 
 - [ ] **Notitie HLM-flow (22-05-2026)** *(geen losse fix nodig)*: HLM-flow heeft eigen client-side birth_year/gender via localStorage en eigen norm-tabel in `hlm/meting_src.html` die divergeert van `hrv.js`. Meenemen in HLM Pro nieuwe generatie doorontwikkeling (~1 aug 2026) vanaf de start.
 
+- [ ] **HLM zone-labels oude pré-rebrand terminologie (05-06-2026)**: `templates/hlm/kwadrant.html` regel 107 (`ZL`-array: 'Schwerer Stress'/'Stress'/'Leichter Stress' DE, 'Zware stress'/'Stress'/'Lichte stress' NL) en regel 149 (comment) gebruiken nog de stress-familie i.p.v. de rebrand belast-familie (Zwaar belast/Belast/Licht belast/In balans/Veerkrachtig — DE: Schwer belastet/.../Vital). Bewust **niet** meegenomen in de menu.html-fix van 05-06: HLM is een apart spoor (unproven product-fit, deploy only when ready) in aparte klantcontext. Bij HLM-activering automatisch op tafel; consolideren naar dezelfde canonieke bron (`analytics.py` RI_ZONES / `static/js/hrv.js` getLabel) als de consumer-flow.
+
 ## Design-keuzes (geen actie nodig)
 
 - **NL-aanspreekvorm split** (bevestigd 22-05-2026): educatieve templates (`welcome.html`, `faq.html`, `upgrade.html`, `profile.html`, `waarschuwing.html`) hanteren **je-vorm**; juridische/activatie-templates (`privacy.html`, `license.html`, `koppelen.html`, plus de toelichting op `/licentie` onder de submit-knop) hanteren **u/uw-vorm**. Bewuste design-keuze, geen technische schuld. DE-equivalent: consumer-flow gebruikt overal `Sie/Ihr` (formeel), niet `du` zoals oorspronkelijk vermoed.

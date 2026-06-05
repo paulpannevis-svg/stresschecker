@@ -2714,6 +2714,20 @@ def zone_label_jinja(zone_key, lang):
     return _analytics.zone_label(zone_key, lang)
 
 
+@app.template_global()
+def zone_key_jinja(ri):
+    """Jinja-helper: numerieke RI → zone-key. Wrapt analytics.zone_for_ri."""
+    import analytics as _analytics
+    return _analytics.zone_for_ri(ri)
+
+
+@app.template_global()
+def zone_desc_jinja(zone_key, lang):
+    """Jinja-helper: zone-key → korte ANS-omschrijving. Wrapt analytics.zone_description."""
+    import analytics as _analytics
+    return _analytics.zone_description(zone_key, lang)
+
+
 def _report_db():
     db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
     db.row_factory = sqlite3.Row

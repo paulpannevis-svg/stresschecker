@@ -1,5 +1,50 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-05 — Dashboard-welkomstkaart: zone-label render-time vertaald (NL/DE/EN, rebrand)
+
+De kaart "Letzte Basismessung" op het consumer-dashboard (`templates/menu.html`)
+toonde hardcoded Nederlands + pré-rebrand terminologie ("Lichte Stress" / "Er is
+lichte stress aanwezig") ongeacht de actieve locale — een gemist code-pad uit de
+mensentaal-rebrand van 25 april. Steven P (DE) zag NL + oude woorden.
+
+### Root cause
+`menu.html:31-32` berekende label én omschrijving zelf uit het RI-getal met twee
+hardcoded `{% set %}`-regels, zónder `lang`-conditie en in de oude stress-familie.
+De `/menu`-route geeft alleen het **numerieke** RI door (`SELECT ri,bpm,hrv_pct`),
+dus de opslag was al locale-onafhankelijk — er is nergens labeltekst opgeslagen.
+Conclusie: **geen DB-migratie nodig**; historische metingen renderen automatisch
+correct zodra de kaart render-time vertaalt.
+
+### Fix (single source of truth)
+- `analytics.py` — nieuwe `zone_description(zone_key, lang)` + `ZONE_DESCRIPTIONS`
+  (NL/DE/EN, rebrand-consistent belast-familie; DE in Sie-vorm conform consumer-conventie).
+  Bestaande `RI_ZONES`/`zone_for_ri`/`zone_label` waren al de canonieke bron.
+- `app.py` — twee Jinja-globals naast `zone_label_jinja`: `zone_key_jinja(ri)` en
+  `zone_desc_jinja(zone_key, lang)`.
+- `templates/menu.html:31-33` — de twee hardcoded regels vervangen door
+  `zone_key_jinja` → `zone_label_jinja`/`zone_desc_jinja` (kleur-logica ongewijzigd).
+
+### Scope (bewust beperkt)
+Alleen de consumer-dashboardkaart (`menu.html`). `templates/kwadrant.html` was al
+correct (rebrand, 3 talen). `templates/hlm/kwadrant.html` (regel 107 + 149) heeft
+nog oude terminologie maar is een apart HLM-spoor in aparte klantcontext — genoteerd
+als open punt in `CLEANUP_TODO.md`, op te pakken bij HLM-activering.
+
+### Verificatie
+- `python3 -m py_compile app.py analytics.py` — schoon
+- `tests/test_menu_zone_label.py` (nieuw, 5 tests) — **5/5 groen**: analytics-bron
+  5 zones × 3 talen, DE-kaart rebrand-term, cross-locale (meting onder NL → correct
+  onder DE/EN want numerieke opslag), zone-grenzen DE, regressie oude termen weg.
+- `tests/run_all.sh` — **21/1** (alleen B3, pre-existent), geen regressie.
+- `kill -HUP` gunicorn-master 1523232 → workers gerecycled; `GET /menu` → 302.
+
+### Geraakte bestanden
+- `analytics.py`, `app.py`, `templates/menu.html`
+- `tests/test_menu_zone_label.py` (nieuw)
+- `CLEANUP_TODO.md` (HLM open punt), `CHANGELOG.md` (deze entry)
+
+Pre-fix backup: `/opt/backups/{menu.html,analytics.py,app.py}.20260605-1548`.
+
 ## 2026-06-05 — Test-fixture: volledig cliëntprofiel voor 999/998
 
 `tests/lib/setup.py` gaf de testcliënten 999/998 alleen id/pro_key/name/client_code.

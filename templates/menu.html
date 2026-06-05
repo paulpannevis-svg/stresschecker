@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.mn-wrap{max-width:860px;margin:0 auto;padding:1.5rem 1rem 2rem;}
+.mn-welkom{font-size:1rem;color:#6B6360;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.2rem;text-align:center;}
+.mn-naam{font-size:1.4rem;font-weight:700;color:#E8344E;margin-bottom:1.2rem;text-align:center;}
+.mn-last{display:flex;align-items:center;gap:1.2rem;background:#fff;border-radius:14px;padding:1rem 1.4rem;box-shadow:0 2px 12px rgba(0,0,0,.08);margin-bottom:1.5rem;}
+.mn-gauge{flex-shrink:0;}
+.mn-last-txt h3{font-size:.95rem;font-weight:700;color:#E8344E;margin:0 0 .2rem;}
+.mn-last-txt p{font-size:.78rem;color:#888;margin:0;line-height:1.4;}
+.mn-last-none{background:#fff;border-radius:14px;padding:.8rem 1.2rem;box-shadow:0 2px 12px rgba(0,0,0,.08);margin-bottom:1.5rem;text-align:center;color:#6B6360;font-size:.85rem;}
+.mn-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem;margin-bottom:.8rem;}
+.mn-grid2{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem;margin-bottom:1.2rem;}
+@media(max-width:600px){.mn-grid{grid-template-columns:repeat(2,1fr);}.mn-grid2{grid-template-columns:repeat(2,1fr);}}
+.mn-card{background:#fff;border-radius:14px;padding:1rem .8rem;box-shadow:0 2px 10px rgba(0,0,0,.07);text-align:center;display:flex;flex-direction:column;align-items:center;gap:.4rem;}
+.mn-icon{font-size:1.6rem;width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#C8384E;}
+.mn-icon.groen{background:#fce8ec;}.mn-icon.blauw{background:#fce8ec;}.mn-icon.oranje{background:#fce8ec;}.mn-icon.rood{background:#fce8ec;}.mn-icon.bruin{background:#fce8ec;}
+.mn-card h4{font-size:.82rem;font-weight:700;color:#444;margin:0;}
+.mn-card p{font-size:.68rem;color:#6B6360;margin:0;line-height:1.3;}
+.mn-btn{width:100%;padding:.5rem;border-radius:20px;border:none;font-weight:700;font-size:.78rem;cursor:pointer;color:#fff;margin-top:.2rem;}
+.mn-btn.groen{background: var(--red);}.mn-btn.blauw{background: var(--red);}.mn-btn.oranje{background: var(--red);}.mn-btn.rood{background: var(--red);}.mn-btn.bruin{background: var(--red);}
+.mn-links{display:flex;flex-direction:column;gap:.5rem;align-items:center;margin-top:.5rem;}
+.mn-links a{color:#C8384E;text-decoration:none;font-size:.82rem;display:flex;align-items:center;gap:.4rem;}
+</style>
+<div class="mn-wrap">
+  <div class="mn-welkom">{% if lang=="de" %}Willkommen{% elif lang=="en" %}Welcome{% else %}Welkom{% endif %}</div>
+  <div class="mn-naam">{{ (name.split()[0] if name and "@" not in name else (name.split("@")[0].split(".")[0].capitalize() if name and "@" in name else ("Benutzer" if lang=="de" else "User" if lang=="en" else "Gebruiker"))) }}</div>
+  {% if last_meting %}
+  {% set ri = last_meting[0] or 0 %}
+  {% set ri_color = "#c0392b" if ri < 2 else "#e67e22" if ri < 4 else "#f1c40f" if ri < 6 else "#2ecc71" if ri < 8 else "#27ae60" %}
+  {% set zk = zone_key_jinja(ri) %}
+  {% set ri_label = zone_label_jinja(zk, lang) %}
+  {% set ri_tekst = zone_desc_jinja(zk, lang) %}
+  <div class="mn-last">
+    <div class="mn-gauge">
+      <svg width="80" height="55" viewBox="0 0 80 55">
+        <path d="M10,48 A32,32 0 0,1 70,48" fill="none" stroke="#eee" stroke-width="8" stroke-linecap="round"/>
+        <path d="M10,48 A32,32 0 0,1 70,48" fill="none" stroke="{{ ri_color }}" stroke-width="8" stroke-linecap="round" stroke-dasharray="{{ (ri/10*100)|round }},100"/>
+        <text x="40" y="50" text-anchor="middle" font-size="14" font-weight="700" fill="{{ ri_color }}">{{ ri }}</text>
+      </svg>
+    </div>
+      <div class="mn-last-txt"><p style="font-size:.75rem;color:#aaa;margin:0 0 2px;">{%if lang=="de"%}Letzte Basismessung{%elif lang=="en"%}Most recent Basic measurement{%else%}Meest recente Basismeting{%endif%}</p><h3>{{ ri_label }}</h3><p>{{ ri_tekst }}</p></div>
+  </div>
+  {% else %}
+    </div>
+  {% endif %}
+  <div class="mn-grid">
+    <div class="mn-card"><div class="mn-icon groen"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div><h4>{%if lang=="de"%}Basismessung{%elif lang=="en"%}Baseline measurement{%else%}Basismeting{%endif%}</h4><p>{%if lang=="de"%}Ihr täglicher ANS-Check{%elif lang=="en"%}Your daily ANS check{%else%}Je dagelijkse ANS check{%endif%}</p><button class="mn-btn groen" onclick="location.href='/voorbereiden?next=basismeting'" ">{%if lang=="de"%}ÖFFNEN{%elif lang=="en"%}OPEN{%else%}OPEN{%endif%}</button></div>
+    <div class="mn-card"><div class="mn-icon blauw"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><h4>Biofeedback</h4><p>{%if lang=="de"%}Sehen Sie live die Wirkung auf Ihr ANS{%elif lang=="en"%}See live the effect on your ANS{%else%}Zie live het effect op je ANS{%endif%}</p><button class="mn-btn blauw" onclick="location.href='/voorbereiden?next=biofeedback'">{%if lang=="de"%}ÖFFNEN{%elif lang=="en"%}OPEN{%else%}OPEN{%endif%}</button></div>
+    <div class="mn-card"><div class="mn-icon oranje"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></div><h4>{%if lang=="de"%}Situationsmessung{%elif lang=="en"%}Situation measurement{%else%}Situatiemeting{%endif%}</h4><p>{%if lang=="de"%}Miss bei einer bestimmten Situation{%elif lang=="en"%}Measure in a specific situation{%else%}Meet bij een specifieke situatie{%endif%}</p><button class="mn-btn oranje" onclick="location.href='/voorbereiden?next=situatiemeting'" ">{%if lang=="de"%}ÖFFNEN{%elif lang=="en"%}OPEN{%else%}OPEN{%endif%}</button></div>
+    <div class="mn-card"><div class="mn-icon rood"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div><h4>{%if lang=="de"%}Detail-Info Messungen{%elif lang=="en"%}Detail info readings{%else%}Detail info metingen{%endif%}</h4><p>{%if lang=="de"%}Alle Messungen ansehen{%elif lang=="en"%}View all readings{%else%}Alle metingen & Kubios export{%endif%}</p><button class="mn-btn rood" onclick="location.href=&quot;{{ url_for('mijn_metingen') }}&quot;">{%if lang=="de"%}ANSEHEN{%elif lang=="en"%}VIEW{%else%}BEKIJK{%endif%}</button></div>
+  </div>
+  </div>
+<div class="mn-grid2">
+    <div class="mn-card"><div class="mn-icon bruin"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg></div><h4>{%if lang=="de"%}Ergebnisse{%elif lang=="en"%}Results{%else%}Resultaten{%endif%}</h4><p>{%if lang=="de"%}Alle Messungen ansehen{%elif lang=="en"%}View all readings{%else%}Verloop Basismeting &amp; Overzicht metingen{%endif%}</p><button class="mn-btn bruin" onclick="location.href=&quot;{{ url_for('results') }}&quot;">{%if lang=="de"%}ANSEHEN{%elif lang=="en"%}VIEW{%else%}BEKIJK{%endif%}</button></div>
+    <div class="mn-card" {% if session.get("is_demo") or session.get("free_trial") or session.get("license_type")=="free" %}style="cursor:default;opacity:0.6;"{% else %}style="cursor:pointer;" onclick="window.location.href='/kenniscentrum'"{% endif %}>
+      <div class="mn-icon bruin"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+      <h4>{% if session.get("is_demo") or session.get("free_trial") or session.get("license_type")=="free" %}🔒 {% endif %}{% if lang=="de" %}Wissenszentrum{% elif lang=="en" %}Knowledge Centre{% else %}Kenniscentrum{% endif %}</h4>
+      <p>{% if lang=="de" %}Begriffe, Tipps und mehr{% elif lang=="en" %}Glossary, tips and more{% else %}Begrippen, tips en meer{% endif %}</p>
+      <button class="mn-btn bruin" {% if not session.get('is_demo') and not session.get('free_trial') and session.get('license_type')!='free' %}onclick="window.location.href='/kenniscentrum'"{% endif %}>{% if lang=="de" %}ÖFFNEN{% elif lang=="en" %}OPEN{% else %}OPEN{% endif %}</button>
+    </div>
+    <div class="mn-card" onclick="window.location.href='/koppelen'" style="cursor:pointer;">
+    <div class="mn-icon bruin"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+    <h4>{% if lang=="de" %}Mit Profi verbinden{% elif lang=="en" %}Connect with professional{% else %}Koppelen met professional{% endif %}</h4>
+    <p>{% if lang=="de" %}Teile Ihre Messungen mit Ihrem Berater{% elif lang=="en" %}Share your readings with your coach{% else %}Deel je metingen met je begeleider{% endif %}</p>
+    <button class="mn-btn bruin" onclick="window.location.href='/koppelen'">{% if lang=="de" %}VERBINDEN{% elif lang=="en" %}CONNECT{% else %}KOPPELEN{% endif %}</button>
+  </div>
+</div>
+<script>
+if(new URLSearchParams(window.location.search).get('demo')==='1'){
+  document.addEventListener('DOMContentLoaded',function(){
+    document.querySelectorAll('button[onclick]').forEach(function(el){
+      var m=el.getAttribute('onclick');
+      if(m && m.indexOf('/sensor-en-meten')>-1){
+        el.setAttribute('onclick', m.replace('/sensor-en-meten','/sensor-en-meten?sensor=demo'));
+      }
+    });
+  });
+}
+</script>
+{% endblock %}

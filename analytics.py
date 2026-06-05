@@ -55,6 +55,45 @@ def zone_label(zone_key, lang='nl'):
     return zone_key
 
 
+# Korte ANS-omschrijving per zone, rebrand-consistent (belast-familie).
+# NL = je-vorm (consumer), DE = Sie-vorm (consumer-conventie), EN.
+ZONE_DESCRIPTIONS = {
+    'zwaar_belast': {
+        'nl': 'Je autonome zenuwstelsel is zwaar belast.',
+        'de': 'Ihr autonomes Nervensystem ist schwer belastet.',
+        'en': 'Your autonomic nervous system is heavily strained.',
+    },
+    'belast': {
+        'nl': 'Je autonome zenuwstelsel is belast.',
+        'de': 'Ihr autonomes Nervensystem ist belastet.',
+        'en': 'Your autonomic nervous system is strained.',
+    },
+    'licht_belast': {
+        'nl': 'Je autonome zenuwstelsel is licht belast.',
+        'de': 'Ihr autonomes Nervensystem ist leicht belastet.',
+        'en': 'Your autonomic nervous system is lightly strained.',
+    },
+    'in_balans': {
+        'nl': 'Je autonome zenuwstelsel is in balans.',
+        'de': 'Ihr autonomes Nervensystem ist im Gleichgewicht.',
+        'en': 'Your autonomic nervous system is in balance.',
+    },
+    'veerkrachtig': {
+        'nl': 'Je autonome zenuwstelsel is veerkrachtig en goed hersteld.',
+        'de': 'Ihr autonomes Nervensystem ist widerstandsfähig und gut erholt.',
+        'en': 'Your autonomic nervous system is resilient and well recovered.',
+    },
+}
+
+
+def zone_description(zone_key, lang='nl'):
+    """zone-key → korte ANS-omschrijving in de actieve locale (fallback nl)."""
+    z = ZONE_DESCRIPTIONS.get(zone_key)
+    if not z:
+        return ''
+    return z.get(lang, z['nl'])
+
+
 def age_category(birth_year, ref_year=None):
     """birth_year → '<30'|'30-45'|'45-60'|'>60'|'unknown'. ref_year default=huidig jaar."""
     if not birth_year:
