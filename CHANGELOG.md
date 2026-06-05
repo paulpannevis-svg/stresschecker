@@ -1,5 +1,33 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-06 — Git-sanering Fase 1: untracked bron in git, docs georganiseerd
+
+Opruimsessie Fase 1 (read-only inventarisatie → per-groep akkoord → uitvoering).
+Sinds git-init (21-05) was de repo selectief getrackt; veel live bron stond untracked.
+Secret-sweep van alle 98 untracked items: exact 2 hardcoded SendGrid-keys
+(`license_notifications.py:12`, `weekly_email.py:8`) — beide bewust geparkeerd voor
+Fase 2. Zeven logische commits (author Paul Pannevis):
+
+- `574c005` i18n(pro): DE Sie-vorm op locatie-keuze (zwevende diff, hoorde bij i18n-week)
+- `adb53d8` test: regressiesuite getrackt (check_routing/calculations/spoor3 + lib + fixtures)
+- `ff49510` templates: 39 consumer+pro templates getrackt (incl. dev-pagina's bttest/lab)
+- `ad87e5c` static: css/fonts/js/icons/manifest/screenshots getrackt
+- `2d8c452` tooling: requirements + backup/deploy + admin/seed-tools; seed_anna.py → scripts/
+- `1b68578` docs: 5 planning-docs → docs/; SYSTEM_REFERENCE.md blijft in root (backup.sh-dep)
+- `520812b` chore(git): .gitignore negeert static/img/*.mp4 (98MB), backup-tarball (64MB), reports/
+
+**Bewust geparkeerd (blijven untracked):** `license_notifications.py` + `weekly_email.py`
+(Fase 2 secrets), `hlm/` + `templates/hlm/` (apart spoor), `email_templates/` +
+`docs/kontakt_v3_backup.html` + `static/paypal_test.html` (verwijderkandidaten, apart te
+beslissen na Fase 2).
+
+⚠️ **Security-flag voor Fase 2:** `static/backup-download.tar.gz` (64MB) staat publiek
+downloadbaar onder `/static/` — nu uit git (.gitignore); verwijdering apart te beslissen.
+
+Geen functionele wijziging; `run_all.sh` = 21/1 (alleen B3, pre-existent).
+**Fase 2 (secrets/security: SendGrid-key → .env, 2FA-codes uit logging) staat gepland
+voor 6 juni en is nog volledig onaangeroerd.**
+
 ## 2026-06-05 — Detail-Info Messungen (/mijn-metingen): titel, meting-type & situatie render-time vertaald
 
 Vervolg op de menu.html-zonefix (ed64acf). De pagina toonde NL op de DE/EN-UI:

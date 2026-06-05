@@ -33,8 +33,8 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
 
 ## TODO — voor latere sessies
 
-- [ ] **Untracked dirs git-tracken**: `hlm/`, `scripts/`, `static/`, `templates/`, `tests/`, `email_templates/`. Aparte sessie nodig: per directory bewust afwegen (secrets? configuratie? testdata?). Tot die sessie blijven deze dirs untracked en gaan ze niet mee met `git add .`.
-- [ ] **Docs-organisatie**: `LAUNCH_LOG.md`, `PWRESET_PLAN.md`, `TODO.md` (en eventueel `SYSTEM_REFERENCE.md`) — verplaatsen naar `docs/` subdir of in root laten? Aparte beslissing per file.
+- [x] **Untracked dirs git-tracken** — UITGEVOERD 06-06-2026 (Fase 1 git-sanering, zie CHANGELOG). Getrackt: `scripts/`, `static/` (excl. video's/backup-tarball), `templates/` (consumer+pro), `tests/`. BEWUST GEPARKEERD: `hlm/`+`templates/hlm/` (apart spoor, beslissen bij HLM-activering), `email_templates/` (verweesd, verwijderkandidaat), `license_notifications.py`+`weekly_email.py` (Fase 2 secrets).
+- [x] **Docs-organisatie** — UITGEVOERD 06-06-2026: `LAUNCH_LOG.md`, `PWRESET_PLAN.md`, `RMSSD_HERBEREKENING_OVERZICHT.md`, `STAGING_OPZET_PLAN.md`, `TODO.md` → `docs/`. `SYSTEM_REFERENCE.md` BLIJFT in root (backup.sh:4 kopieert vanaf root-pad) — verplaatskandidaat zodra backup.sh meeverhuist. `docs/kontakt_v3_backup.html` = verwijderkandidaat (J).
 
 - [ ] **SendGrid API-key audit**: drie unieke SendGrid API-keys in vier codebase-locaties gevonden tijdens 22-05-2026 cleanup-sessie (poging tot SendGrid-key-fallback-cleanup geannuleerd omdat scope buiten terminal-context viel):
     - `/opt/stresschecker/.env` SENDGRID_API_KEY — suffix `8UuY` (huidige, post-12-05 rotatie)
