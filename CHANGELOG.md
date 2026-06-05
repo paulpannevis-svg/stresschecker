@@ -1,5 +1,21 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-05 — Test-fixture: volledig cliëntprofiel voor 999/998
+
+`tests/lib/setup.py` gaf de testcliënten 999/998 alleen id/pro_key/name/client_code.
+De verplicht-profiel-gate in `select_client` (RMSSD-workstream: leeftijd/geslacht
+vereist vóór een cliëntmeting) blokkeerde daardoor de meting → niets in
+`client_metingen` → A2/A4/A5 rood. Geen productiebug: echte Pro-cliënten met
+volledig profiel landen wél (read-only geverifieerd: laatste echte rij id=377,
+client 121, 2026-06-01).
+
+- Fixtures krijgen nu `birth_year`/`gender`/`profile_completed=1` (999=1980/male,
+  998=1975/female) zodat ze de gate passeren. De reuse-tak ververst deze velden
+  ook, zodat een stale incomplete rij uit een oudere run alsnog slaagt.
+- Alleen `tests/lib/setup.py` — geen productiecode.
+- `run_all.sh`: A 6/6, C 8/8, D 4/4 groen. Resteert B3 (HRV%=146 vs 124, bekende
+  `hrv.js`-vs-`references.json`-normtabel-divergentie, tot de RMSSD-consolidatiesessie).
+
 ## 2026-06-05 — Widerruf-instemming op activeringspagina (/licentie)
 
 Juridisch verval van het herroepingsrecht voor de digitale dienst (§ 356 Abs. 5
