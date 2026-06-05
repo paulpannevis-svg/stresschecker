@@ -94,19 +94,43 @@ function switchTab(tab) {
   document.getElementById('code-group').style.display = isNieuw ? 'block' : 'none';
   if(document.getElementById('legacy-group')) document.getElementById('legacy-group').style.display = isNieuw ? 'block' : 'none';
   if(document.getElementById('ri-notice')) document.getElementById('ri-notice').style.display = isNieuw ? 'block' : 'none';
-    // Privacy consent: required alleen bij nieuw account
-    var pc = document.querySelector('[name=privacy_consent]');
-    if(pc){ pc.required = isNieuw; pc.closest('div').style.display = isNieuw ? '' : 'none'; }
+    // Beide consent-boxen alleen tonen in de activeringstab (Neuer Nutzer).
+    // De login-tab (/login) activeert geen licentie → geen checkbox, geen logging.
+    var bp = document.getElementById('box-privacy');
+    var bw = document.getElementById('box-widerruf');
+    if(bp) bp.style.display = isNieuw ? '' : 'none';
+    if(bw) bw.style.display = isNieuw ? '' : 'none';
+    var ep0 = document.getElementById('err-privacy'); if(ep0) ep0.style.display='none';
+    var ew0 = document.getElementById('err-widerruf'); if(ew0) ew0.style.display='none';
   // Knoptekst
   var lang = currentLang in btnLabels.nieuw ? currentLang : 'nl';
   document.getElementById('submitBtn').textContent = isNieuw ? btnLabels.nieuw[lang] : btnLabels.terug[lang];
   var titles = { nl: isNieuw ? 'Licentie activeren' : 'Inloggen', de: isNieuw ? 'Lizenz aktivieren' : 'Anmelden', en: isNieuw ? 'Activate license' : 'Log in' };
   document.getElementById('pageTitle').textContent = titles[lang] || titles['nl'];
 }
+
+// Activerings-validatie: beide checkboxes verplicht. De knop blijft actief;
+// bij klik zonder vinkje verschijnt een inline foutmelding bij de betreffende
+// checkbox. Server-side (/activeer) is de autoritaire vangnet-controle.
+function validateActivation(){
+  var ft = document.getElementById('form-type');
+  if(ft && ft.value !== 'nieuw') return true;  // login-tab: geen checkboxes
+  var pc = document.querySelector('[name=privacy_consent]');
+  var wc = document.querySelector('[name=widerruf_consent]');
+  var ep = document.getElementById('err-privacy');
+  var ew = document.getElementById('err-widerruf');
+  if(ep) ep.style.display='none';
+  if(ew) ew.style.display='none';
+  var ok = true, first = null;
+  if(pc && !pc.checked){ if(ep){ ep.style.display='block'; first = first||ep; } ok=false; }
+  if(wc && !wc.checked){ if(ew){ ew.style.display='block'; first = first||ew; } ok=false; }
+  if(!ok && first){ first.scrollIntoView({behavior:'smooth', block:'center'}); }
+  return ok;
+}
 </script>
 
 <div class="card">
-    <form method="POST" action="{{ url_for('activate') }}" id="licenseForm">
+    <form method="POST" action="{{ url_for('activate') }}" id="licenseForm" onsubmit="return validateActivation()">
       <input type="hidden" name="lang" value="{{ lang }}">
       <input type="hidden" name="type" id="form-type" value="nieuw">
 
@@ -155,7 +179,9 @@ function switchTab(tab) {
               </div
       </div>
 
-      <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:14px;margin-bottom:16px;font-size:.82rem;color:#555;"><label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;line-height:1.5"><input type="checkbox" name="privacy_consent" required style="margin-top:3px;width:18px;height:18px;flex-shrink:0;accent-color:var(--primary)"><span>{% if lang == "de" %}Ich stimme zu, dass meine Gesundheitsdaten (Herzfrequenz, HRV, Stresswerte) zur Nutzung der App verarbeitet werden. Ich habe die <a href="/privacy" target="_blank" style="color:var(--primary)">Datenschutzerklaerung</a> gelesen.{% elif lang == "en" %}I agree that my health data (heart rate, HRV, stress values) will be processed for use of the app. I have read the <a href="/privacy" target="_blank" style="color:var(--primary)">privacy policy</a>.{% else %}Ik ga akkoord dat mijn gezondheidsgegevens worden verwerkt voor gebruik van de app. Ik heb de <a href="/privacy" target="_blank" style="color:var(--primary);text-decoration:underline;font-weight:600">privacyverklaring</a> gelezen.{% endif %}</span></label></div>
+      <div id="box-privacy" style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:14px;margin-bottom:16px;font-size:.82rem;color:#555;"><label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;line-height:1.5"><input type="checkbox" name="privacy_consent" style="margin-top:3px;width:18px;height:18px;flex-shrink:0;accent-color:var(--primary)"><span>{% if lang == "de" %}Ich stimme zu, dass meine Gesundheitsdaten (Herzfrequenz, HRV, Stresswerte) zur Nutzung der App verarbeitet werden. Ich habe die <a href="https://lifestylemonitors.de/datenschutz-dsvgo/" target="_blank" style="color:var(--primary)">Datenschutzerklärung</a> gelesen.{% elif lang == "en" %}I agree that my health data (heart rate, HRV, stress values) will be processed for use of the app. I have read the <a href="/privacy" target="_blank" style="color:var(--primary)">privacy policy</a>.{% else %}Ik ga akkoord dat mijn gezondheidsgegevens worden verwerkt voor gebruik van de app. Ik heb de <a href="/privacy" target="_blank" style="color:var(--primary);text-decoration:underline;font-weight:600">privacyverklaring</a> gelezen.{% endif %}</span></label><div id="err-privacy" class="form-error" style="display:none;margin-top:8px;">{% if lang == "de" %}Bitte bestätigen Sie diese Erklärung, um die Lizenz zu aktivieren.{% elif lang == "en" %}Please confirm this declaration to activate the licence.{% else %}Bevestig deze verklaring om de licentie te activeren.{% endif %}</div></div>
+
+      <div id="box-widerruf" style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:14px;margin-bottom:16px;font-size:.82rem;color:#555;"><label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;line-height:1.5"><input type="checkbox" name="widerruf_consent" style="margin-top:3px;width:18px;height:18px;flex-shrink:0;accent-color:var(--primary)"><span>{% if lang == "de" %}Ich verlange ausdrücklich, dass mit der Bereitstellung der digitalen Leistung (Lizenzaktivierung) vor Ablauf der Widerrufsfrist begonnen wird. Mir ist bekannt, dass ich dadurch mein Widerrufsrecht in Bezug auf die digitale Leistung verliere. Das Widerrufsrecht für die Hardware (Pulsmesser) bleibt unberührt.{% elif lang == "en" %}I expressly request that the provision of the digital service (licence activation) begins before the end of the withdrawal period. I acknowledge that I thereby lose my right of withdrawal for the digital service. The right of withdrawal for the hardware (pulse sensor) remains unaffected.{% else %}Ik stem er uitdrukkelijk mee in dat de levering van de digitale dienst (licentie-activering) begint vóór het einde van de bedenktijd. Ik ben mij ervan bewust dat ik daarmee mijn herroepingsrecht voor de digitale dienst verlies. Het herroepingsrecht voor de hardware (pulsmeter) blijft onverlet.{% endif %}</span></label><div id="err-widerruf" class="form-error" style="display:none;margin-top:8px;">{% if lang == "de" %}Bitte bestätigen Sie diese Erklärung, um die Lizenz zu aktivieren.{% elif lang == "en" %}Please confirm this declaration to activate the licence.{% else %}Bevestig deze verklaring om de licentie te activeren.{% endif %}</div></div>
 <button type="submit" id="submitBtn" class="btn btn-primary">
         {% if lang == 'de' %}AKTIVIEREN ▶
         {% elif lang == 'en' %}ACTIVATE ▶

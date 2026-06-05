@@ -9,8 +9,9 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
 # Sessie-idle-timeout (Sessie B.4 — Datenschutz voor KK-context)
 # 30 min na laatste activiteit → automatische sessie-uitlog door before_request-hook.
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 SESSION_IDLE_TIMEOUT_SECONDS = 30 * 60
+SESSION_IDLE_TIMEOUT_OPERATOR_SECONDS = 24 * 60 * 60
 # SMTP configuratie voor 2FA verificatiecodes
 MAIL_SERVER   = 'mailout.hostnet.nl'
 MAIL_PORT     = 587
@@ -69,6 +70,106 @@ def send_password_reset_email(email, code, lang='nl'):
         return True
     except Exception as e:
         print('Mail fout:', e)
+        return False
+
+
+# ============================================================================
+# Widerruf-/gezondheidsdata-instemming (§ 356 Abs. 5 BGB / art. 6:230p BW)
+# ----------------------------------------------------------------------------
+# De activeringspagina /licentie is het juridische moment waarop het
+# herroepingsrecht voor de digitale dienst vervalt. Bij elke echte
+# licentie-activering leggen we twee instemmingen vast in consent_log
+# (saas_licenses.db), binnen dezelfde transactie als de activerings-UPDATE.
+# Tekstversies zijn constanten: een latere tekstwijziging krijgt een nieuwe
+# version-string (bv. ...-v2-YYYYMMDD), zodat altijd traceerbaar is welke
+# formulering iemand heeft gezien.
+# ============================================================================
+CONSENT_TEXT_VERSIONS = {
+    'widerruf': {
+        'de': 'widerruf-de-v1-20260605',
+        'nl': 'widerruf-nl-v1-20260605',
+        'en': 'widerruf-en-v1-20260605',
+    },
+    'gezondheidsdata': {
+        'de': 'gezondheit-de-v1-20260605',
+        'nl': 'gezondheit-nl-v1-20260605',
+        'en': 'gezondheit-en-v1-20260605',
+    },
+}
+
+# Consent-alinea voor de activeringsbevestiging (duurzame drager, § 312f BGB).
+# {ts} wordt vervangen door het UTC-tijdstip van instemming.
+CONSENT_EMAIL_PARAGRAPH = {
+    'de': ("Bei der Aktivierung haben Sie ausdrücklich zugestimmt, dass die "
+           "Bereitstellung der digitalen Leistung vor Ablauf der Widerrufsfrist "
+           "beginnt, und bestätigt, dass Ihr Widerrufsrecht für die digitale "
+           "Leistung damit erlischt. Das Widerrufsrecht für die Hardware bleibt "
+           "unberührt. (Zeitpunkt der Zustimmung: {ts} UTC)"),
+    'nl': ("Bij de activering hebt u er uitdrukkelijk mee ingestemd dat de "
+           "levering van de digitale dienst begint vóór het einde van de "
+           "bedenktijd, en bevestigd dat uw herroepingsrecht voor de digitale "
+           "dienst daarmee vervalt. Het herroepingsrecht voor de hardware "
+           "blijft onverlet. (Tijdstip van instemming: {ts} UTC)"),
+    'en': ("During activation you expressly agreed that the provision of the "
+           "digital service begins before the end of the withdrawal period, and "
+           "confirmed that your right of withdrawal for the digital service "
+           "thereby lapses. The right of withdrawal for the hardware remains "
+           "unaffected. (Time of consent: {ts} UTC)"),
+}
+
+
+def _log_consent(conn, email, license_code, locale, consent_at):
+    """Schrijf de twee instemmings-rijen (widerruf + gezondheidsdata) op een
+    REEDS GEOPENDE connectie, zodat ze meegaan in de transactie van de aanroeper
+    (de activerings-UPDATE). De caller commit. locale valt terug op 'nl' bij een
+    onbekende taal zodat text_version altijd resolvet."""
+    loc = locale if locale in ('nl', 'de', 'en') else 'nl'
+    for ctype in ('widerruf', 'gezondheidsdata'):
+        conn.execute(
+            "INSERT INTO consent_log (email, license_code, consent_type, text_version, locale, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (email, license_code, ctype, CONSENT_TEXT_VERSIONS[ctype][loc], loc, consent_at)
+        )
+
+
+def build_activation_confirmation_body(lang, consent_ts):
+    """Pure builder voor de activeringsbevestiging (testbaar zonder SendGrid).
+    Retourneert (subject, body) met de consent-alinea inclusief tijdstip."""
+    loc = lang if lang in ('nl', 'de', 'en') else 'nl'
+    para = CONSENT_EMAIL_PARAGRAPH[loc].format(ts=consent_ts)
+    if loc == 'de':
+        subject = 'Ihre StressChecker-Lizenz ist aktiviert'
+        intro = ('Vielen Dank — Ihre Lizenz wurde erfolgreich aktiviert und alle '
+                 'Funktionen sind freigeschaltet.')
+        outro = 'Mit freundlichen Grüßen\nIhr StressChecker-Team'
+    elif loc == 'en':
+        subject = 'Your StressChecker licence is activated'
+        intro = ('Thank you — your licence has been successfully activated and all '
+                 'features are unlocked.')
+        outro = 'Kind regards\nThe StressChecker team'
+    else:
+        subject = 'Uw StressChecker-licentie is geactiveerd'
+        intro = ('Bedankt — uw licentie is succesvol geactiveerd en alle functies '
+                 'zijn ontgrendeld.')
+        outro = 'Met vriendelijke groet\nHet StressChecker-team'
+    body = f"{intro}\n\n{para}\n\n{outro}"
+    return subject, body
+
+
+def send_activation_confirmation_email(email, lang, consent_ts):
+    """Verstuur de activeringsbevestiging (duurzame drager) ná succesvolle
+    activering. Best-effort: een mailfout mag de activering niet breken."""
+    subject, body = build_activation_confirmation_body(lang, consent_ts)
+    try:
+        import sendgrid
+        from sendgrid.helpers.mail import Mail
+        sg = sendgrid.SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
+        msg = Mail(from_email='noreply@lifestylemonitors.com', to_emails=email,
+                   subject=subject, plain_text_content=body)
+        sg.send(msg)
+        return True
+    except Exception as e:
+        print('Activatie-bevestigingsmail fout:', e)
         return False
 
 
@@ -215,6 +316,28 @@ def get_pro_db():
 
 def get_user_key():
     import hashlib
+    # KK-sessies: pro_key gederiveerd van licentie-houder-email (stabiel voor admin én
+    # operator). Anders zou een operator zijn eigen email-hash krijgen en zouden zijn
+    # metingen buiten de KK-aggregatie vallen.
+    if session.get('audience') == 'krankenkasse':
+        lc = session.get('license_code', '')
+        if lc:
+            cached = session.get('_kk_pro_key')
+            if cached:
+                session['user_key'] = cached
+                return cached
+            try:
+                cn = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+                row = cn.execute("SELECT email FROM licenses WHERE license_key=?", (lc,)).fetchone()
+                cn.close()
+                if row and row[0]:
+                    key = hashlib.sha256(row[0].encode()).hexdigest()[:32]
+                    session['_kk_pro_key'] = key
+                    session['user_key'] = key
+                    session.modified = True
+                    return key
+            except Exception:
+                pass
     # Als er een email in sessie zit, gebruik die als stabiele basis
     email = session.get('email', '')
     if email:
@@ -330,6 +453,26 @@ def is_krankenkasse_session():
     return session.get('audience') == 'krankenkasse'
 
 
+def is_kk_admin():
+    return is_krankenkasse_session() and session.get('role') == 'admin'
+
+
+def is_kk_operator():
+    return is_krankenkasse_session() and session.get('role') == 'operator'
+
+
+def require_kk_admin(view):
+    import functools
+    @functools.wraps(view)
+    def _wrapped(*args, **kwargs):
+        if not session.get('license_valid'):
+            return redirect(url_for('sc_login'))
+        if not is_kk_admin():
+            return ("Forbidden — admin role required", 403)
+        return view(*args, **kwargs)
+    return _wrapped
+
+
 def kk_tier_label():
     """Renderbaar tier-label voor Krankenkasse-licentie (Kompakt/Standard/Premium).
     Leest plan_id uit session; valt terug op '?' wanneer onbekend."""
@@ -341,13 +484,21 @@ def kk_tier_label():
 
 
 def require_kk_office_if_krankenkasse(view):
-    """Decorator: KK-sessie zonder gekozen kantoor → redirect naar /pro/locatie.
-    Andere audiences ongemoeid; geen redirect-loop op pro_locatie zelf (die zit niet onder deze decorator)."""
+    """Decorator: KK-sessie routering.
+    - role='admin'  → naar KK-admin-dashboard (eigen scherm, geen kantoor-keuze)
+    - role=operator/missing → bestaande flow: /pro/locatie als nog geen kantoor gekozen
+    Andere audiences ongemoeid; geen redirect-loop op pro_locatie zelf."""
     import functools
     @functools.wraps(view)
     def _wrapped(*args, **kwargs):
-        if is_krankenkasse_session() and not session.get('kk_office'):
-            return redirect(url_for('pro_locatie'))
+        if is_krankenkasse_session():
+            # Admin zonder kk_office → dashboard. Met kk_office (gekozen via
+            # /pro/admin/messen-standort-kiezen) valt admin door op operator-pad
+            # zodat /pro/meting bereikbaar is.
+            if session.get('role') == 'admin' and not session.get('kk_office'):
+                return redirect('/pro/admin')
+            if not session.get('kk_office'):
+                return redirect(url_for('pro_locatie'))
         return view(*args, **kwargs)
     return _wrapped
 
@@ -388,7 +539,8 @@ def _enforce_session_idle_timeout():
         session['_last_activity'] = now
         session.permanent = True
         return
-    if now - last > SESSION_IDLE_TIMEOUT_SECONDS:
+    window = SESSION_IDLE_TIMEOUT_OPERATOR_SECONDS if session.get('_session_window') == 'operator_24h' else SESSION_IDLE_TIMEOUT_SECONDS
+    if now - last > window:
         lang = session.get('lang', 'nl')
         session.clear()
         if path.startswith('/api/') or (request.accept_mimetypes.best == 'application/json'):
@@ -627,6 +779,10 @@ def activate():
     email    = request.form.get('email', '').strip().lower()
     password = request.form.get('password', '').strip()
     lang     = request.form.get('lang', 'nl')
+    # Tijdstip van de wilsverklaring (aanvinken): vastgelegd bij de POST naar
+    # /activeer en later als created_at in consent_log weggeschreven.
+    import datetime as _dt_consent
+    consent_at = _dt_consent.datetime.utcnow().isoformat()
 
     print(f"[ACTIVEER DEBUG] form fields: {dict(request.form)}", flush=True)
     print(f"[ACTIVEER DEBUG] code='{code}' legacy='{legacy}' email='{email}'", flush=True)
@@ -643,6 +799,13 @@ def activate():
     else:
         if not code or not email:
             return redirect(url_for('license_screen', error='Vul beide velden in.' if lang=='nl' else ('Bitte beide Felder ausfüllen.' if lang=='de' else 'Please fill in both fields.')))
+        # Beide instemmingen verplicht voor activering (autoritaire server-side gate;
+        # de inline per-checkbox-melding is client-side, dit is het vangnet).
+        if not request.form.get('privacy_consent') or not request.form.get('widerruf_consent'):
+            return redirect(url_for('license_screen', error=(
+                'Bitte bestätigen Sie beide Erklärungen, um die Lizenz zu aktivieren.' if lang=='de'
+                else 'Please confirm both declarations to activate the licence.' if lang=='en'
+                else 'Bevestig beide verklaringen om de licentie te activeren.')))
 
     if not password or len(password) < 8:
         return redirect(url_for('license_screen', error='Kies een wachtwoord van minimaal 8 tekens.' if lang=='nl' else ('Wählen Sie ein Passwort mit mindestens 8 Zeichen.' if lang=='de' else 'Choose a password of at least 8 characters.')))
@@ -660,6 +823,9 @@ def activate():
         session['legacy_pending_lang']    = lang
         return redirect(url_for('oude_code_keuze'))
     if result['valid']:
+        # True zodra de instemming al in de marketing/eval-bind-transactie is
+        # weggeschreven; verify_2fa logt dan niet nogmaals.
+        _consent_logged_early = False
         # === Marketing/evaluation herclaim-bescherming ===
         # Marketing-codes circuleren breed (campagnes/beurzen/partners); eval-codes
         # zijn 1-op-1 aan een partner uitgegeven. In beide gevallen: eerste
@@ -725,6 +891,11 @@ def activate():
                  request.headers.get('User-Agent','')[:200],
                  f'origin={_bind_origin} plan_id={_plan_id_resolved} email={email}')
             )
+            # Marketing/eval bindt de licentie HIER (vóór 2FA) → instemming in
+            # dezelfde transactie als de activering. consent_meta krijgt logged=True
+            # zodat verify_2fa niet dubbel logt.
+            _log_consent(_bind_cn, email, code, lang, consent_at)
+            _consent_logged_early = True
             _bind_cn.commit()
             _bind_cn.close()
             result = validate_license(code, email)
@@ -739,6 +910,15 @@ def activate():
         session['license_code']  = code
         session['email']         = email
         session['lang']          = lang
+        # Instemming meedragen naar verify_2fa, waar de activering voltooit. Daar
+        # worden de consent-rijen (indien nog niet vroeg gelogd) in dezelfde
+        # transactie als de activerings-UPDATE geschreven, en wordt de
+        # bevestigingsmail verstuurd.
+        session['consent_meta'] = {
+            'locale': lang,
+            'consent_at': consent_at,
+            'logged': _consent_logged_early,
+        }
 
         import sqlite3 as _sq2
         _cn = _sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
@@ -1063,14 +1243,48 @@ def sc_login():
             _cn3.execute("UPDATE users SET password_hash=? WHERE email=? COLLATE NOCASE", (hash_password(password), email))
             _cn3.commit()
             _cn3.close()
+        # KK-operator: 2FA overslaan, sessie direct opzetten (24u-window)
+        if user['role'] == 'operator':
+            import time as _opt_t  # noqa: F811  — sc_login bevat een latere lokale `import time`
+            _cn_op = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _cn_op.row_factory = _sq.Row
+            op_lic = _cn_op.execute(
+                "SELECT l.license_key, l.product, l.type, l.user_key "
+                "FROM licenses l JOIN user_licenses ul ON ul.license_key=l.license_key "
+                "WHERE ul.user_id=? AND l.status='activated' LIMIT 1",
+                (user['id'],)
+            ).fetchone()
+            _cn_op.close()
+            if not op_lic:
+                error = ('Kein verknüpftes Konto.' if lang=='de'
+                         else 'No linked license.' if lang=='en'
+                         else 'Geen gekoppelde licentie.')
+                return render_template('sc_login.html', lang=lang, error=error, email=email)
+            session.clear()
+            session['license_valid']   = True
+            session['license_type']    = 'pro'
+            session['audience']        = 'krankenkasse'
+            session['role']            = 'operator'
+            session['license_code']    = op_lic['license_key']
+            session['plan_id']         = op_lic['product']
+            session['email']           = email
+            session['session_id']      = email
+            session['lang']            = lang
+            session['profile_name']    = user['display_name'] or email
+            session['_session_window'] = 'operator_24h'
+            session.permanent          = True
+            session['_last_activity']  = _opt_t.time()
+            return redirect(url_for('pro_locatie'))
         # Inloggen gelukt — 2FA code sturen
         _cn2 = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
         _cn2.row_factory = _sq.Row
         lic = _cn2.execute(
-            "SELECT type FROM licenses WHERE email=? AND status='activated' AND (license_key LIKE 'SC-%' OR type IN ('consumer','pro')) AND license_key NOT LIKE 'HLM%' ORDER BY created_at DESC LIMIT 1",
+            "SELECT type, license_key, product FROM licenses WHERE email=? AND status='activated' AND (license_key LIKE 'SC-%' OR type IN ('consumer','pro')) AND license_key NOT LIKE 'HLM%' ORDER BY created_at DESC LIMIT 1",
             (email,)).fetchone()
         _cn2.close()
         license_type = lic['type'] if lic else 'consumer'
+        _lic_product = (lic['product'] or '') if lic else ''
+        _lic_audience = 'krankenkasse' if _lic_product.startswith('sc-krankenkasse-') else license_type
         # Sessie opschonen (demo flags verwijderen) en 2FA starten
         import random as _rnd
         code = str(_rnd.randint(100000, 999999))
@@ -1078,6 +1292,9 @@ def sc_login():
         session['2fa_code']         = code
         session['2fa_email']        = email
         session['2fa_license_type'] = license_type
+        session['2fa_audience']     = _lic_audience
+        session['2fa_license_code'] = lic['license_key'] if lic else ''
+        session['2fa_plan_id']      = _lic_product or None
         session['2fa_name']         = user['display_name'] if user['display_name'] else email
         session['2fa_lang']         = lang
         import time
@@ -1166,35 +1383,52 @@ def verify_2fa():
             plan_id_2fa  = session.pop('2fa_plan_id', None)
             em = session.pop('2fa_email','')
             nm = session.pop('2fa_name',em)
-            if nm == em:
-                try:
-                    import sqlite3 as _sq3
-                    _uc = _sq3.connect('/opt/ic-license-server/data/saas_licenses.db')
-                    _uc.row_factory = _sq3.Row
-                    _ur = _uc.execute("SELECT display_name, birth_year, gender, sensor_pref, language, surname, profile_completed FROM users WHERE email=?", (em,)).fetchone()
-                    if _ur and _ur['display_name']:
-                        nm = _ur['display_name']
-                        try: session['profile_surname'] = _ur['surname'] or ''
-                        except (IndexError, KeyError): session['profile_surname'] = ''
-                    # Laad ook birth_year en gender
-                    if _ur and _ur['birth_year']:
-                        session['profile_birth_year'] = _ur['birth_year']
-                    if _ur and _ur['gender']:
-                        session['profile_gender'] = _ur['gender']
-                    session['profile_completed'] = (_ur['profile_completed'] if _ur and _ur['profile_completed'] else 0)
-                    session['sensor_pref'] = _ur['sensor_pref'] if _ur['sensor_pref'] else 'bluetooth'
-                    _uc.close()
-                except Exception:
-                    import logging; logging.getLogger().warning(f"Settings load error: {__import__("traceback").format_exc()}")
+            # Profielvelden onvoorwaardelijk uit DB laden (fix 2026-05-30): de load
+            # zat ingesloten in `if nm == em`, waardoor users mét display_name nooit
+            # hun birth_year/gender kregen → profile_setup-redirect bij elke login.
+            try:
+                import sqlite3 as _sq3
+                _uc = _sq3.connect('/opt/ic-license-server/data/saas_licenses.db')
+                _uc.row_factory = _sq3.Row
+                _ur = _uc.execute("SELECT display_name, birth_year, gender, sensor_pref, language, surname, profile_completed FROM users WHERE email=?", (em,)).fetchone()
+                # display_name-override alleen wanneer 2FA geen echte naam meegaf
+                if _ur and _ur['display_name'] and nm == em:
+                    nm = _ur['display_name']
+                    try: session['profile_surname'] = _ur['surname'] or ''
+                    except (IndexError, KeyError): session['profile_surname'] = ''
+                # Laad ook birth_year en gender
+                if _ur and _ur['birth_year']:
+                    session['profile_birth_year'] = _ur['birth_year']
+                if _ur and _ur['gender']:
+                    session['profile_gender'] = _ur['gender']
+                session['profile_completed'] = (_ur['profile_completed'] if _ur and _ur['profile_completed'] else 0)
+                session['sensor_pref'] = _ur['sensor_pref'] if _ur['sensor_pref'] else 'bluetooth'
+                _uc.close()
+            except Exception:
+                import logging; logging.getLogger().warning(f"Settings load error: {__import__("traceback").format_exc()}")
             # Bewaar velden die we nodig hebben, dan sessie schoonvegen
             _birth = session.get('profile_birth_year', 1970)
             _gender = session.get('profile_gender', 'male')
             _completed = session.get('profile_completed', 0)
             _sensor = session.get('sensor_pref', 'bluetooth')
             _lic_code = session.get('2fa_license_code', '')
+            # Instemming uit /activeer (None bij pure login via /login → geen logging).
+            _consent_meta = session.get('consent_meta')
+            _did_activate = False
             session.clear()
             session['license_valid']=True; session['license_type']=lt
             session['audience']=audience_2fa or lt
+            # Role-load voor KK-admin routing (Sessie B.6)
+            if session['audience'] == 'krankenkasse':
+                try:
+                    import sqlite3 as _sq_r
+                    _rc = _sq_r.connect('/opt/ic-license-server/data/saas_licenses.db')
+                    _rr = _rc.execute("SELECT role FROM users WHERE email=?", (em,)).fetchone()
+                    _rc.close()
+                    if _rr and _rr[0]:
+                        session['role'] = _rr[0]
+                except Exception:
+                    pass
             session['plan_id']=plan_id_2fa
             session['license_code']=_lic_code
             session['email']=em; session['session_id']=em; session['lang']=lang
@@ -1204,16 +1438,63 @@ def verify_2fa():
             # Link license to email and mark as activated
             import sqlite3 as _sq2; _ldb2=_sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
             if _lic_code:
+                _pre = _ldb2.execute("SELECT status FROM licenses WHERE license_key=?", (_lic_code,)).fetchone()
+                _is_fresh_activation = bool(_pre and _pre[0] == 'available')
                 _ldb2.execute("UPDATE licenses SET email=?, status='activated' WHERE license_key=? AND status='available'", (em, _lic_code))
+                # Instemming in DEZELFDE transactie als de activerings-UPDATE.
+                # Alleen bij een verse activering (status available→activated) en
+                # mits niet al vroeg gelogd (marketing/eval). Een re-login met een
+                # reeds geactiveerde code is geen activering → geen rij.
+                if _consent_meta and _is_fresh_activation and not _consent_meta.get('logged'):
+                    _log_consent(_ldb2, em, _lic_code,
+                                 _consent_meta.get('locale', 'nl'),
+                                 _consent_meta.get('consent_at'))
                 _ldb2.commit()
+                # Echte activering = verse status-transitie OF marketing/eval (vroeg
+                # gebonden+gelogd in /activeer). Bepaalt of de bevestigingsmail gaat.
+                if _consent_meta and (_is_fresh_activation or _consent_meta.get('logged')):
+                    _did_activate = True
+                # KK-licentie verse activatie → admin role op deze user + operator-auto-create (Sessie B.6)
+                if _is_fresh_activation and _lic_code.startswith('SC-KK-'):
+                    _ldb2.execute("UPDATE users SET role='admin' WHERE email=?", (em,))
+                    _ldb2.commit()  # commit admin-role los van operator-create-tak
+                    session['role'] = 'admin'
+                    _op_email = _derive_operator_email(em)
+                    if not _ldb2.execute("SELECT 1 FROM users WHERE email=? COLLATE NOCASE", (_op_email,)).fetchone():
+                        import secrets as _opsec
+                        _op_pw = _opsec.token_urlsafe(12)
+                        _op_hash = hash_password(_op_pw)
+                        _opc = _ldb2.execute(
+                            "INSERT INTO users (email, password_hash, display_name, language, role, created_at) "
+                            "VALUES (?, ?, ?, 'de', 'operator', datetime('now'))",
+                            (_op_email, _op_hash, 'KK Operator')
+                        )
+                        _op_id = _opc.lastrowid
+                        _ldb2.execute(
+                            "INSERT INTO user_licenses (user_id, license_key, product, is_primary, linked_at) "
+                            "VALUES (?, ?, 'sc', 0, datetime('now'))",
+                            (_op_id, _lic_code)
+                        )
+                        _ldb2.commit()
+                        # Eenmalige flash naar admin-dashboard (token gepop't bij eerste render)
+                        session['_kk_operator_welcome'] = {'email': _op_email, 'password': _op_pw}
             _lr2=_ldb2.execute("SELECT user_key FROM licenses WHERE email=? AND product='sc' ORDER BY rowid DESC LIMIT 1",(em,)).fetchone(); _ldb2.close(); session['user_key']=_paired_user_key if _paired_user_key else (_lr2[0] if _lr2 else None)
             session['profile_name']=nm; session['profile_birth_year']=_birth; session['profile_gender']=_gender; session['profile_completed']=_completed; session['sensor_pref']=_sensor
+            # Activeringsbevestiging op duurzame drager (§ 312f BGB) — alleen bij
+            # een echte activering, ná de commit. Best-effort: mailfout breekt niet.
+            if _did_activate and _consent_meta:
+                send_activation_confirmation_email(
+                    em, _consent_meta.get('locale', 'nl'),
+                    _consent_meta.get('consent_at'))
             if _paired_pro_id:
                 session['paired_with_pro']  = _paired_pro_id
                 session['paired_client_id'] = _paired_client_id
             # Verplicht profile_setup vóór menu zolang profiel niet voltooid is (vlag, niet de 1970-sentinel)
             if not _completed:
                 return redirect(url_for('profile_setup'))
+            # KK-admin → eigen dashboard; KK-operator (login skipt 2FA, komt hier niet) en Pro → pro_menu
+            if session.get('role') == 'admin' and session.get('audience') == 'krankenkasse':
+                return redirect('/pro/admin')
             return redirect(url_for('pro_menu') if lt=='pro' else url_for('menu'))
         else:
             error='Onjuiste code.' if lang=='nl' else ('Falscher Code.' if lang=='de' else 'Incorrect.')
@@ -1988,6 +2269,16 @@ def _kk_office_stats(license_code, pro_user_key):
     return out
 
 
+def _derive_operator_email(admin_email):
+    """Lei operator-email af van admin-email: '<local>+kkoperator@<domain>'.
+    Voor admin met +tag (paulpannevis+kktest@gmail.com): strip de bestaande tag eerst."""
+    local, _, domain = (admin_email or '').partition('@')
+    if not domain:
+        return f"{admin_email}_operator"
+    base = local.split('+', 1)[0]
+    return f"{base}+kkoperator@{domain}"
+
+
 def _log_kk_action(license_code, action, details):
     """Schrijf KK-CRUD-event naar saas_licenses.db.activation_log (Sessie B.4).
     Aanroepen NA succesvolle DB-write zodat we geen orphans loggen bij fail.
@@ -2045,6 +2336,147 @@ def _parse_kk_csv(raw_bytes, max_rows=500):
             continue
         rows.append({'office_name': name, 'region': region, 'line': i})
     return (rows, errors)
+
+
+@app.route('/pro/admin/messen-standort-kiezen', methods=['GET', 'POST'])
+@require_kk_admin
+def kk_admin_messen_standort():
+    """Admin-specifieke Standort-keuze vóór een eigen meting.
+    Eigen scherm — onthoudt de keuze niet permanent (admin heeft geen vaste Standort).
+    POST → kk_office in sessie → redirect /pro/meting."""
+    lang = session.get('lang', 'nl')
+    license_code = session.get('license_code', '')
+    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db.row_factory = sqlite3.Row
+    if request.method == 'POST':
+        chosen = (request.form.get('office_name','') or '').strip()
+        row = db.execute(
+            "SELECT office_name FROM krankenkasse_offices WHERE license_code=? AND office_name=? AND active=1",
+            (license_code, chosen)).fetchone()
+        db.close()
+        if row:
+            session['kk_office'] = row['office_name']
+            return redirect(url_for('pro_meting_keuze'))
+        return redirect(url_for('kk_admin_messen_standort', error='invalid'))
+    offices = [r['office_name'] for r in db.execute(
+        "SELECT office_name FROM krankenkasse_offices WHERE license_code=? AND active=1 ORDER BY office_name",
+        (license_code,)).fetchall()]
+    db.close()
+    return render_template('pro/admin_messen_standort.html', lang=lang, offices=offices,
+                           error=request.args.get('error', ''))
+
+
+@app.route('/pro/operatoren', methods=['GET'])
+@require_kk_admin
+def kk_operatoren_lijst():
+    """Lijst alle operator-accounts gekoppeld aan deze KK-licentie via user_licenses."""
+    lang = session.get('lang', 'nl')
+    license_code = session.get('license_code', '')
+    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db.row_factory = sqlite3.Row
+    rows = db.execute(
+        "SELECT u.id, u.email, u.display_name, u.created_at, u.last_login "
+        "FROM users u JOIN user_licenses ul ON ul.user_id = u.id "
+        "WHERE ul.license_key=? AND u.role='operator' AND (u.deleted_at IS NULL OR u.deleted_at='') "
+        "ORDER BY u.created_at",
+        (license_code,)
+    ).fetchall()
+    db.close()
+    operators = [dict(r) for r in rows]
+    new_credentials = session.pop('_kk_new_operator_credentials', None)
+    err = request.args.get('error', '')
+    return render_template('pro/operatoren.html', lang=lang,
+                           operators=operators, new_credentials=new_credentials,
+                           error=err, license_code=license_code)
+
+
+@app.route('/pro/operatoren/toevoegen', methods=['POST'])
+@require_kk_admin
+def kk_operatoren_toevoegen():
+    """Voeg een operator-account toe aan de huidige KK-licentie.
+    - email-uniek check
+    - random password (token_urlsafe(12)), eenmalig getoond via session-flash
+    - INSERT users + INSERT user_licenses
+    - audit-log via _log_kk_action
+    """
+    import secrets as _sec, re as _re
+    license_code = session.get('license_code', '')
+    email_raw = (request.form.get('email','') or '').strip().lower()
+    display_name = (request.form.get('display_name','') or '').strip()[:80] or 'KK Operator'
+    if not _re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email_raw):
+        return redirect(url_for('kk_operatoren_lijst', error='email_format'))
+    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db.row_factory = sqlite3.Row
+    if db.execute("SELECT 1 FROM users WHERE email=? COLLATE NOCASE", (email_raw,)).fetchone():
+        db.close()
+        return redirect(url_for('kk_operatoren_lijst', error='email_exists'))
+    pw = _sec.token_urlsafe(12)
+    pw_hash = hash_password(pw)
+    cur = db.execute(
+        "INSERT INTO users (email, password_hash, display_name, language, role, created_at) "
+        "VALUES (?, ?, ?, 'de', 'operator', datetime('now'))",
+        (email_raw, pw_hash, display_name)
+    )
+    op_id = cur.lastrowid
+    db.execute(
+        "INSERT INTO user_licenses (user_id, license_key, product, is_primary, linked_at) "
+        "VALUES (?, ?, 'sc', 0, datetime('now'))",
+        (op_id, license_code)
+    )
+    db.commit()
+    db.close()
+    _log_kk_action(license_code, 'kk_operator_create', f"email={email_raw} user_id={op_id}")
+    session['_kk_new_operator_credentials'] = {'email': email_raw, 'password': pw}
+    return redirect(url_for('kk_operatoren_lijst'))
+
+
+@app.route('/pro/admin')
+@require_kk_admin
+def kk_admin_dashboard():
+    """KK-admin-overzicht: KPI's, Standorte-tabel, recente 10 metingen.
+    Auth-only voor role='admin' binnen KK-sessie. (Sessie B.6)"""
+    from analytics import aggregate_period, period_bounds
+    lang = session.get('lang', 'nl')
+    license_code = session.get('license_code', '')
+    pro_key = get_user_key()
+
+    ps, pe = period_bounds('alles')
+    agg = aggregate_period(license_code, pro_key, ps, pe, group_by=None, filter=None)
+
+    offices = _kk_office_stats(license_code, pro_key)
+    active_count = sum(1 for o in offices if o['active'])
+
+    pro_db = get_pro_db()
+    recent_raw = pro_db.execute(
+        "SELECT ts, office_label, ri FROM client_metingen "
+        "WHERE pro_key=? AND ri IS NOT NULL ORDER BY ts DESC LIMIT 10",
+        (pro_key,)
+    ).fetchall()
+    pro_db.close()
+    recent = []
+    for r in recent_raw:
+        ts_fmt = datetime.fromtimestamp(r['ts']/1000).strftime('%d-%m-%Y %H:%M') if r['ts'] else '-'
+        recent.append({
+            'ts': ts_fmt,
+            'office_label': r['office_label'] or '–',
+            'ri': round(r['ri'], 1) if r['ri'] is not None else None,
+        })
+
+    operator_welcome = session.pop('_kk_operator_welcome', None)
+
+    return render_template('pro/dashboard_kk.html',
+        lang=lang,
+        license_code=license_code,
+        tier_label=kk_tier_label(),
+        total_metingen=agg.get('total_metingen', 0),
+        unique_clients=agg.get('unique_clients', 0),
+        ri_average=agg.get('ri_average'),
+        active_count=active_count,
+        total_offices=len(offices),
+        offices=offices,
+        recent=recent,
+        operator_welcome=operator_welcome,
+    )
 
 
 @app.route('/pro/locaties')

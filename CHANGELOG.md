@@ -1,5 +1,63 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-05 — Widerruf-instemming op activeringspagina (/licentie)
+
+Juridisch verval van het herroepingsrecht voor de digitale dienst (§ 356 Abs. 5
+BGB / art. 6:230p BW) wordt nu kanaal-onafhankelijk vastgelegd bij elke echte
+licentie-activering. Sluit aan op de nieuwe AGB § 12 (Stand 5 juni 2026).
+Pre-fix backup: `/opt/backups/*.20260605-0912`.
+
+### Tweede checkbox + validatie (`templates/license.html`)
+- Nieuwe gele box `widerruf_consent` direct onder de gezondheidsdata-box, niet
+  voorgevinkt, NL/DE/EN (u-vorm NL). Beide boxen tonen alleen in de
+  activeringstab ("Neuer Nutzer"); de login-tab (/login) activeert niets en
+  toont geen checkbox.
+- `validateActivation()`: knop blijft actief; bij submit zonder vinkje een
+  inline foutmelding bij de betreffende checkbox (3 talen). Server-side gate in
+  `/activeer` is de autoritaire controle (beide verplicht voor activering).
+- Typo-fix: DE `Datenschutzerklaerung` → `Datenschutzerklärung`, nu hyperlink
+  naar https://lifestylemonitors.de/datenschutz-dsvgo/ (target=_blank). NL/EN
+  blijven bewust naar interne `/privacy` (DSGVO-pagina is Duitstalig).
+
+### Consent-logging (`app.py` + nieuwe tabel)
+- Nieuwe tabel `consent_log` in `saas_licenses.db` (id, email, license_code,
+  consent_type, text_version, locale, created_at). Bewaartermijn: niet opruimen
+  (juridisch bewijs).
+- Tekstversie-constanten `CONSENT_TEXT_VERSIONS` (widerruf/gezondheidsdata ×
+  nl/de/en, suffix `-v1-20260605`). Latere tekstwijziging = nieuwe version-string.
+- Bij succesvolle activering twee rijen (één per checkbox) in dezelfde transactie
+  als de activerings-UPDATE: regulier in `verify_2fa` (status available→activated),
+  marketing/eval in de bind-transactie van `/activeer`. `created_at` = tijdstip
+  van aanvinken (vastgelegd bij de POST naar `/activeer`, meegedragen via sessie).
+  Re-login met reeds geactiveerde code = geen activering → geen rij.
+
+### Bevestigingsmail op duurzame drager (§ 312f BGB)
+- Nieuwe `send_activation_confirmation_email` + pure builder
+  `build_activation_confirmation_body` (testbaar). Verstuurd ná succesvolle
+  activering (na 2FA), alleen bij echte activeringen, met de consent-alinea +
+  tijdstip van instemming. Er bestond nog géén activeringsbevestiging — dit is
+  nieuw (de enige mails waren 2FA-code en wachtwoord-reset).
+
+### Tests
+- `tests/test_consent_widerruf.py` (categorie D, 4/4 groen), gewired in
+  `run_all.sh`: D1 zonder widerruf geblokkeerd (geen rij), D2 beide → activated +
+  2 rijen (juiste text_version/locale/created_at) + mail, D3 consent-alinea in 3
+  talen, D4 regressie login zonder checkbox/zonder rij. Eigen fixture-licentie,
+  SendGrid gemockt; productie-fixtures (o.a. id=25/26) onaangeroerd.
+
+### Verificatie
+- `py_compile app.py` schoon; Jinja-render `/licentie` NL/DE/EN OK.
+- `kill -HUP` graceful reload (workers 1538591/1538592); live `/licentie` (DE)
+  toont checkbox + umlaut-fix + DSGVO-link + validatie.
+- `run_all.sh`: categorie C 8/8 + D 4/4 groen. **Pre-existent en niet door deze
+  wijziging veroorzaakt:** A2/A4/A5 (pro-cliëntmeting-routing, live server) en B3
+  (HRV%=146 vs 124, `hrv.js` vs `references.json` — RMSSD-herberekening-workstream).
+  Beide subsystemen liggen buiten deze diff.
+
+### Buiten scope (zoals opgedragen)
+- 2FA-codes uit journalctl (apart ticket, vóór Machtfit-livegang).
+- AGB-pagina op lifestylemonitors.de (via WordPress).
+
 ## 2026-05-25 — Methodische rapport-tekst herzien (Sessie B.5 / Pass 3)
 
 Voor de KKH-propositie moet de naam **Verveen** uit alle klantzichtbare rapport-tekst verdwijnen (eigennaam wekt de indruk dat essentiële knowhow uit het bedrijf weg is). Vervangende tekst behoudt de wetenschappelijke onderbouwing via de gehanteerde **methode**: HRV/RMSSD per Task Force ESC (1996), Kubios-standaard voor artefactcorrectie, leeftijd/geslacht-genormaliseerde populatiereferenties.
