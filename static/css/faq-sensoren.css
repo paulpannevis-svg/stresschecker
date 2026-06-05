@@ -1,0 +1,71 @@
+<!-- FAQ Sensoren / Sensors - voor opname in FAQ-pagina app.stresschecker.com -->
+<!-- CSS: voeg faq-sensoren.css toe of neem de styles op in je bestaande stylesheet -->
+
+<div class="faq-item" id="faq-sensoren">
+  <h3>
+    {%if lang=="de"%}Wie genau sind die verschiedenen Messmethoden?{%elif lang=="en"%}How accurate are the different measurement methods?{%else%}Hoe nauwkeurig zijn de verschillende meetmethoden?{%endif%}
+  </h3>
+
+  <p>
+    {%if lang=="de"%}StressChecker unterst&#xFC;tzt drei Messmethoden zur Erfassung Ihres Herzrhythmus. Jede Methode hat ein unterschiedliches Genauigkeitsniveau:{%elif lang=="en"%}StressChecker supports three measurement methods for capturing your heart rhythm. Each method has a different level of accuracy:{%else%}StressChecker ondersteunt drie meetmethoden om je hartritme te meten. Elke methode heeft een ander niveau van nauwkeurigheid:{%endif%}
+  </p>
+
+  <!-- 1. Camera -->
+  <h4>
+    {%if lang=="de"%}1. Kamera (rPPG &#xFC;ber Smartphone){%elif lang=="en"%}1. Camera (rPPG via smartphone){%else%}1. Camera (rPPG via smartphone){%endif%}
+    <span class="accuracy-indicative">
+      {%if lang=="de"%}Indikativ{%elif lang=="en"%}Indicative{%else%}Indicatief{%endif%}
+    </span>
+  </h4>
+  <p>
+    {%if lang=="de"%}Bei dieser Methode legen Sie Ihren Finger auf die Kameralinse Ihres Telefons. Die Kamera erfasst subtile Farbver&#xE4;nderungen in Ihrer Haut, die durch Ihren Herzschlag verursacht werden.{%elif lang=="en"%}With this method, you place your finger against the camera lens of your phone. The camera detects subtle colour changes in your skin caused by your heartbeat.{%else%}Bij deze methode plaats je je vinger tegen de cameralens van je telefoon. De camera registreert subtiele kleurveranderingen in je huid die worden veroorzaakt door je hartslag.{%endif%}
+  </p>
+  <p>
+    {%if lang=="de"%}Dies ist die zug&#xE4;nglichste Methode, aber auch die st&#xF6;ranf&#xE4;lligste. Umgebungslicht, Fingerbewegungen und der Druck auf die Linse beeinflussen das Signal. Geeignet f&#xFC;r einen ersten Eindruck Ihres Stressniveaus, aber weniger konsistent als ein spezieller Sensor.{%elif lang=="en"%}This is the most accessible method, but also the most sensitive to interference. Ambient light, finger movement and the pressure applied to the lens all affect the signal. Suitable for getting a first impression of your stress level, but less consistent than a dedicated sensor.{%else%}Dit is de meest toegankelijke methode, maar ook de meest gevoelige voor verstoringen. Omgevingslicht, beweging van je vinger en de druk waarmee je tegen de lens drukt be&#xEF;nvloeden het signaal. Geschikt om een eerste indruk te krijgen van je stressniveau, maar minder consistent dan een dedicated sensor.{%endif%}
+  </p>
+  <p class="faq-tip">
+    {%if lang=="de"%}<em>Tipp: Messen Sie in einer ruhigen Umgebung, halten Sie den Finger still und achten Sie auf gleichm&#xE4;&#xDF;igen Druck auf die Linse.</em>{%elif lang=="en"%}<em>Tip: Measure in a quiet environment, keep your finger still and apply even pressure to the lens.</em>{%else%}<em>Tip: Meet in een rustige omgeving, houd je vinger stil en zorg voor gelijkmatige druk op de lens.</em>{%endif%}
+  </p>
+
+  <!-- 2. Clip sensor -->
+  <h4>
+    {%if lang=="de"%}2. Ohr-/Fingerclipsensor (PPG &#xFC;ber Bluetooth oder USB){%elif lang=="en"%}2. Ear/finger clip sensor (PPG via Bluetooth or USB){%else%}2. Oor-/vingerclipsensor (PPG via Bluetooth of USB){%endif%}
+    <span class="accuracy-good">
+      {%if lang=="de"%}Gut{%elif lang=="en"%}Good{%else%}Goed{%endif%}
+    </span>
+  </h4>
+  <p>
+    {%if lang=="de"%}Ein Clipsensor wird an Ihrem Ohrl&#xE4;ppchen oder Ihrer Fingerspitze befestigt und misst den Herzrhythmus &#xFC;ber Lichtabsorption durch die Haut (Photoplethysmografie).{%elif lang=="en"%}A clip sensor is attached to your earlobe or fingertip and measures heart rhythm through light absorption in the skin (photoplethysmography).{%else%}Een clipsensor wordt bevestigd aan je oorlel of vingertop en meet het hartritme via lichtabsorptie door de huid (fotoplethysmografie).{%endif%}
+  </p>
+  <p>
+    {%if lang=="de"%}Deutlich genauer als die Kameramethode. Der Sensor hat stabilen Hautkontakt und wird weniger durch Umgebungslicht und Bewegung beeinflusst. F&#xFC;r die meisten Anwender bietet diese Methode das beste Verh&#xE4;ltnis zwischen Benutzerfreundlichkeit und Zuverl&#xE4;ssigkeit.{%elif lang=="en"%}Considerably more accurate than the camera method. The sensor maintains stable contact with the skin and is far less affected by ambient light and movement. For most users, this method offers the best balance between ease of use and reliability.{%else%}Aanzienlijk nauwkeuriger dan de cameramethode. De sensor maakt stabiel contact met de huid en heeft veel minder last van omgevingslicht en beweging. Voor de meeste gebruikers biedt deze methode de beste balans tussen gebruiksgemak en betrouwbaarheid.{%endif%}
+  </p>
+  <p class="faq-tip">
+    {%if lang=="de"%}<em>Tipp: Achten Sie darauf, dass der Clip gut sitzt, aber nicht zu fest. Bewegen Sie sich w&#xE4;hrend der Messung so wenig wie m&#xF6;glich.</em>{%elif lang=="en"%}<em>Tip: Make sure the clip fits snugly but not too tightly. Move as little as possible during the measurement.</em>{%else%}<em>Tip: Zorg dat de clip goed zit maar niet te strak. Beweeg zo min mogelijk tijdens de meting.</em>{%endif%}
+  </p>
+
+  <!-- 3. Borstband / Chest strap -->
+  <h4>
+    {%if lang=="de"%}3. Brustgurt (EKG-Qualit&#xE4;t &#xFC;ber Bluetooth){%elif lang=="en"%}3. Chest strap (ECG-quality via Bluetooth){%else%}3. Borstband (ECG-kwaliteit via Bluetooth){%endif%}
+    <span class="accuracy-excellent">
+      {%if lang=="de"%}Ausgezeichnet{%elif lang=="en"%}Excellent{%else%}Uitstekend{%endif%}
+    </span>
+  </h4>
+  <p>
+    {%if lang=="de"%}Ein Brustgurt mit Herzfrequenzsensor misst das elektrische Signal Ihres Herzens, vergleichbar mit einer klinischen EKG-Messung.{%elif lang=="en"%}A chest strap with heart rate sensor measures the electrical signal from your heart, comparable to a clinical ECG measurement.{%else%}Een borstband met hartslagsensor meet het elektrische signaal van je hart, vergelijkbaar met een klinische ECG-meting.{%endif%}
+  </p>
+  <p>
+    {%if lang=="de"%}Dies ist die genaueste Messmethode. Das elektrische Herzsignal liefert die zuverl&#xE4;ssigsten HRV-Daten (Herzratenvariabilit&#xE4;t) und damit den genauesten Relax Index auf einer Skala von 0&#x2013;10.{%elif lang=="en"%}This is the most accurate measurement method. The electrical heart signal provides the most reliable HRV data (heart rate variability) and therefore the most accurate Relax Index score on a 0&#x2013;10 scale.{%else%}Dit is de meest nauwkeurige meetmethode. Het elektrische hartsignaal levert de betrouwbaarste HRV-data (hartritmevariabiliteit) en daarmee de meest nauwkeurige Relax Index score op een schaal van 0&#x2013;10.{%endif%}
+  </p>
+  <p class="faq-tip">
+    {%if lang=="de"%}<em>Tipp: Befeuchten Sie die Kontaktstellen des Gurtes leicht f&#xFC;r optimalen Hautkontakt.</em>{%elif lang=="en"%}<em>Tip: Lightly moisten the contact points of the strap for optimal skin contact.</em>{%else%}<em>Tip: Maak de contactpunten van de band licht vochtig voor optimaal contact met de huid.</em>{%endif%}
+  </p>
+
+  <!-- Samenvatting -->
+  <p class="faq-summary">
+    <strong>
+      {%if lang=="de"%}Zusammenfassung:{%elif lang=="en"%}Summary:{%else%}Samengevat:{%endif%}
+    </strong>
+    {%if lang=="de"%}Kamera &#x2192; <span class="accuracy-indicative">Indikativ</span> | Clipsensor &#x2192; <span class="accuracy-good">Gut</span> | Brustgurt &#x2192; <span class="accuracy-excellent">Ausgezeichnet</span>. F&#xFC;r das zuverl&#xE4;ssigste Ergebnis empfehlen wir einen Clipsensor oder Brustgurt.{%elif lang=="en"%}Camera &#x2192; <span class="accuracy-indicative">Indicative</span> | Clip sensor &#x2192; <span class="accuracy-good">Good</span> | Chest strap &#x2192; <span class="accuracy-excellent">Excellent</span>. For the most reliable result, we recommend a clip sensor or chest strap.{%else%}Camera &#x2192; <span class="accuracy-indicative">Indicatief</span> | Clipsensor &#x2192; <span class="accuracy-good">Goed</span> | Borstband &#x2192; <span class="accuracy-excellent">Uitstekend</span>. Voor het meest betrouwbare resultaat raden wij een clipsensor of borstband aan.{%endif%}
+  </p>
+</div>

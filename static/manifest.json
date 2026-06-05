@@ -1,0 +1,36 @@
+{
+  "name": "StressChecker",
+  "short_name": "StressChecker",
+  "description": "Meet je stressniveau en ontspanning",
+  "start_url": "/welkom",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#E8344E",
+  "icons": [
+    {
+      "src": "/static/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "id": "/welkom",
+  "screenshots": [
+    {
+      "src": "/static/img/screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/static/img/screenshot-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ]
+}

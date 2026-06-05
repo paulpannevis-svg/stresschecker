@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#E8344E"/>
+  <text x="256" y="320" font-size="280" text-anchor="middle" fill="white" font-family="Arial">♥</text>
+  <line x1="256" y1="160" x2="256" y2="380" stroke="white" stroke-width="20"/>
+  <line x1="150" y1="270" x2="362" y2="270" stroke="white" stroke-width="20"/>
+</svg>
