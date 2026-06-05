@@ -4,10 +4,10 @@
 <div style="max-width:520px;margin:0 auto;padding:1rem;">
   <h1 class="screen-title" style="font-size:1.3rem;">
     <span style="background:#1565c0;color:#fff;font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:10px;vertical-align:middle;margin-right:.3rem;">KK</span>
-    {% if lang=='de' %}Für welchen Standort arbeitest du jetzt?{% elif lang=='en' %}Which location are you working at now?{% else %}Voor welke locatie ga je nu werken?{% endif %}
+    {% if lang=='de' %}Für welchen Standort arbeiten Sie jetzt?{% elif lang=='en' %}Which location are you working at now?{% else %}Voor welke locatie ga je nu werken?{% endif %}
   </h1>
   <p class="screen-subtitle" style="margin-bottom:18px;color:#555;">
-    {% if lang=='de' %}Alle Messungen werden mit diesem Standort verknüpft, bis du ihn änderst.{% elif lang=='en' %}All measurements will be tagged with this location until you change it.{% else %}Alle metingen worden gekoppeld aan deze locatie totdat je ze wijzigt.{% endif %}
+    {% if lang=='de' %}Alle Messungen werden mit diesem Standort verknüpft, bis Sie ihn ändern.{% elif lang=='en' %}All measurements will be tagged with this location until you change it.{% else %}Alle metingen worden gekoppeld aan deze locatie totdat je ze wijzigt.{% endif %}
   </p>
 
   {% if request.args.get('error') == 'invalid' %}
