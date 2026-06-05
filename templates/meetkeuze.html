@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width:480px;margin:40px auto;padding:20px;">
+  <h2 style="text-align:center;color:#E8344E;">
+    {% if lang=='de' %}Messungsart wählen{% elif lang=='en' %}Choose measurement type{% else %}Kies je meting{% endif %}
+  </h2>
+
+  {% if role=='pro' %}
+  <a href="/trial/client" style="display:block;padding:20px;margin:12px 0;background:#E8344E;border-radius:12px;text-decoration:none;">
+    <h3 style="color:white;margin:0 0 6px;">{% if lang=='de' %}Messung für einen Klienten{% elif lang=='en' %}Measure a client{% else %}Meting voor een cliënt{% endif %}</h3>
+    <p style="color:rgba(255,255,255,0.85);margin:0;">{% if lang=='de' %}Pro-Funktion: Klientenverwaltung{% elif lang=='en' %}Pro feature: client management{% else %}Pro functie: cliëntenbeheer{% endif %}</p>
+  </a>
+  <div style="text-align:center;color:#999;margin:8px 0;">— {% if lang=='de' %}oder{% elif lang=='en' %}or{% else %}of{% endif %} —</div>
+  {% endif %}
+
+  <a href="/voorbereiden?next=basismeting" style="display:block;padding:20px;margin:12px 0;background:white;border-radius:12px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <h3 style="color:#E8344E;margin:0 0 6px;">{% if lang=='de' %}Basismessung{% elif lang=='en' %}Baseline{% else %}Basismeting{% endif %}</h3>
+    <p style="color:#666;margin:0;">{% if lang=='de' %}90-Sekunden ANS-Messung im Ruhezustand{% elif lang=='en' %}90-second ANS measurement at rest{% else %}90 seconden meting in rust{% endif %}</p>
+  </a>
+  <a href="/voorbereiden?next=situatiemeting" style="display:block;padding:20px;margin:12px 0;background:white;border-radius:12px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <h3 style="color:#E8344E;margin:0 0 6px;">{% if lang=='de' %}Situationsmessung{% elif lang=='en' %}Situation{% else %}Situatiemeting{% endif %}</h3>
+    <p style="color:#666;margin:0;">{% if lang=='de' %}Messen in einer bestimmten Situation{% elif lang=='en' %}Measure in a specific situation{% else %}Meten in een specifieke situatie{% endif %}</p>
+  </a>
+  <a href="/voorbereiden?next=biofeedback" style="display:block;padding:20px;margin:12px 0;background:white;border-radius:12px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <h3 style="color:#E8344E;margin:0 0 6px;">Biofeedback</h3>
+    <p style="color:#666;margin:0;">{% if lang=='de' %}Echtzeit-HRV-Biofeedback-Übung{% elif lang=='en' %}Real-time HRV biofeedback exercise{% else %}Real-time HRV biofeedback oefening{% endif %}</p>
+  </a>
+</div>
+{% endblock %}

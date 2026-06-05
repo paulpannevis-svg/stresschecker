@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block head %}<style>
+.ww-btn { background: #E8344E !important; }
+.ww-btn:hover { background: #1E6B54 !important; }
+.ww-back:hover { color: #E8344E !important; }
+circle[fill="#fdecea"] { fill: #e8f5f0 !important; }
+circle[stroke="#E8344E"], line[stroke="#E8344E"], path[stroke="#E8344E"] { stroke: #E8344E !important; }
+
+.ww-wrap{max-width:480px;margin:0 auto;padding:1.5rem 1rem 2rem;}
+.ww-title{text-align:center;font-size:1.1rem;font-weight:700;color:#E8344E;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.3rem;}
+.ww-sub{text-align:center;font-size:.82rem;color:#888;margin-bottom:1.2rem;}
+.ww-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-bottom:1.5rem;}
+.ww-item{display:flex;flex-direction:column;align-items:center;gap:.3rem;position:relative;}
+.ww-icon{width:64px;height:64px;cursor:pointer;}
+.ww-icon svg{width:100%;height:100%;}
+.ww-label{font-size:.72rem;color:#555;text-align:center;}
+.ww-tooltip{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#333;color:#fff;font-size:.7rem;padding:.4rem .65rem;border-radius:6px;white-space:nowrap;z-index:99;pointer-events:none;line-height:1.4;text-align:center;max-width:160px;white-space:normal;}
+.ww-tooltip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#333;}
+.ww-item:hover .ww-tooltip{display:block;}
+.ww-btn{display:block;width:100%;background:#E8344E;color:#fff;border:none;border-radius:20px;padding:.9rem;font-size:.95rem;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;letter-spacing:.03em;margin-top:.5rem;}
+.ww-btn:hover{background:#1E6B54;}
+.ww-back{display:block;text-align:center;margin-top:.8rem;font-size:.78rem;color:#aaa;text-decoration:none;}
+.ww-back:hover{color:#E8344E;}
+</style>{% endblock %}
+{% block content %}
+<div class="ww-wrap">
+  <div class="ww-title">
+    {% if lang=='de' %}Vor der Messung{% elif lang=='en' %}Before Your Reading{% else %}Voor de meting{% endif %}
+  </div>
+  <div class="ww-sub">
+    {% if lang=='de' %}Für zuverlässige Ergebnisse — bitte beachten{% elif lang=='en' %}For reliable results — please observe{% else %}Voor betrouwbare resultaten — houd dit aan{% endif %}
+  </div>
+
+  <div class="ww-grid">
+
+    <!-- 1. Niet eten -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Nicht essen (mind. 2 Std. vorher){% elif lang=='en' %}No eating (at least 2 hrs before){% else %}Niet eten (minimaal 2 uur van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- vork en mes -->
+          <line x1="27" y1="18" x2="27" y2="30" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M24 18 Q24 26 27 28" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <path d="M30 18 Q30 26 27 28" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <line x1="27" y1="28" x2="27" y2="50" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M38 18 C38 18 41 22 41 26 C41 29 39.5 30 38 30.5 L38 50" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <!-- verbodslijn -->
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Nicht essen{% elif lang=='en' %}No eating{% else %}Niet eten{% endif %}</div>
+    </div>
+
+    <!-- 2. Niet sporten -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Kein Sport (mind. 30 Min. vorher){% elif lang=='en' %}No exercise (at least 30 min before){% else %}Niet sporten (minimaal 30 min van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- hardloper -->
+          <circle cx="36" cy="20" r="3.5" fill="#E8344E"/>
+          <path d="M36 24 L32 35 L25 42" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <path d="M32 35 L38 42 L44 38" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <path d="M36 24 L42 30 L46 28" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <!-- verbodslijn -->
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Kein Sport{% elif lang=='en' %}No exercise{% else %}Niet sporten{% endif %}</div>
+    </div>
+
+    <!-- 3. Niet roken -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Nicht rauchen (mind. 1 Std. vorher){% elif lang=='en' %}No smoking (at least 1 hr before){% else %}Niet roken (minimaal 1 uur van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- sigaret -->
+          <rect x="18" y="31" width="28" height="7" rx="1.5" stroke="#E8344E" stroke-width="2.2"/>
+          <line x1="40" y1="31" x2="40" y2="38" stroke="#E8344E" stroke-width="2.5"/>
+          <path d="M44 28 Q46 25 44 22" stroke="#E8344E" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <path d="M47 30 Q50 26 47 22" stroke="#E8344E" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <!-- verbodslijn -->
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Nicht rauchen{% elif lang=='en' %}No smoking{% else %}Niet roken{% endif %}</div>
+    </div>
+
+    <!-- 4. Geen alcohol -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Kein Alkohol (mind. 12 Std. vorher){% elif lang=='en' %}No alcohol (at least 12 hrs before){% else %}Geen alcohol (minimaal 12 uur van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- wijnglas -->
+          <path d="M25 18 L43 18 L39 32 C39 37 34 40 34 40 C34 40 29 37 29 32 Z" stroke="#E8344E" stroke-width="2.2" stroke-linejoin="round" fill="none"/>
+          <line x1="34" y1="40" x2="34" y2="50" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="28" y1="50" x2="40" y2="50" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round"/>
+          <!-- verbodslijn -->
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Kein Alkohol{% elif lang=='en' %}No alcohol{% else %}Geen alcohol{% endif %}</div>
+    </div>
+
+    <!-- 5. Geen koffie -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Kein Kaffee/Tee (mind. 1 Std. vorher){% elif lang=='en' %}No coffee/tea (at least 1 hr before){% else %}Geen koffie/thee (minimaal 1 uur van tevoren){% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- koffiekop -->
+          <path d="M20 28 L20 44 Q20 48 24 48 L42 48 Q46 48 46 44 L46 28 Z" stroke="#E8344E" stroke-width="2.2" fill="none"/>
+          <path d="M46 32 Q52 32 52 38 Q52 44 46 44" stroke="#E8344E" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <path d="M28 22 Q28 18 30 20 Q30 24 28 22" stroke="#E8344E" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <path d="M34 20 Q34 16 36 18 Q36 22 34 20" stroke="#E8344E" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <!-- verbodslijn -->
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Kein Kaffee{% elif lang=='en' %}No coffee{% else %}Geen koffie{% endif %}</div>
+    </div>
+
+    <!-- 6. Geen telefoon -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Handy weglegen während der Messung{% elif lang=='en' %}Put phone away during the reading{% else %}Telefoon wegleggen tijdens de meting{% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#E8344E" stroke-width="2.5"/>
+          <!-- smartphone -->
+          <rect x="24" y="16" width="20" height="36" rx="3" stroke="#E8344E" stroke-width="2.2"/>
+          <line x1="31" y1="47" x2="37" y2="47" stroke="#E8344E" stroke-width="2" stroke-linecap="round"/>
+          <!-- verbodslijn -->
+          <line x1="14" y1="14" x2="54" y2="54" stroke="#E8344E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Kein Handy{% elif lang=='en' %}No phone{% else %}Geen telefoon{% endif %}</div>
+    </div>
+
+    <!-- 7. Rechtop zitten (groen) -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Aufrecht sitzen, entspannen{% elif lang=='en' %}Sit upright and relax{% else %}Rechtop zitten en ontspannen{% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#c0392b" stroke-width="2.5"/>
+          <!-- stoel/persoon zittend -->
+          <circle cx="34" cy="20" r="4" fill="#c0392b"/>
+          <path d="M34 24 L34 38" stroke="#c0392b" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M26 30 L34 30 L42 30" stroke="#c0392b" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M28 38 L34 38 L40 38" stroke="#c0392b" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M28 38 L26 48" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M40 38 L42 48" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Aufrecht sitzen{% elif lang=='en' %}Sit upright{% else %}Rechtop zitten{% endif %}</div>
+    </div>
+
+    <!-- 8. Sensor bevestigen (groen) -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Sensor am Ohr oder Finger anlegen{% elif lang=='en' %}Attach sensor to ear or finger{% else %}Sensor aan oor of vinger bevestigen{% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#c0392b" stroke-width="2.5"/>
+          <!-- oor met sensor clip -->
+          <path d="M28 22 C28 16 40 16 40 24 C40 30 36 32 36 38 L32 38 C32 32 28 30 28 24 Z" stroke="#c0392b" stroke-width="2.2" fill="none" stroke-linejoin="round"/>
+          <path d="M32 38 L32 42 C32 44 34 46 36 46 C38 46 40 44 40 42" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <circle cx="44" cy="36" r="5" fill="#c0392b"/>
+          <polyline points="41,36 43,38 47,34" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}Sensor anlegen{% elif lang=='en' %}Attach sensor{% else %}Sensor bevestigen{% endif %}</div>
+    </div>
+
+    <!-- 9. 90 seconden (groen) -->
+    <div class="ww-item">
+      <div class="ww-tooltip">{% if lang=='de' %}Die Messung dauert 90 Sekunden{% elif lang=='en' %}The reading takes 90 seconds{% else %}De meting duurt 90 seconden{% endif %}</div>
+      <div class="ww-icon">
+        <svg viewBox="0 0 68 68" fill="none">
+          <circle cx="34" cy="34" r="32" fill="#fdecea" stroke="#c0392b" stroke-width="2.5"/>
+          <circle cx="34" cy="36" r="14" stroke="#c0392b" stroke-width="2.2"/>
+          <line x1="34" y1="36" x2="34" y2="26" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="34" y1="36" x2="41" y2="40" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="30" y1="20" x2="38" y2="20" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="34" y1="20" x2="34" y2="22" stroke="#c0392b" stroke-width="2.2" stroke-linecap="round"/>
+          <text x="34" y="54" text-anchor="middle" font-size="8" fill="#c0392b" font-weight="700">90s</text>
+        </svg>
+      </div>
+      <div class="ww-label">{% if lang=='de' %}90 Sekunden{% elif lang=='en' %}90 seconds{% else %}90 seconden{% endif %}</div>
+    </div>
+
+  </div>
+
+  <a href="/sc/sensor-keuze" class="ww-btn">>
+    {% if lang=='de' %}Weiter zum Sensor →{% elif lang=='en' %}Continue to sensor →{% else %}Verder naar sensor →{% endif %}
+  </a>
+  <a href="/pro" class="ww-back">← {% if lang=='de' %}Zurück{% elif lang=='en' %}Back{% else %}Terug{% endif %}</a>
+</div>
+{% endblock %}

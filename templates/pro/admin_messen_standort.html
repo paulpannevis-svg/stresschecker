@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}StressChecker® — {% if lang=='de' %}Standort für Messung wählen{% elif lang=='en' %}Choose location for measurement{% else %}Locatie voor meting kiezen{% endif %}{% endblock %}
+
+{% block content %}
+<style>
+  .adm-loc-wrap { max-width: 520px; margin: 0 auto; padding: 1rem; }
+  .adm-loc-wrap h1 { font-size: 1.3rem; margin: .2rem 0 .4rem; }
+  .adm-loc-wrap .badge {
+    background: #1565c0; color: #fff; font-size: .65rem; font-weight: 700;
+    padding: 2px 8px; border-radius: 10px; vertical-align: middle; margin-right: .3rem;
+  }
+  .adm-loc-wrap p.sub { color: #555; margin: 0 0 1.2rem; font-size: .95rem; }
+  .adm-loc-wrap .card {
+    background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 1.2rem;
+  }
+  .adm-loc-wrap label.opt {
+    display: flex; align-items: center; gap: .6rem; padding: .55rem 0;
+    border-bottom: 1px solid #f0f0f0; cursor: pointer; font-size: 1.02rem;
+  }
+  .adm-loc-wrap label.opt:last-of-type { border-bottom: 0; }
+  .adm-loc-wrap button.start {
+    margin-top: 1.2rem; width: 100%;
+    background: #1565c0; color: #fff; border: 0;
+    padding: .65rem 1rem; border-radius: 6px; font-size: 1rem; cursor: pointer;
+  }
+  .adm-loc-wrap .form-error {
+    background: #fdecea; color: #b71c1c; padding: .6rem .8rem;
+    border-radius: 6px; margin-bottom: 1rem;
+  }
+  .adm-loc-wrap .back-link { text-align: center; margin-top: 1.2rem; font-size: .88rem; }
+  .adm-loc-wrap .back-link a { color: #1565c0; text-decoration: none; }
+  .adm-loc-wrap .empty {
+    background: #fff8e1; border: 1px solid #f0c987; border-radius: 8px;
+    padding: 1rem; color: #444;
+  }
+</style>
+
+<div class="adm-loc-wrap">
+  <h1>
+    <span class="badge">KK</span>
+    {% if lang=='de' %}Standort für diese Messung wählen{% elif lang=='en' %}Choose location for this measurement{% else %}Locatie voor deze meting kiezen{% endif %}
+  </h1>
+  <p class="sub">
+    {% if lang=='de' %}Als Admin haben Sie keinen festen Standort. Wählen Sie pro Messung, zu welchem Standort sie zählen soll.{% elif lang=='en' %}As admin you do not have a fixed location. Choose per measurement which location it should count toward.{% else %}Als admin heeft u geen vaste locatie. Kies per meting bij welke locatie de meting hoort.{% endif %}
+  </p>
+
+  {% if error == 'invalid' %}
+  <div class="form-error">
+    {% if lang=='de' %}Ungültige Auswahl.{% elif lang=='en' %}Invalid choice.{% else %}Ongeldige keuze.{% endif %}
+  </div>
+  {% endif %}
+
+  {% if offices %}
+  <div class="card">
+    <form method="POST" action="{{ url_for('kk_admin_messen_standort') }}">
+      {% for office in offices %}
+      <label class="opt">
+        <input type="radio" name="office_name" value="{{ office }}" {% if loop.first %}checked{% endif %} required>
+        <span>{{ office }}</span>
+      </label>
+      {% endfor %}
+      <button type="submit" class="start">
+        {% if lang=='de' %}Messung starten ▶{% elif lang=='en' %}Start measurement ▶{% else %}Meting starten ▶{% endif %}
+      </button>
+    </form>
+  </div>
+  {% else %}
+  <div class="empty">
+    {% if lang=='de' %}Es sind keine aktiven Standorte verfügbar. Bitte legen Sie zuerst einen Standort an unter <a href="{{ url_for('kk_locaties_beheren') }}">Standorte verwalten</a>.{% elif lang=='en' %}No active locations available. Please create one first under <a href="{{ url_for('kk_locaties_beheren') }}">Manage locations</a>.{% else %}Geen actieve locaties beschikbaar. Maak er eerst een aan onder <a href="{{ url_for('kk_locaties_beheren') }}">Locaties beheren</a>.{% endif %}
+  </div>
+  {% endif %}
+
+  <div class="back-link">
+    <a href="/pro/admin">&#8592; {% if lang=='de' %}Zurück zur Admin-Übersicht{% elif lang=='en' %}Back to admin overview{% else %}Terug naar admin-overzicht{% endif %}</a>
+  </div>
+</div>
+{% endblock %}

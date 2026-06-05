@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="screen" style="max-width:680px;margin:0 auto;padding:24px 16px 48px">
+
+  <h1 class="screen-title" style="font-size:1.3rem;margin-bottom:4px">
+    {% if lang=="de" %}Datenschutz &amp; DSGVO{% elif lang=="en" %}Privacy Policy &amp; GDPR{% else %}Privacyverklaring &amp; AVG{% endif %}
+  </h1>
+  <p style="font-size:.78rem;color:#888;margin-bottom:24px">
+    {% if lang=="de" %}Zuletzt aktualisiert: November 2025{% elif lang=="en" %}Last updated: November 2025{% else %}Laatst bijgewerkt: november 2025{% endif %}
+  </p>
+
+  <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e8e5de">
+    <h2 style="font-size:.95rem;font-weight:700;color:var(--text-dark);margin-bottom:6px">
+      {% if lang=="de" %}1. Wer sind wir?{% elif lang=="en" %}1. Who are we?{% else %}1. Wie zijn wij?{% endif %}
+    </h2>
+    <p style="font-size:.85rem;color:#555;line-height:1.6;margin:0">
+      {% if lang=="de" %}Lifestyle Monitors, Oosterhout, Niederlande. Verantwortlicher im Sinne der DSGVO. E-Mail: info@lifestylemonitors.com{% elif lang=="en" %}Lifestyle Monitors, Oosterhout, Netherlands. Data controller under the GDPR. Email: info@lifestylemonitors.com{% else %}Lifestyle Monitors, Oosterhout, Nederland. Verwerkingsverantwoordelijke in de zin van de AVG. E-mail: info@lifestylemonitors.com{% endif %}
+    </p>
+  </div>
+
+  <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e8e5de">
+    <h2 style="font-size:.95rem;font-weight:700;color:var(--text-dark);margin-bottom:6px">
+      {% if lang=="de" %}2. Welche Daten verarbeiten wir?{% elif lang=="en" %}2. What data do we process?{% else %}2. Welke gegevens verwerken wij?{% endif %}
+    </h2>
+    <p style="font-size:.85rem;color:#555;line-height:1.6;margin:0">
+      {% if lang=="de" %}<strong>Kontodaten:</strong> E-Mail, Name. <strong>Profildaten:</strong> Geburtsdatum, Geschlecht. <strong>Gesundheitsdaten (Art. 9 DSGVO):</strong> Herzfrequenz, HRV, Stresswerte, Entspannungsindex. <strong>Technische Daten:</strong> Browser, App-Version, Sprache.{% elif lang=="en" %}<strong>Account data:</strong> Email, name. <strong>Profile data:</strong> Date of birth, gender. <strong>Health data (GDPR Art. 9):</strong> Heart rate, HRV, stress values, relaxation index. <strong>Technical data:</strong> Browser, app version, language.{% else %}<strong>Accountgegevens:</strong> E-mail, naam. <strong>Profielgegevens:</strong> Geboortedatum, geslacht. <strong>Gezondheidsgegevens (AVG art. 9):</strong> Hartslag, HRV, stresswaardes, ontspanningsindex. <strong>Technische gegevens:</strong> Browser, app-versie, taal.{% endif %}
+    </p>
+  </div>
+
+  <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e8e5de">
+    <h2 style="font-size:.95rem;font-weight:700;color:var(--text-dark);margin-bottom:6px">
+      {% if lang=="de" %}3. Warum verarbeiten wir Ihre Daten?{% elif lang=="en" %}3. Why do we process your data?{% else %}3. Waarom verwerken wij uw gegevens?{% endif %}
+    </h2>
+    <p style="font-size:.85rem;color:#555;line-height:1.6;margin:0">
+      {% if lang=="de" %}Ausschließlich zur Bereitstellung des StressChecker-Dienstes: Messungen speichern, Ergebnisse anzeigen, Trends berechnen, und (bei Pro) Verknüpfung mit einem Fachmann. <strong>Rechtsgrundlage:</strong> Ihre ausdrückliche Einwilligung (DSGVO Art. 9 Abs. 2a) — jederzeit widerrufbar.{% elif lang=="en" %}Solely to provide the StressChecker service: storing readings, showing results, calculating trends, and (with Pro) linking with a professional. <strong>Legal basis:</strong> Your explicit consent (GDPR Art. 9(2)(a)) — withdrawable at any time.{% else %}Uitsluitend voor het leveren van de StressChecker-dienst: metingen opslaan, resultaten tonen, trends berekenen, en (bij Pro) koppeling met een professional. <strong>Grondslag:</strong> Uw uitdrukkelijke toestemming (AVG art. 9 lid 2a) — te allen tijde intrekbaar.{% endif %}
+    </p>
+  </div>
+
+  <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e8e5de">
+    <h2 style="font-size:.95rem;font-weight:700;color:var(--text-dark);margin-bottom:6px">
+      {% if lang=="de" %}4. Datenweitergabe{% elif lang=="en" %}4. Sharing with third parties{% else %}4. Delen met derden{% endif %}
+    </h2>
+    <p style="font-size:.85rem;color:#555;line-height:1.6;margin:0">
+      {% if lang=="de" %}Wir verkaufen Ihre Daten niemals. Weitergabe nur an Ihren Pro-Fachmann — ausschließlich mit Ihrer ausdrücklichen Zustimmung per Kopplungscode. Unsere Server stehen in Europa.{% elif lang=="en" %}We never sell your data. Data is only shared with your Pro professional — exclusively with your explicit consent via pairing code. Our servers are located in Europe.{% else %}Wij verkopen uw gegevens nooit. Delen alleen met uw Pro-professional — uitsluitend met uw expliciete toestemming via koppelingscode. Onze servers staan in Europa.{% endif %}
+    </p>
+  </div>
+
+  <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e8e5de">
+    <h2 style="font-size:.95rem;font-weight:700;color:var(--text-dark);margin-bottom:6px">
+      {% if lang=="de" %}5. Sicherheit{% elif lang=="en" %}5. Security{% else %}5. Beveiliging{% endif %}
+    </h2>
+    <p style="font-size:.85rem;color:#555;line-height:1.6;margin:0">
+      {% if lang=="de" %}TLS/SSL-Verschlüsselung bei Übertragung und Speicherung. Passwörter werden gehasht. Zugang zu personenbezogenen Daten ist auf autorisiertes Personal beschränkt.{% elif lang=="en" %}TLS/SSL encryption during transmission and storage. Passwords are hashed. Access to personal data is restricted to authorised personnel.{% else %}TLS/SSL-versleuteling bij overdracht en opslag. Wachtwoorden worden gehasht. Toegang tot persoonsgegevens is beperkt tot bevoegd personeel.{% endif %}
+    </p>
+  </div>
+
+  <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e8e5de">
+    <h2 style="font-size:.95rem;font-weight:700;color:var(--text-dark);margin-bottom:6px">
+      {% if lang=="de" %}6. Aufbewahrungsfristen{% elif lang=="en" %}6. Retention periods{% else %}6. Bewaartermijnen{% endif %}
+    </h2>
+    <p style="font-size:.85rem;color:#555;line-height:1.6;margin:0">
+      {% if lang=="de" %}Kontodaten: solange Ihr Konto aktiv ist. Gesundheitsdaten: bis zur Löschung oder Kontoaufhebung. Konto und alle Daten jederzeit löschbar unter Einstellungen.{% elif lang=="en" %}Account data: as long as your account is active. Health data: until deletion or account closure. Account and all data deletable at any time via Settings.{% else %}Accountgegevens: zolang uw account actief is. Gezondheidsdata: tot verwijdering of accountopheffing. Account en alle data verwijderbaar via Instellingen.{% endif %}
+    </p>
+  </div>
+
+  <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e8e5de">
+    <h2 style="font-size:.95rem;font-weight:700;color:var(--text-dark);margin-bottom:6px">
+      {% if lang=="de" %}7. Ihre Rechte (DSGVO){% elif lang=="en" %}7. Your rights (GDPR){% else %}7. Uw rechten (AVG){% endif %}
+    </h2>
+    <p style="font-size:.85rem;color:#555;line-height:1.6;margin:0">
+      {% if lang=="de" %}Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit, Widerspruch. Kontakt: info@lifestylemonitors.com. Beschwerde beim Bundesbeauftragten für den Datenschutz möglich.{% elif lang=="en" %}Access, rectification, erasure, restriction, portability, objection. Contact: info@lifestylemonitors.com. You may also lodge a complaint with your national data protection authority.{% else %}Inzage, rectificatie, verwijdering, beperking, overdraagbaarheid, bezwaar. Contact: info@lifestylemonitors.com. Klacht indienen bij de Autoriteit Persoonsgegevens (autoriteitpersoonsgegevens.nl).{% endif %}
+    </p>
+  </div>
+
+  <div style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #e8e5de">
+    <h2 style="font-size:.95rem;font-weight:700;color:var(--text-dark);margin-bottom:6px">
+      {% if lang=="de" %}8. Medizinischer Haftungsausschluss{% elif lang=="en" %}8. Medical disclaimer{% else %}8. Medische disclaimer{% endif %}
+    </h2>
+    <p style="font-size:.85rem;color:#555;line-height:1.6;margin:0">
+      {% if lang=="de" %}Der StressChecker ist kein Medizinprodukt. Nicht für Diagnose oder Behandlung bestimmt. Bei Herzinsuffizienz, Arrhythmien, Herzschrittmacher oder Herzmedikation können Ergebnisse unzuverlässig sein. Stets einen Arzt konsultieren.{% elif lang=="en" %}The StressChecker is not a medical device. Not intended for diagnosis or treatment. Results may be unreliable with heart failure, arrhythmias, a pacemaker or heart medication. Always consult a doctor.{% else %}De StressChecker is geen medisch hulpmiddel. Niet bedoeld voor diagnose of behandeling. Bij hartfalen, ritmestoornissen, pacemaker of hartmedicatie kunnen resultaten onbetrouwbaar zijn. Raadpleeg altijd een arts.{% endif %}
+    </p>
+  </div>
+
+  <div style="background:#f0f8f6;border-radius:10px;padding:14px;font-size:.82rem;color:#555">
+    <strong>Lifestyle Monitors</strong> &mdash; Vlierlaan 238, 4907 AX Oosterhout, Nederland<br>
+    <a href="mailto:info@lifestylemonitors.com" style="color:var(--primary)">info@lifestylemonitors.com</a><br><br>
+    {% if lang=="de" %}
+      <a href="https://lifestylemonitors.de/datenschutz-dsvgo/" target="_blank" style="color:var(--primary)">&#8594; Vollst&auml;ndige Datenschutzerkl&auml;rung</a> &nbsp;&middot;&nbsp;
+      <a href="https://lifestylemonitors.de/softwarenutzung/" target="_blank" style="color:var(--primary)">Softwarenutzungsbedingungen</a>
+    {% elif lang=="en" %}
+      <a href="https://lifestylemonitors.com/privacy-policy/?lang=en" target="_blank" style="color:var(--primary)">&#8594; Full privacy policy</a> &nbsp;&middot;&nbsp;
+      <a href="https://lifestylemonitors.com/software-usage/?lang=en" target="_blank" style="color:var(--primary)">Software usage terms</a>
+    {% else %}
+      <a href="https://lifestylemonitors.com/privacybeleid/" target="_blank" style="color:var(--primary)">&#8594; Volledige privacyverklaring</a> &nbsp;&middot;&nbsp;
+      <a href="https://lifestylemonitors.com/softwaregebruik/" target="_blank" style="color:var(--primary)">Softwaregebruiksvoorwaarden</a>
+    {% endif %}
+  </div>
+
+  <div style="text-align:center;margin-top:24px">
+    <a href="javascript:history.back()" style="color:var(--primary);font-size:.85rem">
+      &larr; {% if lang=="de" %}Zur&uuml;ck{% elif lang=="en" %}Back{% else %}Terug{% endif %}
+    </a>
+  </div>
+
+</div>
+{% endblock %}

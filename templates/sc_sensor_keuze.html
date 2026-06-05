@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="ans-uitleg" style="max-width:480px;margin:60px auto 2rem;padding:0 20px;font-size:.95rem;color:#555;line-height:1.6;text-align:left;">
+  {% if lang=='de' %}
+    <h3 style="font-size:1.1rem;color:var(--text);margin:0 0 .8rem;">Warum Ihr Herzschlag?</h3>
+    <p>Ihr Körper hat einen stillen Motor, der immer läuft — das autonome Nervensystem. Es regelt unter anderem Ihren Herzschlag, Ihre Atmung, Ihre Erholung. Ohne dass Sie etwas dafür tun müssen.</p>
+    <p>Das Besondere: Es reagiert auf alles, was Sie erleben, wie Anspannung, Ruhe, Anstrengung, Emotion — aber es lügt nie. Es zeigt, was wirklich ist, nicht was Sie zu fühlen glaubst.</p>
+    <p>Indem wir Ihren Herzschlag 90 Sekunden lang messen, können wir diesen stillen Motor ablesen. Das ist alles, was nötig ist.</p>
+  {% elif lang=='en' %}
+    <h3 style="font-size:1.1rem;color:var(--text);margin:0 0 .8rem;">Why your heartbeat?</h3>
+    <p>Your body has a silent motor that is always running — the autonomic nervous system. It regulates, among other things, your heartbeat, your breathing, your recovery. Without you having to do anything for it.</p>
+    <p>What makes it special: it responds to everything you experience, such as tension, rest, exertion, emotion — but it never lies. It tells what is really there, not what you think you feel.</p>
+    <p>By measuring your heartbeat for 90 seconds, we can read that silent motor. That is all that is needed.</p>
+  {% else %}
+    <h3 style="font-size:1.1rem;color:var(--text);margin:0 0 .8rem;">Waarom je hartslag?</h3>
+    <p>Je lichaam heeft een stille motor die altijd aan staat — het autonoom zenuwstelsel. Het regelt onder meer je hartslag, je ademhaling, je herstel. Zonder dat je er iets voor hoeft te doen.</p>
+    <p>Wat het bijzondere maakt: het reageert op alles wat je meemaakt, zoals spanning, rust, inspanning, emotie — maar het liegt nooit. Het vertelt wat er werkelijk is, niet wat je denkt dat er is.</p>
+    <p>Door je hartslag 90 seconden te meten, kunnen we die stille motor aflezen. Dat is alles wat nodig is.</p>
+  {% endif %}
+</div>
+<div style="max-width:480px;margin:0 auto;padding:20px;text-align:center;">
+  <h2 style="color:#E8344E;margin-bottom:32px;">{% if lang=='de' %}Sensor wählen{% else %}Sensor kiezen{% endif %}</h2>
+  <div style="display:flex;gap:16px;justify-content:center;margin-bottom:32px;">
+    <div onclick="window.location.href='/sensor-en-meten?skip_subj=1&open_sensor=1&sensor=usb'" style="flex:1;max-width:180px;background:#E8344E;border-radius:16px;padding:40px 20px;cursor:pointer;color:white;">
+      <svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="white" stroke-width="1.8"><polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/></svg>
+      <div style="font-size:20px;font-weight:700;margin-top:12px;">Bluetooth</div>
+      <div style="font-size:13px;opacity:0.85;margin-top:4px;">{% if lang=='de' %}Drahtlos{% else %}Draadloos{% endif %}</div>
+    </div>
+    <div onclick="window.location.href='/sensor-en-meten?skip_subj=1&open_sensor=1&sensor=bluetooth'" style="flex:1;max-width:180px;background:#E8344E;border-radius:16px;padding:40px 20px;cursor:pointer;color:white;">
+      <svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="white" stroke-width="1.8"><path d="M12 2v11m0 0l-3-3m3 3l3-3M5 19a2 2 0 1 0 4 0 2 2 0 0 0-4 0zm10 0a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM7 19V9h10v10"/></svg>
+      <div style="font-size:20px;font-weight:700;margin-top:12px;">USB</div>
+      <div style="font-size:13px;opacity:0.85;margin-top:4px;">{% if lang=='de' %}Kabelgebunden{% else %}Bekabeld{% endif %}</div>
+    </div>
+  </div>
+  <a href="/pro" style="color:#888;font-size:13px;">&#8592; {% if lang=='de' %}Zurück{% else %}Terug{% endif %}</a>
+</div>
+
+<div style="margin:1.2rem auto;max-width:400px;background:#EFF6FF;border-left:4px solid #E8344E;border-radius:8px;padding:.9rem 1.1rem;font-size:.82rem;color:#1E3A5F;line-height:1.6;">
+  <strong>📱 {% if lang=="de" %}Bluetooth & Browser-Kompatibilität{% elif lang=="en" %}Bluetooth & Browser Compatibility{% else %}Bluetooth & browser compatibiliteit{% endif %}</strong><br>
+  {% if lang=="de" %}
+  Nicht alle Browser unterstützen Bluetooth. Windows und Android: Chrome oder Edge verwenden. Mac: Chrome oder Edge. <strong>iPhone/iPad:</strong> Safari unterstützt kein Bluetooth — bitte <a href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055" target="_blank" style="color:#2563EB;">Bluefy</a> (kostenlos) installieren.
+  {% elif lang=="en" %}
+  Not all browsers support Bluetooth. Windows and Android: use Chrome or Edge. Mac: Chrome or Edge. <strong>iPhone/iPad:</strong> Safari does not support Bluetooth — please install <a href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055" target="_blank" style="color:#2563EB;">Bluefy</a> (free).
+  {% else %}
+  Niet alle browsers ondersteunen Bluetooth. Windows en Android: gebruik Chrome of Edge. Mac: Chrome of Edge. <strong>iPhone/iPad:</strong> Safari ondersteunt geen Bluetooth — installeer <a href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055" target="_blank" style="color:#2563EB;">Bluefy</a> (gratis) via de App Store.
+  {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,1262 @@
+{% extends 'base.html' %}
+{% from 'macros.html' import youtube_embed %}
+{% block title %}{% if lang=="de" %}Wissenszentrum{% elif lang=="en" %}Knowledge Centre{% else %}Kenniscentrum{% endif %}{% endblock %}
+
+{% block content %}
+<style>
+.kc-wrap{max-width:560px;margin:0 auto;padding:1rem}
+.kc-header{text-align:center;margin-bottom:1.5rem}
+.kc-header h1{font-size:1.35rem;font-weight:700;color:#333;margin-bottom:.3rem}
+.kc-header p{font-size:.85rem;color:#6B5360;line-height:1.5}
+
+/* Nav tabs */
+.kc-nav{display:flex;gap:.4rem;margin-bottom:1.2rem;flex-wrap:wrap;justify-content:center}
+.kc-nav-btn{padding:.4rem .85rem;border-radius:20px;border:none;background:#f0ebe4;color:#6B5360;font-size:.78rem;cursor:pointer;font-weight:600;transition:background .2s}
+.kc-nav-btn.active{background:#E8344E;color:#fff}
+
+/* Sections */
+.kc-section{display:none}
+.kc-section.active{display:block}
+
+/* Cards */
+.kc-card{background:#fff;border-radius:12px;padding:1.1rem 1.2rem;margin-bottom:.8rem;box-shadow:0 1px 6px rgba(75,54,41,.07)}
+.kc-card h3{font-size:.95rem;font-weight:700;color:#333;margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem}
+.kc-card h3 .kc-icon{font-size:1.1rem}
+.kc-card p,.kc-card li{font-size:.83rem;color:#555;line-height:1.65;margin-bottom:.4rem}
+.kc-card ul{padding-left:1.1rem;margin-bottom:.4rem}
+.kc-card ul li{margin-bottom:.2rem}
+.kc-card .kc-tag{display:inline-block;background:#f0ebe4;color:#6B5360;font-size:.72rem;font-weight:600;padding:.2rem .55rem;border-radius:10px;margin-bottom:.5rem}
+
+/* RI schaal */
+.kc-ri-table{width:100%;border-collapse:collapse;font-size:.8rem;margin-top:.5rem}
+.kc-ri-table th{background:#f0ebe4;color:#6B5360;padding:.35rem .5rem;font-weight:600;text-align:left}
+.kc-ri-table td{padding:.3rem .5rem;border-bottom:1px solid #f0ebe4;vertical-align:middle}
+.kc-ri-table td:first-child,.kc-ri-table th:first-child{white-space:nowrap;width:55px;min-width:55px}
+.kc-ri-table tr:last-child td{border-bottom:none}
+.ri-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.35rem;vertical-align:middle}
+
+/* FAQ accordion */
+.kc-faq-item{border-bottom:1px solid #f0ebe4}
+.kc-faq-item:last-child{border-bottom:none}
+.kc-faq-q{width:100%;text-align:left;background:none;border:none;padding:.65rem .35rem;font-size:.85rem;font-weight:600;color:#333;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-radius:4px;transition:background .15s}
+.kc-faq-q:hover{background:#faf6f1}
+.kc-faq-q:after{content:"+";font-size:1.55rem;font-weight:700;color:#E8344E;min-width:1.2rem;text-align:right;line-height:1}
+.kc-faq-q.open:after{content:"−"}
+.kc-faq-a{display:none;font-size:.82rem;color:#555;line-height:1.65;padding-bottom:.65rem}
+.kc-faq-a.open{display:block}
+
+/* Factor grid */
+.kc-factor-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.5rem}
+.kc-factor{background:#f9f6f2;border-radius:8px;padding:.55rem .7rem;font-size:.8rem;color:#555}
+.kc-factor strong{display:block;color:#333;font-size:.82rem;margin-bottom:.1rem}
+
+/* Sensor cards */
+.kc-sensor{background:#f9f6f2;border-radius:8px;padding:.65rem .8rem;margin-bottom:.5rem}
+.kc-sensor h4{font-size:.85rem;font-weight:700;color:#333;margin-bottom:.2rem}
+.kc-sensor p{font-size:.8rem;color:#555;margin:0}
+.kc-badge{display:inline-block;padding:.15rem .45rem;border-radius:8px;font-size:.7rem;font-weight:700;margin-left:.4rem;vertical-align:middle}
+.badge-good{background:#d4edda;color:#155724}
+.badge-ok{background:#fff3cd;color:#856404}
+.badge-pro{background:#cce5ff;color:#004085}
+
+/* Tips do/don't */
+.kc-tip-row{display:flex;gap:.3rem;align-items:flex-start;padding:.3rem 0;border-bottom:1px solid #f0ebe4;font-size:.82rem;color:#555}
+.kc-tip-row:last-child{border-bottom:none}
+.kc-tip-row .kc-tip-icon{min-width:1.2rem;font-size:.9rem}
+
+/* Begrippen */
+.kc-begrip{padding:.55rem 0;border-bottom:1px solid #f0ebe4}
+.kc-begrip:last-child{border-bottom:none}
+.kc-begrip dt{font-size:.85rem;font-weight:700;color:#333;margin-bottom:.15rem}
+.kc-begrip dd{font-size:.81rem;color:#555;line-height:1.6;margin:0}
+
+/* Video placeholder */
+.kc-video-placeholder{background:#f0ebe4;border-radius:10px;padding:1.5rem;text-align:center;color:#6B5360;font-size:.82rem;margin-top:.6rem}
+.kc-video-placeholder span{display:block;font-size:1.8rem;margin-bottom:.3rem}
+
+.kc-landing-video{margin:0 0 1rem;}
+.video-wrapper{position:relative;width:100%;max-width:560px;aspect-ratio:16/9;margin:0 auto;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.1);}
+.video-wrapper iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+
+</style>
+
+<div class="kc-wrap">
+  <div class="kc-header">
+    <h1>{% if lang=="de" %}Wissenszentrum{% elif lang=="en" %}Knowledge Centre{% else %}Kenniscentrum{% endif %}</h1>
+    <p>{% if lang=="de" %}Entwickelt für Menschen, die selbst entdecken wollen, was zu ihnen passt{% elif lang=="en" %}Developed for people who want to discover for themselves what works for them{% else %}Ontwikkeld voor mensen die zelf willen ontdekken wat bij hen past{% endif %}{% if lang=="de" %}. Der StressChecker zeigt objektiv, was funktioniert und was nicht.{% elif lang=="en" %}. The StressChecker objectively shows what works and what doesn't.{% else %}. De StressChecker laat objectief zien wat werkt en wat niet.{% endif %}</p>
+  </div>
+
+  {% set kc_video = {'nl': 'kb4tmHnEL2I', 'en': 'KwF4c_Xy6sg', 'de': '_idcAaruv1M'} %}
+
+  <div class="kc-landing-video">
+    {{ youtube_embed(kc_video.get(lang, kc_video['nl']), 'Kenniscentrum') }}
+  </div>
+
+  {# TODO Kenniscentrum-Pro: zelfde YouTube-embed + chip-rij toevoegen aan kenniscentrum_pro.html in aparte sprint. Voor sprint 2026-05-13 alleen consument-Kenniscentrum in scope. #}
+
+  <div class="kc-nav">
+    <button class="kc-nav-btn active" data-kc="lichaam" onclick="showKC('lichaam')">{% if lang=="de" %}Ihr Körper{% elif lang=="en" %}Your Body{% else %}Je lichaam{% endif %}</button>
+    <button class="kc-nav-btn" data-kc="meten" onclick="showKC('meten')">{% if lang=="de" %}Messen{% elif lang=="en" %}Measuring{% else %}Meten{% endif %}</button>
+    <button class="kc-nav-btn" data-kc="resultaat" onclick="showKC('resultaat')">{% if lang=="de" %}Ihr Ergebnis{% elif lang=="en" %}Your result{% else %}Je resultaat{% endif %}</button>
+        <button class="kc-nav-btn" data-kc="gevoel" onclick="showKC('gevoel')">{% if lang=="de" %}Ihr Gefühl{% elif lang=="en" %}Your Feeling{% else %}Je gevoel{% endif %}</button>
+    <button class="kc-nav-btn" data-kc="herstel" onclick="showKC('herstel')">{% if lang=="de" %}Besser erholen{% elif lang=="en" %}Better recovery{% else %}Beter herstellen{% endif %}</button>
+    <button class="kc-nav-btn" data-kc="sport" onclick="showKC('sport')">Sport</button>
+    <button class="kc-nav-btn" data-kc="faq" onclick="showKC('faq')">FAQ</button>
+    <button class="kc-nav-btn" data-kc="begrippen" onclick="showKC('begrippen')">{% if lang=="de" %}Begriffe{% elif lang=="en" %}Glossary{% else %}Begrippenlijst{% endif %}</button>
+  </div>
+
+  <!-- ===== JE LICHAAM ===== -->
+  <div class="kc-section active" id="kc-lichaam">
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">🧠</span> {% if lang=="de" %}Was ist Stress wirklich?{% elif lang=="en" %}What is stress, really?{% else %}Wat is stress eigenlijk?{% endif %}</h3>
+      {% if lang=="de" %}
+      <p>Stress ist keine Emotion — es ist eine körperliche Reaktion. Wenn Ihr Körper eine Belastung wahrnimmt, schaltet er in den Aktivierungsmodus: das Herz schlägt schneller, die Muskeln spannen sich an, die Verdauung verlangsamt sich. Das ist nützlich — in kleinen Dosen. Das Problem entsteht, wenn die Erholung ausbleibt.</p>
+      <p>Der StressChecker misst nicht, wie gestresst Sie sich <em>fühlen</em>, sondern wie gut Ihr Körper sich <em>erholt</em>. Das ist ein wichtiger Unterschied: Sie können sich ruhig fühlen, während Ihr Körper noch auf Hochtouren läuft — und umgekehrt.</p>
+      {% elif lang=="en" %}
+      <p>Stress is not an emotion — it's a physical response. When your body senses a load, it switches to activation mode: the heart beats faster, muscles tense, digestion slows down. This is useful — in small doses. The problem arises when recovery doesn't follow.</p>
+      <p>The StressChecker doesn't measure how stressed you <em>feel</em>, but how well your body is <em>recovering</em>. That's an important distinction: you can feel calm while your body is still running at full speed — and vice versa.</p>
+      {% else %}
+      <p>Stress is geen emotie — het is een lichamelijke reactie. Wanneer je lichaam een belasting waarneemt, schakelt het naar activatiemodus: het hart klopt sneller, spieren spannen aan, de spijsvertering vertraagt. Dat is nuttig — in kleine doses. Het probleem ontstaat wanneer herstel uitblijft.</p>
+      <p>De StressChecker meet niet hoe gestrest je je <em>voelt</em>, maar hoe goed je lichaam zich <em>herstelt</em>. Dat is een belangrijk verschil: je kunt je rustig voelen terwijl je lichaam nog op volle toeren draait — en andersom.</p>
+      {% endif %}
+    </div>
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">⚖️</span> {% if lang=="de" %}Das autonome Nervensystem{% elif lang=="en" %}The autonomic nervous system{% else %}Het autonome zenuwstelsel{% endif %}</h3>
+      {% if lang=="de" %}
+      <p>Das autonome Nervensystem (ANS) regelt alle Körperfunktionen, die Sie nicht bewusst steuern können: Herzschlag, Atmung, Verdauung, Schlaf. Es hat zwei Hauptzweige:</p>
+      <ul>
+        <li><strong>Sympathisch</strong> — das Gaspedal. Aktiviert bei Belastung, Aufregung, Gefahr. Erhöht Herzfrequenz und Muskelspannung.</li>
+        <li><strong>Parasympathisch</strong> — die Bremse. Aktiviert bei Ruhe und Erholung. Senkt Herzfrequenz, fördert Verdauung und Schlaf.</li>
+      </ul>
+      <p>Ein gesunder Mensch wechselt flexibel zwischen beiden Zuständen. Die <strong>Herzratenvariabilität (HRV)</strong> ist das Maß dieser Flexibilität — und das messen wir.</p>
+      {% elif lang=="en" %}
+      <p>The autonomic nervous system (ANS) regulates all body functions you can't consciously control: heartbeat, breathing, digestion, sleep. It has two main branches:</p>
+      <ul>
+        <li><strong>Sympathetic</strong> — the accelerator. Activates under load, excitement, danger. Increases heart rate and muscle tension.</li>
+        <li><strong>Parasympathetic</strong> — the brake. Activates during rest and recovery. Lowers heart rate, supports digestion and sleep.</li>
+      </ul>
+      <p>A healthy person switches flexibly between both states. <strong>Heart Rate Variability (HRV)</strong> measures this flexibility — and that is what we measure.</p>
+      {% else %}
+      <p>Het autonome zenuwstelsel (ANS) regelt alle lichaamsfuncties die je niet bewust aanstuurt: hartslag, ademhaling, spijsvertering, slaap. Het heeft twee hoofdtakken:</p>
+      <ul>
+        <li><strong>Sympathisch</strong> — het gaspedaal. Activeert bij belasting, opwinding, gevaar. Verhoogt hartslag en spierspanning.</li>
+        <li><strong>Parasympathisch</strong> — de rem. Activeert bij rust en herstel. Verlaagt hartslag, bevordert spijsvertering en slaap.</li>
+      </ul>
+      <p>Een gezond persoon schakelt soepel tussen beide toestanden. De <strong>hartritmevariabiliteit (HRV)</strong> is de maat voor deze soepelheid — en dat meten wij.</p>
+      {% endif %}
+    </div>
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">🔄</span> {% if lang=="de" %}Vier Bereiche{% elif lang=="en" %}Four areas{% else %}Vier gebieden{% endif %}</h3>
+      {% if lang=="de" %}
+      <p>Stress ist nicht nur "zu viel Arbeit". Belastung kann aus vier Bereichen kommen — und echte Erholung auch:</p>
+      <div class="kc-factor-grid">
+        <div class="kc-factor"><strong>Körperlich</strong>Sport, Krankheit, Schlafmangel, Ernährung</div>
+        <div class="kc-factor"><strong>Mental</strong>Konzentration, Entscheidungen, Informationsflut</div>
+        <div class="kc-factor"><strong>Emotional</strong>Beziehungen, Verluste, Freude, Sorgen</div>
+        <div class="kc-factor"><strong>Spirituell</strong>Sinn, Werte, innere Ruhe, Identität</div>
+      </div>
+      <p style="margin-top:.6rem">Der StressChecker zeigt das Gesamtbild — Ihr ANS reagiert auf alle vier Dimensionen gleichzeitig.</p>
+      {% elif lang=="en" %}
+      <p>Stress isn't just "too much work". Load can come from four areas — and real recovery too:</p>
+      <div class="kc-factor-grid">
+        <div class="kc-factor"><strong>Physical</strong>Sport, illness, sleep deprivation, nutrition</div>
+        <div class="kc-factor"><strong>Mental</strong>Focus, decisions, information overload</div>
+        <div class="kc-factor"><strong>Emotional</strong>Relationships, loss, joy, worry</div>
+        <div class="kc-factor"><strong>Spiritual</strong>Meaning, values, inner peace, identity</div>
+      </div>
+      <p style="margin-top:.6rem">The StressChecker shows the full picture — your ANS responds to all four dimensions simultaneously.</p>
+      {% else %}
+      <p>Stress is niet alleen "te veel werk". Belasting kan uit vier gebieden komen — en echt herstel ook:</p>
+      <div class="kc-factor-grid">
+        <div class="kc-factor"><strong>Lichamelijk</strong>Sport, ziekte, slaaptekort, voeding, etc.</div>
+        <div class="kc-factor"><strong>Mentaal</strong>Concentratie, beslissingen, informatiestress, etc.</div>
+        <div class="kc-factor"><strong>Emotioneel</strong>Relaties, verlies, vreugde, zorgen, etc.</div>
+        <div class="kc-factor"><strong>Spiritueel</strong>Zingeving, waarden, innerlijke rust, identiteit, etc.</div>
+      </div>
+      <p style="margin-top:.6rem">De StressChecker toont het totaalbeeld — je ANS reageert op alle vier dimensies tegelijk.</p>
+      {% endif %}
+    </div>
+
+    {% if lang=="de" %}
+    <div class="kc-card">
+      <h3><span class="kc-icon">🧭</span> Vom Messen zum Navigieren</h3>
+      <p>Der StressChecker gibt Ihnen ein objektives Bild Ihres ANS. Aber eine Zahl allein verändert nichts. Entscheidend ist, was Sie mit dieser Information machen.</p>
+      <p>Nachhaltige Veränderung scheitert meist nicht an mangelnder Motivation — sie scheitert, weil Verhalten angegangen wird, ohne zu schauen, wer jemand ist. Wer sich selbst als "unsportlich" sieht, erlebt jeden Bewegungsversuch als Kampf. Willenskraft hilft kurz, hält aber nicht durch.</p>
+      <p>Deshalb beginnen wir nicht beim Verhalten, sondern bei der Selbstkenntnis. Drei Fragen stehen im Mittelpunkt:</p>
+      <ul>
+        <li><strong>Was brauche ich?</strong> — körperlich, mental, emotional, spirituell</li>
+        <li><strong>Was kann ich verändern?</strong> — realistisch, konkret, Schritt für Schritt</li>
+        <li><strong>Wie geht es mir wirklich?</strong> — nicht wie ich denke dass es mir geht, sondern was mein Körper zeigt</li>
+      </ul>
+      <p>Der Innere Kompass hat vier Richtungen: Ihr <strong>Körper</strong> sendet Signale, Ihre <strong>Emotionen</strong> weisen die Richtung, Ihre <strong>Gedanken</strong> erzählen eine Geschichte, und manchmal gibt es <strong>Intuition</strong> — ein Wissen jenseits der Logik. Die meisten Menschen hören nur auf ihre Gedanken. Der StressChecker hilft Ihnen, auch die anderen Richtungen zu lesen.</p>
+      <p>Die App ist ein Gerüst, kein dauerhaftes Gebäude. Das Ziel ist nicht, dass Sie sie für immer nutzen — das Ziel ist, dass Sie lernen, selbst zu navigieren. <em>Resilient bei Rückschlägen, flexibel bei Veränderungen, unabhängig von externen Ratgebern.</em></p>
+    </div>
+</div>
+    {% elif lang=="en" %}
+    <div class="kc-card">
+      <h3><span class="kc-icon">🧭</span> From measuring to navigating</h3>
+      <p>The StressChecker gives you an objective picture of your ANS. But a number alone changes nothing. What matters is what you do with that information.</p>
+      <p>Lasting change usually fails not from lack of motivation — it fails because behaviour is addressed without looking at who someone is. Someone who sees themselves as "not sporty" experiences every attempt at exercise as a battle. Willpower helps briefly, but doesn't last.</p>
+      <p>That's why we don't start with behaviour, but with self-knowledge. Three questions are central:</p>
+      <ul>
+        <li><strong>What do I need?</strong> — physically, mentally, emotionally, spiritually</li>
+        <li><strong>What can I change?</strong> — realistically, concretely, step by step</li>
+        <li><strong>How am I really doing?</strong> — not how I think I'm doing, but what my body shows</li>
+      </ul>
+      <p>The Inner Compass has four directions: your <strong>body</strong> sends signals, your <strong>emotions</strong> point the way, your <strong>thoughts</strong> form a story, and sometimes there is <strong>intuition</strong> — a knowing beyond logic. Most people only listen to their thoughts. The StressChecker helps you learn to read the other directions too.</p>
+      <p>The app is a scaffold, not a permanent structure. The goal isn't that you keep using it forever — the goal is that you learn to navigate yourself. <em>Resilient in setbacks, flexible in change, independent of external advice.</em></p>
+    </div>
+</div>
+    {% else %}
+        <div class="kc-card">
+            <h3><span class="kc-icon">🧭</span> Van meten naar bewust handelen</h3>
+            <p style="font-size:.8rem;color:#555;">De StressChecker is een hulpmiddel waarmee je jouw stressgevoeligheid en je vermogen om te herstellen van inspanning en druk inzichtelijk maakt. Het laat je objectief zien hoe het met het functioneren van je autonome zenuwstelsel staat en wat bij jou werkt — en niet werkt — om dat te verbeteren.</p>
+          </div>
+    <div class="kc-card">
+      {% if lang=="de" %}
+      <h3>Was HRV mit Ihrem Nervensystem macht</h3>
+      <p>Ihr Herz schlägt nicht wie ein Metronom — und das ist gut so. Die kleinen Zeitunterschiede zwischen den Herzschlägen heißen <strong>Herzratenvariabilität (HRV)</strong>. Je größer diese Variation, desto aktiver ist Ihr parasympathisches Nervensystem — der natürliche Erholungsschalter Ihres Körpers.</p>
+      <p>Der Schlüssel dazu ist der <strong>Nervus vagus</strong> — ein langer Nerv vom Gehirn bis zu den Organen. Wenn er aktiv ist, verlangsamt sich Ihr Herz beim Ausatmen, sinkt Ihr Blutdruck und beruhigt sich Ihr Geist.</p>
+      <p><strong>Was eine bessere HRV bedeutet:</strong></p>
+      <ul>
+        <li>Sie erholen sich schneller nach Stress oder Belastung</li>
+        <li>Ihre Emotionen sind leichter zu regulieren</li>
+        <li>Ihr Körper wechselt besser zwischen Anspannung und Entspannung</li>
+        <li>Ihr Immunsystem funktioniert effizienter</li>
+      </ul>
+      <p>Der StressChecker misst Ihre HRV in 90 Sekunden und zeigt, wie aktiv Ihr parasympathisches System gerade ist.</p>
+      {% elif lang=="en" %}
+      <h3>What HRV does to your nervous system</h3>
+      <p>Your heart does not beat like a metronome — and that is a good thing. The small time differences between heartbeats are called <strong>Heart Rate Variability (HRV)</strong>. The greater this variation, the more active your parasympathetic nervous system — your body's natural recovery switch.</p>
+      <p>The key is the <strong>vagus nerve</strong> — running from your brainstem to your organs. When active, your heart slows on exhale, your blood pressure drops, and your mind calms.</p>
+      <p><strong>What better HRV means in practice:</strong></p>
+      <ul>
+        <li>You recover faster after stress or effort</li>
+        <li>Your emotions are easier to regulate</li>
+        <li>Your body switches more smoothly between tension and relaxation</li>
+        <li>Your immune system functions more efficiently</li>
+      </ul>
+      <p>StressChecker measures your HRV in 90 seconds and shows how active your parasympathetic system is right now.</p>
+      {% else %}
+      <h3>Wat HRV doet met je zenuwstelsel</h3>
+      <p>Je hart klopt niet als een metronoom — en dat is maar goed ook. De kleine tijdsverschillen tussen opeenvolgende hartslagen noemen we <strong>hartritmevariabiliteit (HRV)</strong>. Hoe groter deze variatie, hoe actiever je parasympathisch zenuwstelsel — de natuurlijke herstelschakelaar van je lichaam.</p>
+      <p>De sleutel is de <strong>nervus vagus</strong> — een lange zenuw van de hersenstam naar je organen. Als hij actief is, vertraagt je hart bij uitademing, daalt je bloeddruk en komt je geest tot rust.</p>
+      <p><strong>Wat een betere HRV in de praktijk betekent:</strong></p>
+      <ul>
+        <li>Je herstelt sneller na stress of inspanning</li>
+        <li>Je emoties zijn makkelijker te reguleren</li>
+        <li>Je lichaam schakelt soepeler tussen spanning en ontspanning</li>
+        <li>Je immuunsysteem functioneert efficiënter</li>
+      </ul>
+      <p>De StressChecker meet je HRV in 90 seconden en laat zien hoe actief je parasympathische systeem op dit moment is.</p>
+      {% endif %}
+    </div>
+    <div class="kc-card">
+      {% if lang=="de" %}
+      <h3>Atmung und HRV: langsamer ist besser</h3>
+      <p>Die Atemfrequenz hat einen direkten Einfluss auf die HRV. Forschungen zeigen, dass eine niedrigere Atemfrequenz — etwa 6 bis 10 Atemzüge pro Minute — durchgehend höhere HRV-Werte erzeugt als 15 Atemzüge pro Minute.</p>
+      <p>Wichtig: Es geht dabei <strong>nicht</strong> um tiefes Atmen, sondern um ruhiges, reduziertes Atmen. Tiefes Atmen verbraucht zu viel CO₂, was die Sauerstoffabgabe ans Gewebe verschlechtert (Bohr-Effekt). Die optimale Atmung ist ruhig, durch die Nase und mit niedrigerer Frequenz.</p>
+      <p>Die 90-sekündige Basismessung des StressCheckers ist selbst bereits eine Mini-Intervention: Wer ruhig sitzen und bewusst atmet, senkt automatisch seine Atemfrequenz — und verbessert damit die HRV.</p>
+      {% elif lang=="en" %}
+      <h3>Breathing and HRV: slower is better</h3>
+      <p>Breathing frequency has a direct effect on HRV. Research shows that a lower breathing rate — around 6 to 10 breaths per minute — consistently produces higher HRV values than 15 breaths per minute.</p>
+      <p>Importantly, this is <strong>not</strong> about breathing deeply, but about breathing quietly and with reduced volume. Deep breathing depletes CO₂, which impairs oxygen delivery to tissues (the Bohr effect). Optimal breathing is gentle, nasal and at a lower frequency.</p>
+      <p>The StressChecker's 90-second measurement is itself a mini-intervention: sitting quietly and breathing consciously automatically lowers your breathing rate — and improves HRV.</p>
+      {% else %}
+      <h3>Ademhaling en HRV: langzamer is beter</h3>
+      <p>De ademfrequentie heeft een directe invloed op de HRV. Onderzoek toont aan dat een lagere ademfrequentie — ongeveer 6 tot 10 ademhalingen per minuut — consistent hogere HRV-waarden oplevert dan 15 per minuut.</p>
+      <p>Belangrijk: het gaat daarbij <strong>niet</strong> om diep ademen, maar om rustig en gereduceerd ademen. Diep ademen verlaagt het CO₂-gehalte in het bloed, wat de zuurstofafgifte aan de weefsels verslechtert (Bohr-effect). De optimale ademhaling is rustig, door de neus en met een lagere frequentie.</p>
+      <p>De 90-seconden basismeting van de StressChecker is op zichzelf al een mini-interventie: rustig zitten en bewust ademen verlaagt automatisch de ademfrequentie — en verbetert daarmee de HRV. Een lagere ademfrequentie vermindert ook de sympathische activiteit — niet door hem uit te schakelen, maar door het evenwicht te herstellen. De HRV stijgt juist omdat beide systemen soepeler samenwerken.</p>
+      {% endif %}
+    </div>
+    <div class="kc-card">
+      {% if lang=="de" %}
+      <h3>Warum wir zu viel atmen — und wie man das ändert</h3>
+      <p>Das Atemzentrum im Gehirn steuert unsere Atmung bis zu 20.000-mal täglich — auch im Schlaf. Es reagiert nicht auf Sauerstoff, sondern auf das CO₂-Niveau im Blut. Bei vielen Menschen ist es überempfindlich geworden — durch Stress, schlechte Ernährung oder Bewegungsmangel — und erzwingt mehr Atemzüge als nötig.</p>
+      <p>Die Lösung ist kein bewusstes Atemanhalten, sondern ein schrittweises <strong>Umtrainieren des Atemzentrums</strong> durch konsequent ruhigere Atmung. Das optimale Atemvolumen liegt bei 3–4 Liter pro Minute. Das ist das Prinzip der Buteyko-Methode.</p>
+      {% elif lang=="en" %}
+      <h3>Why we breathe too much — and how to change it</h3>
+      <p>The breathing centre controls our breathing up to 20,000 times daily — even during sleep. It responds not to oxygen but to CO₂ levels. In many people it has become oversensitive — through stress, poor diet or lack of exercise — and drives more breathing than necessary.</p>
+      <p>The solution is not breath-holding but gradually <strong>retraining the breathing centre</strong> through consistently quieter breathing. The optimal volume is 3–4 litres per minute. This is the Buteyko principle.</p>
+      {% else %}
+      <h3>Waarom we teveel ademen — en hoe je dat verandert</h3>
+      <p>Het ademhalingscentrum stuurt onze ademhaling tot 20.000 keer per dag — ook tijdens slaap. Het reageert niet op zuurstof maar op CO₂. Bij veel mensen is het overgevoelig geworden — door stress, voeding of gebrek aan beweging — en dwingt meer ademhalingen dan nodig.</p>
+      <p>De oplossing is niet adem inhouden, maar geleidelijk <strong>het ademhalingscentrum hertrainen</strong> door consequent rustiger te ademen. Het optimale ademvolume ligt op 3–4 liter per minuut. Dat is het principe van de Buteyko-methode.</p>
+      {% endif %}
+    </div>
+
+    <div class="kc-card">
+      {% if lang=="de" %}
+      <h3>Das Zwerchfell — das zweite Herz</h3>
+      <p>Bei Bauch- und Zwerchfellatmung entsteht beim Einatmen ein Druckunterschied zwischen Bauch- und Brustbereich, der Blut aus dem Bauch aktiv zum Herzen pumpt. Das Zwerchfell wirkt dabei wie eine zweite Pumpe — ein Mechanismus, den Prof. Klinkhamer (UvA) als "zweites Herz" bezeichnet.</p>
+      <p>Bei Brustatmung unter Stress fällt dieser Mechanismus aus: das Herz erhält weniger Blut und muss schneller schlagen, um den Bedarf zu decken. Die HRV sinkt. Bei korrekter Zwerchfellatmung kehrt sich dieser Prozess um — mehr Blutvolumen, stärkerer Herzschlag, höhere HRV.</p>
+      <p><strong>Für die Praxis:</strong> Fragen Sie Ihren Klienten vor der Messung, wo er atmet — Brust oder Bauch. Das allein gibt wertvolle diagnostische Information.</p>
+      {% elif lang=="en" %}
+      <h3>The diaphragm — the second heart</h3>
+      <p>During abdominal and diaphragmatic breathing, the pressure difference between abdomen and chest actively pumps blood from the abdomen toward the heart. The diaphragm acts as a second pump — a mechanism described by Prof. Klinkhamer (UvA) as a "second heart".</p>
+      <p>In chest breathing under stress, this mechanism fails: the heart receives less blood and must beat faster to meet demand. HRV drops. With correct diaphragmatic breathing, this reverses — more blood volume, stronger heartbeat, higher HRV.</p>
+      <p><strong>For practice:</strong> Ask your client before the measurement where they are breathing — chest or belly. That alone gives valuable diagnostic information.</p>
+      {% else %}
+      <h3>Het middenrif — het tweede hart</h3>
+      <p>Bij buik- en middenrifademhaling ontstaat bij inademing een drukverschil tussen buik- en borstholte dat bloed uit de buik actief naar het hart pompt. Het middenrif werkt daarbij als een tweede pomp — een mechanisme dat prof. Klinkhamer (UvA) omschrijft als "het tweede hart".</p>
+      <p>Bij borstademhaling onder stress valt dit mechanisme weg: het hart ontvangt minder bloed en moet sneller kloppen om in de behoefte te voorzien. De HRV daalt. Bij correcte middenrifademhaling keert dit om — meer bloedvolume, krachtiger hartslag, hogere HRV.</p>
+      <p><strong>Voor de praktijk:</strong> Vraag je cliënt vóór de meting waar hij ademt — borst of buik. Dat alleen al geeft waardevolle diagnostische informatie.</p>
+      {% endif %}
+    </div>
+
+    <div class="kc-card">
+      {% if lang=="de" %}
+      <h3>Warum wir zu viel atmen — und wie man das ändert</h3>
+      <p>Das Atemzentrum im Gehirn steuert unsere Atmung rund um die Uhr — bis zu 20.000-mal täglich, auch im Schlaf. Es reagiert dabei nicht auf den Sauerstoffgehalt, sondern auf das CO₂-Niveau im Blut. Steigt CO₂ an, entsteht ein unwiderstehlicher Atemdrang.</p>
+      <p>Das Problem: Bei vielen Menschen ist das Atemzentrum überempfindlich geworden — durch Stress, schlechte Ernährung, Bewegungsmangel oder Trauma. Es hat sich an ein zu niedriges CO₂-Niveau gewöhnt und erzwingt deshalb häufigeres und tieferes Atmen als nötig. Das optimale Atemvolumen liegt bei 3 bis 4 Liter pro Minute.</p>
+      <p>Die Lösung ist kein bewusstes Atemanhalten, sondern ein schrittweises <strong>Umtrainieren des Atemzentrums</strong> — durch konsequent ruhigere, reduzierte Atmung über einen längeren Zeitraum. Das ist das Prinzip der Buteyko-Methode.</p>
+      {% elif lang=="en" %}
+      <h3>Why we breathe too much — and how to change it</h3>
+      <p>The breathing centre in the brain controls our breathing around the clock — up to 20,000 times a day, even during sleep. It responds not to oxygen levels but to CO₂ levels in the blood. When CO₂ rises, an irresistible urge to breathe follows.</p>
+      <p>The problem: in many people the breathing centre has become oversensitive — through stress, poor diet, lack of exercise or trauma. It has adapted to a chronically low CO₂ level and therefore drives more frequent and deeper breathing than necessary. The optimal breathing volume is 3 to 4 litres per minute.</p>
+      <p>The solution is not deliberate breath-holding, but gradually <strong>retraining the breathing centre</strong> — through consistently quieter, reduced breathing over time. This is the principle behind the Buteyko method.</p>
+      {% else %}
+      <h3>Waarom we teveel ademen — en hoe je dat verandert</h3>
+      <p>Het ademhalingscentrum in de hersenen stuurt onze ademhaling dag en nacht — tot 20.000 keer per dag, ook tijdens de slaap. Het reageert daarbij niet op het zuurstofgehalte maar op het CO₂-gehalte in het bloed. Stijgt het CO₂, dan ontstaat een onweerstaanbare aandrang om te ademen.</p>
+      <p>Het probleem: bij veel mensen is het ademhalingscentrum overgevoelig geworden — door stress, slechte voeding, weinig beweging of trauma. Het is gewend geraakt aan een chronisch laag CO₂-niveau en dwingt daardoor vaker en dieper ademen dan nodig. Het optimale ademvolume ligt op 3 tot 4 liter per minuut.</p>
+      <p>De oplossing is geen bewust adem inhouden, maar het geleidelijk <strong>hertrainen van het ademhalingscentrum</strong> — door consequent rustiger en gereduceerd te ademen over een langere periode. Dat is het principe achter de Buteyko-methode.</p>
+      {% endif %}
+    </div>
+
+</div>
+    {% endif %}
+
+  <!-- ===== GOED METEN ===== -->
+  <div class="kc-section" id="kc-meten">
+
+<style>
+  .middelen-tabel-wrap {
+    background: #fdfaf6;
+    border: 1px solid #e8dccc;
+    border-radius: 12px;
+    padding: 1.2rem 1.1rem;
+    margin: 1rem 0 1.5rem 0;
+    box-shadow: 0 1px 6px rgba(75,54,41,.07);
+  }
+  .middelen-tabel-wrap h3 {
+    margin: 0 0 .5rem 0;
+    color: #4b3629;
+    font-size: 1.05rem;
+  }
+  .middelen-tabel-wrap .intro {
+    font-size: .88rem;
+    color: #6B5360;
+    margin: 0 0 1rem 0;
+    line-height: 1.5;
+    font-style: italic;
+  }
+  .middelen-tabel {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .85rem;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .middelen-tabel th {
+    background: #2a9d8f;
+    color: #fff;
+    text-align: left;
+    padding: .55rem .7rem;
+    font-weight: 600;
+    font-size: .78rem;
+    line-height: 1.3;
+  }
+  .middelen-tabel td {
+    padding: .6rem .7rem;
+    border-top: 1px solid #f0ebe4;
+    vertical-align: top;
+    line-height: 1.45;
+    color: #555;
+  }
+  .middelen-tabel td:first-child {
+    font-weight: 600;
+    color: #333;
+  }
+  .middelen-tabel tr:nth-child(even) td {
+    background: #fbf6ee;
+  }
+  .middelen-legenda {
+    margin-top: 1rem;
+    padding: .7rem .9rem;
+    background: #fff;
+    border-radius: 8px;
+    font-size: .8rem;
+    color: #6B5360;
+    line-height: 1.6;
+  }
+  .middelen-legenda strong { color: #333; display: block; margin-bottom: .3rem; }
+  .legenda-symbol {
+    display: inline-block;
+    width: 1.4rem;
+    text-align: center;
+    font-weight: 700;
+    margin-right: .25rem;
+  }
+  .legenda-ok { color: #2a9d8f; }
+  .legenda-let { color: #c87a1f; }
+  .legenda-niet { color: #b03030; }
+  .middelen-disclaimer {
+    margin-top: .8rem;
+    font-size: .78rem;
+    color: #8a7a6a;
+    font-style: italic;
+    line-height: 1.5;
+  }
+  @media (max-width: 640px) {
+    .middelen-tabel { font-size: .78rem; }
+    .middelen-tabel th, .middelen-tabel td { padding: .45rem .5rem; }
+  }
+</style>
+
+<div class="middelen-tabel-wrap" id="kc-middelen">
+  <h3>{% if lang=="de" %}Mittel und Ihre Messung{% elif lang=="en" %}Substances and your reading{% else %}Middelen en je meting{% endif %}</h3>
+  <p class="intro">{% if lang=="de" %}Spüren Sie das Mittel noch wirken? Dann sagt Ihre RI gerade vor allem etwas über das Mittel — nicht über Sie.{% elif lang=="en" %}Can you still feel the substance working? Then your RI mostly tells you something about the substance — not about you.{% else %}Voel je het middel nog werken? Dan zegt je RI nu vooral iets over het middel, niet over jou.{% endif %}</p>
+
+  <table class="middelen-tabel">
+    <thead>
+      <tr>
+        <th>{% if lang=="de" %}Was haben Sie verwendet?{% elif lang=="en" %}What have you used?{% else %}Wat heb je gebruikt?{% endif %}</th>
+        <th>{% if lang=="de" %}Wirkung auf Ihre RI{% elif lang=="en" %}Effect on your RI{% else %}Effect op je RI{% endif %}</th>
+        <th>{% if lang=="de" %}Wann zuverlässig messen?{% elif lang=="en" %}When to measure reliably?{% else %}Wanneer betrouwbaar meten?{% endif %}</th>
+        <th>{% if lang=="de" %}Eignung{% elif lang=="en" %}Suitability{% else %}Inzetbaarheid{% endif %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>{% if lang=="de" %}Alkohol — 1–2 Gläser{% elif lang=="en" %}Alcohol — 1-2 drinks{% else %}Alcohol — 1-2 glazen{% endif %}</td>
+        <td>{% if lang=="de" %}RI deutlich niedriger, Puls erhöht{% elif lang=="en" %}RI clearly lower, heart rate higher{% else %}RI duidelijk lager, hartslag hoger{% endif %}</td>
+        <td>{% if lang=="de" %}am Folgetag, vorzugsweise nach einer Nacht Schlaf{% elif lang=="en" %}the next day, preferably after a night's sleep{% else %}volgende dag, bij voorkeur na een nacht slapen{% endif %}</td>
+        <td><span class="legenda-symbol legenda-let">△</span></td>
+      </tr>
+      <tr>
+        <td>{% if lang=="de" %}Alkohol — 3 Gläser oder mehr{% elif lang=="en" %}Alcohol — 3 drinks or more{% else %}Alcohol — 3 glazen of meer{% endif %}</td>
+        <td>{% if lang=="de" %}RI stark verzerrt{% elif lang=="en" %}RI strongly distorted{% else %}RI sterk vertekend{% endif %}</td>
+        <td>{% if lang=="de" %}2 bis 3 Tage{% elif lang=="en" %}2 to 3 days{% else %}2 tot 3 dagen{% endif %}</td>
+        <td><span class="legenda-symbol legenda-niet">✗</span></td>
+      </tr>
+      <tr>
+        <td>{% if lang=="de" %}Tabak / Nikotin (Zigarette, Vape, Snus){% elif lang=="en" %}Tobacco / nicotine (cigarette, vape, snus){% else %}Tabak / nicotine (sigaret, vape, snus){% endif %}</td>
+        <td>{% if lang=="de" %}RI direkt niedriger{% elif lang=="en" %}RI immediately lower{% else %}RI valt direct lager uit{% endif %}</td>
+        <td>{% if lang=="de" %}mindestens 1–2 Stunden nach der letzten Zigarette{% elif lang=="en" %}at least 1-2 hours after the last cigarette{% else %}minstens 1-2 uur na laatste sigaret{% endif %}</td>
+        <td><span class="legenda-symbol legenda-let">△</span></td>
+      </tr>
+      <tr>
+        <td>{% if lang=="de" %}Koffein (Kaffee, Cola, Energy-Drink){% elif lang=="en" %}Caffeine (coffee, cola, energy drink){% else %}Cafeïne (koffie, cola, energiedrank){% endif %}</td>
+        <td>{% if lang=="de" %}Spüren Sie Herzklopfen oder Unruhe? Dann ist Ihre Messung verzerrt. Spüren Sie nichts? Messen geht.{% elif lang=="en" %}Feeling palpitations or jitters? Your reading is distorted. No effect? Measuring is fine.{% else %}Voel je hartkloppingen of onrust? Je meting is vertekend. Voel je niets? Meten kan.{% endif %}</td>
+        <td>{% if lang=="de" %}wenn Sie Wirkung spüren: 2–4 Stunden warten{% elif lang=="en" %}if you feel an effect: wait 2-4 hours{% else %}als je effect voelt: 2-4 uur wachten{% endif %}</td>
+        <td><span class="legenda-symbol legenda-ok">✓</span></td>
+      </tr>
+      <tr>
+        <td>{% if lang=="de" %}Cannabis{% elif lang=="en" %}Cannabis{% else %}Cannabis{% endif %}</td>
+        <td>{% if lang=="de" %}Puls steigt stark, RI gerade nicht brauchbar{% elif lang=="en" %}heart rate rises sharply, RI not usable now{% else %}hartslag stijgt fors, RI nu onbruikbaar{% endif %}</td>
+        <td>{% if lang=="de" %}mindestens 3–4 Stunden nach dem Rausch{% elif lang=="en" %}at least 3-4 hours after the high{% else %}minstens 3-4 uur na de roes{% endif %}</td>
+        <td><span class="legenda-symbol legenda-niet">✗</span></td>
+      </tr>
+      <tr>
+        <td>{% if lang=="de" %}Betablocker (Bisoprolol, Metoprolol u.ä.){% elif lang=="en" %}Beta-blockers (bisoprolol, metoprolol etc.){% else %}Bètablokkers (bisoprolol, metoprolol e.d.){% endif %}</td>
+        <td>{% if lang=="de" %}Ihre RI liegt strukturell anders{% elif lang=="en" %}your RI sits at a structurally different level{% else %}je RI ligt structureel anders{% endif %}</td>
+        <td>{% if lang=="de" %}immer messbar — vergleichen Sie Ihre eigene Linie{% elif lang=="en" %}always measurable — compare your own line{% else %}meten kan altijd, vergelijk je eigen lijn{% endif %}</td>
+        <td><span class="legenda-symbol legenda-let">△</span></td>
+      </tr>
+      <tr>
+        <td>{% if lang=="de" %}Schmerzmittel — Paracetamol{% elif lang=="en" %}Painkillers — paracetamol{% else %}Pijnstillers — paracetamol{% endif %}</td>
+        <td>{% if lang=="de" %}kein spürbarer Einfluss{% elif lang=="en" %}no noticeable effect{% else %}geen merkbaar effect{% endif %}</td>
+        <td>{% if lang=="de" %}direkt messbar{% elif lang=="en" %}measure directly{% else %}meten kan direct{% endif %}</td>
+        <td><span class="legenda-symbol legenda-ok">✓</span></td>
+      </tr>
+      <tr>
+        <td>{% if lang=="de" %}Schmerzmittel — Ibuprofen, NSAR{% elif lang=="en" %}Painkillers — ibuprofen, NSAIDs{% else %}Pijnstillers — ibuprofen, NSAIDs{% endif %}</td>
+        <td>{% if lang=="de" %}gering bis kein Einfluss{% elif lang=="en" %}small to no effect{% else %}klein tot geen effect{% endif %}</td>
+        <td>{% if lang=="de" %}direkt messbar — bei Fieber/Schmerz liegt Ihre RI ohnehin anders{% elif lang=="en" %}measure directly — fever or pain shifts your RI anyway{% else %}meten kan direct — bij koorts of pijn ligt je RI sowieso anders{% endif %}</td>
+        <td><span class="legenda-symbol legenda-ok">✓</span></td>
+      </tr>
+      <tr>
+        <td>{% if lang=="de" %}Schlaf- / Beruhigungsmittel (Diazepam, Oxazepam){% elif lang=="en" %}Sleep / sedative medication (diazepam, oxazepam){% else %}Slaap-/kalmeringsmiddelen (diazepam, oxazepam){% endif %}</td>
+        <td>{% if lang=="de" %}RI gedämpft, solange das Mittel wirkt{% elif lang=="en" %}RI suppressed while the medication is active{% else %}RI is gedempt zolang het middel werkt{% endif %}</td>
+        <td>{% if lang=="de" %}einige Stunden nach der letzten Einnahme{% elif lang=="en" %}several hours after the last dose{% else %}enkele uren na laatste dosis{% endif %}</td>
+        <td><span class="legenda-symbol legenda-let">△</span></td>
+      </tr>
+      <tr>
+        <td>{% if lang=="de" %}Starke Schmerzmittel (Morphin, Oxycodon, Tramadol){% elif lang=="en" %}Strong painkillers (morphine, oxycodone, tramadol){% else %}Zware pijnstillers (morfine, oxycodon, tramadol){% endif %}</td>
+        <td>{% if lang=="de" %}Puls niedrig, RI verzerrt{% elif lang=="en" %}heart rate low, RI distorted{% else %}hartslag laag, RI vertekend{% endif %}</td>
+        <td>{% if lang=="de" %}während der Anwendung nicht mit „normal" vergleichbar{% elif lang=="en" %}during use, not comparable to "normal"{% else %}tijdens gebruiksperiode niet vergelijkbaar met "normaal"{% endif %}</td>
+        <td><span class="legenda-symbol legenda-let">△</span></td>
+      </tr>
+      <tr>
+        <td>{% if lang=="de" %}Stimulierende Drogen (Kokain, Amphetamin, MDMA){% elif lang=="en" %}Stimulant drugs (cocaine, amphetamine, MDMA){% else %}Stimulerende drugs (cocaïne, amfetamine, MDMA){% endif %}</td>
+        <td>{% if lang=="de" %}RI stark verzerrt, Puls deutlich erhöht{% elif lang=="en" %}RI strongly distorted, heart rate sharply elevated{% else %}RI sterk vertekend, hartslag fors verhoogd{% endif %}</td>
+        <td>{% if lang=="de" %}mindestens 24 Stunden nach Abklingen der Wirkung{% elif lang=="en" %}at least 24 hours after the effect has worn off{% else %}minstens 24 uur na uitwerking{% endif %}</td>
+        <td><span class="legenda-symbol legenda-niet">✗</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="middelen-legenda">
+    <strong>{% if lang=="de" %}Legende{% elif lang=="en" %}Legend{% else %}Legenda{% endif %}</strong>
+    <span class="legenda-symbol legenda-ok">✓</span> {% if lang=="de" %}Messung gut brauchbar{% elif lang=="en" %}reading reliable{% else %}meting goed bruikbaar{% endif %}
+    &nbsp;·&nbsp;
+    <span class="legenda-symbol legenda-let">△</span> {% if lang=="de" %}Messung brauchbar, aber innerhalb Ihrer eigenen Linie vergleichen{% elif lang=="en" %}reading usable, but compare within your own line{% else %}meting bruikbaar, maar vergelijk binnen je eigen lijn{% endif %}
+    &nbsp;·&nbsp;
+    <span class="legenda-symbol legenda-niet">✗</span> {% if lang=="de" %}Messung gerade nicht sinnvoll{% elif lang=="en" %}reading not meaningful right now{% else %}meting nu niet zinvol{% endif %}
+  </div>
+
+  <p class="middelen-disclaimer">{% if lang=="de" %}Diese Tabelle ist eine Orientierung, kein medizinischer Rat. Verwenden Sie StressChecker nicht, um Medikamente anzupassen — sprechen Sie dafür mit Ihrem Arzt oder Therapeuten.{% elif lang=="en" %}This table is guidance, not medical advice. Don't use StressChecker to adjust medication — speak with your doctor or therapist about that.{% else %}Deze tabel is ter oriëntatie, geen medisch advies. Gebruik StressChecker niet om medicatie aan te passen — spreek hierover met je huisarts of behandelaar.{% endif %}</p>
+</div>
+
+
+        <div class="kc-card">
+            <h3><span class="kc-icon">🧭</span> {% if lang=="de" %}Von Messen zu bewusstem Handeln{% elif lang=="en" %}From measuring to conscious action{% else %}Van meten naar bewust handelen{% endif %}</h3>
+            <p style="font-size:.8rem;color:#555;">{% if lang=="de" %}Der StressChecker ist ein Hilfsmittel, mit dem Sie Ihre Stressempfindlichkeit und Ihre Erholungsfähigkeit objektiv sichtbar machen können.{% elif lang=="en" %}The StressChecker is a tool that helps you objectively understand your stress sensitivity and recovery capacity.{% else %}De StressChecker is een hulpmiddel waarmee je jouw stressgevoeligheid en je vermogen om te herstellen van inspanning en druk inzichtelijk maakt.{% endif %}</p>
+        </div>
+
+        <div class="kc-card">
+            <h3><span class="kc-icon">✅</span> {% if lang=="de" %}Vorbereitung{% elif lang=="en" %}Preparation{% else %}Voorbereiding{% endif %}</h3>
+            {% if lang=="de" %}
+            <ul><li>Mindestens <strong>1 Stunde</strong> vor der Messung nichts gegessen</li><li>Keinen Alkohol oder Koffein — spezifische Wartezeiten siehe Tabelle <strong>Mittel und Ihre Messung</strong> oben</li><li>Mindestens <strong>2 Stunden</strong> keinen Sport</li><li>Mindestens <strong>15 Minuten</strong> keine Treppe</li><li>Ruhig und aufrecht sitzen</li><li>Regelmäßig atmen</li><li>Allein und ungestört</li></ul>
+            <p>Abbrechen wenn: Schreck, Schluckauf, Bewegung oder unregelmäßiger Herzschlag.</p>
+            {% elif lang=="en" %}
+            <ul><li>At least <strong>1 hour</strong> before: no food</li><li>No alcohol or caffeine — for specific waiting times see table <strong>Substances and your reading</strong> above</li><li>At least <strong>2 hours</strong> before: no exercise</li><li>At least <strong>15 minutes</strong> before: no stairs</li><li>Sit quietly and upright</li><li>Breathe regularly</li><li>Alone and undisturbed</li></ul>
+            <p>Stop if: startled, hiccups, movement, or irregular heartbeat.</p>
+            {% else %}
+            <ul><li>Minimaal <strong>1 uur</strong> voor de meting niets gegeten</li><li>Geen alcohol of cafeïne — voor specifieke wachttijden zie tabel <strong>Middelen en je meting</strong> hierboven</li><li>Minimaal <strong>2 uur</strong> niet gesport</li><li>Minimaal <strong>15 minuten</strong> geen trap geklommen</li><li>Rustig en rechtop zitten</li><li>Regelmatig in- en uitademen</li><li>Alleen en ongestoord</li></ul>
+            <p>Breek af en begin opnieuw als: je schrikt, de hik krijgt, je beweegt, of een onregelmatige hartslag voelt.</p>
+            {% endif %}
+        </div>
+
+        <div class="kc-card">
+            <h3><span class="kc-icon">🔌</span> {% if lang=="de" %}Sensor richtig verwenden{% elif lang=="en" %}Using the sensor correctly{% else %}Sensor correct gebruiken{% endif %}</h3>
+            {% if lang=="de" %}
+            <p><strong>USB-Clip:</strong> Am Ohrläppchen oder Fingerkuppe befestigen. Gebogene Seite auf dem Nagel. Nagellack stört die Messung.</p>
+            <p><strong>Bluetooth-Sensor:</strong> Wie beschrieben befestigen. Kalte Stellen vorher warmreiben.</p>
+            <div class="kc-highlight">Empfindlich auf helles Licht. Messung in ruhiger Umgebung ohne starke Lichtquelle.</div>
+            {% elif lang=="en" %}
+            <p><strong>USB clip:</strong> Attach to earlobe or fingertip. Curved side on nail. Nail polish distorts results.</p>
+            <p><strong>Bluetooth sensor:</strong> Attach as described. Rub cold spots warm beforehand.</p>
+            <div class="kc-highlight">Sensitive to bright light. Take reading in calm environment without strong light sources.</div>
+            {% else %}
+            <p>De clip- en vingerkapsensor kunnen beide worden gekoppeld aan de signaal/voeding units met USB of Bluetooth voor koppeling met pc, Mac, smartphone en tablet.</p>
+            <p><strong>Bevestiging:</strong> Bevestig de clip aan het oorlelletje of de vingertop. De bolle zijde moet op de nagel rusten.</p>
+            <p>Let op: nagellak kan het hartsignaal blokkeren. Het dragen van oorbellen kan leiden tot minder goede doorbloeding van de oorlel waardoor geen of beperkt hartsignaal.</p>
+            <p>Koude oren of vingers geven een minder sterk signaal door. Eerst even warm wrijven.</p>
+            <div class="kc-highlight">De clipsensor is gevoelig voor fel omgevingslicht. Gebruik in zo'n situatie de vingerkapsensor.</div>
+            {% endif %}
+        </div>
+
+        <div class="kc-card">
+            <h3><span class="kc-icon">📊</span> {% if lang=="de" %}Messqualität{% elif lang=="en" %}Reading quality{% else %}Meetkwaliteit{% endif %}</h3>
+            {% if lang=="de" %}
+            <p>Nach jeder Messung zeigt die StressChecker einen <strong>Qualitätsscore</strong>. <strong>Über 90% ist ausgezeichnet.</strong></p>
+            <div class="kc-highlight">Qualität wiederholt niedrig? Messung unter ruhigeren Bedingungen wiederholen. Bei anhaltendem unregelmäßigem Herzschlag: Arzt aufsuchen.</div>
+            {% elif lang=="en" %}
+            <p>After each reading the StressChecker shows a <strong>quality score</strong>. <strong>Above 90% is excellent.</strong></p>
+            <div class="kc-highlight">Quality repeatedly low? Repeat under calmer conditions. Persistent irregular heartbeat: consult a doctor.</div>
+            {% else %}
+            <p>Na elke meting toont de StressChecker een <strong>kwaliteitsscore</strong>. <strong>Boven 90% is uitstekend.</strong></p>
+            <div class="kc-highlight">Kwaliteit herhaaldelijk laag? Herhaal onder rustiger omstandigheden. Aanhoudend onregelmatige hartslag: raadpleeg een arts.</div>
+            {% endif %}
+        </div>
+
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">📋</span> {% if lang=="de" %}Vor der Messung{% elif lang=="en" %}Before the reading{% else %}Vóór de meting{% endif %}</h3>
+      {% if lang=="de" %}
+      <div class="kc-tip-row"><span class="kc-tip-icon">✅</span><span>Miss morgens, kurz nach dem Aufstehen — das gibt die zuverlässigste Basislinie</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">✅</span><span>Sitze ruhig oder liege, entspannte Position</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">✅</span><span>Atmen Sie normal, nicht bewusst tief oder langsam</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">✅</span><span>Warte 5 Minuten nach körperlicher Aktivität</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">❌</span><span>Nicht direkt nach dem Essen oder Kaffee messen</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">❌</span><span>Nicht beim Sprechen oder Bewegen messen</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">❌</span><span>Nicht nach starkem Alkoholkonsum — das verfälscht das Ergebnis</span></div>
+      {% elif lang=="en" %}
+      <div class="kc-tip-row"><span class="kc-tip-icon">✅</span><span>Take readings in the morning, shortly after waking — gives the most reliable baseline</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">✅</span><span>Sit quietly or lie down, relaxed position</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">✅</span><span>Breathe normally, not consciously deep or slow</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">✅</span><span>Wait 5 minutes after physical activity</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">❌</span><span>Don't take readings directly after eating or coffee</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">❌</span><span>Don't take readings while speaking or moving</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">❌</span><span>Not after heavy alcohol — this distorts the result</span></div>
+      {% else %}
+      <div class="kc-tip-row"><span class="kc-tip-icon">✅</span><span>Meet 's ochtends, kort na het opstaan — geeft de betrouwbaarste basislijn</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">✅</span><span>Zit recht op en probeer te ontspannen.</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">✅</span><span>Adem normaal, niet bewust diep of langzaam</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">✅</span><span>Neem voldoende tijd om bij te komen van fysieke inspanning.</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">❌</span><span>Wacht minstens een uur na eten of koffie drinken.</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">❌</span><span>Niet praten of bewegen tijdens de meting.</span></div>
+      <div class="kc-tip-row"><span class="kc-tip-icon">❌</span><span>Drink geen alcohol voor de meting.</span></div>
+      {% endif %}
+      <p style="margin-top:.8rem;font-size:.9rem;color:#666;">Let op: nagellak verhindert de doorlating van infrarood licht. Bij het dragen van oorbellen kan littekenweefsel ontstaan waardoor er mogelijk minder goede doorbloeding is en het hartsignaal moeilijker op te vangen is.</p>
+    </div>
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">💓</span> {% if lang=="de" %}Welcher Sensor ist der beste?{% elif lang=="en" %}Which sensor is best?{% else %}Welke sensor is het beste?{% endif %}</h3>
+
+      <div class="kc-sensor">
+        <h4>{% if lang=="de" %}Brustgurt (ECG-Methode){% elif lang=="en" %}Chest strap (ECG method){% else %}Borstband (ECG-methode){% endif %} <span class="kc-badge badge-good">{% if lang=="de" %}Bester{% elif lang=="en" %}Best{% else %}Beste{% endif %}</span></h4>
+        <p>{% if lang=="de" %}Direkte Messung der Herzaktivität. Sehr genaue RR-Intervalle, ideal für HRV-Messung. Empfohlen für ernsthafte Aufzeichnungen.{% elif lang=="en" %}Direct measurement of cardiac activity. Very accurate RR intervals, ideal for HRV measurement. Recommended for serious recordings.{% else %}Directe meting van hartactiviteit. Zeer nauwkeurige RR-intervallen, ideaal voor HRV-meting. Aanbevolen voor serieuze metingen.{% endif %}</p>
+      </div>
+
+      <div class="kc-sensor">
+        <h4>{% if lang=="de" %}Fingersensor (PPG-Methode){% elif lang=="en" %}Finger sensor (PPG method){% else %}Clipsensor (voor vinger of oorlel) en Vingerkapsensor (PPG-methode){% endif %} <span class="kc-badge badge-ok">{% if lang=="de" %}Gut{% elif lang=="en" %}Good{% else %}Goed{% endif %}</span></h4>
+        <p>{% if lang=="de" %}Misst den Blutfluss optisch. Etwas weniger präzise als ECG, aber praktisch und gut geeignet für den täglichen Gebrauch. USB-Anschluss, keine Bluetooth-Kopplung nötig.{% elif lang=="en" %}Measures blood flow optically. Slightly less precise than ECG, but practical and well suited for daily use. USB connection, no Bluetooth pairing needed.{% else %}Draadloos (Bluetooth) of bekabeld (USB poort). Beide hebben hun voordelen. Draadloos meer bewegingsvrijheid, bekabeld minder straling.{% endif %}</p>
+      </div>
+
+
+      <div class="kc-sensor">
+        <h4>{% if lang=="de" %}Kamera (Smartphone/Webcam){% elif lang=="en" %}Camera (smartphone/webcam){% else %}Camera (smartphone/webcam){% endif %} <span class="kc-badge badge-pro">{% if lang=="de" %}Experimentell{% elif lang=="en" %}Experimental{% else %}Experimenteel{% endif %}</span></h4>
+        <p>{% if lang=="de" %}PPG-Messung über Kamera. Weniger zuverlässig — Licht und Bewegung beeinflussen das Ergebnis stark. Für orientierende Messungen geeignet.{% elif lang=="en" %}PPG reading via camera. Less reliable — light and movement strongly affect results. Suitable for indicative readings.{% else %}PPG-meting via camera. Minder betrouwbaar — licht en beweging beïnvloeden het resultaat sterk. Geschikt voor oriënterende metingen. Onze app biedt deze optie niet in verband met het genoemde nadeel.{% endif %}</p>
+      </div>
+    </div>
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">🔬</span> {% if lang=="de" %}Warum 90 Sekunden?{% elif lang=="en" %}Why 90 seconds?{% else %}Waarom 90 seconden?{% endif %}</h3>
+      {% if lang=="de" %}
+      <p>90 Sekunden liefern genügend RR-Intervalle (ca. 90–110 Herzschläge), um eine zuverlässige RMSSD-Berechnung zu machen. Kürzer ist unzuverlässig; länger bringt wenig zusätzliche Information für die Basismessung.</p>
+      <p>Die ersten 15–20 Herzschläge werden automatisch als Aufwärmphase herausgefiltert — Ihr Körper braucht einen Moment um sich zu stabilisieren.</p>
+      {% elif lang=="en" %}
+      <p>90 seconds provides enough RR intervals (approx. 90–110 heartbeats) to calculate a reliable RMSSD. Shorter is unreliable; longer adds little extra information for a baseline reading.</p>
+      <p>The first 15–20 heartbeats are automatically filtered out as a warm-up period — your body needs a moment to stabilise.</p>
+      {% else %}
+      <p>90 seconden levert voldoende RR-intervallen (ca. 90–110 hartslagen) om een betrouwbare RMSSD te berekenen. Korter is onbetrouwbaar; langer voegt weinig extra informatie toe voor een basismeting.</p>
+      <p>De eerste 15–20 hartslagen worden automatisch weggefilterd als opwarmperiode — je lichaam heeft een moment nodig om te stabiliseren.</p>
+      {% endif %}
+    </div>
+  </div>
+
+    <!-- Tips voor goede meting kaarten -->
+    <div class="kc-card">
+  <div class="kc-section" id="kc-resultaat">
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">📊</span> {% if lang=="de" %}Die Relax-Index-Skala{% elif lang=="en" %}The Relax Index scale{% else %}De Relax Index schaal{% endif %}</h3>
+      <p style="font-size:.8rem;color:#555;margin-bottom:.5rem">{% if lang=="de" %}Der Relax Index (RI) kombiniert Herzfrequenz und HRV% zu einer Zahl von 0–10.{% elif lang=="en" %}The Relax Index (RI) combines heart rate and HRV% into a single number from 0–10.{% else %}De Relax Index (RI) combineert hartslag en HRV% tot één getal van 0–10.{% endif %}</p>
+      <table class="kc-ri-table">
+        <tr><th>RI</th><th>{% if lang=="de" %}Status{% elif lang=="en" %}Status{% else %}Status{% endif %}</th><th>{% if lang=="de" %}Bedeutung{% elif lang=="en" %}Meaning{% else %}Betekenis{% endif %}</th></tr>
+        <tr><td><span class="ri-dot" style="background:#1a7a3e"></span>8–10</td><td><strong>{% if lang=="de" %}Widerstandsfähig{% elif lang=="en" %}Resilient{% else %}Veerkrachtig{% endif %}</strong></td><td>{% if lang=="de" %}Ausgezeichnete Erholungsfähigkeit{% elif lang=="en" %}Excellent recovery capacity{% else %}Uitstekend herstelvermogen{% endif %}</td></tr>
+        <tr><td><span class="ri-dot" style="background:#52b788"></span>6–7</td><td><strong>{% if lang=="de" %}Im Gleichgewicht{% elif lang=="en" %}Balanced{% else %}In balans{% endif %}</strong></td><td>{% if lang=="de" %}Gute Balance zwischen Belastung und Erholung{% elif lang=="en" %}Good balance between load and recovery{% else %}Goede balans tussen belasting en herstel{% endif %}</td></tr>
+        <tr><td><span class="ri-dot" style="background:#f4a261"></span>4–5</td><td><strong>{% if lang=="de" %}Leichter Stress{% elif lang=="en" %}Mild stress{% else %}Lichte stress{% endif %}</strong></td><td>{% if lang=="de" %}Erste Zeichen verminderter Erholungsfähigkeit{% elif lang=="en" %}First signs of reduced recovery capacity{% else %}Eerste tekenen van verminderd herstelvermogen{% endif %}</td></tr>
+        <tr><td><span class="ri-dot" style="background:#e63946"></span>2–3</td><td><strong>{% if lang=="de" %}Stress{% elif lang=="en" %}Stress{% else %}Stress{% endif %}</strong></td><td>{% if lang=="de" %}ANS unzureichend erholt — Stress oder Müdigkeit{% elif lang=="en" %}ANS insufficiently recovered — stress or fatigue{% else %}ANS onvoldoende hersteld — stress of vermoeidheid{% endif %}</td></tr>
+        <tr><td><span class="ri-dot" style="background:#9b2226"></span>0–1</td><td><strong>{% if lang=="de" %}Schwerer Stress{% elif lang=="en" %}Severe stress{% else %}Zware stress{% endif %}</strong></td><td>{% if lang=="de" %}Stark vermindert — Arzt aufsuchen{% elif lang=="en" %}Severely reduced — consult a doctor{% else %}Sterk verminderd — raadpleeg een arts{% endif %}</td></tr>
+      </table>
+    </div>
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">🗺️</span> {% if lang=="de" %}Das Quadrant-Diagramm{% elif lang=="en" %}The quadrant chart{% else %}Het kwadrant{% endif %}</h3>
+      {% if lang=="de" %}
+      <p>Das Quadrant zeigt gleichzeitig Ihre <strong>Herzfrequenz</strong> (X-Achse) und Ihre <strong>HRV%</strong> (Y-Achse). So sehen Sie nicht nur die RI-Zahl, sondern auch <em>warum</em> Sie da sind.</p>
+      <div class="kc-factor-grid">
+        <div class="kc-factor"><strong style="color:#52b788">WIDERSTANDSFÄHIG</strong>Normale BPM + gute HRV. Guter Allgemeinzustand.</div>
+        <div class="kc-factor"><strong style="color:#e63946">STRESS</strong>Hohe BPM + niedrige HRV. ANS unter Belastung, wenig Erholungsfähigkeit.</div>
+        <div class="kc-factor"><strong style="color:#6b7280">AKTIV BELASTET</strong>Hohe BPM + gute HRV. Körper aktiv, aber noch flexibel.</div>
+      </div>
+      {% elif lang=="en" %}
+      <p>The quadrant shows your <strong>heart rate</strong> (X-axis) and your <strong>HRV%</strong> (Y-axis) simultaneously. So you see not just the RI number, but also <em>why</em> you're there.</p>
+      <div class="kc-factor-grid">
+        <div class="kc-factor"><strong style="color:#52b788">RESILIENT</strong>Normal HR + good HRV. Good general condition.</div>
+        <div class="kc-factor"><strong style="color:#e63946">STRESS</strong>High HR + low HRV. ANS under load, little recovery capacity.</div>
+        <div class="kc-factor"><strong style="color:#6b7280">ACTIVELY LOADED</strong>High HR + good HRV. Body active, but still flexible.</div>
+      </div>
+      {% else %}
+      <p>Het kwadrant toont tegelijk je <strong>hartslag</strong> (X-as) en je <strong>HRV%</strong> (Y-as). Zo zie je niet alleen het RI-getal, maar ook <em>waarom</em> je daar staat.</p>
+      <div class="kc-factor-grid">
+        <div class="kc-factor"><strong style="color:#52b788">VEERKRACHTIG</strong>Normale hartslag + goede HRV. Goede algemene conditie.</div>
+        <div class="kc-factor"><strong style="color:#e63946">STRESS</strong>Hoge hartslag + lage HRV. ANS onder belasting, weinig herstelvermogen.</div>
+        <div class="kc-factor"><strong style="color:#6b7280">ACTIEF BELAST</strong>Hoge hartslag + goede HRV. Lichaam actief, maar nog soepel.</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">📈</span> {% if lang=="de" %}Wie lesen man die Basismessung?{% elif lang=="en" %}How to read the baseline?{% else %}Hoe lees je de basismeting?{% endif %}</h3>
+      {% if lang=="de" %}
+      <p>Die <strong>Basismessung</strong> ist Ihr täglicher ANS-Check. Führen Sie sie jeden Morgen zur gleichen Zeit durch — idealerweise kurz nach dem Aufwachen, bevor Sie aufstehen.</p>
+      <p>Wichtig: <em>Eine einzelne Messung sagt wenig.</em> Erst durch regelmäßige Messung erkennen Sie Muster: Wie erholt sind Sie nach einer schlechten Nacht? Wie reagiert Ihr Körper auf Sport? Wann sind Sie wirklich erholt?</p>
+      {% elif lang=="en" %}
+      <p>The <strong>baseline reading</strong> is your daily ANS check. Take it every morning at the same time — ideally shortly after waking, before getting up.</p>
+      <p>Important: <em>A single reading says little.</em> Only through regular readings do you recognise patterns: How recovered are you after a bad night? How does your body respond to exercise? When are you truly recovered?</p>
+      {% else %}
+      <p>De <strong>basismeting</strong> is je dagelijkse ANS-check. Doe hem elke ochtend op hetzelfde tijdstip — bij voorkeur kort na het ontwaken, voor je opstaat.</p>
+      <p>Belangrijk: <em>Eén meting zegt weinig.</em> Pas door regelmatig meten herken je patronen: hoe hersteld ben je na een slechte nacht? Hoe reageert je lichaam op sport? Wanneer ben je echt uitgerust?</p>
+      {% endif %}
+    </div>
+
+    <!-- Basismeting: Wat meet je eigenlijk? -->
+    <div class="kc-card">
+      <h3><span class="kc-icon">🔬</span> {% if lang=="de" %}Was misst Sie eigentlich?{% elif lang=="en" %}What are you actually measuring?{% else %}Wat meet je eigenlijk?{% endif %}</h3>
+
+      {% if lang=="de" %}
+      <p><strong>Ihr autonomes Nervensystem als Spiegel</strong></p>
+      <p>Die Basismessung misst nicht nur Stress — sie misst die Anpassungsfähigkeit Ihres autonomen Nervensystems (ANS). Das ist der Teil Ihres Nervensystems, der automatisch Herzschlag, Atmung, Verdauung und Erholung steuert. Sie haben keine direkte Kontrolle darüber, aber es reagiert auf alles, was Sie erleben: körperlich, emotional, mental und spirituell.</p>
+      <p>Ein niedriger Relax Index kann daher viele Ursachen haben. Schlechter Schlaf. Sorgen. Spät gegessen. Ein Problem, das sich beschäftigt. Oder Ihr Körper erholt sich von einem harten Training. Der RI urteilt nicht — er zeigt, wie viel Spielraum Ihr Nervensystem gerade hat.</p>
+
+      <p><strong>Warum morgens?</strong></p>
+      <p>Die zuverlässigste Basismessung machen Sie kurz nach dem Aufwachen, bevor Sie aufstehen. Zu diesem Zeitpunkt ist Ihr Körper noch nicht beeinflusst von Kaffee, Bewegung, Reizen oder Gesprächen. Sie misst Ihr Nervensystem in seinem neutralsten Zustand — das Fundament, auf dem der Rest Ihres Tages aufbaut.</p>
+
+      <p><strong>Morgen versus Abend</strong></p>
+      <p>Eine Abendmessung ist nicht falsch, erzählt aber eine andere Geschichte. Abends trägt Ihr RI den ganzen Tag mit sich: die Besprechung, die zu lang dauerte, der Spaziergang, der guttat, der Konflikt, der nachwirkt. Das macht eine Abendmessung wertvoll als Situationsmessung, aber weniger geeignet als Basislinie.</p>
+
+      <p><strong>Ihre persönliche Basislinie aufbauen</strong></p>
+      <p>Eine Messung ist eine Momentaufnahme. Sieben Messungen erzählen eine Geschichte. Nach einer Woche täglichen Messens entsteht Ihre persönliche Basislinie — das durchschnittliche Niveau, auf dem Ihr ANS funktioniert. Von dieser Basislinie aus erkennen Sie Veränderungen: geht es in die richtige Richtung? Hat sich etwas verschoben? Ohne Basislinie ist jede Messung eine Insel.</p>
+
+      {% elif lang=="en" %}
+      <p><strong>Your autonomic nervous system as a mirror</strong></p>
+      <p>The baseline reading doesn't just measure stress — it measures the adaptive capacity of your autonomic nervous system (ANS). That's the part of your nervous system that automatically controls heart rate, breathing, digestion, and recovery. You have no direct control over it, but it responds to everything you experience: physical, emotional, mental, and spiritual.</p>
+      <p>A low Relax Index can therefore have many causes. Poor sleep. Worries. Eating late. A problem you're mulling over. Or your body recovering from a hard workout. The RI doesn't judge — it shows how much room your nervous system has right now.</p>
+
+      <p><strong>Why mornings?</strong></p>
+      <p>The most reliable baseline reading is taken shortly after waking, before getting up. At that moment, your body isn't yet influenced by coffee, movement, stimuli, or conversations. You're measuring your nervous system in its most neutral state — the foundation on which the rest of your day is built.</p>
+
+      <p><strong>Morning versus evening</strong></p>
+      <p>An evening reading isn't wrong, but it tells a different story. In the evening, your RI carries the entire day with it: the meeting that ran long, the walk that helped, the conflict that lingered. That makes an evening reading valuable as a situation measurement, but less suitable as a baseline.</p>
+
+      <p><strong>Building your personal baseline</strong></p>
+      <p>One reading is a snapshot. Seven readings are a story. After a week of daily readings, your personal baseline emerges — the average level at which your ANS functions. From that baseline, you can recognize changes: are things moving in the right direction? Has something shifted? Without a baseline, every reading is an island.</p>
+
+      {% else %}
+      <p><strong>Je autonoom zenuwstelsel als spiegel</strong></p>
+      <p>De basismeting meet niet alleen stress — het meet het aanpassingsvermogen van je autonoom zenuwstelsel (ANS). Dat is het deel van je zenuwstelsel dat automatisch je hartslag, ademhaling, spijsvertering en herstelvermogen regelt. Je hebt er geen directe controle over, maar het reageert wél op alles wat je meemaakt: lichamelijk, emotioneel, mentaal en spiritueel.</p>
+      <p>Een lage Relax Index kan daarom veel oorzaken hebben. Je hebt slecht geslapen. Je maakt je zorgen. Je hebt gisteravond laat gegeten. Je bent aan het broeden op een probleem. Of je lichaam herstelt van een zware training. De RI oordeelt niet — hij laat zien hoeveel ruimte je zenuwstelsel op dit moment heeft.</p>
+
+      <p><strong>Waarom 's ochtends?</strong></p>
+      <p>De betrouwbaarste basismeting doe je kort na het ontwaken, vóór je opstaat. Op dat moment is je lichaam nog niet beïnvloed door koffie, beweging, prikkels of gesprekken. Je meet je zenuwstelsel in zijn meest neutrale staat — het fundament waarop de rest van je dag wordt gebouwd.</p>
+
+      <p><strong>Ochtend versus avond</strong></p>
+      <p>Een avondmeting is niet fout, maar vertelt een ander verhaal. 's Avonds draagt je RI de hele dag met zich mee: de vergadering die uitliep, de wandeling die goed deed, het conflict dat bleef hangen. Dat maakt een avondmeting waardevol als situatiemeting, maar minder geschikt als basislijn.</p>
+
+      <p><strong>Je persoonlijke basislijn opbouwen</strong></p>
+      <p>Eén meting is een momentopname. Zeven metingen zijn een verhaal. Na een week dagelijks meten zie je je persoonlijke basislijn ontstaan — het gemiddelde niveau waarop jouw ANS functioneert. Vanuit die basislijn kun je veranderingen herkennen: gaat het de goede kant op? Is er iets verschoven? Zonder basislijn is elke meting een eiland.</p>
+      {% endif %}
+    </div>
+
+    <!-- Situatiemeting: context maakt het verschil -->
+    <div class="kc-card">
+      <h3><span class="kc-icon">📍</span> {% if lang=="de" %}Situationsmessung: Kontext macht den Unterschied{% elif lang=="en" %}Situation measurement: context makes the difference{% else %}Situatiemeting: context maakt het verschil{% endif %}</h3>
+
+      {% if lang=="de" %}
+      <p><strong>Messen im Kontext</strong></p>
+      <p>Eine Basismessung machen Sie in Ruhe. Eine Situationsmessung machen Sie bewusst in oder nach einer bestimmten Situation: einer Besprechung, einem Gespräch, einem Spaziergang in der Natur, einer Behandlung bei Ihrem Therapeuten, dem Moment nach einem Konflikt. Sie misst nicht Ihr Grundniveau — Sie misst die Wirkung eines Kontextes auf Ihr Nervensystem.</p>
+      <p>Das macht die Situationsmessung zu einem Forschungsinstrument. Sie werden zum Wissenschaftler Ihres eigenen Körpers.</p>
+
+      <p><strong>Vergleich mit Ihrer Basislinie</strong></p>
+      <p>Die Situationsmessung vergleicht Ihren RI mit Ihrer persönlichen Basislinie — dem Durchschnitt Ihrer letzten Basismessungen. Dieser Unterschied erzählt die Geschichte:</p>
+      <ul>
+        <li><strong>RI über Ihrer Basislinie:</strong> diese Situation gibt Ihrem Nervensystem mehr Spielraum. Etwas in diesem Kontext hilft Ihrem Körper, sich zu entspannen.</li>
+        <li><strong>RI auf Ihrer Basislinie:</strong> diese Situation hat wenig Einfluss auf Ihr ANS. Das kann neutral sein, oder es kann bedeuten, dass Ihr Körper an diesen Kontext gewöhnt ist.</li>
+        <li><strong>RI unter Ihrer Basislinie:</strong> diese Situation aktiviert Ihr Nervensystem. Das ist nicht per Definition schlecht — auch ein gutes Gespräch kann aktivierend sein — aber es ist Information.</li>
+      </ul>
+
+      <p><strong>Warum dieselbe Situation bei jedem anders wirkt</strong></p>
+      <p>Eine Präsentation halten ist für den einen purer Stress, für den anderen Flow. Das liegt daran, dass Ihr autonomes Nervensystem nicht auf die Situation selbst reagiert, sondern auf das, was diese Situation für sich bedeutet — Ihre Geschichte, Ihre Überzeugungen, Ihre Empfindlichkeit. Die Situationsmessung zeigt, wie Ihr einzigartiges Nervensystem reagiert, nicht wie die Situation sich anfühlen "sollte".</p>
+
+      <p><strong>Muster erkennen über die Zeit</strong></p>
+      <p>Die wahre Kraft der Situationsmessung liegt in der Wiederholung. Eine Messung nach einer Besprechung ist ein Datenpunkt. Zehn Messungen nach Besprechungen sind ein Muster. Vielleicht entdecken Sie, dass Teamgespräche Ihren RI immer senken, Einzelgespräche aber nicht. Oder dass Natur immer Ihren höchsten RI liefert — höher als jede Atemübung.</p>
+
+      <p><strong>Die vier Kanäle des Inneren Kompasses</strong></p>
+      <p>Bei jeder Situationsmessung können Sie angeben, was vor allem eine Rolle spielt: körperlich, emotional, mental oder spirituell. Diese vier Kanäle stammen aus dem Columbus Catalyst Code Modell und helfen Ihnen zu verstehen, auf welcher Ebene eine Situation sich berührt:</p>
+      <ul>
+        <li><strong>Körperlich:</strong> Spannung in den Schultern, Müdigkeit, Kopfschmerzen, Unruhe im Körper</li>
+        <li><strong>Emotional:</strong> ein Gefühl, das da ist, aber schwer zu benennen — Unsicherheit, Frustration, Traurigkeit, Freude</li>
+        <li><strong>Mental:</strong> Ihr Kopf, der nicht aufhört, Grübeln, Analysieren, Planen</li>
+        <li><strong>Spirituell:</strong> das Gefühl, dass etwas auf einer tieferen Ebene nicht stimmt, oder gerade dass Sie ganz an Ihrem Platz sind</li>
+      </ul>
+      <p>Über die Zeit zeigt das Muster dieser Kanäle, wo Ihre Empfindlichkeit liegt. Das ist kein Problem. Das ist Selbsterkenntnis.</p>
+
+      {% elif lang=="en" %}
+      <p><strong>Measuring in context</strong></p>
+      <p>A baseline reading is taken at rest. A situation measurement is taken consciously during or after a specific situation: a meeting, a conversation, a walk in nature, a therapy session, the moment after a conflict. You're not measuring your baseline — you're measuring the effect of a context on your nervous system.</p>
+      <p>This makes the situation measurement a research tool. You become a scientist of your own body.</p>
+
+      <p><strong>Comparing to your baseline</strong></p>
+      <p>The situation measurement compares your RI with your personal baseline — the average of your recent baseline readings. That difference tells the story:</p>
+      <ul>
+        <li><strong>RI above your baseline:</strong> this situation gives your nervous system more room. Something in this context helps your body relax.</li>
+        <li><strong>RI at your baseline:</strong> this situation has little effect on your ANS. That can be neutral, or it may mean your body is used to this context.</li>
+        <li><strong>RI below your baseline:</strong> this situation activates your nervous system. That's not bad by definition — a good conversation can also be activating — but it is information.</li>
+      </ul>
+
+      <p><strong>Why the same situation affects everyone differently</strong></p>
+      <p>Giving a presentation is pure stress for one person, pure flow for another. That's because your autonomic nervous system doesn't respond to the situation itself, but to what that situation means to you — your history, your beliefs, your sensitivity. The situation measurement shows how your unique nervous system responds, not how the situation "should" feel.</p>
+
+      <p><strong>Recognizing patterns over time</strong></p>
+      <p>The real power of the situation measurement lies in repetition. One reading after a meeting is a data point. Ten readings after meetings are a pattern. You might discover that team meetings always lower your RI, but one-on-one conversations don't. Or that nature always produces your highest RI — higher than any breathing exercise.</p>
+
+      <p><strong>The four channels of the Inner Compass</strong></p>
+      <p>With each situation measurement, you can indicate what's most at play: physical, emotional, mental, or spiritual. These four channels come from the Columbus Catalyst Code model and help you understand at which level a situation affects you:</p>
+      <ul>
+        <li><strong>Physical:</strong> tension in your shoulders, fatigue, headaches, restlessness in your body</li>
+        <li><strong>Emotional:</strong> a feeling that's there but hard to name — uncertainty, frustration, sadness, joy</li>
+        <li><strong>Mental:</strong> your mind won't stop, ruminating, analysing, planning</li>
+        <li><strong>Spiritual:</strong> the feeling that something isn't right at a deeper level, or precisely that you're exactly where you belong</li>
+      </ul>
+      <p>Over time, the pattern of these channels reveals where your sensitivity lies. That's not a problem. That's self-knowledge.</p>
+
+      {% else %}
+      <p><strong>Meten in context</strong></p>
+      <p>Een basismeting doe je in rust. Een situatiemeting doe je bewust in of na een specifieke situatie: een vergadering, een gesprek, een wandeling in de natuur, een behandeling bij je therapeut, het moment na een conflict. Je meet niet je basisniveau — je meet het effect van een context op je zenuwstelsel.</p>
+      <p>Dit maakt de situatiemeting tot een onderzoeksinstrument. Je wordt een wetenschapper van je eigen lichaam.</p>
+
+      <p><strong>Vergelijken met je basislijn</strong></p>
+      <p>De situatiemeting vergelijkt je RI met je persoonlijke basislijn — het gemiddelde van je recente basismetingen. Dat verschil vertelt het verhaal:</p>
+      <ul>
+        <li><strong>RI boven je basislijn:</strong> deze situatie geeft je zenuwstelsel meer ruimte. Iets in deze context helpt je lichaam ontspannen.</li>
+        <li><strong>RI op je basislijn:</strong> deze situatie heeft weinig effect op je ANS. Dat kan neutraal zijn, of het kan betekenen dat je lichaam gewend is aan deze context.</li>
+        <li><strong>RI onder je basislijn:</strong> deze situatie activeert je zenuwstelsel. Dat is niet per definitie slecht — een goed gesprek kan ook activerend zijn — maar het is informatie.</li>
+      </ul>
+
+      <p><strong>Waarom dezelfde situatie bij iedereen anders werkt</strong></p>
+      <p>Een presentatie geven is voor de ene persoon pure stress, voor de ander flow. Dat komt doordat je autonoom zenuwstelsel niet reageert op de situatie zelf, maar op wat die situatie voor jou betekent — je geschiedenis, je overtuigingen, je gevoeligheid. De situatiemeting laat zien hoe jouw unieke zenuwstelsel reageert, niet hoe de situatie "zou moeten" voelen.</p>
+
+      <p><strong>Patronen herkennen over tijd</strong></p>
+      <p>De echte kracht van de situatiemeting zit in herhaling. Eén meting na een vergadering is een datapunt. Tien metingen na vergaderingen is een patroon. Misschien ontdek je dat teamoverleg je RI altijd verlaagt, maar één-op-één gesprekken niet. Of dat wandelen in de natuur altijd je hoogste RI oplevert — hoger dan welke ademoefening ook.</p>
+
+      <p><strong>De vier kanalen van het Innerlijk Kompas</strong></p>
+      <p>Bij elke situatiemeting kun je aangeven wat er vooral speelt: lichamelijk, emotioneel, mentaal of spiritueel. Deze vier kanalen komen uit het Columbus Catalyst Code model en helpen je begrijpen op welk niveau een situatie je raakt:</p>
+      <ul>
+        <li><strong>Lichamelijk:</strong> spanning in je schouders, vermoeidheid, hoofdpijn, onrust in je lijf</li>
+        <li><strong>Emotioneel:</strong> een gevoel dat er is maar lastig te benoemen — onzekerheid, frustratie, verdriet, vreugde</li>
+        <li><strong>Mentaal:</strong> je hoofd dat niet stopt, piekeren, analyseren, plannen maken</li>
+        <li><strong>Spiritueel:</strong> het gevoel dat iets niet klopt op een dieper niveau, of juist dat je helemaal op je plek bent</li>
+      </ul>
+      <p>Over tijd laat het patroon van deze kanalen zien waar jouw gevoeligheid zit. Dat is geen probleem. Dat is zelfkennis.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- ===== BETER HERSTELLEN ===== -->
+<div class="kc-section" id="kc-gevoel">
+
+  <div class="kc-card">
+    <h3>{% if lang=="de" %}🧠 Was sagt Ihr Gefühl?{% elif lang=="en" %}🧠 What does your feeling say?{% else %}🧠 Wat zegt jouw gevoel?{% endif %}</h3>
+    <p>{% if lang=="de" %}Der StressChecker misst objektiv, wie gut Ihr Körper sich erholt. Aber was <em>Sie wahrnehmen</em>, ist genauso wertvoll. Manchmal fühlen Sie sich gestresst, während Ihr Körper sich gut erholt – oder umgekehrt. Genau dieser Unterschied ist der Beginn echter Bewusstheit.{% elif lang=="en" %}The StressChecker measures objectively how well your body recovers. But what <em>you perceive</em> is equally valuable. Sometimes you feel stressed while your body recovers well – or the opposite. That difference is exactly where awareness begins.{% else %}De StressChecker meet objectief hoe goed jouw lichaam herstelt. Maar wat <em>jij ervaart</em>, is net zo waardevol. Soms voel je je gespannen terwijl je lichaam goed herstelt — of andersom. Dat verschil is precies waar bewustwording begint.{% endif %}</p>
+  </div>
+
+  <div class="kc-card">
+    <h3>{% if lang=="de" %}📊 Was Sie durch Vergleich lernen{% elif lang=="en" %}📊 What you learn by comparing{% else %}📊 Wat je leert door vergelijken{% endif %}</h3>
+    <p>{% if lang=="de" %}Bevor jede Messung geben Sie an, wie entspannt Sie sich <em>fühlen</em>. Danach sehen Sie, was Ihr Körper tatsächlich gemessen hat. Mit der Zeit erkennen Sie:{% elif lang=="en" %}Before each measurement you indicate how relaxed you <em>feel</em>. Afterwards you see what your body actually measured. Over time you discover:{% else %}Voor elke meting geef je aan hoe ontspannen jij je <em>voelt</em>. Daarna zie je wat je lichaam werkelijk mat. Over tijd ontdek je:{% endif %}</p>
+    <ul>
+      <li>{% if lang=="de" %}Neigen Sie dazu, Ihren Stress zu über- oder unterschätzen?{% elif lang=="en" %}Are you tending to over- or underestimate your stress?{% else %}Neig jij ertoe je stress te over- of onderschatten?{% endif %}</li>
+      <li>{% if lang=="de" %}Welche Situationen wirken sich mehr auf Ihren Körper aus als Sie denken?{% elif lang=="en" %}Which situations affect your body more than you think?{% else %}Welke situaties hebben meer effect op jouw lichaam dan je denkt?{% endif %}</li>
+      <li>{% if lang=="de" %}Werden Gefühl und Messung im Laufe der Zeit übereinstimmender?{% elif lang=="en" %}Does your feeling align more with the measurement over time?{% else %}Komen gevoel en meting over tijd dichter bij elkaar?{% endif %}</li>
+    </ul>
+    <p>{% if lang=="de" %}Das ist kein Test – es ist ein Spiegel. Je öfter Sie ihn nutzen, desto klarer wird das Bild.{% elif lang=="en" %}This is not a test – it is a mirror. The more often you use it, the clearer the picture.{% else %}Zie het doen van metingen niet als een test — het is een spiegel. Hoe vaker je hem gebruikt, hoe scherper je inzicht.{% endif %}</p>
+  </div>
+
+  <div class="kc-card">
+    <h3>{% if lang=="de" %}💡 Körperbewusstsein trainieren{% elif lang=="en" %}💡 Training body awareness{% else %}💡 Lichaamsbewustzijn trainen{% endif %}</h3>
+    <p>{% if lang=="de" %}Körperbewusstsein – das Spüren, was in Ihnen vorgeht – ist eine Kernfähigkeit für nachhaltige Stressregulation. Es entwickelt sich nicht durch Willenskraft, sondern durch regelmäßige, aufmerksame Beobachtung. Die tägliche Einschätzung vor Ihrer Messung ist genau das: eine kleine Übung in Selbstwahrnehmung.{% elif lang=="en" %}Body awareness – sensing what is happening inside you – is a core skill for sustainable stress regulation. It does not develop through willpower, but through regular, attentive observation. The daily self-assessment before your measurement is exactly that: a small exercise in self-perception.{% else %}Lichaamsbewustzijn — het voelen van wat er in je omgaat — is een kernvaardigheid voor duurzame stressregulatie. Het ontwikkelt zich niet door wilskracht, maar door regelmatige, aandachtige observatie. De dagelijkse inschatting vóór je meting is precies dat: een kleine oefening in zelfwaarneming.{% endif %}</p>
+  </div>
+
+</div>
+<div class="kc-section" id="kc-gevoel">
+
+  <div class="kc-card">
+    <h3>{% if lang=="de" %}🧠 Was sagt Ihr Gefühl?{% elif lang=="en" %}🧠 What does your feeling say?{% else %}🧠 Wat zegt jouw gevoel?{% endif %}</h3>
+    <p>{% if lang=="de" %}Der StressChecker misst objektiv, wie gut Ihr Körper sich erholt. Aber was <em>Sie wahrnehmen</em>, ist genauso wertvoll. Manchmal fühlen Sie sich gestresst, während Ihr Körper sich gut erholt – oder umgekehrt. Genau dieser Unterschied ist der Beginn echter Bewusstheit.{% elif lang=="en" %}The StressChecker measures objectively how well your body recovers. But what <em>you perceive</em> is equally valuable. Sometimes you feel stressed while your body recovers well – or the opposite. That difference is exactly where awareness begins.{% else %}De StressChecker meet objectief hoe goed jouw lichaam herstelt. Maar wat <em>jij ervaart</em>, is net zo waardevol. Soms voel je je gespannen terwijl je lichaam goed herstelt — of andersom. Dat verschil is precies waar bewustwording begint.{% endif %}</p>
+  </div>
+
+  <div class="kc-card">
+    <h3>{% if lang=="de" %}📊 Was Sie durch Vergleich lernen{% elif lang=="en" %}📊 What you learn by comparing{% else %}📊 Wat je leert door vergelijken{% endif %}</h3>
+    <p>{% if lang=="de" %}Bevor jede Messung geben Sie an, wie entspannt Sie sich <em>fühlen</em>. Danach sehen Sie, was Ihr Körper tatsächlich gemessen hat. Mit der Zeit erkennen Sie:{% elif lang=="en" %}Before each measurement you indicate how relaxed you <em>feel</em>. Afterwards you see what your body actually measured. Over time you discover:{% else %}Voor elke meting geef je aan hoe ontspannen jij je <em>voelt</em>. Daarna zie je wat je lichaam werkelijk mat. Over tijd ontdek je:{% endif %}</p>
+    <ul>
+      <li>{% if lang=="de" %}Neigen Sie dazu, Ihren Stress zu über- oder unterschätzen?{% elif lang=="en" %}Are you tending to over- or underestimate your stress?{% else %}Neig jij ertoe je stress te over- of onderschatten?{% endif %}</li>
+      <li>{% if lang=="de" %}Welche Situationen wirken sich mehr auf Ihren Körper aus als Sie denken?{% elif lang=="en" %}Which situations affect your body more than you think?{% else %}Welke situaties hebben meer effect op jouw lichaam dan je denkt?{% endif %}</li>
+      <li>{% if lang=="de" %}Werden Gefühl und Messung im Laufe der Zeit übereinstimmender?{% elif lang=="en" %}Does your feeling align more with the measurement over time?{% else %}Komen gevoel en meting over tijd dichter bij elkaar?{% endif %}</li>
+    </ul>
+    <p>{% if lang=="de" %}Das ist kein Test – es ist ein Spiegel. Je öfter Sie ihn nutzen, desto klarer wird das Bild.{% elif lang=="en" %}This is not a test – it is a mirror. The more often you use it, the clearer the picture.{% else %}Zie het doen van metingen niet als een test — het is een spiegel. Hoe vaker je hem gebruikt, hoe scherper je inzicht.{% endif %}</p>
+  </div>
+
+  <div class="kc-card">
+    <h3>{% if lang=="de" %}💡 Körperbewusstsein trainieren{% elif lang=="en" %}💡 Training body awareness{% else %}💡 Lichaamsbewustzijn trainen{% endif %}</h3>
+    <p>{% if lang=="de" %}Körperbewusstsein – das Spüren, was in Ihnen vorgeht – ist eine Kernfähigkeit für nachhaltige Stressregulation. Es entwickelt sich nicht durch Willenskraft, sondern durch regelmäßige, aufmerksame Beobachtung. Die tägliche Einschätzung vor Ihrer Messung ist genau das: eine kleine Übung in Selbstwahrnehmung.{% elif lang=="en" %}Body awareness – sensing what is happening inside you – is a core skill for sustainable stress regulation. It does not develop through willpower, but through regular, attentive observation. The daily self-assessment before your measurement is exactly that: a small exercise in self-perception.{% else %}Lichaamsbewustzijn — het voelen van wat er in je omgaat — is een kernvaardigheid voor duurzame stressregulatie. Het ontwikkelt zich niet door wilskracht, maar door regelmatige, aandachtige observatie. De dagelijkse inschatting vóór je meting is precies dat: een kleine oefening in zelfwaarneming.{% endif %}</p>
+  </div>
+
+</div>
+  <div class="kc-section" id="kc-herstel">
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">🌿</span> {% if lang=="de" %}10 Faktoren die Ihren ANS beeinflussen{% elif lang=="en" %}10 factors that influence your ANS{% else %}10 factoren die je ANS beïnvloeden{% endif %}</h3>
+      <div class="kc-factor-grid">
+        {% if lang=="de" %}
+        <div class="kc-factor"><strong>😤 Stress</strong>Gedanken, Sorgen, Druck — auch positiver Stress (Eustress) belastet das ANS</div>
+        <div class="kc-factor"><strong>🫁 Atmung</strong>Langsame, tiefe Atmung aktiviert den Vagusnerv und fördert Erholung</div>
+        <div class="kc-factor"><strong>🏃 Bewegung</strong>Regelmäßige Bewegung verbessert langfristig die HRV; intensive Einheiten senken sie kurzfristig</div>
+        <div class="kc-factor"><strong>🥗 Ernährung</strong>Schwere Mahlzeiten, Alkohol und Koffein belasten das ANS noch Stunden danach</div>
+        <div class="kc-factor"><strong>😴 Schlaf</strong>Schlechter Schlaf ist der stärkste Einzelfaktor für niedrige HRV am nächsten Morgen</div>
+        <div class="kc-factor"><strong>🌡️ Umgebung</strong>Hitze, Kälte, Lärm und Luftqualität beeinflussen das ANS direkt</div>
+        <div class="kc-factor"><strong>🤝 Soziales</strong>Einsamkeit erhöht chronisch die Sympathikusaktivität; Verbundenheit fördert Erholung</div>
+        <div class="kc-factor"><strong>🧩 Kognition</strong>Entscheidungsmüdigkeit und Informationsüberflutung kosten ANS-Ressourcen</div>
+        <div class="kc-factor"><strong>💊 Medikamente</strong>Bestimmte Mittel (Betablocker, Stimulanzien) verändern das HRV-Bild erheblich</div>
+        <div class="kc-factor"><strong>🩺 Chronische Erkrankungen</strong>Diabetes, Herzkrankheiten und chronische Entzündungen senken strukturell die HRV</div>
+        {% elif lang=="en" %}
+        <div class="kc-factor"><strong>😤 Stress</strong>Thoughts, worries, pressure — even positive stress (eustress) loads the ANS</div>
+        <div class="kc-factor"><strong>🫁 Breathing</strong>Slow, deep breathing activates the vagus nerve and promotes recovery</div>
+        <div class="kc-factor"><strong>🏃 Exercise</strong>Regular exercise improves HRV long-term; intense sessions lower it short-term</div>
+        <div class="kc-factor"><strong>🥗 Nutrition</strong>Heavy meals, alcohol and caffeine load the ANS for hours afterwards</div>
+        <div class="kc-factor"><strong>😴 Sleep</strong>Poor sleep is the single strongest factor for low HRV the next morning</div>
+        <div class="kc-factor"><strong>🌡️ Environment</strong>Heat, cold, noise and air quality directly affect the ANS</div>
+        <div class="kc-factor"><strong>🤝 Social</strong>Loneliness chronically increases sympathetic activity; connection promotes recovery</div>
+        <div class="kc-factor"><strong>🧩 Cognition</strong>Decision fatigue and information overload consume ANS resources</div>
+        <div class="kc-factor"><strong>💊 Medication</strong>Certain drugs (beta blockers, stimulants) significantly alter the HRV picture</div>
+        <div class="kc-factor"><strong>🩺 Chronic illness</strong>Diabetes, heart disease and chronic inflammation structurally lower HRV</div>
+        {% else %}
+        <div class="kc-factor"><strong>😤 Stress</strong>Gedachten, zorgen, druk — ook positieve stress (eustress) belast het ANS</div>
+        <div class="kc-factor"><strong>🫁 Ademhaling</strong>Langzaam, diep ademen activeert de nervus vagus en bevordert herstel</div>
+        <div class="kc-factor"><strong>🏃 Beweging</strong>Regelmatige beweging verbetert HRV op lange termijn; intensieve sessies verlagen hem kortstondig</div>
+        <div class="kc-factor"><strong>🥗 Voeding</strong>Zware maaltijden, alcohol en cafeïne belasten het ANS nog uren daarna</div>
+        <div class="kc-factor"><strong>😴 Slaap</strong>Slechte slaap is de sterkste enkelvoudige factor voor lage HRV de volgende ochtend</div>
+        <div class="kc-factor"><strong>🌡️ Omgeving</strong>Warmte, kou, lawaai en luchtkwaliteit beïnvloeden het ANS direct</div>
+        <div class="kc-factor"><strong>🤝 Sociaal</strong>Eenzaamheid verhoogt chronisch de sympathicusactiviteit; verbondenheid bevordert herstel</div>
+        <div class="kc-factor"><strong>🧩 Cognitie</strong>Beslissingsvermoeidheid en informatiestress beperken het herstelvermogen van het ANS.</div>
+        <div class="kc-factor"><strong>💊 Medicatie</strong>Bepaalde middelen (bètablokkers, stimulantia) veranderen het HRV-beeld aanzienlijk</div>
+        <div class="kc-factor"><strong>🩺 Chronische aandoeningen</strong>Diabetes, hartziekten en chronische ontstekingen verlagen structureel de HRV</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">🎛️</span> {% if lang=="de" %}Biofeedback nutzen{% elif lang=="en" %}Using biofeedback{% else %}Biofeedback gebruiken{% endif %}</h3>
+      {% if lang=="de" %}
+      <p>Mit dem Biofeedback-Modus sehen Sie in Echtzeit, wie Ihre Herzfrequenz und HRV auf Ihr Verhalten reagieren. Das macht bestimmte Zusammenhänge direkt erlebbar:</p>
+      <ul>
+        <li>Wie verändert sich die Kurve, wenn Sie langsamer atmen?</li>
+        <li>Was passiert, wenn Sie an etwas Schönes denken?</li>
+        <li>Wie schnell erholt sich Ihr ANS nach einer kurzen Anspannung?</li>
+      </ul>
+      <p>Biofeedback ist kein Trainingsprotokoll — es ist ein Spiegel. Sie lernen Ihren Körper kennen und können gezielte Übungen ausprobieren.</p>
+      {% elif lang=="en" %}
+      <p>Biofeedback mode shows you in real time how your heart rate and HRV respond to your behaviour. This makes certain connections directly tangible:</p>
+      <ul>
+        <li>How does the curve change when you breathe more slowly?</li>
+        <li>What happens when you think of something pleasant?</li>
+        <li>How quickly does your ANS recover after a brief moment of tension?</li>
+      </ul>
+      <p>Biofeedback is not a training protocol — it's a mirror. You get to know your body and can test targeted exercises.</p>
+      {% else %}
+      <p>Met de biofeedback-modus zie je in real time hoe je hartslag en HRV reageren op je gedrag. Dat maakt bepaalde verbanden direct voelbaar:</p>
+      <ul>
+        <li>Hoe verandert de curve als je langzamer ademt?</li>
+        <li>Wat gebeurt er als je aan iets moois denkt?</li>
+        <li>Hoe snel herstelt je ANS na een korte spanning?</li>
+      </ul>
+      <p>Biofeedback is geen trainingsprotocol — het is een spiegel. Je leert je lichaam kennen en kunt gerichte oefeningen testen.</p>
+      {% endif %}
+    </div>
+
+    <!-- Biofeedback: hoe werkt het écht? -->
+    <div class="kc-card">
+      <h3><span class="kc-icon">🧠</span> {% if lang=="de" %}Wie funktioniert Biofeedback wirklich?{% elif lang=="en" %}How does biofeedback really work?{% else %}Hoe werkt biofeedback écht?{% endif %}</h3>
+
+      {% if lang=="de" %}
+      <p><strong>Nicht messen, sondern reagieren</strong></p>
+      <p>Bei einer Basismessung beobachten Sie. Bei Biofeedback tun Sie etwas — und schauen, wie Ihr Körper reagiert. Das ist ein fundamentaler Unterschied. Sie misst nicht Ihren Zustand, Sie misst die Wirkung Ihrer Handlung. Atemübung, Visualisierung, Musik, Stille: Biofeedback zeigt, was in Ihrem autonomen Nervensystem passiert, während Sie aktiv sind.</p>
+      <p>Das macht Biofeedback zu einem Gespräch mit Ihrem Körper. Nicht Sie sagen Ihrem Körper, was er tun soll — Ihr Körper zeigt Ihnen, was bereits geschieht.</p>
+
+      <p><strong>Warum ein Abfall auch informativ sein kann</strong></p>
+      <p>Manchmal sinkt Ihr RI während einer Biofeedback-Sitzung. Das kann überraschen — Sie entspannen sich doch? Aber ein vorübergehender Rückgang ist nicht unbedingt negativ. Es kann bedeuten, dass:</p>
+      <ul>
+        <li>Ihr Körper Spannung loslässt, die er festhielt — Loslassen fühlt sich anfangs unangenehm an</li>
+        <li>Ihr Nervensystem tiefer geht, bevor es sich erholt — wie ein Muskel, der sich erst dehnt, bevor er entspannt</li>
+        <li>Die Übung etwas berührt hat, das Aufmerksamkeit braucht — eine Emotion, eine Erinnerung, eine körperliche Blockade</li>
+      </ul>
+      <p>Ein Anstieg nach einem Abfall ist oft kraftvoller als ein allmählicher Anstieg. Ihr Körper musste erst durch etwas hindurch.</p>
+
+      <p><strong>Schnell und langsam reagierende Nervensysteme</strong></p>
+      <p>Nicht jeder reagiert gleich schnell auf eine Intervention. Manche Menschen sehen ihren RI innerhalb von 30 Sekunden bei einer Atemübung steigen. Bei anderen geschieht es erst nach der Sitzung, oder sogar am nächsten Morgen in der Basismessung.</p>
+      <p>Das sagt nichts darüber aus, wie "gut" Sie im Entspannen sind. Es sagt etwas über den Aufbau Ihres Nervensystems — Ihre Konstitution, Ihr Alter, Ihre Geschichte. Ein langsam reagierendes ANS ist nicht weniger effektiv. Es lernt nur in einem anderen Tempo.</p>
+
+      <p><strong>Wiederholung ist das Geheimnis</strong></p>
+      <p>Ihr autonomes Nervensystem lernt durch Wiederholung, nicht durch Intensität. Eine lange Meditation verändert weniger als zehn kurze Momente bewussten Atmens, verteilt über die Woche. Biofeedback hilft Ihnen zu entdecken, welche Übungen für sich funktionieren — und diese Entdeckung wird wertvoller, je öfter Sie es tun. Das erste Mal ist Kennenlernen. Das zehnte Mal ist Wiedererkennen. Das hundertste Mal ist ein Automatismus.</p>
+
+      {% elif lang=="en" %}
+      <p><strong>Not measuring, but responding</strong></p>
+      <p>During a baseline reading, you observe. During biofeedback, you do something — and watch how your body responds. That's a fundamental difference. You're not measuring your state, you're measuring the effect of your action. Breathing exercise, visualization, music, silence: biofeedback shows what's happening in your autonomic nervous system while you're at it.</p>
+      <p>This makes biofeedback a conversation with your body. You don't tell your body what to do — your body shows you what's already happening.</p>
+
+      <p><strong>Why a dip can also be informative</strong></p>
+      <p>Sometimes your RI drops during a biofeedback session. That can feel surprising — aren't you relaxing? But a temporary dip isn't necessarily negative. It can mean that:</p>
+      <ul>
+        <li>Your body is releasing tension it was holding — letting go feels uncomfortable at first</li>
+        <li>Your nervous system is going deeper before it recovers — like a muscle that stretches before it relaxes</li>
+        <li>The exercise touched something that needs attention — an emotion, a memory, a physical blockage</li>
+      </ul>
+      <p>A rise after a dip is often more powerful than a gradual rise. Your body had to go through something first.</p>
+
+      <p><strong>Fast and slow responding nervous systems</strong></p>
+      <p>Not everyone responds equally quickly to an intervention. Some people see their RI rise within 30 seconds during a breathing exercise. For others, it happens after the session, or even the next morning in the baseline reading.</p>
+      <p>This says nothing about how "good" you are at relaxing. It says something about how your nervous system is built — your constitution, your age, your history. A slow-responding ANS is not less effective. It simply learns at a different pace.</p>
+
+      <p><strong>Repetition is the secret</strong></p>
+      <p>Your autonomic nervous system learns through repetition, not intensity. One long meditation changes less than ten short moments of conscious breathing spread across the week. Biofeedback helps you discover which exercises work for you — and that discovery becomes more valuable the more often you do it. The first time is getting acquainted. The tenth time is recognition. The hundredth time is automatic.</p>
+
+      {% else %}
+      <p><strong>Niet meten, maar reageren</strong></p>
+      <p>Bij een basismeting observeer je. Bij biofeedback doe je iets — en kijkt hoe je lichaam reageert. Dat is een fundamenteel verschil. Je meet niet je toestand, je meet het effect van je handeling. Zaken als bijvoorbeeld ademoefening, visualisatie, muziek, stilte: biofeedback laat zien wat er gebeurt in je autonoom zenuwstelsel terwijl je bezig bent.</p>
+      <p>Dit maakt biofeedback tot een gesprek met je lichaam. Niet jij vertelt je lichaam wat het moet doen — je lichaam laat jou zien wat er al gebeurt.</p>
+
+      <p><strong>Waarom een dip ook informatief kan zijn</strong></p>
+      <p>Soms daalt je RI tijdens een biofeedback-sessie. Dat kan verrassend voelen — je bent toch aan het ontspannen? Maar een tijdelijke daling is niet per se negatief. Het kan betekenen dat:</p>
+      <ul>
+        <li>Je lichaam spanning loslaat die het vasthield — loslaten voelt eerst oncomfortabel</li>
+        <li>Je zenuwstelsel dieper gaat voordat het herstelt — zoals een spier die eerst rekt voor hij ontspant</li>
+        <li>De oefening iets raakte wat aandacht nodig heeft — een emotie, een herinnering, een lichamelijke blokkade</li>
+      </ul>
+      <p>Een stijging na een dip is vaak krachtiger dan een geleidelijke stijging. Je lichaam moest eerst ergens doorheen.</p>
+
+      <p><strong>Snel en langzaam reagerende zenuwstelsels</strong></p>
+      <p>Niet iedereen reageert even snel op een interventie. Sommige mensen zien hun RI binnen 30 seconden stijgen bij een ademoefening. Bij anderen gebeurt het pas na de sessie, of zelfs de volgende ochtend in de basismeting.</p>
+      <p>Dit zegt niets over hoe "goed" je bent in ontspannen. Het zegt iets over hoe jouw zenuwstelsel is opgebouwd — door je constitutie, je leeftijd, je geschiedenis. Een langzaam reagerend ANS is niet minder effectief. Het leert alleen op een ander tempo.</p>
+
+      <p><strong>Herhaling is het geheim</strong></p>
+      <p>Je autonoom zenuwstelsel leert door herhaling, niet door intensiteit. Eén lange meditatie verandert minder dan tien korte momenten van bewuste adem verspreid over de week. Biofeedback helpt je ontdekken welke oefeningen voor jou werken — en die ontdekking wordt waardevoller naarmate je het vaker doet. De eerste keer is kennismaking. De tiende keer is herkenning. De honderdste keer is een automatisme.</p>
+      {% endif %}
+    </div>
+
+</div>
+
+
+  <!-- ===== SPORT ===== -->
+  <div class="kc-section" id="kc-sport">
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">🏃</span> {% if lang=="de" %}Sport und Ihr ANS{% elif lang=="en" %}Sport and your ANS{% else %}Sport en het ANS{% endif %}</h3>
+      {% if lang=="de" %}
+      <p>Intensives Training belastet Ihren Körper — das ist gut und beabsichtigt. Aber Anpassung geschieht nicht während des Trainings, sondern danach. Erholung ist kein Luxus, sondern der Moment, in dem Sie stärker werden.</p>
+      <p>Die HRV ist einer der zuverlässigsten Indikatoren für Ihren Erholungsstatus. Eine niedrige Relax Index-Messung am Morgen nach einer intensiven Einheit ist normal — sie zeigt, dass Ihr Körper noch arbeitet.</p>
+      {% elif lang=="en" %}
+      <p>Intensive training loads your body — that's good and intentional. But adaptation doesn't happen during training, it happens afterwards. Recovery isn't a luxury, it's the moment you become stronger.</p>
+      <p>HRV is one of the most reliable indicators of your recovery status. A low Relax Index reading the morning after an intense session is normal — it shows your body is still working.</p>
+      {% else %}
+      <p>Intensief trainen belast het lichaam. Dat is iets dat je wilt en bewust voor kiest. Het herstel van je lichaam begint pas na je training. Dit herstel is geen luxe, maar pure noodzaak om sterker te worden.</p>
+      <p>De HRV en de BPM zijn een van de betrouwbaarste indicatoren voor de mate van herstel. Een lage Relax Index (combinatie van de gemiddelde hartslag en gemiddelde HRV, gemeten gedurende 90 seconden) de ochtend na een intensieve sessie is normaal — het toont dat je lichaam nog herstellende is.</p>
+      {% endif %}
+    </div>
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">📊</span> {% if lang=="de" %}Was sagt Ihre Messung nach dem Sport?{% elif lang=="en" %}What does your reading say after exercise?{% else %}Wat zegt je meting na het sporten?{% endif %}</h3>
+      <table class="kc-ri-table">
+        <tr>
+          <th>RI</th>
+          <th>{% if lang=="de" %}Bedeutung{% elif lang=="en" %}Meaning{% else %}Betekenis{% endif %}</th>
+          <th>{% if lang=="de" %}Was tun?{% elif lang=="en" %}What to do?{% else %}Wat doen?{% endif %}</th>
+        </tr>
+        <tr>
+          <td><span class="ri-dot" style="background:#1a7a3e"></span>8–10</td>
+          <td>{% if lang=="de" %}Vollständig erholt{% elif lang=="en" %}Fully recovered{% else %}Volledig hersteld{% endif %}</td>
+          <td>{% if lang=="de" %}Intensives Training möglich{% elif lang=="en" %}Intense training possible{% else %}Intensieve training mogelijk{% endif %}</td>
+        </tr>
+        <tr>
+          <td><span class="ri-dot" style="background:#52b788"></span>6–7</td>
+          <td>{% if lang=="de" %}Gut erholt{% elif lang=="en" %}Well recovered{% else %}Goed hersteld{% endif %}</td>
+          <td>{% if lang=="de" %}Normale Trainingseinheit{% elif lang=="en" %}Normal training session{% else %}Normale trainingssessie{% endif %}</td>
+        </tr>
+        <tr>
+          <td><span class="ri-dot" style="background:#f4a261"></span>4–5</td>
+          <td>{% if lang=="de" %}Teilweise erholt{% elif lang=="en" %}Partially recovered{% else %}Beperkt hersteld{% endif %}</td>
+          <td>{% if lang=="de" %}Leichte Einheit oder Techniktraining{% elif lang=="en" %}Light session or technique work{% else %}Lichte sessie of techniektraining{% endif %}</td>
+        </tr>
+        <tr>
+          <td><span class="ri-dot" style="background:#e63946"></span>0–3</td>
+          <td>{% if lang=="de" %}Unzureichend erholt{% elif lang=="en" %}Insufficiently recovered{% else %}Onvoldoende hersteld{% endif %}</td>
+          <td>{% if lang=="de" %}Ruhetag oder aktive Erholung (spazieren, dehnen){% elif lang=="en" %}Rest day or active recovery (walk, stretch){% else %}Rustdag of actief herstel beïnvloeden (wandelen, rekoefeningen){% endif %}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">⚠️</span> {% if lang=="de" %}Übertraining erkennen{% elif lang=="en" %}Recognising overtraining{% else %}Overtraining herkennen{% endif %}</h3>
+      {% if lang=="de" %}
+      <p>Übertraining entsteht nicht durch eine harte Einheit, sondern durch <strong>wiederholte Belastung ohne ausreichende Erholung</strong>. Die HRV macht das sichtbar bevor Sie es spüren.</p>
+      <p>Signale die auf Übertraining hinweisen:</p>
+      <ul>
+        <li>Mehrere aufeinanderfolgende Tage mit RI unter 4</li>
+        <li>Morgendliche HRV sinkt trotz reduziertem Training</li>
+        <li>Sie fühlen Sie müde, obwohl Sie genug geschlafen haben</li>
+        <li>Leistung sinkt trotz harter Arbeit</li>
+      </ul>
+      <p>Was tun? Mindestens 2–3 komplette Ruhetage einlegen. Schlaf priorisieren. Erst wenn die RI wieder konsistent über 6 liegt, mit intensivem Training fortfahren.</p>
+      {% elif lang=="en" %}
+      <p>Overtraining doesn't arise from one hard session, but from <strong>repeated load without sufficient recovery</strong>. HRV makes this visible before you feel it.</p>
+      <p>Signs pointing to overtraining:</p>
+      <ul>
+        <li>Several consecutive days with RI below 4</li>
+        <li>Morning HRV dropping despite reduced training</li>
+        <li>Feeling tired even though you've slept enough</li>
+        <li>Performance declining despite hard work</li>
+      </ul>
+      <p>What to do? Take at least 2–3 complete rest days. Prioritise sleep. Only resume intense training when RI is consistently above 6 again.</p>
+      {% else %}
+      <p>Overtraining ontstaat niet door één zware sessie, maar door <strong>herhaalde belasting zonder voldoende herstel</strong>. HRV maakt dit zichtbaar voordat je het voelt.</p>
+      <p>Signalen die wijzen op overtraining:</p>
+      <ul>
+        <li>Meerdere opeenvolgende dagen met RI onder de 4</li>
+        <li>Ochtend-HRV daalt ondanks minder training</li>
+        <li>Je voelt je moe terwijl je genoeg hebt geslapen</li>
+        <li>Prestaties dalen ondanks hard werken</li>
+      </ul>
+      <p>Wat doen? Neem minimaal 2–3 volledige rustdagen. Prioriteit geven aan slaap. Pas als de RI weer consistent boven de 6 staat, intensief hervatten.</p>
+      {% endif %}
+    </div>
+
+    <div class="kc-card">
+      <h3><span class="kc-icon">💡</span> {% if lang=="de" %}Biofeedback für Sport{% elif lang=="en" %}Biofeedback for sport{% else %}Biofeedback voor sport{% endif %}</h3>
+      {% if lang=="de" %}
+      <p>Der Biofeedback-Modus eignet sich gut für die mentale Vorbereitung vor dem Training oder Wettkampf. Beobachte wie Ihr ANS auf folgendes reagiert:</p>
+      <ul>
+        <li>Aufwärmen — steigt Ihre HRV oder sinkt sie?</li>
+        <li>Visualisierung Ihrer Leistung</li>
+        <li>Atemübungen vor dem Start</li>
+      </ul>
+      <p>Viele Sportler entdecken, dass Nervosität vor dem Wettkampf die HRV kurzfristig senkt — aber dass gezielte Atemübungen sie schnell wieder stabilisieren.</p>
+      {% elif lang=="en" %}
+      <p>Biofeedback mode is well suited for mental preparation before training or competition. Observe how your ANS responds to:</p>
+      <ul>
+        <li>Warming up — does your HRV rise or fall?</li>
+        <li>Visualising your performance</li>
+        <li>Breathing exercises before the start</li>
+      </ul>
+      <p>Many athletes discover that pre-competition nerves temporarily lower HRV — but that targeted breathing exercises quickly stabilise it again.</p>
+      {% else %}
+      <p>De biofeedback-modus is goed geschikt voor mentale voorbereiding voor training of wedstrijd. Observeer hoe je ANS reageert op:</p>
+      <ul>
+        <li>Opwarmen — stijgt je HRV of daalt ze?</li>
+        <li>Visualisatie van je prestatie</li>
+        <li>Ademoefeningen voor de start</li>
+      </ul>
+      <p>Veel sporters ontdekken dat wedstrijdzenuwachtigheid de HRV kortstondig verlaagt — maar dat gerichte ademoefeningen hem snel weer stabiliseren.</p>
+      {% endif %}
+    </div>
+
+      <div class="kc-card">
+        <h3><span class="kc-icon">⏰</span> {% if lang=="de" %}Wann messen?{% elif lang=="en" %}When to measure?{% else %}Wanneer meten?{% endif %}</h3>
+        {% if lang=="de" %}<p>Die zuverlässigste Messung ist <strong>morgens direkt nach dem Aufwachen</strong> — bevor das Nervensystem Tagesreizen ausgesetzt wird.</p><div class="kc-highlight">Messen Sie täglich zur gleichen Zeit und in derselben Position. Nur so erkennen Sie Trends über Zeit.</div>
+        {% elif lang=="en" %}<p>The most reliable measurement is <strong>in the morning directly after waking</strong> — before the nervous system is exposed to daily stimuli.</p><div class="kc-highlight">Measure at the same time each day in the same position. Only then can you identify trends over time.</div>
+        {% else %}<p>De meest betrouwbare meting is <strong>'s ochtends direct na het opstaan</strong> — voordat het zenuwstelsel blootgesteld wordt aan de dagelijkse prikkels.</p><div class="kc-highlight">Meet bij voorkeur elke dag op hetzelfde tijdstip en in dezelfde positie. Alleen zo kun je trends over tijd herkennen.</div>{% endif %}
+      </div>
+
+      <div class="kc-card">
+        <h3><span class="kc-icon">📈</span> {% if lang=="de" %}Trainingsplan aufbauen{% elif lang=="en" %}Building a training plan{% else %}Trainingsplan opbouwen{% endif %}</h3>
+        {% if lang=="de" %}<p>Bestimmen Sie zuerst Ihren <strong>Referenzwert</strong> (Relax Index) über 1–2 Wochen. Steigern Sie dann schrittweise das Training und messen Sie am nächsten Morgen.</p><div class="kc-highlight">Ziel ist nicht der höchste Score — sondern Ihren Score bei steigender Belastung nahe am Referenzwert zu halten.</div>
+        {% elif lang=="en" %}<p>First determine your <strong>reference value</strong> (Relax Index) over 1–2 weeks. Then gradually increase training and measure the next morning.</p><div class="kc-highlight">The goal is not the highest score — but keeping your score close to the reference value as training load increases.</div>
+        {% else %}<p>Bepaal eerst je <strong>basiswaarde</strong> (Relax Index) over 1–2 weken. Verzwaar daarna stap voor stap je training en meet de volgende ochtend.</p><div class="kc-highlight">Het doel is niet de hoogste score — maar je score in de buurt van je basiswaarde houden bij een oplopende trainingsbelasting.</div>{% endif %}
+      </div>
+
+      <div class="kc-card">
+        <h3><span class="kc-icon">🧘</span> {% if lang=="de" %}Stress & Wettkampf{% elif lang=="en" %}Stress & competition{% else %}Stress & wedstrijd{% endif %}</h3>
+        {% if lang=="de" %}<p>Nicht nur körperliche Erschöpfung, sondern auch <strong>mentaler Stress</strong> senkt die HRV messbar. Nutzen Sie den <strong>Biofeedback-Modus</strong> um herauszufinden, was Sie wirklich entspannt.</p>
+        {% elif lang=="en" %}<p>Not only physical exhaustion, but also <strong>mental stress</strong> measurably lowers HRV. Use <strong>Biofeedback mode</strong> to discover what truly relaxes you.</p>
+        {% else %}<p>Niet alleen lichamelijke vermoeidheid, maar ook <strong>mentale stress</strong> verlaagt de HRV meetbaar. Gebruik de <strong>biofeedbackmodus</strong> om te ontdekken wat jou echt ontspant: ademoefeningen, muziek, visualisatie.</p>{% endif %}
+      </div>
+  </div>
+
+  <!-- ===== FAQ ===== -->
+  <div class="kc-section" id="kc-faq">
+    <div class="kc-card">
+      <h3>{% if lang=="de" %}Häufig gestellte Fragen{% elif lang=="en" %}Frequently asked questions{% else %}Veelgestelde vragen{% endif %}</h3>
+      <p style="font-size:.8rem;color:#888;font-style:italic;margin-bottom:.8rem">{% if lang=="de" %}Klicken Sie auf eine Frage, um die Antwort zu sehen.{% elif lang=="en" %}Click a question to see the answer.{% else %}Klik op een vraag om het antwoord te zien.{% endif %}</p>
+
+      {% if lang=="de" %}
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">Was misst der StressChecker genau?</button><div class="kc-faq-a">Der StressChecker misst die Herzratenvariabilität (HRV) — die Schwankung im zeitlichen Abstand zwischen aufeinanderfolgenden Herzschlägen. Diese Schwankung spiegelt den Zustand Ihres autonomen Nervensystems wider und zeigt, wie gut Ihr Körper auf Belastung reagiert und sich davon erholt.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">Was ist der Relax Index?</button><div class="kc-faq-a">Der Relax Index (RI) ist eine Zahl von 0 bis 10, die aus Herzfrequenz und HRV% berechnet wird. Er basiert auf der empirischen Nachschlagetabelle des Biofeedback-Experten Ed Verveen. Ein höherer Wert bedeutet bessere Erholungsfähigkeit.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">Was ist die Basismessung?</button><div class="kc-faq-a">Die Basismessung ist eine 90-sekündige Aufzeichnung morgens, kurz nach dem Aufwachen. Sie gibt Ihnen die zuverlässigste Momentaufnahme Ihres ANS-Zustands ohne äußere Störfaktoren.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">Wie genau ist der Fingersensor?</button><div class="kc-faq-a">Der PPG-Fingersensor ist für den täglichen Gebrauch gut geeignet. Ein Brustgurt liefert präzisere ECG-Daten, aber für Trendbeobachtung über Zeit ist der Fingersensor sehr brauchbar. Wichtig: denselben Sensor konsequent nutzen, um Messungen vergleichbar zu halten.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">Kann mein Coach meine Messungen auf Distanz verfolgen?</button><div class="kc-faq-a">Ja — mit einem StressChecker Pro-Account kann Ihr Coach oder Therapeut Ihre Messungen begleiten. Sie können ihn auf diese Möglichkeit hinweisen: die Fernbegleitung ist eine echte Mehrwert für die professionelle Betreuung.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">Wie koppele ich mich an meinen Coach?</button><div class="kc-faq-a">Ihr Coach sendet Ihnen einen Kopplungscode. Gehe zum Startbildschirm → klicke auf "Ich habe einen Code" → gib den Code ein. Ab dann werden Ihre Messdaten automatisch mit Ihrem Coach geteilt.</div></div>
+      {% elif lang=="en" %}
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">What exactly does the StressChecker measure?</button><div class="kc-faq-a">The StressChecker measures heart rate variability (HRV) — the variation in time between consecutive heartbeats. This variation reflects the state of your autonomic nervous system and shows how well your body responds to and recovers from load.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">What is the Relax Index?</button><div class="kc-faq-a">The Relax Index (RI) is a number from 0 to 10, calculated from heart rate and HRV%. It is based on biofeedback expert Ed Verveen's empirical lookup table. A higher value means better recovery capacity.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">What is a baseline reading?</button><div class="kc-faq-a">The baseline reading is a 90-second recording taken in the morning shortly after waking. It gives you the most reliable snapshot of your ANS state without external disturbances.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">How accurate is the finger sensor?</button><div class="kc-faq-a">The PPG finger sensor is well suited for daily use. A chest strap provides more precise ECG data, but for trend observation over time the finger sensor is very usable. Important: use the same sensor consistently to keep readings comparable.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">Can my coach follow my readings remotely?</button><div class="kc-faq-a">Yes — with a StressChecker Pro account your coach or therapist can monitor your readings remotely. You can point them to this option: remote monitoring is a real added value for professional care.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">How do I link to my coach?</button><div class="kc-faq-a">Your coach sends you a linking code. Go to the welcome screen → click "I have a code" → enter the code. From that point your readings are automatically shared with your coach.</div></div>
+      {% else %}
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">Wat meet de StressChecker precies?</button><div class="kc-faq-a">De StressChecker meet de hartritmevariabiliteit (HRV) — de variatie in de tijdsafstand tussen opeenvolgende hartslagen. Deze variatie weerspiegelt de toestand van je autonome zenuwstelsel en toont hoe goed je lichaam reageert op belasting en er van herstelt.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">Wat is de Relax Index?</button><div class="kc-faq-a">De Relax Index (RI) is een getal van 0 tot 10, berekend uit hartslag en HRV%. Hij is gebaseerd op de empirische opzoektabel van Ed Verveen. Een hogere waarde betekent beter herstelvermogen.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">Wat is de basismeting?</button><div class="kc-faq-a">De basismeting is een 90 seconden durende opname 's ochtends, kort na het ontwaken. Die geeft je de betrouwbaarste momentopname van je ANS-toestand zonder externe verstoringen.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">Hoe nauwkeurig is de vingersensor?</button><div class="kc-faq-a">De PPG-vingersensor is goed geschikt voor dagelijks gebruik. Een borstband levert nauwkeurigere ECG-data, maar voor trendwaarneming over tijd is de vingersensor zeer bruikbaar. Belangrijk: gebruik consequent dezelfde sensor om metingen vergelijkbaar te houden.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">Kan mijn coach mijn metingen op afstand volgen?</button><div class="kc-faq-a">Ja — met een StressChecker Pro-account kan je coach of therapeut je metingen op afstand volgen. Je kunt hem of haar op deze mogelijkheid wijzen: begeleiding op afstand is een echte meerwaarde voor professionele ondersteuning.</div></div>
+      <div class="kc-faq-item"><button class="kc-faq-q" onclick="toggleFAQ(this)">Hoe koppel ik mijn StressChecker aan mijn coach?</button><div class="kc-faq-a">Je coach stuurt je een koppelcode. Ga naar het welkomscherm → klik op 'Ik heb een code' → voer de code in. Vanaf dat moment worden je metingen automatisch met je coach gedeeld.</div></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ===== BEGRIPPEN ===== -->
+  <div class="kc-section" id="kc-begrippen">
+    <div class="kc-card">
+      <h3>{% if lang=="de" %}Begriffslexikon{% elif lang=="en" %}Glossary{% else %}Begrippenlijst{% endif %}</h3>
+      <dl>
+        {% if lang=="de" %}
+        <div class="kc-begrip"><dt>ANS — Autonomes Nervensystem</dt><dd>Der Teil des Nervensystems, der Körperfunktionen wie Herzschlag, Atmung und Verdauung automatisch regelt — ohne bewusste Kontrolle.</dd></div>
+        <div class="kc-begrip"><dt>HRV — Herzratenvariabilität</dt><dd>Die Variation im zeitlichen Abstand zwischen aufeinanderfolgenden Herzschlägen. Hohe HRV bedeutet, dass das ANS flexibel reagiert — ein Zeichen guter Erholungsfähigkeit.</dd></div>
+        <div class="kc-begrip"><dt>RMSSD</dt><dd>Root Mean Square of Successive Differences. Der statistische Berechnungsweg für HRV den wir verwenden. Er ist besonders empfindlich für parasympathische Aktivität.</dd></div>
+        <div class="kc-begrip"><dt>HRV% — Relative Herzratenvariabilität</dt><dd>HRV ausgedrückt als Prozentsatz der durchschnittlichen Herzfrequenz. Das macht Werte zwischen verschiedenen Personen und über die Zeit vergleichbar.</dd></div>
+        <div class="kc-begrip"><dt>Relax Index (RI)</dt><dd>Eine zusammengesetzte Zahl (0–10) aus Herzfrequenz und HRV%, berechnet anhand der empirischen Tabelle von Ed Verveen.</dd></div>
+        <div class="kc-begrip"><dt>RR-Intervall</dt><dd>Der zeitliche Abstand zwischen zwei aufeinanderfolgenden Herzschlägen, in Millisekunden. Basis aller HRV-Berechnungen.</dd></div>
+        <div class="kc-begrip"><dt>Sympathikus</dt><dd>Der "Aktivierungsast" des ANS. Erhöht Herzfrequenz und Muskelspannung; aktiviert bei Stress oder körperlicher Belastung.</dd></div>
+        <div class="kc-begrip"><dt>Parasympathikus</dt><dd>Der "Erholungsast" des ANS. Senkt Herzfrequenz, fördert Verdauung und Schlaf; aktiviert bei Ruhe und Sicherheit.</dd></div>
+        <div class="kc-begrip"><dt>PPG — Photoplethysmographie</dt><dd>Optische Messmethode, bei der ein Lichtstrahl Blutvolumenänderungen in der Haut misst. Wird von Fingersensoren und Kameras verwendet.</dd></div>
+        <div class="kc-begrip"><dt>ECG — Elektrokardiogramm</dt><dd>Direkte elektrische Messung der Herzaktivität. Genauer als PPG. Wird von Brustgurten verwendet.</dd></div>
+        <div class="kc-begrip"><dt>Basismessung</dt><dd>Eine 90-sekündige Messung morgens nach dem Aufwachen, ohne äußere Einflüsse. Zeigt den Grundzustand Ihres ANS.</dd></div>
+        <div class="kc-begrip"><dt>Situationsmessung</dt><dd>Eine Messung zu einem bestimmten Zeitpunkt oder nach einem bestimmten Ereignis, um die ANS-Reaktion zu verstehen.</dd></div>
+        <div class="kc-begrip"><dt>Biofeedback</dt><dd>Echtzeit-Visualisierung von Herzfrequenz und HRV. Ermöglicht Ihnen, die Auswirkungen Ihres Verhaltens auf Ihr ANS direkt zu beobachten.</dd></div>
+        {% elif lang=="en" %}
+        <div class="kc-begrip"><dt>ANS — Autonomic Nervous System</dt><dd>The part of the nervous system that automatically regulates body functions such as heartbeat, breathing and digestion — without conscious control.</dd></div>
+        <div class="kc-begrip"><dt>HRV — Heart Rate Variability</dt><dd>The variation in time between consecutive heartbeats. High HRV means the ANS responds flexibly — a sign of good recovery capacity.</dd></div>
+        <div class="kc-begrip"><dt>RMSSD</dt><dd>Root Mean Square of Successive Differences. The statistical calculation method for HRV that we use. It is particularly sensitive to parasympathetic activity.</dd></div>
+        <div class="kc-begrip"><dt>HRV% — Relative Heart Rate Variability</dt><dd>HRV expressed as a percentage of average heart rate. This makes values comparable between different people and over time.</dd></div>
+        <div class="kc-begrip"><dt>Relax Index (RI)</dt><dd>A composite number (0–10) from heart rate and HRV%, calculated using Ed Verveen's empirical lookup table.</dd></div>
+        <div class="kc-begrip"><dt>RR interval</dt><dd>The time between two consecutive heartbeats, in milliseconds. The basis of all HRV calculations.</dd></div>
+        <div class="kc-begrip"><dt>Sympathetic</dt><dd>The "activation branch" of the ANS. Increases heart rate and muscle tension; activates under stress or physical load.</dd></div>
+        <div class="kc-begrip"><dt>Parasympathetic</dt><dd>The "recovery branch" of the ANS. Lowers heart rate, supports digestion and sleep; activates during rest and safety.</dd></div>
+        <div class="kc-begrip"><dt>PPG — Photoplethysmography</dt><dd>Optical measurement method where a light beam measures blood volume changes in the skin. Used by finger sensors and cameras.</dd></div>
+        <div class="kc-begrip"><dt>ECG — Electrocardiogram</dt><dd>Direct electrical measurement of cardiac activity. More accurate than PPG. Used by chest straps.</dd></div>
+        <div class="kc-begrip"><dt>Baseline reading</dt><dd>A 90-second reading taken in the morning after waking, without external influences. Shows the baseline state of your ANS.</dd></div>
+        <div class="kc-begrip"><dt>Situation reading</dt><dd>A reading at a specific moment or after a specific event, to understand the ANS response.</dd></div>
+        <div class="kc-begrip"><dt>Biofeedback</dt><dd>Real-time visualisation of heart rate and HRV. Allows you to directly observe the effect of your behaviour on your ANS.</dd></div>
+        {% else %}
+        <div class="kc-begrip"><dt>ANS — Autonoom Zenuwstelsel</dt><dd>Het deel van het zenuwstelsel dat lichaamsfuncties zoals hartslag, ademhaling en spijsvertering automatisch regelt — zonder bewuste controle.</dd></div>
+        <div class="kc-begrip"><dt>HRV — Hartritmevariabiliteit</dt><dd>De variatie in de tijdsafstand tussen opeenvolgende hartslagen. Hoge HRV betekent dat het ANS soepel reageert — een teken van goed herstelvermogen.</dd></div>
+        <div class="kc-begrip"><dt>RMSSD</dt><dd>Root Mean Square of Successive Differences. De statistische berekeningswijze voor HRV die wij gebruiken. Hij is bijzonder gevoelig voor parasympathische activiteit.</dd></div>
+        <div class="kc-begrip"><dt>HRV% — Relatieve hartritmevariabiliteit</dt><dd>HRV uitgedrukt als percentage van de gemiddelde hartslag. Dit maakt waarden vergelijkbaar tussen verschillende personen en over de tijd.</dd></div>
+        <div class="kc-begrip"><dt>Relax Index (RI)</dt><dd>Samengestelde score (0–10) uit BPM en HRV%, gebaseerd op de empirische opzoektabel van biofeedback deskundige Ed Verveen. De score wordt weergegeven in een kwadrant met de hartslag (BPM) op de X-as en de HRV% op de Y-as. De HRV% drukt de hartslagvariabiliteit uit als percentage ten opzichte van gezonde mensen van dezelfde leeftijd en hetzelfde geslacht.</dd></div>
+        <div class="kc-begrip"><dt>RR-interval</dt><dd>De tijdsafstand tussen twee opeenvolgende hartslagen, in milliseconden. De basis van alle HRV-berekeningen.</dd></div>
+        <div class="kc-begrip"><dt>Sympathicus</dt><dd>De "activeringstak" van het ANS. Verhoogt hartslag en spierspanning; activeert bij stress of lichamelijke belasting.</dd></div>
+        <div class="kc-begrip"><dt>Parasympathicus</dt><dd>De "hersteltak" van het ANS. Verlaagt hartslag, bevordert spijsvertering en slaap; activeert bij rust en veiligheid.</dd></div>
+        <div class="kc-begrip"><dt>PPG — Fotoplethysmografie</dt><dd>Optische meetmethode waarbij een lichtstraal bloedvolumeveranderingen in de huid meet. Wordt gebruikt door vingersensoren en camera's.</dd></div>
+        <div class="kc-begrip"><dt>ECG — Elektrocardiogram</dt><dd>Directe elektrische meting van hartactiviteit. Nauwkeuriger dan PPG. Wordt gebruikt door borstbanden.</dd></div>
+        <div class="kc-begrip"><dt>Basismeting</dt><dd>Een 90 seconden durende meting 's ochtends na het ontwaken, zonder externe invloeden. Toont de basisconditie van je ANS.</dd></div>
+        <div class="kc-begrip"><dt>Situatiemeting</dt><dd>Een meting op een specifiek moment of na een specifieke gebeurtenis, om de ANS-reactie te begrijpen.</dd></div>
+        <div class="kc-begrip"><dt>Biofeedback</dt><dd>Real-time visualisatie van hartslag en HRV. Hiermee kun je direct het effect van je gedrag op je ANS waarnemen.</dd></div>
+        {% endif %}
+      </dl>
+    </div>
+  </div>
+
+  <a href="{{ url_for('menu') }}" class="back-link">← {% if lang=="de" %}Zurück zum Menü{% elif lang=="en" %}Back to menu{% else %}Terug naar menu{% endif %}</a>
+</div>
+
+
+<script>
+function showKC(id) {
+  document.querySelectorAll('.kc-section').forEach(function(s){ s.classList.remove('active'); });
+  document.querySelectorAll('.kc-nav-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('kc-' + id).classList.add('active');
+  document.querySelectorAll('[data-kc="' + id + '"]').forEach(function(b){ b.classList.add('active'); });
+}
+function toggleFAQ(btn) {
+  var a = btn.nextElementSibling;
+  var isOpen = a.classList.contains('open');
+  document.querySelectorAll('.kc-faq-q').forEach(function(q){ q.classList.remove('open'); });
+  document.querySelectorAll('.kc-faq-a').forEach(function(a){ a.classList.remove('open'); });
+  if (!isOpen) { btn.classList.add('open'); a.classList.add('open'); }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width:500px;margin:3rem auto;text-align:center;padding:0 1rem;">
+  <div style="font-size:3rem;margin-bottom:1rem;">✅</div>
+  <h2>{% if lang=='de' %}Bestätigung{% elif lang=='en' %}Confirmation{% else %}Bevestiging{% endif %}</h2>
+  <p style="margin:1.5rem 0;color:#555;">{{ msg }}</p>
+  <a href="/menu" style="display:inline-block;background:#6B6360;color:#fff;padding:.85rem 2.5rem;border-radius:8px;text-decoration:none;font-size:1rem;">
+    {% if lang=='de' %}Zum Menü{% elif lang=='en' %}To menu{% else %}Naar menu{% endif %}
+  </a>
+</div>
+{% endblock %}

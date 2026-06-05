@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.mk-container{max-width:680px;margin:0 auto;padding:1rem 1rem 4rem}
+.mk-header{text-align:center;margin-bottom:1.5rem}
+.mk-header h1{font-size:1.2rem;color:#E8344E;margin-bottom:.3rem}
+.mk-header p{font-size:.85rem;color:#666}
+.mk-card{background:#fff;border-radius:12px;padding:1.2rem;margin-bottom:1rem;box-shadow:0 1px 4px rgba(0,0,0,.08);display:flex;align-items:center;gap:1rem;text-decoration:none;color:inherit}
+.mk-card:hover{box-shadow:0 3px 10px rgba(0,0,0,.15)}
+.mk-icon{font-size:2rem;min-width:48px;text-align:center}
+.mk-text h3{font-size:1rem;color:#E8344E;margin:0 0 .3rem}
+.mk-text p{font-size:.83rem;color:#555;margin:0}
+.mk-back{display:inline-flex;align-items:center;gap:.4rem;color:#E8344E;font-size:.85rem;text-decoration:none;margin-bottom:1rem}
+</style>
+<div class="mk-container">
+  <a href="/pro" class="mk-back">&#8592; {% if lang=="de" %}Zurück{% elif lang=="en" %}Back{% else %}Terug{% endif %}</a>
+  <div class="mk-header">
+    <h1>{% if lang=="de" %}Eigene Messung{% elif lang=="en" %}Own reading{% else %}Eigen meting{% endif %}</h1>
+    <p>{% if lang=="de" %}Wählen Sie den Messtyp{% elif lang=="en" %}Choose measurement type{% else %}Kies het meettype{% endif %}</p>
+  </div>
+
+  <a href="/voorbereiden?next=basismeting&cid={{ client_id }}" class="mk-card">
+    <div class="mk-icon"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#E8344E" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+    <div class="mk-text">
+      <h3>{% if lang=="de" %}Basismessung{% elif lang=="en" %}Baseline measurement{% else %}Basismeting{% endif %}</h3>
+      <p>{% if lang=="de" %}90-Sekunden ANS-Messung im Ruhezustand{% elif lang=="en" %}90-second ANS measurement at rest{% else %}90 seconden ANS-meting in rust{% endif %}</p>
+    </div>
+  </a>
+
+  <a href="/voorbereiden?next=situatiemeting&cid={{ client_id }}" class="mk-card">
+    <div class="mk-icon"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#E8344E" stroke-width="1.5"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>
+    <div class="mk-text">
+      <h3>{% if lang=="de" %}Situationsmessung{% elif lang=="en" %}Situation measurement{% else %}Situatiemeting{% endif %}</h3>
+      <p>{% if lang=="de" %}Messen in einer bestimmten Situation{% elif lang=="en" %}Measure in a specific situation{% else %}Meten in een specifieke situatie{% endif %}</p>
+    </div>
+  </a>
+
+  <a href="/voorbereiden?next=biofeedback&cid={{ client_id }}" class="mk-card">
+    <div class="mk-icon"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#E8344E" stroke-width="1.5"><path d="M2 12h3l3-9 4 18 3-9h3l2-3"/></svg></div>
+    <div class="mk-text">
+      <h3>{% if lang=="de" %}Biofeedback{% elif lang=="en" %}Biofeedback{% else %}Biofeedback{% endif %}</h3>
+      <p>{% if lang=="de" %}Frei experimentieren und entspannen{% elif lang=="en" %}Freely experiment and relax{% else %}Vrij experimenteren en ontspannen{% endif %}</p>
+    </div>
+  </a>
+</div>
+{% endblock %}

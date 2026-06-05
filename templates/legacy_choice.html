@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StressChecker - {% if lang == 'de' %}Willkommen zurück{% elif lang == 'en' %}Welcome back{% else %}Welkom terug{% endif %}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F5F0EB; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .card { background: #fff; border-radius: 20px; padding: 40px 32px; max-width: 460px; width: 92%; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+        .welcome-icon { margin-bottom: 16px; }
+        h1 { color: #E8344E; font-size: 1.6rem; margin-bottom: 8px; }
+        .subtitle { color: #666; font-size: 0.95rem; margin-bottom: 28px; line-height: 1.6; }
+        .choices { display: flex; gap: 16px; margin-bottom: 20px; }
+        .choice-btn { flex: 1; padding: 24px 12px; border: 2px solid #E8344E; border-radius: 14px; background: #fff; cursor: pointer; transition: all 0.2s; }
+        .choice-btn:hover { background: #FFF5F5; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(232,52,78,0.2); }
+        .choice-icon { margin-bottom: 12px; }
+        .choice-icon svg { width: 48px; height: 48px; }
+        .choice-title { font-weight: 700; color: #E8344E; font-size: 1.1rem; }
+        .choice-desc { color: #888; font-size: 0.8rem; margin-top: 4px; }
+        #status { display: none; padding: 12px; border-radius: 10px; font-size: 0.9rem; margin-top: 8px; }
+        .code-display { background: #F5F0EB; padding: 8px 16px; border-radius: 8px; font-family: monospace; font-size: 0.75rem; color: #999; margin-bottom: 20px; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="welcome-icon">
+            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="32" cy="32" r="30" stroke="#E8344E" stroke-width="2.5" fill="#FFF5F5"/>
+                <path d="M32 18C28 18 20 22 20 32C20 42 28 46 32 46C36 46 44 42 44 32C44 22 36 18 32 18Z" fill="none" stroke="#E8344E" stroke-width="2"/>
+                <path d="M26 30C26 30 28 34 32 34C36 34 38 30 38 30" stroke="#E8344E" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="27" cy="27" r="1.5" fill="#E8344E"/>
+                <circle cx="37" cy="27" r="1.5" fill="#E8344E"/>
+                <path d="M17 17L21 21M47 17L43 21M17 47L21 43M47 47L43 43M12 32H16M52 32H48M32 12V16M32 52V48" stroke="#E8344E" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+        </div>
+
+        {% if lang == 'de' %}
+        <h1>Willkommen zur&uuml;ck!</h1>
+        <p class="subtitle">
+            Ihr alter StressChecker-Code wurde erkannt.<br>
+            Sie erhalten <strong>kostenlosen Zugang bis 1. Januar 2027</strong>.<br>
+            Bitte w&auml;hlen Sie Ihre Version:
+        </p>
+        {% elif lang == 'en' %}
+        <h1>Welcome back!</h1>
+        <p class="subtitle">
+            Your old StressChecker code was recognized.<br>
+            You get <strong>free access until January 1, 2027</strong>.<br>
+            Choose your version:
+        </p>
+        {% else %}
+        <h1>Welkom terug!</h1>
+        <p class="subtitle">
+            Je oude StressChecker-code is herkend.<br>
+            Je krijgt <strong>gratis toegang tot 1 januari 2027</strong>.<br>
+            Kies je versie:
+        </p>
+        {% endif %}
+
+        <div class="code-display">{{ legacy_code }}</div>
+
+        {% if not pending_email %}
+        <div style="text-align:left;margin-bottom:18px;">
+          <input type="email" id="lc-email" placeholder="{% if lang=='de' %}E-Mail-Adresse{% elif lang=='en' %}Email address{% else %}E-mailadres{% endif %}"
+                 style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;font-size:.95rem;margin-bottom:8px;box-sizing:border-box;font-family:inherit;">
+          <input type="password" id="lc-pw" placeholder="{% if lang=='de' %}Passwort (min. 8 Zeichen){% elif lang=='en' %}Password (min. 8 chars){% else %}Wachtwoord (min. 8 tekens){% endif %}"
+                 style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;font-size:.95rem;box-sizing:border-box;font-family:inherit;">
+        </div>
+        {% endif %}
+
+        <div class="choices">
+            <button class="choice-btn" onclick="migrate('consumer')">
+                <div class="choice-icon">
+                    <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="24" cy="16" r="8" stroke="#E8344E" stroke-width="2.5" fill="none"/>
+                        <path d="M8 42C8 33.2 15.2 26 24 26C32.8 26 40 33.2 40 42" stroke="#E8344E" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                    </svg>
+                </div>
+                <div class="choice-title">Consumer</div>
+                <div class="choice-desc">
+                    {% if lang == 'de' %}Pers&ouml;nliche Nutzung{% elif lang == 'en' %}Personal use{% else %}Persoonlijk gebruik{% endif %}
+                </div>
+            </button>
+            <button class="choice-btn" onclick="migrate('pro')">
+                <div class="choice-icon">
+                    <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="6" y="8" width="36" height="32" rx="4" stroke="#E8344E" stroke-width="2.5" fill="none"/>
+                        <path d="M24 20V32M18 26H30" stroke="#E8344E" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M18 8V4M30 8V4" stroke="#E8344E" stroke-width="2.5" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div class="choice-title">Professional</div>
+                <div class="choice-desc">
+                    {% if lang == 'de' %}Klienten verwalten{% elif lang == 'en' %}Manage clients{% else %}Cli&euml;nten beheren{% endif %}
+                </div>
+            </button>
+        </div>
+        <div id="status"></div>
+    </div>
+    <script>
+    function migrate(choice) {
+        var s = document.getElementById('status');
+        var emailEl = document.getElementById('lc-email');
+        var pwEl    = document.getElementById('lc-pw');
+        var emailVal = emailEl ? emailEl.value.trim() : '';
+        var pwVal    = pwEl ? pwEl.value : '';
+        if (emailEl && (!emailVal || emailVal.indexOf('@') < 0)) {
+            s.style.display='block'; s.style.background='#FFEBEE'; s.style.color='#C62828';
+            s.textContent = {% if lang=='de' %}'Bitte gültige E-Mail-Adresse eingeben.'{% elif lang=='en' %}'Please enter a valid email address.'{% else %}'Vul een geldig e-mailadres in.'{% endif %};
+            return;
+        }
+        if (pwEl && pwVal.length < 8) {
+            s.style.display='block'; s.style.background='#FFEBEE'; s.style.color='#C62828';
+            s.textContent = {% if lang=='de' %}'Passwort min. 8 Zeichen.'{% elif lang=='en' %}'Password at least 8 characters.'{% else %}'Wachtwoord minimaal 8 tekens.'{% endif %};
+            return;
+        }
+        s.style.display = 'block';
+        s.style.background = '#FFF3E0';
+        s.style.color = '#E65100';
+        {% if lang == 'de' %}
+        s.textContent = '\u23F3 Migration l\u00e4uft...';
+        {% elif lang == 'en' %}
+        s.textContent = '\u23F3 Migrating...';
+        {% else %}
+        s.textContent = '\u23F3 Migreren...';
+        {% endif %}
+        var btns = document.querySelectorAll('.choice-btn');
+        btns.forEach(function(b){ b.style.opacity='0.5'; b.style.pointerEvents='none'; });
+        fetch('/api/license/migrate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({legacy_code: '{{ legacy_code }}', choice: choice, email: emailVal, password: pwVal})
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (d.ok) {
+                s.style.background = '#E8F5E9';
+                s.style.color = '#2E7D32';
+                {% if lang == 'de' %}
+                s.innerHTML = '\u2705 Aktiviert!<br><b>Neuer Code: ' + d.new_code + '</b><br><small>G\u00fcltig bis ' + d.valid_until + '</small>';
+                {% elif lang == 'en' %}
+                s.innerHTML = '\u2705 Activated!<br><b>New code: ' + d.new_code + '</b><br><small>Valid until ' + d.valid_until + '</small>';
+                {% else %}
+                s.innerHTML = '\u2705 Geactiveerd!<br><b>Nieuwe code: ' + d.new_code + '</b><br><small>Geldig tot ' + d.valid_until + '</small>';
+                {% endif %}
+                setTimeout(function(){ window.location.href = d.redirect || '/verify'; }, 1500);
+            } else {
+                s.style.background = '#FFEBEE';
+                s.style.color = '#C62828';
+                s.textContent = '\u274C ' + (d.error || 'Error');
+                btns.forEach(function(b){ b.style.opacity='1'; b.style.pointerEvents='auto'; });
+            }
+        })
+        .catch(function(e){
+            s.style.background = '#FFEBEE';
+            s.style.color = '#C62828';
+            s.textContent = 'Error: ' + e;
+            btns.forEach(function(b){ b.style.opacity='1'; b.style.pointerEvents='auto'; });
+        });
+    }
+    </script>
+</body>
+</html>

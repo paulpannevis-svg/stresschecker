@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.sensors-page{max-width:700px;margin:0 auto;padding:20px 16px 40px}
+.sensors-intro{text-align:center;margin-bottom:28px}
+.sensors-intro h1{font-size:1.5rem;color:#4B3629;margin-bottom:8px}
+.sensors-intro p{color:#7A6B5D;font-size:.95rem;line-height:1.6}
+.sensor-type-header{display:flex;align-items:center;gap:10px;padding:14px 18px;margin-top:20px;background:linear-gradient(135deg,#E8344E 0%,#C02A40 100%);border-radius:10px 10px 0 0;color:#fff;font-weight:700;font-size:1rem}
+.sensor-type-header svg{width:22px;height:22px;fill:#fff;flex-shrink:0}
+.sensor-card{background:#fff;border:1px solid #E8DDD4;border-top:none;padding:0;overflow:hidden}
+.sensor-card:last-of-type{border-radius:0 0 10px 10px}
+.sensor-item{border-bottom:1px solid #F0EBE5;cursor:pointer;transition:background .2s}
+.sensor-item:last-child{border-bottom:none}
+.sensor-item:hover{background:#FDFBF7}
+.sensor-item-header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;gap:12px}
+.sensor-item-left{display:flex;align-items:center;gap:14px;flex:1}
+.sensor-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;white-space:nowrap}
+.badge-webshop{background:#FFF3E0;color:#E65100}
+.sensor-name-lbl{font-weight:700;color:#4B3629;font-size:.95rem}
+.sensor-type-tag{font-size:.8rem;color:#9E8E7E;margin-top:2px}
+.sensor-chevron{width:20px;height:20px;flex-shrink:0;transition:transform .25s ease;fill:#C9A26D}
+.sensor-item.active .sensor-chevron{transform:rotate(180deg)}
+.sensor-detail{max-height:0;overflow:hidden;transition:max-height .3s ease-out;background:#FDFBF7}
+.sensor-detail-inner{padding:0 18px 16px;font-size:.9rem;color:#5A5550;line-height:1.7}
+.sensor-detail-inner p{margin:0 0 8px}
+.spec-table{width:100%;border-collapse:collapse;margin:8px 0}
+.spec-table td{padding:6px 10px;border-bottom:1px solid #F0EBE5;font-size:.85rem;vertical-align:top}
+.spec-table td:first-child{font-weight:600;color:#4B3629;width:40%;white-space:nowrap}
+.spec-table tr:last-child td{border-bottom:none}
+.webshop-link{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:8px 16px;background:linear-gradient(135deg,#E8344E,#C02A40);color:#fff;text-decoration:none;border-radius:6px;font-size:.85rem;font-weight:600;transition:opacity .2s}
+.webshop-link:hover{opacity:.85}
+.sensors-note{margin-top:24px;padding:16px 18px;background:#FFF8E1;border-radius:10px;border:1px solid #FFE082;font-size:.85rem;color:#5D4E37;line-height:1.6}
+.sensors-note strong{color:#4B3629}
+.sensors-compat{margin-top:20px;padding:16px 18px;background:#F1F8E9;border-radius:10px;border:1px solid #C5E1A5;font-size:.85rem;color:#33691E;line-height:1.6}
+</style>
+<div class="sensors-page">
+<div class="sensors-intro">
+{% if lang == 'de' %}<h1>Kompatible Sensoren</h1><p>Die StressChecker App funktioniert mit Bluetooth- und USB-Herzfrequenzsensoren.</p>
+{% elif lang == 'en' %}<h1>Compatible Sensors</h1><p>The StressChecker app works with Bluetooth and USB heart rate sensors.</p>
+{% else %}<h1>Compatibele sensoren</h1><p>De StressChecker app werkt met Bluetooth- en USB-hartslagsensoren.</p>{% endif %}
+</div>
+
+<div class="sensor-type-header"><svg viewBox="0 0 24 24"><path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg> Bluetooth</div>
+<div class="sensor-card">
+
+<div class="sensor-item" onclick="toggleSensor(this)">
+<div class="sensor-item-header"><div class="sensor-item-left"><div><div class="sensor-name-lbl">Kyto HRM-2935</div><div class="sensor-type-tag">{%if lang=='de'%}Ohrclip / Fingersensor{%elif lang=='en'%}Ear clip / finger sensor{%else%}Oorclip / vingersensor{%endif%}</div></div><span class="sensor-badge badge-webshop">Webshop</span></div><svg class="sensor-chevron" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></div>
+<div class="sensor-detail"><div class="sensor-detail-inner">
+{%if lang=='de'%}<p>Kompakter Bluetooth-Sensor mit Ohrclip und optionalem Fingersensor. Besonders praktisch: kein Brustgurt nötig.</p><table class="spec-table"><tr><td>Verbindung</td><td>Bluetooth 4.0 (BLE)</td></tr><tr><td>Sensor</td><td>Infrarot PPG</td></tr><tr><td>Akku</td><td>Wiederaufladbar, ca. 20 Std.</td></tr></table><a href="https://lifestylemonitors.com/shop" class="webshop-link">🛒 Im Webshop bestellen</a>
+{%elif lang=='en'%}<p>Compact Bluetooth sensor with ear clip and optional finger sensor. No chest strap needed.</p><table class="spec-table"><tr><td>Connection</td><td>Bluetooth 4.0 (BLE)</td></tr><tr><td>Sensor</td><td>Infrared PPG</td></tr><tr><td>Battery</td><td>Rechargeable, approx. 20 hrs</td></tr></table><a href="https://lifestylemonitors.com/shop" class="webshop-link">🛒 Order in webshop</a>
+{%else%}<p>Compacte Bluetooth-sensor met oorclip en optionele vingersensor. Geen borstband nodig.</p><table class="spec-table"><tr><td>Verbinding</td><td>Bluetooth 4.0 (BLE)</td></tr><tr><td>Sensor</td><td>Infrarood PPG</td></tr><tr><td>Accu</td><td>Oplaadbaar, ca. 20 uur</td></tr></table><a href="https://lifestylemonitors.com/shop" class="webshop-link">🛒 Bestellen in webshop</a>{%endif%}
+</div></div></div>
+
+<div class="sensor-item" onclick="toggleSensor(this)">
+<div class="sensor-item-header"><div class="sensor-item-left"><div><div class="sensor-name-lbl">Polar H10</div><div class="sensor-type-tag">{%if lang=='de'%}Brustgurt{%elif lang=='en'%}Chest strap{%else%}Borstband{%endif%}</div></div></div><svg class="sensor-chevron" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></div>
+<div class="sensor-detail"><div class="sensor-detail-inner">
+{%if lang=='de'%}<p>Brustgurt-Sensor, Goldstandard für HRV-Messung. ECG-Technologie, sehr genaue RR-Intervalle.</p><table class="spec-table"><tr><td>Verbindung</td><td>Bluetooth 4.0 + ANT+</td></tr><tr><td>Sensor</td><td>ECG</td></tr><tr><td>Akku</td><td>CR2025, ca. 400 Std.</td></tr></table>
+{%elif lang=='en'%}<p>Chest strap sensor, gold standard for HRV measurement. ECG technology, very accurate RR intervals.</p><table class="spec-table"><tr><td>Connection</td><td>Bluetooth 4.0 + ANT+</td></tr><tr><td>Sensor</td><td>ECG</td></tr><tr><td>Battery</td><td>CR2025, approx. 400 hrs</td></tr></table>
+{%else%}<p>Borstbandsensor, gouden standaard voor HRV-meting. ECG-technologie, zeer nauwkeurige RR-intervallen.</p><table class="spec-table"><tr><td>Verbinding</td><td>Bluetooth 4.0 + ANT+</td></tr><tr><td>Sensor</td><td>ECG</td></tr><tr><td>Accu</td><td>CR2025, ca. 400 uur</td></tr></table>{%endif%}
+</div></div></div>
+
+<div class="sensor-item" onclick="toggleSensor(this)">
+<div class="sensor-item-header"><div class="sensor-item-left"><div><div class="sensor-name-lbl">{%if lang=='de'%}Andere BLE-Sensoren{%elif lang=='en'%}Other BLE sensors{%else%}Andere BLE sensoren{%endif%}</div><div class="sensor-type-tag">Bluetooth 4.0+</div></div></div><svg class="sensor-chevron" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></div>
+<div class="sensor-detail"><div class="sensor-detail-inner">
+{%if lang=='de'%}<p>Kompatibel mit jedem BLE-Sensor der Heart Rate Service (0x180D) unterstützt und ungefilterte RR-Intervalle überträgt. Z.B. Garmin HRM-Dual, Wahoo TICKR.</p>
+{%elif lang=='en'%}<p>Compatible with any BLE sensor supporting Heart Rate Service (0x180D) transmitting unfiltered RR intervals. E.g. Garmin HRM-Dual, Wahoo TICKR.</p>
+{%else%}<p>Compatibel met elke BLE-sensor die Heart Rate Service (0x180D) ondersteunt en ongefilterde RR-intervallen verstuurt. Bijv. Garmin HRM-Dual, Wahoo TICKR.</p>{%endif%}
+</div></div></div>
+
+</div>
+
+<div class="sensor-type-header" style="margin-top:28px"><svg viewBox="0 0 24 24"><path d="M15 7v4h1v2h-3V5h2l-3-4-3 4h2v8H8v-2.07c.7-.37 1.2-1.08 1.2-1.93 0-1.21-.99-2.2-2.2-2.2-1.21 0-2.2.99-2.2 2.2 0 .85.5 1.56 1.2 1.93V13c0 1.11.89 2 2 2h3v3.05c-.71.37-1.2 1.1-1.2 1.95 0 1.21.99 2.2 2.2 2.2 1.21 0 2.2-.99 2.2-2.2 0-.85-.49-1.58-1.2-1.95V15h3c1.11 0 2-.89 2-2v-2h1V7h-4z"/></svg> USB</div>
+<div class="sensor-card">
+
+<div class="sensor-item" onclick="toggleSensor(this)">
+<div class="sensor-item-header"><div class="sensor-item-left"><div><div class="sensor-name-lbl">LM Sensor (Lifestyle Monitors)</div><div class="sensor-type-tag">{%if lang=='de'%}Ohrclip{%elif lang=='en'%}Ear clip{%else%}Oorclip{%endif%}</div></div><span class="sensor-badge badge-webshop">Webshop</span></div><svg class="sensor-chevron" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></div>
+<div class="sensor-detail"><div class="sensor-detail-inner">
+{%if lang=='de'%}<p>USB-Ohrclipsensor, direkt über USB anschließen. Keine Bluetooth-Kopplung nötig.</p><table class="spec-table"><tr><td>Verbindung</td><td>USB (direkt)</td></tr><tr><td>Sensor</td><td>Infrarot PPG</td></tr><tr><td>Strom</td><td>Über USB</td></tr></table><a href="https://lifestylemonitors.com/shop" class="webshop-link">🛒 Im Webshop bestellen</a>
+{%elif lang=='en'%}<p>USB ear clip sensor, connect directly via USB. No Bluetooth pairing needed.</p><table class="spec-table"><tr><td>Connection</td><td>USB (direct)</td></tr><tr><td>Sensor</td><td>Infrared PPG</td></tr><tr><td>Power</td><td>Via USB</td></tr></table><a href="https://lifestylemonitors.com/shop" class="webshop-link">🛒 Order in webshop</a>
+{%else%}<p>USB-oorclipsensor, direct via USB aansluiten. Geen Bluetooth-koppeling nodig.</p><table class="spec-table"><tr><td>Verbinding</td><td>USB (direct)</td></tr><tr><td>Sensor</td><td>Infrarood PPG</td></tr><tr><td>Voeding</td><td>Via USB</td></tr></table><a href="https://lifestylemonitors.com/shop" class="webshop-link">🛒 Bestellen in webshop</a>{%endif%}
+</div></div></div>
+
+<div class="sensor-item" onclick="toggleSensor(this)">
+<div class="sensor-item-header"><div class="sensor-item-left"><div><div class="sensor-name-lbl">Kyto HRM-2901</div><div class="sensor-type-tag">{%if lang=='de'%}Ohrclip{%elif lang=='en'%}Ear clip{%else%}Oorclip{%endif%}</div></div></div><svg class="sensor-chevron" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></div>
+<div class="sensor-detail"><div class="sensor-detail-inner">
+{%if lang=='de'%}<p>USB-Ohrclipsensor von Kyto. Direkt über USB, keine Bluetooth-Verbindung nötig.</p><table class="spec-table"><tr><td>Verbindung</td><td>USB (direkt)</td></tr><tr><td>Sensor</td><td>Infrarot PPG</td></tr><tr><td>Gewicht</td><td>27 g</td></tr></table>
+{%elif lang=='en'%}<p>USB ear clip sensor by Kyto. Direct USB connection, no Bluetooth needed.</p><table class="spec-table"><tr><td>Connection</td><td>USB (direct)</td></tr><tr><td>Sensor</td><td>Infrared PPG</td></tr><tr><td>Weight</td><td>27 g</td></tr></table>
+{%else%}<p>USB-oorclipsensor van Kyto. Direct via USB, geen Bluetooth nodig.</p><table class="spec-table"><tr><td>Verbinding</td><td>USB (direct)</td></tr><tr><td>Sensor</td><td>Infrarood PPG</td></tr><tr><td>Gewicht</td><td>27 g</td></tr></table>{%endif%}
+</div></div></div>
+
+</div>
+
+<div class="sensors-note">
+{%if lang=='de'%}<strong>💡 Tipp:</strong> Für die tägliche Morgenmessung ist der Kyto HRM-2935 besonders praktisch: Ohrclip anlegen, 90 Sekunden messen, fertig. Kein Brustgurt nötig.
+{%elif lang=='en'%}<strong>💡 Tip:</strong> For daily morning readings, the Kyto HRM-2935 is particularly practical: attach ear clip, measure 90 seconds, done. No chest strap needed.
+{%else%}<strong>💡 Tip:</strong> Voor de dagelijkse ochtendmeting is de Kyto HRM-2935 bijzonder handig: oorclip bevestigen, 90 seconden meten, klaar. Geen borstband nodig.{%endif%}
+</div>
+
+<div class="sensors-compat">
+{%if lang=='de'%}<strong>✅ Kompatibilität:</strong> Web Bluetooth (Chrome/Edge) für BT-Sensoren, WebHID für USB-Sensoren. Safari/iOS unterstützt kein Web Bluetooth.
+{%elif lang=='en'%}<strong>✅ Compatibility:</strong> Web Bluetooth (Chrome/Edge) for BT sensors, WebHID for USB sensors. Safari/iOS does not support Web Bluetooth.
+{%else%}<strong>✅ Compatibiliteit:</strong> Web Bluetooth (Chrome/Edge) voor BT-sensoren, WebHID voor USB-sensoren. Safari/iOS ondersteunt geen Web Bluetooth.{%endif%}
+</div>
+</div>
+<script>
+function toggleSensor(el){var d=el.querySelector('.sensor-detail'),a=el.classList.contains('active');document.querySelectorAll('.sensor-item').forEach(function(i){i.classList.remove('active');i.querySelector('.sensor-detail').style.maxHeight='0'});if(!a){el.classList.add('active');d.style.maxHeight=d.scrollHeight+'px'}}
+</script>
+
+<div style="margin:1.2rem auto;max-width:400px;background:#EFF6FF;border-left:4px solid #3B82F6;border-radius:8px;padding:.9rem 1.1rem;font-size:.82rem;color:#1E3A5F;line-height:1.6;">
+  <strong>📱 {% if lang=="de" %}Bluetooth & Browser-Kompatibilität{% elif lang=="en" %}Bluetooth & Browser Compatibility{% else %}Bluetooth & browser compatibiliteit{% endif %}</strong><br>
+  {% if lang=="de" %}
+  Nicht alle Browser unterstützen Bluetooth. Windows und Android: Chrome oder Edge verwenden. Mac: Chrome oder Edge. <strong>iPhone/iPad:</strong> Safari unterstützt kein Bluetooth — bitte <a href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055" target="_blank" style="color:#2563EB;">Bluefy</a> (kostenlos) installieren.
+  {% elif lang=="en" %}
+  Not all browsers support Bluetooth. Windows and Android: use Chrome or Edge. Mac: Chrome or Edge. <strong>iPhone/iPad:</strong> Safari does not support Bluetooth — please install <a href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055" target="_blank" style="color:#2563EB;">Bluefy</a> (free).
+  {% else %}
+  Niet alle browsers ondersteunen Bluetooth. Windows en Android: gebruik Chrome of Edge. Mac: Chrome of Edge. <strong>iPhone/iPad:</strong> Safari ondersteunt geen Bluetooth — installeer <a href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055" target="_blank" style="color:#2563EB;">Bluefy</a> (gratis) via de App Store.
+  {% endif %}
+</div>
+
+{% endblock %}

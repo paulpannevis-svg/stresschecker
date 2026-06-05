@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block content %}
+<div style="max-width:420px;margin:40px auto;padding:0 16px;">
+
+  <div style="text-align:center;margin-bottom:24px;">
+    <div style="font-size:20px;font-weight:700;color:var(--red);">
+      {% if lang=='de' %}Neues Passwort{% elif lang=='en' %}New password{% else %}Nieuw wachtwoord{% endif %}
+    </div>
+    <div style="font-size:13px;color:#888;margin-top:4px;">StressChecker</div>
+  </div>
+
+  {% if error %}
+  <div style="background:#fff0f0;border:1px solid #f5c6cb;color:#721c24;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;">{{ error }}</div>
+  {% endif %}
+
+  <p style="font-size:13px;color:#666;margin-bottom:16px;text-align:center;">
+    {% if lang=='de' %}Geben Sie den 6-stelligen Code aus Ihrer E-Mail und Ihr neues Passwort ein.
+    {% elif lang=='en' %}Enter the 6-digit code from your email and your new password.
+    {% else %}Vul de 6-cijferige code uit je e-mail in en kies een nieuw wachtwoord.{% endif %}
+  </p>
+
+  <form method="POST" action="{{ url_for('password_reset_form') }}">
+    <input type="hidden" name="lang" value="{{ lang }}">
+    <div class="card" style="padding:0;overflow:hidden;border-radius:12px;border:1px solid #eee;margin-bottom:10px;">
+      <div style="padding:12px 16px;border-bottom:1px solid #f0ece6;">
+        <label style="display:block;font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">E-mail</label>
+        <input type="email" name="email" required value="{{ email or '' }}"
+               style="width:100%;border:none;outline:none;font-size:14px;background:transparent;font-family:inherit;">
+      </div>
+      <div style="padding:12px 16px;border-bottom:1px solid #f0ece6;">
+        <label style="display:block;font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">
+          {% if lang=='de' %}Reset-Code{% elif lang=='en' %}Reset code{% else %}Resetcode{% endif %}
+        </label>
+        <input type="text" name="code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+               value="{{ code or '' }}" autocomplete="one-time-code"
+               style="width:100%;border:none;outline:none;font-size:14px;background:transparent;font-family:inherit;letter-spacing:0.2em;">
+      </div>
+      <div style="padding:12px 16px;border-bottom:1px solid #f0ece6;">
+        <label style="display:block;font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">
+          {% if lang=='de' %}Neues Passwort{% elif lang=='en' %}New password{% else %}Nieuw wachtwoord{% endif %}
+        </label>
+        <input type="password" name="password" required minlength="8" autocomplete="new-password"
+               style="width:100%;border:none;outline:none;font-size:14px;background:transparent;font-family:inherit;">
+      </div>
+      <div style="padding:12px 16px;">
+        <label style="display:block;font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">
+          {% if lang=='de' %}Wiederholen{% elif lang=='en' %}Confirm{% else %}Herhaal{% endif %}
+        </label>
+        <input type="password" name="password_confirm" required minlength="8" autocomplete="new-password"
+               style="width:100%;border:none;outline:none;font-size:14px;background:transparent;font-family:inherit;">
+      </div>
+    </div>
+    <button type="submit" style="width:100%;background:var(--red);color:white;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">
+      {% if lang=='de' %}Passwort speichern{% elif lang=='en' %}Save password{% else %}Wachtwoord opslaan{% endif %}
+    </button>
+  </form>
+
+  <div style="text-align:center;margin-top:16px;font-size:12px;color:#aaa;">
+    <a href="{{ url_for('sc_login') }}" style="color:var(--red);font-weight:600;">
+      {% if lang=='de' %}Zurück zur Anmeldung{% elif lang=='en' %}Back to login{% else %}Terug naar inloggen{% endif %}
+    </a>
+  </div>
+
+</div>
+{% endblock %}

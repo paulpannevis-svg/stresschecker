@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width:480px;margin:40px auto;padding:20px;">
+  <h2 style="text-align:center;color:#E8344E;">
+    {% if lang=='de' %}3 kostenlose Messungen{% elif lang=='en' %}3 free readings{% else %}3 gratis metingen{% endif %}
+  </h2>
+  <p style="text-align:center;color:#666;">
+    {% if lang=='de' %}Geben Sie Ihre Daten ein, um zu beginnen.{% elif lang=='en' %}Enter your details to get started.{% else %}Voer je gegevens in om te beginnen.{% endif %}
+  </p>
+  {% if error %}
+  <p style="color:red;text-align:center;">
+    {% if lang=='de' %}Bitte alle Felder ausfüllen.{% elif lang=='en' %}Please fill in all fields.{% else %}Vul alle velden in.{% endif %}
+  </p>
+  {% endif %}
+  <form method="POST">
+    <input type="email" name="email" required placeholder="{% if lang=='de' %}E-Mail-Adresse{% elif lang=='en' %}Email address{% else %}Emailadres{% endif %}"
+      style="width:100%;padding:12px;font-size:16px;border:1px solid #ccc;border-radius:8px;margin-bottom:12px;box-sizing:border-box;">
+    <input type="number" name="birth_year" required min="1930" max="2005"
+      placeholder="{% if lang=='de' %}Geburtsjahr (z.B. 1975){% elif lang=='en' %}Birth year (e.g. 1975){% else %}Geboortejaar (bijv. 1975){% endif %}"
+      style="width:100%;padding:12px;font-size:16px;border:1px solid #ccc;border-radius:8px;margin-bottom:12px;box-sizing:border-box;">
+    <select name="gender" required style="width:100%;padding:12px;font-size:16px;border:1px solid #ccc;border-radius:8px;margin-bottom:16px;box-sizing:border-box;">
+      <option value="">{% if lang=='de' %}Geschlecht wählen{% elif lang=='en' %}Select gender{% else %}Kies geslacht{% endif %}</option>
+      <option value="male">{% if lang=='de' %}Männlich{% elif lang=='en' %}Male{% else %}Man{% endif %}</option>
+      <option value="female">{% if lang=='de' %}Weiblich{% elif lang=='en' %}Female{% else %}Vrouw{% endif %}</option>
+    </select>
+    <button type="submit"
+      style="width:100%;padding:14px;background:#E8344E;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;">
+      {% if lang=='de' %}Jetzt starten{% elif lang=='en' %}Start now{% else %}Nu starten{% endif %}
+    </button>
+  </form>
+</div>
+{% endblock %}

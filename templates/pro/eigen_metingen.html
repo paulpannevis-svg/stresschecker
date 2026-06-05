@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}{%if lang=='de'%}Verlauf Basismessung & Übersicht Messungen{%elif lang=='en'%}Baseline Trend & Measurement Overview{%else%}Verloop Basismeting & Overzicht Metingen{%endif%}{% endblock %}
+{% block content %}
+<div style="max-width:900px;margin:0 auto;padding:1rem;">
+  <h2 style="text-align:center;color:#c0392b;font-size:1.1rem;letter-spacing:.08em;margin-bottom:1.5rem;">📋 {%if lang=='de'%}VERLAUF BASISMESSUNG &amp; ÜBERSICHT MESSUNGEN{%elif lang=='en'%}BASELINE TREND &amp; MEASUREMENT OVERVIEW{%else%}VERLOOP BASISMETING &amp; OVERZICHT METINGEN{%endif%}</h2>
+  <div style="text-align:center;margin-bottom:.75rem;">
+    <button onclick="filterData('week')" id="btn-week" style="margin:.2rem;padding:.35rem .9rem;border:1px solid #c0392b;border-radius:4px;background:#fff;color:#c0392b;cursor:pointer;font-size:.85rem;">{%if lang=='de'%}Woche{%elif lang=='en'%}Week{%else%}Week{%endif%}</button>
+    <button onclick="filterData('maand')" id="btn-maand" style="margin:.2rem;padding:.35rem .9rem;border:1px solid #c0392b;border-radius:4px;background:#fff;color:#c0392b;cursor:pointer;font-size:.85rem;">{%if lang=='de'%}Monat{%elif lang=='en'%}Month{%else%}Maand{%endif%}</button>
+    <button onclick="filterData('jaar')" id="btn-jaar" style="margin:.2rem;padding:.35rem .9rem;border:1px solid #c0392b;border-radius:4px;background:#fff;color:#c0392b;cursor:pointer;font-size:.85rem;">{%if lang=='de'%}Jahr{%elif lang=='en'%}Year{%else%}Jaar{%endif%}</button>
+    <button onclick="filterData('alles')" id="btn-alles" style="margin:.2rem;padding:.35rem .9rem;border:1px solid #c0392b;border-radius:4px;background:#c0392b;color:#fff;cursor:pointer;font-size:.85rem;">{%if lang=='de'%}Alles{%elif lang=='en'%}All{%else%}Alles{%endif%}</button>
+  </div>
+  <div style="background:#fff;border-radius:8px;padding:1rem;margin-bottom:1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+    <div class="chart-container" style="position:relative;height:240px;">
+      <canvas id="riChart"></canvas>
+    </div>
+    <div id="chartHint" style="display:none;text-align:center;font-size:.78rem;color:#999;font-style:italic;margin-top:.4rem;">{%if lang=='de'%}Fügen Sie weitere Messungen hinzu, um den Verlauf zu sehen{%elif lang=='en'%}Add more readings to see the trend{%else%}Voeg meer metingen toe om het verloop te zien{%endif%}</div>
+  </div>
+
+  <!-- PERSOONLIJKE FEEDBACK -->
+  <div id="feedbackCard" style="display:none;background:linear-gradient(135deg,#fdfaf7 0%,#f9f3ec 100%);border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:1.2rem 1.4rem;margin-bottom:1rem;border-left:4px solid #E8A020;">
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8A020" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="#E8A020" stroke="none"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+      <span style="font-size:.75rem;font-weight:700;letter-spacing:.08em;color:#C08A2A;text-transform:uppercase;">
+        {% if lang=='de' %}Ihr Innerer Kompass{% elif lang=='en' %}Your Inner Compass{% else %}Jouw Innerlijk Kompas{% endif %}
+      </span>
+    </div>
+    <div id="feedbackInsight" style="font-size:.95rem;font-weight:700;color:#3C3228;line-height:1.6;margin-bottom:.4rem;white-space:normal;overflow:visible;text-overflow:clip;max-height:none;word-break:normal;overflow-wrap:break-word;"></div>
+    <div id="feedbackReflection" style="font-size:.88rem;color:#4a3f35;line-height:1.7;white-space:normal;overflow:visible;text-overflow:clip;max-height:none;word-break:normal;overflow-wrap:break-word;"></div>
+    <div id="feedbackQuestion" style="font-size:.88rem;font-style:italic;color:#C08A2A;line-height:1.6;margin-top:.6rem;padding-top:.5rem;border-top:1px solid rgba(192,138,42,.2);"></div>
+    <div id="feedbackLoading" style="font-size:.82rem;color:#aaa;padding:.5rem 0;">
+      <span style="display:inline-block;animation:fbPulse 1.2s infinite;">&#9679;</span>
+      {% if lang=='de' %}Einen Moment...{% elif lang=='en' %}One moment...{% else %}Even geduld...{% endif %}
+    </div>
+  </div>
+  <div id="feedbackTrendHint" style="display:none;font-size:.78rem;color:#a09890;font-style:italic;line-height:1.5;padding:0 .3rem;margin:-.6rem 0 1rem;"></div>
+  <style>@keyframes fbPulse{0%,100%{opacity:.3}50%{opacity:1}}</style>
+  <div style="font-size:.72rem;font-style:italic;color:#a09890;line-height:1.5;margin-top:1.2rem;padding-top:.5rem;">{%if lang=='de'%}Wie Sie das lesen, wird auch davon beeinflusst, wie Sie sich jetzt fühlen — das ist selbst auch Information.{%elif lang=='en'%}How you read this is also influenced by how you feel right now — that itself is information too.{%else%}Hoe je dit leest wordt mede bepaald door hoe je je nu voelt — dat is zelf ook informatie.{%endif%}</div>
+
+  <div id="metingenLijst"></div>
+  <a href="/pro" style="display:inline-block;margin-top:1.5rem;color:#c0392b;text-decoration:none;font-size:.9rem;">&#8592; {%if lang=='de'%}Zurück zum Menü{%elif lang=='en'%}Back to menu{%else%}Terug naar menu{%endif%}</a>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/1.4.0/chartjs-plugin-annotation.min.js"></script>
+<script>if(window.Chart&&window['chartjs-plugin-annotation']){Chart.register(window['chartjs-plugin-annotation']);}</script>
+<script>
+var dNL={lichamelijk:'Lichamelijk',mentaal:'Mentaal',emotioneel:'Emotioneel',spiritueel:'Spiritueel',weet_niet:'?'};
+var data = {{ metingen_chart | tojson }};
+var sorted = data.slice().sort(function(a,b){return a.ts-b.ts;});
+var riChart;
+var _L='{{lang}}';
+var dgnNL=_L==='de'?['So','Mo','Di','Mi','Do','Fr','Sa']:_L==='en'?['Sun','Mon','Tue','Wed','Thu','Fri','Sat']:['Zo','Ma','Di','Wo','Do','Vr','Za'];
+var mndNL=_L==='de'?['Jan','Feb','Mrz','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']:_L==='en'?['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']:['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+
+function padDate(d){return ('0'+d).slice(-2);}
+
+// Bouw volledige tijdlijn met nulls waar geen meting is
+// Chart toont uitsluitend basismetingen — biofeedback/situatiemetingen blijven buiten de trend
+function buildFullTimeline(period){
+  var now = new Date(); now.setHours(23,59,59,0);
+  var labels=[], vals=[], szV=[];
+  var sortedBasis = sorted.filter(function(r){ return (r.meting_type||'').toLowerCase()==='basismeting'; });
+
+  if(period=='week'){
+    // Laatste 7 dagen (vandaag t/m 6 dagen terug)
+    for(var i=6;i>=0;i--){
+      var d=new Date(now); d.setDate(now.getDate()-i); d.setHours(0,0,0,0);
+      var label=dgnNL[d.getDay()]+' '+padDate(d.getDate())+'/'+padDate(d.getMonth()+1);
+      labels.push(label);
+      var match=sortedBasis.filter(function(r){var rd=new Date(r.ts);return rd.getDate()==d.getDate()&&rd.getMonth()==d.getMonth()&&rd.getFullYear()==d.getFullYear();});
+      vals.push(match.length?match[match.length-1].ri:null);var _spd=match.filter(function(dd){return dd.subjectief_score!=null;});szV.push(_spd.length?_spd[_spd.length-1].subjectief_score:null);
+    }
+  } else if(period=='maand'){
+    // Alle dagen van huidige maand
+    var dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    for(var i=1;i<=dim;i++){
+      var d=new Date(now.getFullYear(),now.getMonth(),i);
+      var label=dgnNL[d.getDay()]+' '+padDate(d.getDate());
+      labels.push(label);
+      var match=sortedBasis.filter(function(r){var rd=new Date(r.ts);return rd.getDate()==d.getDate()&&rd.getMonth()==d.getMonth()&&rd.getFullYear()==d.getFullYear();});
+      vals.push(match.length?match[match.length-1].ri:null);var _spd=match.filter(function(d){return d.subjectief_score!=null;});szV.push(_spd.length?_spd[_spd.length-1].subjectief_score:null);
+    }
+  } else if(period=='jaar'){
+    // Jan-Dec huidig jaar
+    for(var i=0;i<12;i++){
+      var d=new Date(now.getFullYear(),i,1);
+      var label=mndNL[d.getMonth()]+' '+d.getFullYear();
+      labels.push(label);
+      var match=sortedBasis.filter(function(r){var rd=new Date(r.ts);return rd.getMonth()==d.getMonth()&&rd.getFullYear()==d.getFullYear();});
+      if(match.length){var avg=match.reduce(function(s,r){return s+(r.ri||0);},0)/match.length;vals.push(Math.round(avg*10)/10);var _sp2=match.filter(function(d){return d.subjectief_score!=null;});szV.push(_sp2.length?_sp2.reduce(function(s,x){return s+x.subjectief_score;},0)/_sp2.length:null);}else{vals.push(null);szV.push(null);}
+    }
+  } else {
+    // Alles: 2026, 2027, 2028 per jaar
+    [2026,2027,2028].forEach(function(yr){
+      labels.push(String(yr));
+      var match=sortedBasis.filter(function(r){return new Date(r.ts).getFullYear()==yr;});
+      if(match.length){var avg=match.reduce(function(s,r){return s+(r.ri||0);},0)/match.length;vals.push(Math.round(avg*10)/10);var _sp2=match.filter(function(d){return d.subjectief_score!=null;});szV.push(_sp2.length?_sp2.reduce(function(s,x){return s+x.subjectief_score;},0)/_sp2.length:null);}else{vals.push(null);szV.push(null);}
+    });
+  }
+  return {labels:labels, vals:vals, szV:szV};
+}
+
+function buildChart(labels, vals, szVdata){
+  if(riChart) riChart.destroy();
+  var ctx=document.getElementById('riChart').getContext('2d');
+  var nonNull=vals.filter(function(v){return v!==null;});
+  var isSingle=nonNull.length<=1;
+  var pR=isSingle?6:4;var pHR=isSingle?8:6;
+  var szLabel=_L==='de'?'Selbsteinschätzung':_L==='en'?'Self-assessment':'Zelfinschatting';
+  riChart=new Chart(ctx,{type:'line',data:{labels:labels,datasets:[{label:'Relax Index',data:vals,borderColor:'#ffffff',backgroundColor:'rgba(0,0,0,.0)',tension:.3,pointRadius:pR,pointHoverRadius:pHR,borderWidth:2.5,pointBackgroundColor:'#ffffff',pointBorderColor:'#333333',pointBorderWidth:1.5,spanGaps:true},{label:szLabel,data:szVdata||[],borderColor:"#0078ff",backgroundColor:"#0078ff",tension:.3,pointRadius:5,borderWidth:2,borderDash:[6,3],pointBackgroundColor:"#0078ff",pointBorderColor:"#0078ff",spanGaps:true}]},options:{scales:{y:{beginAtZero:true,min:0,max:10,ticks:{stepSize:2},grid:{color:'rgba(0,0,0,.07)'}},x:{offset:true,grid:{color:'rgba(0,0,0,.07)'},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:16}}},plugins:{legend:{display:true,position:"top",labels:{color:"#555",font:{size:11},boxWidth:20,boxHeight:2,padding:12,generateLabels:function(chart){var items=Chart.defaults.plugins.legend.labels.generateLabels(chart);items.forEach(function(l){if(l.text==='Relax Index'){l.strokeStyle='#666666';l.fillStyle='#666666';}});return items;}}},annotation:{annotations:{z1:{type:'box',yMin:0,yMax:2,backgroundColor:'rgba(169,50,38,.75)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z2:{type:'box',yMin:2,yMax:4,backgroundColor:'rgba(186,74,0,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z3:{type:'box',yMin:4,yMax:6,backgroundColor:'rgba(185,150,10,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z4:{type:'box',yMin:6,yMax:8,backgroundColor:'rgba(30,150,80,.65)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z5:{type:'box',yMin:8,yMax:10,backgroundColor:'rgba(20,110,60,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'}}}},responsive:true,maintainAspectRatio:false}});
+  var hint=document.getElementById('chartHint');
+  if(hint){hint.style.display=isSingle?'block':'none';}
+}
+
+function filterData(period){
+  ['week','maand','jaar','alles'].forEach(function(p){var b=document.getElementById('btn-'+p);b.style.background=p==period?'#c0392b':'#fff';b.style.color=p==period?'#fff':'#c0392b';});
+  var tl=buildFullTimeline(period);
+  var firstIdx=tl.vals.findIndex(function(v){return v!==null;});
+  var lastIdx=-1;
+  for(var i=tl.vals.length-1;i>=0;i--){if(tl.vals[i]!==null){lastIdx=i;break;}}
+  if(firstIdx<0){firstIdx=0;lastIdx=tl.vals.length-1;}
+  var trimL=tl.labels.slice(firstIdx,lastIdx+1);
+  var trimV=tl.vals.slice(firstIdx,lastIdx+1);
+  var trimS=tl.szV.slice(firstIdx,lastIdx+1);
+  buildChart(trimL, trimV, trimS);
+}
+
+filterData('alles');
+
+var list=document.getElementById('metingenLijst');
+var LANG='{{lang}}';
+var hTH='padding:.55rem .35rem;text-align:left;border-bottom:2px solid #dde3ea;font-size:.82rem;white-space:nowrap;';
+var cTD='padding:.5rem .35rem;font-size:.85rem;white-space:normal;word-break:break-word;overflow-wrap:anywhere;line-height:1.35;vertical-align:top;';
+var cNUM='padding:.5rem .35rem;font-size:.85rem;text-align:right;white-space:nowrap;vertical-align:top;';
+var hDatum=LANG=='de'?'Datum':LANG=='en'?'Date':'Datum';
+var hTijd=LANG=='de'?'Zeit':LANG=='en'?'Time':'Tijd';
+var hMeting=LANG=='de'?'Messung':LANG=='en'?'Type':'Meting';
+var hLabel=LANG=='de'?'Notiz':LANG=='en'?'Label':'Label';
+var hDim=LANG=='de'?'Was beschäftigt Sie':LANG=='en'?'Dimension':'Wat speelt er';
+var dDIM=LANG=='de'?{lichamelijk:'Körperlich',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spirituell',weet_niet:'?'}:LANG=='en'?{lichamelijk:'Physical',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spiritual',weet_niet:'?'}:{lichamelijk:'Lichamelijk',mentaal:'Mentaal',emotioneel:'Emotioneel',spiritueel:'Spiritueel',weet_niet:'?'};
+var mTYPE=LANG=='de'?{basismeting:'Basismessung',biofeedback:'Biofeedback',situatiemeting:'Situationsmessung'}:LANG=='en'?{basismeting:'Baseline measurement',biofeedback:'Biofeedback',situatiemeting:'Situation measurement'}:{};
+if(!data||!data.length){list.innerHTML='<p style="text-align:center;color:#888;">'+(LANG=='de'?'Noch keine Messungen.':LANG=='en'?'No readings yet.':'Nog geen metingen.')+'</p>';}
+else{
+  var html='<div class="table-responsive"><table class="meting-tabel" style="width:100%;border-collapse:collapse;table-layout:fixed;">';
+  html+='<colgroup>'
+    +'<col style="width:11%">'   // Datum (DD-MM-YY) — breder voor volledige datum
+    +'<col style="width:5%">'    // Tijd (HH:MM)
+    +'<col style="width:5%">'    // RI
+    +'<col style="width:5%">'    // BPM
+    +'<col style="width:5%">'    // HRV%
+    +'<col style="width:6%">'    // RMSSD
+    +'<col style="width:14%">'   // Meting
+    +'<col style="width:17%">'   // Label
+    +'<col style="width:20%">'   // Wat speelt er — breedst voor volle context
+    +'<col style="width:12%">'   // Kubios
+    +'</colgroup>';
+  html+='<tr style="background:#f8f8f6;"><th style="'+hTH+'">'+hDatum+'</th><th style="'+hTH+'">'+hTijd+'</th><th style="'+hTH+'">RI</th><th style="'+hTH+'">BPM</th><th style="'+hTH+'">HRV%</th><th style="'+hTH+'">RMSSD</th><th style="'+hTH+'">'+hMeting+'</th><th style="'+hTH+'">'+hLabel+'</th><th style="'+hTH+'">'+hDim+'</th><th style="'+hTH+'">Kubios</th></tr>';
+  data.forEach(function(r){
+    var dt=r.ts?new Date(r.ts):null;
+    var date=dt?padDate(dt.getDate())+'-'+padDate(dt.getMonth()+1)+'-'+String(dt.getFullYear()).slice(-2):'';
+    var tijd=dt?dt.toTimeString().substring(0,5):'';
+    var ri=r.ri||0;
+    var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+(ri<2?'#c0392b':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#27ae60':'#1e8449')+'"></span>';
+    var mt=r.meting_type||'-';var mtL=mTYPE[mt.toLowerCase()]||mt;
+    var dimL=r.dimensie?(dDIM[r.dimensie]||r.dimensie):'-';
+    html+='<tr style="border-bottom:1px solid #eef0f3;"><td style="'+cTD+'white-space:nowrap;">'+date+'</td><td style="'+cTD+'white-space:nowrap;">'+tijd+'</td><td style="'+cTD+'white-space:nowrap;">'+dot+ri+'</td><td style="'+cNUM+'">'+(r.bpm||'-')+'</td><td style="'+cNUM+'">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td style="'+cNUM+'">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td style="'+cTD+'">'+mtL+'</td><td style="'+cTD+'">'+(r.notes||'')+'</td><td style="'+cTD+'">'+dimL+'</td><td style="'+cTD+'white-space:nowrap;">'+(r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" style="font-size:.75rem;color:#0078ff;text-decoration:none;">&darr; Kubios</a>':'')+'</td></tr>';
+  });
+  html+='</table></div>';
+  list.innerHTML=html;
+}
+
+// Innerlijk Kompas feedback laden
+(function(){
+  var card=document.getElementById('feedbackCard');
+  var insEl=document.getElementById('feedbackInsight');
+  var refEl=document.getElementById('feedbackReflection');
+  var qEl=document.getElementById('feedbackQuestion');
+  var loadEl=document.getElementById('feedbackLoading');
+  if(!card||!insEl||!data||!data.length)return;
+  card.style.display='block';
+  fetch('/api/feedback?_=' + Date.now(), {cache: 'no-store'}).then(function(r){return r.json();}).then(function(result){
+    if(result.reflection){
+      if(insEl)insEl.textContent=result.insight||'';
+      if(refEl)refEl.textContent=result.reflection;
+      if(qEl&&result.question)qEl.textContent=result.question;
+      if(loadEl)loadEl.style.display='none';
+      var thEl=document.getElementById('feedbackTrendHint');
+      if(thEl){if(result.trend_hint){thEl.textContent=result.trend_hint;thEl.style.display='block';}else{thEl.style.display='none';}}
+    } else{card.style.display='none';}
+  }).catch(function(){card.style.display='none';});
+})();
+</script>
+{% endblock %}

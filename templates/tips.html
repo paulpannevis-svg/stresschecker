@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.tips-wrap{max-width:560px;margin:0 auto;padding:1rem;}
+.tab-bar{display:flex;gap:.4rem;margin-bottom:1rem;flex-wrap:wrap;}
+.tab-btn{padding:.4rem .9rem;border-radius:20px;border:none;background:#f0ebe4;color:#6B5360;font-size:.78rem;cursor:pointer;font-weight:600;}
+.tab-btn.active{background:#2a9d8f;color:#fff;}
+.tab-content{display:none;}.tab-content.active{display:block;}
+.tip-section{background:#fff;border-radius:12px;padding:1rem 1.1rem;margin-bottom:.8rem;box-shadow:0 1px 6px rgba(75,54,41,.07);}
+.tip-section h3{font-size:.95rem;font-weight:700;margin-bottom:.5rem;color:#333;}
+.tip-item{padding:.45rem 0;border-bottom:1px solid #eee;font-size:.83rem;color:#555;}
+.tip-item:last-child{border-bottom:none;}
+.tip-item strong{color:#333;font-size:.85rem;}
+</style>
+<div class="tips-wrap">
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab_meting" onclick="showCat('meting')">
+      {%if lang=="de"%}Vorbereitung{%elif lang=="en"%}Good reading{%else%}Voorbereiding{%endif%}
+    </button>
+    <button class="tab-btn" id="tab_sport" onclick="showCat('sport')">
+      {%if lang=="de"%}Training{%elif lang=="en"%}Sports{%else%}Sport{%endif%}
+    </button>
+    <button class="tab-btn" id="tab_biofeedback" onclick="showCat('biofeedback')">
+      Biofeedback
+    </button>
+  </div>
+
+  <!-- TAB: VOORBEREIDING -->
+  <div id="cat_meting" class="tab-content active">
+    <div class="tip-section">
+      <h3>{%if lang=="de"%}Vorbereitung auf die Messung{%elif lang=="en"%}Preparing for the reading{%else%}Voorbereiding{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}In der letzten Stunde nichts gegessen{%elif lang=="en"%}Do not eat in the past hour{%else%}Niet eten in het afgelopen uur{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Kein Kaffee oder Alkohol in der letzten Stunde{%elif lang=="en"%}No coffee or alcohol in the past hour{%else%}Geen koffie of alcohol in het afgelopen uur{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Kein Sport in den letzten 2 Stunden{%elif lang=="en"%}No exercise in the past 2 hours{%else%}Niet sporten in de afgelopen 2 uur{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}5 Minuten ruhig sitzen vor der Messung{%elif lang=="en"%}Sit quietly for 5 minutes before measuring{%else%}5 minuten rustig zitten voor de meting{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Nicht rauchen in der letzten Stunde{%elif lang=="en"%}No smoking in the past hour{%else%}Niet roken in het afgelopen uur{%endif%}</div>
+    </div>
+    <div class="tip-section">
+      <h3>{%if lang=="de"%}Während der Messung{%elif lang=="en"%}During the reading{%else%}Tijdens de meting{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}Ruhig und aufrecht sitzen{%elif lang=="en"%}Sit still and upright{%else%}Rustig en rechtop zitten{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Nicht sprechen oder sich bewegen{%elif lang=="en"%}Do not talk or move{%else%}Niet praten of bewegen{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Normal atmen — nicht tief oder bewusst{%elif lang=="en"%}Breathe normally — not deep or conscious{%else%}Normaal ademhalen — niet diep of bewust{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Handy weglegen{%elif lang=="en"%}Put your phone away{%else%}Telefoon wegleggen{%endif%}</div>
+    </div>
+    <div class="tip-section">
+      <h3>{%if lang=="de"%}Bestes Messzeitpunkt{%elif lang=="en"%}Best time to measure{%else%}Beste meettijdstip{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}<strong>Morgens nach dem Aufwachen</strong> — niedrigster Stresslevel, bestes Basisergebnis{%elif lang=="en"%}<strong>Morning after waking</strong> — lowest stress level, best baseline result{%else%}<strong>'s Ochtends na het opstaan</strong> — laagste stressniveau, beste basiswaarde{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Täglich zur gleichen Zeit messen für zuverlässige Trends{%elif lang=="en"%}Measure daily at the same time for reliable trends{%else%}Dagelijks op hetzelfde tijdstip meten voor betrouwbare trends{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Situationsmessungen: direkt vor und nach der Situation{%elif lang=="en"%}Situation readings: directly before and after the situation{%else%}Situatiemetingen: direct voor en na de situatie{%endif%}</div>
+    </div>
+  </div>
+
+  <!-- TAB: SPORT -->
+
+<div class="tip-section" id="kc-middelen-tips-link" style="background:#f0f7f5; border-left:3px solid #2a9d8f;">
+  <h3>{% if lang=="de" %}💊 Mittel und Ihre Messung{% elif lang=="en" %}💊 Substances and your reading{% else %}💊 Middelen en je meting{% endif %}</h3>
+  <div class="tip-item">
+    {% if lang=="de" %}Bestimmte Mittel beeinflussen Ihre RI direkt — Alkohol, Nikotin, Koffein, Cannabis und auch einige Medikamente. Welches Mittel wann zu einer zuverlässigen Messung führt, sehen Sie in der Tabelle <strong>Mittel und Ihre Messung</strong> im Wissenszentrum.{% elif lang=="en" %}Some substances influence your RI directly — alcohol, nicotine, caffeine, cannabis, and some medications. To see which substance allows a reliable reading and when, see the table <strong>Substances and your reading</strong> in the Knowledge Centre.{% else %}Bepaalde middelen beïnvloeden je RI direct — alcohol, nicotine, cafeïne, cannabis en ook sommige medicijnen. Welk middel wanneer een betrouwbare meting toelaat, zie je in de tabel <strong>Middelen en je meting</strong> in het Kenniscentrum.{% endif %}
+    <br><br>
+    <a href="/kenniscentrum#kc-middelen" style="color:#2a9d8f; font-weight:600; text-decoration:none;">{% if lang=="de" %}→ Zur Tabelle{% elif lang=="en" %}→ Go to the table{% else %}→ Naar de tabel{% endif %}</a>
+  </div>
+</div>
+
+  <div id="cat_sport" class="tab-content">
+    <div class="tip-section">
+      <h3>{%if lang=="de"%}StressChecker und Training{%elif lang=="en"%}StressChecker and training{%else%}StressChecker en training{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}Messen Sie <strong>vor</strong> dem Training für Ihren Ausgangswert{%elif lang=="en"%}Measure <strong>before</strong> training for your baseline value{%else%}Meet <strong>voor</strong> de training voor je uitgangswaarde{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Messen Sie <strong>nach</strong> dem Training erst nach vollständiger Erholung (mind. 2 Std.){%elif lang=="en"%}Measure <strong>after</strong> training only after full recovery (min. 2 hrs){%else%}Meet <strong>na</strong> de training pas na volledig herstel (min. 2 uur){%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Morgensmessung nach intensivem Training zeigt Erholungsgrad{%elif lang=="en"%}Morning reading after intense training shows recovery level{%else%}Ochtendmeting na intensieve training toont herstelgraad{%endif%}</div>
+    </div>
+    <div class="tip-section">
+      <h3>{%if lang=="de"%}Erholung erkennen{%elif lang=="en"%}Recognising recovery{%else%}Herstel herkennen{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}<strong>Gute Erholung:</strong> RI steigt zurück auf Ausgangswert oder höher{%elif lang=="en"%}<strong>Good recovery:</strong> RI returns to baseline or higher{%else%}<strong>Goed herstel:</strong> RI stijgt terug naar uitgangswaarde of hoger{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}<strong>Unzureichende Erholung:</strong> RI bleibt niedrig — mehr Ruhe einplanen{%elif lang=="en"%}<strong>Insufficient recovery:</strong> RI stays low — schedule more rest{%else%}<strong>Onvoldoende herstel:</strong> RI blijft laag — meer rust inplannen{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}<strong>Vorsicht:</strong> Parasympathisches Übertraining — Ruhepuls normaliert, aber Müdigkeit nimmt zu{%elif lang=="en"%}<strong>Caution:</strong> Parasympathetic overtraining — resting pulse normalises but fatigue increases{%else%}<strong>Let op:</strong> Parasympathische overtraining — rustpols normaliseert, maar vermoeidheid neemt toe{%endif%}</div>
+    </div>
+    <div class="tip-section">
+      <h3>{%if lang=="de"%}Trainingsbelastung anpassen{%elif lang=="en"%}Adjusting training load{%else%}Trainingsbelasting aanpassen{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}RI unter 4 morgens: leichtes Training oder Ruhetag{%elif lang=="en"%}RI below 4 in the morning: light training or rest day{%else%}RI onder 4 'sochtends: lichte training of rustdag{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}RI 4–6: normales Training möglich, keine Höchstleistung{%elif lang=="en"%}RI 4–6: normal training possible, no peak performance{%else%}RI 4–6: normale training mogelijk, geen topprestatie{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}RI 6–10: volle Trainingsbelastung möglich{%elif lang=="en"%}RI 6–10: full training load possible{%else%}RI 6–10: volledige trainingsbelasting mogelijk{%endif%}</div>
+    </div>
+  </div>
+
+  <!-- TAB: BIOFEEDBACK -->
+  <div id="cat_biofeedback" class="tab-content">
+    <div class="tip-section">
+      <h3>{%if lang=="de"%}Was ist Biofeedback?{%elif lang=="en"%}What is biofeedback?{%else%}Wat is biofeedback?{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}Biofeedback zeigt in Echtzeit, wie Aktivitäten Ihr Nervensystem beeinflussen{%elif lang=="en"%}Biofeedback shows in real time how activities affect your nervous system{%else%}Biofeedback toont in real-time hoe activiteiten je zenuwstelsel beïnvloeden{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Kein 90-Sekunden-Limit — messen Sie so lange Sie möchten{%elif lang=="en"%}No 90-second limit — measure as long as you like{%else%}Geen 90 secondenlimiet — meet zo lang je wilt{%endif%}</div>
+    </div>
+    <div class="tip-section">
+      <h3>{%if lang=="de"%}Was können Sie testen?{%elif lang=="en"%}What can you test?{%else%}Wat kun je testen?{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}Atemübungen — beobachten Sie den direkten Effekt auf Ihre HRV{%elif lang=="en"%}Breathing exercises — observe the direct effect on your HRV{%else%}Ademhalingsoefeningen — observeer het directe effect op je HRV{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Meditation oder Entspannung — sehen Sie den RI in Echtzeit steigen{%elif lang=="en"%}Meditation or relaxation — see the RI rise in real time{%else%}Meditatie of ontspanning — zie de RI in real-time stijgen{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Stresssituationen — beobachten Sie den Einfluss auf Ihr ANS{%elif lang=="en"%}Stress situations — observe the influence on your ANS{%else%}Stresssituaties — observeer de invloed op je ANS{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Musik, Natur, Kälte — entdecken Sie was für Sie wirkt{%elif lang=="en"%}Music, nature, cold — discover what works for you{%else%}Muziek, natuur, koude — ontdek wat voor jou werkt{%endif%}</div>
+    </div>
+    <div class="tip-section">
+      <h3>{%if lang=="de"%}Tipps für Biofeedback{%elif lang=="en"%}Tips for biofeedback{%else%}Tips voor biofeedback{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}Sensor gut befestigen — Bewegungsartefakte verfälschen das Ergebnis{%elif lang=="en"%}Attach sensor well — movement artefacts distort the result{%else%}Sensor goed bevestigen — bewegingsartefacten verstoren het resultaat{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Änderungen sind oft erst nach 30–60 Sekunden sichtbar{%elif lang=="en"%}Changes are often only visible after 30–60 seconds{%else%}Veranderingen zijn vaak pas na 30–60 seconden zichtbaar{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Vergleichen Sie verschiedene Techniken über mehrere Sitzungen{%elif lang=="en"%}Compare different techniques over multiple sessions{%else%}Vergelijk verschillende technieken over meerdere sessies{%endif%}</div>
+    </div>
+  </div>
+
+  <a href="/menu" class="back-link">← {%if lang=="de"%}Zurück zum Menü{%elif lang=="en"%}Back to menu{%else%}Terug naar menu{%endif%}</a>
+</div>
+<script>
+function showCat(id){
+  ['meting','sport','biofeedback'].forEach(function(c){
+    document.getElementById('cat_'+c).style.display=c===id?'block':'none';
+    var b=document.getElementById('tab_'+c);
+    b.style.background=c===id?'#2a9d8f':'#f0ebe4';
+    b.style.color=c===id?'#fff':'#6B5360';
+  });
+}
+</script>
+{% endblock %}

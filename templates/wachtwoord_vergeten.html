@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+<div style="max-width:420px;margin:40px auto;padding:0 16px;">
+
+  <div style="text-align:center;margin-bottom:24px;">
+    <div style="font-size:20px;font-weight:700;color:var(--red);">
+      {% if lang=='de' %}Passwort vergessen{% elif lang=='en' %}Forgot password{% else %}Wachtwoord vergeten{% endif %}
+    </div>
+    <div style="font-size:13px;color:#888;margin-top:4px;">StressChecker</div>
+  </div>
+
+  {% if info %}
+  <div style="background:#f0f8f0;border:1px solid #c6e0c6;color:#1c5c1c;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;">{{ info }}</div>
+  <div style="text-align:center;margin-top:20px;">
+    <a href="/wachtwoord-reset?lang={{ lang }}" style="display:inline-block;background:var(--red);color:white;text-decoration:none;padding:13px 24px;border-radius:10px;font-size:15px;font-weight:700;">
+      {% if lang=='de' %}Code eingeben{% elif lang=='en' %}Enter code{% else %}Code invoeren{% endif %}
+    </a>
+  </div>
+  {% else %}
+  <p style="font-size:13px;color:#666;margin-bottom:16px;text-align:center;">
+    {% if lang=='de' %}Geben Sie Ihre E-Mail-Adresse ein. Falls ein Konto existiert, senden wir einen 6-stelligen Reset-Code.
+    {% elif lang=='en' %}Enter your email address. If an account exists, we will send a 6-digit reset code.
+    {% else %}Vul je e-mailadres in. Als er een account bestaat, sturen we een 6-cijferige resetcode.{% endif %}
+  </p>
+
+  <form method="POST" action="{{ url_for('password_forgot') }}">
+    <input type="hidden" name="lang" value="{{ lang }}">
+    <div class="card" style="padding:0;overflow:hidden;border-radius:12px;border:1px solid #eee;margin-bottom:10px;">
+      <div style="padding:12px 16px;">
+        <label style="display:block;font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">E-mail</label>
+        <input type="email" name="email" required autofocus
+               style="width:100%;border:none;outline:none;font-size:14px;background:transparent;font-family:inherit;">
+      </div>
+    </div>
+    <button type="submit" style="width:100%;background:var(--red);color:white;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">
+      {% if lang=='de' %}Reset-Code senden{% elif lang=='en' %}Send reset code{% else %}Resetcode versturen{% endif %}
+    </button>
+  </form>
+  {% endif %}
+
+  <div style="text-align:center;margin-top:16px;font-size:12px;color:#aaa;">
+    <a href="{{ url_for('sc_login') }}" style="color:var(--red);font-weight:600;">
+      {% if lang=='de' %}Zurück zur Anmeldung{% elif lang=='en' %}Back to login{% else %}Terug naar inloggen{% endif %}
+    </a>
+  </div>
+
+</div>
+{% endblock %}

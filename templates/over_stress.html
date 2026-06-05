@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.os-wrap{max-width:560px;margin:0 auto;padding:1rem;}
+.tab-bar{display:flex;gap:.4rem;margin-bottom:1rem;flex-wrap:wrap;}
+.tab-btn{padding:.4rem .9rem;border-radius:20px;border:none;background:#f0ebe4;color:#6B5360;font-size:.78rem;cursor:pointer;font-weight:600;}
+.tab-btn.active{background:#2a9d8f;color:#fff;}
+.tab-content{display:none;}.tab-content.active{display:block;}
+.os-section{background:#fff;border-radius:12px;padding:1rem 1.1rem;margin-bottom:.8rem;box-shadow:0 1px 6px rgba(75,54,41,.07);}
+.os-section h3{font-size:.95rem;font-weight:700;margin-bottom:.5rem;color:#333;}
+.os-section p{font-size:.83rem;color:#555;line-height:1.6;margin-bottom:.5rem;}
+.os-section p:last-child{margin-bottom:0;}
+.ri-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-top:.5rem;}
+.ri-box{border-radius:6px;padding:.5rem .75rem;font-size:.82rem;}
+.tip-item{padding:.45rem 0;border-bottom:1px solid #eee;font-size:.83rem;color:#555;}
+.tip-item:last-child{border-bottom:none;}
+.tip-item strong{color:#333;font-size:.85rem;}
+</style>
+<div class="os-wrap">
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab_stress" onclick="showTab('stress')">
+      {%if lang=="de"%}Stress verstehen{%elif lang=="en"%}Understanding stress{%else%}Stress begrijpen{%endif%}
+    </button>
+    <button class="tab-btn" id="tab_ri" onclick="showTab('ri')">
+      {%if lang=="de"%}Relax Index{%elif lang=="en"%}Relax Index{%else%}Relax Index{%endif%}
+    </button>
+    <button class="tab-btn" id="tab_ontspanning" onclick="showTab('ontspanning')">
+      {%if lang=="de"%}Entspannung{%elif lang=="en"%}Relaxation{%else%}Ontspanning{%endif%}
+    </button>
+    <button class="tab-btn" id="tab_leefstijl" onclick="showTab('leefstijl')">
+      {%if lang=="de"%}Lebensstil{%elif lang=="en"%}Lifestyle{%else%}Leefstijl{%endif%}
+    </button>
+  </div>
+
+  <!-- TAB: STRESS BEGRIJPEN -->
+  <div id="cat_stress" class="tab-content active">
+    <div class="os-section">
+      <h3>{%if lang=="de"%}🧠 Was macht Stress mit Ihrem Körper?{%elif lang=="en"%}🧠 What does stress do to your body?{%else%}🧠 Wat doet stress met je lichaam?{%endif%}</h3>
+      {% if lang=="de" %}
+      <p>Stress ist jede Form von Ungleichgewicht im autonomen Nervensystem (ANS) — ob die Ursache körperlich, mental, emotional oder spirituell ist. Bei Stress verschiebt sich das Gleichgewicht zum Sympathikus: Herzschlag und Stresshormone steigen an.</p>
+      <p>Das Parasympathische System sorgt für Erholung. Der Relax Index misst wie gut diese Erholungsfähigkeit aktiv ist. Ein höherer Relax Index bedeutet bessere Erholung und weniger Stress.</p>
+      {% elif lang=="en" %}
+      <p>Stress is any form of imbalance in the autonomic nervous system (ANS) — whether the cause is physical, mental, emotional or spiritual. Under stress, the balance shifts to the sympathetic system: heart rate rises and stress hormones are released.</p>
+      <p>The parasympathetic system provides recovery. The Relax Index measures how well this recovery capacity is active. A higher Relax Index means better recovery and less stress.</p>
+      {% else %}
+      <p>Stress is elke vorm van disbalans in je autonome zenuwstelsel (ANS) — lichamelijk, mentaal, emotioneel of spiritueel. Bij stress verschuift de balans naar het sympathische stelsel: je hartslag stijgt en stresshormonen komen vrij.</p>
+      <p>Het parasympathische stelsel zorgt voor herstel. De Relax Index meet hoe goed dit herstelvermogen actief is. Een hogere Relax Index betekent beter herstelvermogen en minder stress.</p>
+      {% endif %}
+    </div>
+    <div class="os-section">
+      <h3>{%if lang=="de"%}⚡ Sympathikus vs. Parasympathikus{%elif lang=="en"%}⚡ Sympathetic vs. Parasympathetic{%else%}⚡ Sympathisch vs. parasympathisch{%endif%}</h3>
+      {% if lang=="de" %}
+      <p><strong>Sympathikus (Aktivierung):</strong> Herzschlag ↑, Atmung ↑, Stresshormone ↑, Verdauung ↓. Nützlich bei akutem Stress — schädlich bei Dauerstress.</p>
+      <p><strong>Parasympathikus (Erholung):</strong> Herzschlag ↓, Atmung ↓, Verdauung ↑, HRV ↑. Aktiv bei Ruhe, Schlaf und Entspannung.</p>
+      {% elif lang=="en" %}
+      <p><strong>Sympathetic (activation):</strong> Heart rate ↑, breathing ↑, stress hormones ↑, digestion ↓. Useful under acute stress — harmful under chronic stress.</p>
+      <p><strong>Parasympathetic (recovery):</strong> Heart rate ↓, breathing ↓, digestion ↑, HRV ↑. Active during rest, sleep and relaxation.</p>
+      {% else %}
+      <p><strong>Sympathisch (activatie):</strong> Hartslag ↑, ademhaling ↑, stresshormonen ↑, spijsvertering ↓. Nuttig bij acute stress — schadelijk bij chronische stress.</p>
+      <p><strong>Parasympathisch (herstel):</strong> Hartslag ↓, ademhaling ↓, spijsvertering ↑, HRV ↑. Actief bij rust, slaap en ontspanning.</p>
+      {% endif %}
+    </div>
+    <div class="os-section">
+      <h3>{%if lang=="de"%}🔵 Wie der StressChecker hilft{%elif lang=="en"%}🔵 How the StressChecker helps{%else%}🔵 Hoe de StressChecker helpt{%endif%}</h3>
+      {% if lang=="de" %}
+      <p>Der StressChecker misst objektiv über HRV-Technologie. Verfolgen Sie Ihren Verlauf über die Zeit und nutzen Sie Biofeedback um zu entdecken welche Aktivitäten Ihren Stress am besten vermindern.</p>
+      {% elif lang=="en" %}
+      <p>The StressChecker measures objectively via HRV technology. Track your progress over time and use biofeedback to discover which activities best reduce your stress.</p>
+      {% else %}
+      <p>De StressChecker meet objectief via HRV-technologie. Volg je verloop over tijd en gebruik biofeedback om te ontdekken welke activiteiten jouw stress het beste verminderen.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- TAB: RELAX INDEX -->
+  <div id="cat_ri" class="tab-content">
+    <div class="os-section">
+      <h3>{%if lang=="de"%}📊 Der Relax Index als Stressmesser{%elif lang=="en"%}📊 The Relax Index as stress meter{%else%}📊 De Relax Index als stressmeter{%endif%}</h3>
+      {% if lang=="de" %}
+      <p>Der Relax Index (0–10) kombiniert Herzfrequenz und HRV zu einem einzigen Wert. Er zeigt wie gut das parasympathische Nervensystem aktiv ist — d.h. wie gut Ihr Körper von Belastung erholt.</p>
+      {% elif lang=="en" %}
+      <p>The Relax Index (0–10) combines heart rate and HRV into a single value. It shows how well the parasympathetic nervous system is active — i.e. how well your body recovers from strain.</p>
+      {% else %}
+      <p>De Relax Index (0–10) combineert hartslag en HRV tot één waarde. Hij toont hoe goed het parasympathische zenuwstelsel actief is — d.w.z. hoe goed jouw lichaam herstelt van belasting.</p>
+      {% endif %}
+      <div class="ri-grid">
+        <div class="ri-box" style="background:#1b5e20;color:#fff"><strong>8–10</strong> — {%if lang=="de"%}Widerstandsfähig{%elif lang=="en"%}Resilient{%else%}Veerkrachtig{%endif%}</div>
+        <div class="ri-box" style="background:#388e3c;color:#fff"><strong>6–7</strong> — {%if lang=="de"%}Im Gleichgewicht{%elif lang=="en"%}Balanced{%else%}In balans{%endif%}</div>
+        <div class="ri-box" style="background:#f57f17;color:#fff"><strong>4–5</strong> — {%if lang=="de"%}Leichter Stress{%elif lang=="en"%}Mild stress{%else%}Lichte stress{%endif%}</div>
+        <div class="ri-box" style="background:#e65100;color:#fff"><strong>2–3</strong> — {%if lang=="de"%}Stress{%elif lang=="en"%}Stress{%else%}Stress{%endif%}</div>
+        <div class="ri-box" style="background:#b71c1c;color:#fff"><strong>0–1</strong> — {%if lang=="de"%}Schwerer Stress{%elif lang=="en"%}Severe stress{%else%}Zware stress{%endif%}</div>
+      </div>
+    </div>
+    <div class="os-section">
+      <h3>{%if lang=="de"%}💡 Stressbehandlung in der Praxis{%elif lang=="en"%}💡 Stress management in practice{%else%}💡 Stressbeheersing in de praktijk{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}<strong>Messen ist wissen</strong> — täglich messen, Muster erkennen{%elif lang=="en"%}<strong>Measuring is knowing</strong> — measure daily, recognise patterns{%else%}<strong>Meten is weten</strong> — dagelijks meten, patronen herkennen{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}<strong>Biofeedback nutzen</strong> — live sehen wie Atmung und Meditation die HRV beeinflussen{%elif lang=="en"%}<strong>Use biofeedback</strong> — see live how breathing and meditation influence HRV{%else%}<strong>Biofeedback gebruiken</strong> — live zien hoe ademhaling en meditatie de HRV beïnvloeden{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}<strong>Situationsmessungen</strong> — vor und nach Stresssituationen messen{%elif lang=="en"%}<strong>Situation readings</strong> — measure before and after stressful situations{%else%}<strong>Situatiemetingen</strong> — meet voor en na stressvolle situaties{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}<strong>Lebensstil anpassen</strong> — Schlaf, Bewegung, Ernährung und soziale Kontakte haben großen Einfluss{%elif lang=="en"%}<strong>Adjust lifestyle</strong> — sleep, movement, nutrition and social contacts have major influence{%else%}<strong>Leefstijl aanpassen</strong> — slaap, beweging, voeding en sociale contacten hebben grote invloed{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}<strong>Professionelle Hilfe</strong> — bei dauerhaft niedrigem Relax Index: Arzt oder Coach aufsuchen{%elif lang=="en"%}<strong>Professional help</strong> — with persistently low Relax Index: consult a doctor or coach{%else%}<strong>Professionele hulp</strong> — bij aanhoudend lage Relax Index: raadpleeg een arts of coach{%endif%}</div>
+    </div>
+  </div>
+
+  <!-- TAB: ONTSPANNING -->
+  <div id="cat_ontspanning" class="tab-content">
+    <div class="os-section">
+      <h3>{%if lang=="de"%}🌬️ Gute Atmung{%elif lang=="en"%}🌬️ Good breathing{%else%}🌬️ Goede ademhaling{%endif%}</h3>
+      {% if lang=="de" %}
+      <p>Die Atmung ist die wichtigste Grundlage für ein gesundes und entspanntes Leben. Eine optimale Atmung wirkt sich direkt auf das Gehirn aus und beeinflusst die Klarheit des Denkens, die Kommunikation und die Entspannung.</p>
+      <p><strong>Technik:</strong> einatmen: 3 zählen, ausatmen: 6–8, halten: 3</p>
+      {% elif lang=="en" %}
+      <p>Breathing is the most important basis for a healthy and relaxed life. Optimal breathing directly affects the brain and influences clarity of thinking, communication and relaxation.</p>
+      <p><strong>Technique:</strong> breathe in: 3 counts, breathe out: 6–8, hold: 3</p>
+      {% else %}
+      <p>Een goede ademhaling is de belangrijkste basis voor een gezond en ontspannen leven. Een optimale ademhaling heeft direct effect op de hersenen en de helderheid van je denken, communicatie en ontspanning.</p>
+      <p><strong>Techniek:</strong> inademen: 3 tellen, uitademen: 6–8, vasthouden: 3</p>
+      {% endif %}
+    </div>
+    <div class="os-section">
+      <h3>{%if lang=="de"%}💪 Progressive Muskelentspannung{%elif lang=="en"%}💪 Progressive muscle relaxation{%else%}💪 Progressieve spierontspanning{%endif%}</h3>
+      {% if lang=="de" %}
+      <p>Spannen Sie nacheinander verschiedene Muskelgruppen an (5–7 Sek.) und lassen Sie dann los (20–30 Sek.). Beginnen Sie bei den Füßen und arbeiten Sie sich nach oben. Reduziert körperliche Anspannung und fördert parasympathische Aktivierung.</p>
+      {% elif lang=="en" %}
+      <p>Tense different muscle groups in turn (5–7 sec) then release (20–30 sec). Start at the feet and work upward. Reduces physical tension and promotes parasympathetic activation.</p>
+      {% else %}
+      <p>Span opeenvolgend verschillende spiergroepen aan (5–7 sec.) en laat dan los (20–30 sec.). Begin bij de voeten en werk omhoog. Vermindert lichamelijke spanning en bevordert parasympathische activering.</p>
+      {% endif %}
+    </div>
+    <div class="os-section">
+      <h3>{%if lang=="de"%}🧘 Meditation{%elif lang=="en"%}🧘 Meditation{%else%}🧘 Meditatie{%endif%}</h3>
+      {% if lang=="de" %}
+      <p>Es gibt vier Formen der Meditation, die alle das ANS positiv beeinflussen:</p>
+      <p><strong>1. Gedankenlosigkeit</strong> — Gedanken kommen und gehen lassen, ohne zu urteilen.<br>
+      <strong>2. Fixation</strong> — Aufmerksamkeit auf einen Punkt richten (Flamme, Atemzug).<br>
+      <strong>3. Imagination</strong> — Eine ruhige Szene oder positives Erlebnis visualisieren.<br>
+      <strong>4. Visualisierung</strong> — Aktives Visualisieren eines gewünschten Ergebnisses.</p>
+      {% elif lang=="en" %}
+      <p>There are four forms of meditation, all of which positively influence the ANS:</p>
+      <p><strong>1. Thoughtlessness</strong> — Let thoughts come and go without judgement.<br>
+      <strong>2. Fixation</strong> — Direct attention to one point (flame, breath).<br>
+      <strong>3. Imagination</strong> — Visualise a calm scene or positive experience.<br>
+      <strong>4. Visualisation</strong> — Actively visualise a desired outcome.</p>
+      {% else %}
+      <p>Er zijn vier vormen van meditatie die alle het ANS positief beïnvloeden:</p>
+      <p><strong>1. Gedachteloosheid</strong> — Gedachten laten komen en gaan zonder oordeel.<br>
+      <strong>2. Fixatie</strong> — Aandacht richten op één punt (vlam, ademhaling).<br>
+      <strong>3. Imaginatie</strong> — Een rustige scène of positieve ervaring voor ogen halen.<br>
+      <strong>4. Visualisatie</strong> — Actief een gewenste uitkomst visualiseren.</p>
+      {% endif %}
+    </div>
+    <div class="os-section">
+      <h3>{%if lang=="de"%}🎵 Andere Entspannungsformen{%elif lang=="en"%}🎵 Other relaxation forms{%else%}🎵 Andere ontspanningsvormen{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}Musik hören — besonders langsame, ruhige Musik senkt den Herzschlag{%elif lang=="en"%}Listening to music — especially slow, calm music lowers heart rate{%else%}Muziek luisteren — vooral langzame, rustige muziek verlaagt de hartslag{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Natur — Spaziergang im Wald oder Park reduziert Cortisol nachweislich{%elif lang=="en"%}Nature — walking in forest or park demonstrably reduces cortisol{%else%}Natuur — wandelen in bos of park verlaagt aantoonbaar cortisol{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Yoga — kombiniert Atmung, Bewegung und Achtsamkeit{%elif lang=="en"%}Yoga — combines breathing, movement and mindfulness{%else%}Yoga — combineert ademhaling, beweging en mindfulness{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Soziale Verbindung — positiver Kontakt aktiviert das Bindungshormon Oxytocin{%elif lang=="en"%}Social connection — positive contact activates the bonding hormone oxytocin{%else%}Sociale verbinding — positief contact activeert het bindingshormoon oxytocine{%endif%}</div>
+    </div>
+  </div>
+
+  <!-- TAB: LEEFSTIJL -->
+  <div id="cat_leefstijl" class="tab-content">
+    <div class="os-section">
+      <h3>{%if lang=="de"%}😴 Schlaf{%elif lang=="en"%}😴 Sleep{%else%}😴 Slaap{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}7–9 Stunden pro Nacht für optimale ANS-Erholung{%elif lang=="en"%}7–9 hours per night for optimal ANS recovery{%else%}7–9 uur per nacht voor optimaal ANS-herstel{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Regelmäßige Schlafzeiten stabilisieren den Biorhythmus{%elif lang=="en"%}Regular sleep times stabilise the biorhythm{%else%}Regelmatige slaaptijden stabiliseren het bioritme{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Bildschirme 1 Stunde vor dem Schlafen vermeiden{%elif lang=="en"%}Avoid screens 1 hour before sleep{%else%}Schermen 1 uur voor slapen vermijden{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Kühles, dunkles Schlafzimmer fördert Tiefschlaf{%elif lang=="en"%}Cool, dark bedroom promotes deep sleep{%else%}Koele, donkere slaapkamer bevordert diepe slaap{%endif%}</div>
+    </div>
+    <div class="os-section">
+      <h3>{%if lang=="de"%}🏃 Bewegung{%elif lang=="en"%}🏃 Movement{%else%}🏃 Beweging{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}Regelmäßige moderate Bewegung erhöht die HRV langfristig{%elif lang=="en"%}Regular moderate movement increases HRV long-term{%else%}Regelmatige matige beweging verhoogt de HRV op lange termijn{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}30 Minuten täglich reichen — Gehen zählt{%elif lang=="en"%}30 minutes daily is sufficient — walking counts{%else%}30 minuten per dag is voldoende — wandelen telt{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Intensives Training erhöht kurzfristig den Stress — Erholung einplanen{%elif lang=="en"%}Intense training raises stress short-term — plan recovery{%else%}Intensieve training verhoogt kortdurend de stress — herstel inplannen{%endif%}</div>
+    </div>
+    <div class="os-section">
+      <h3>{%if lang=="de"%}🥗 Ernährung{%elif lang=="en"%}🥗 Nutrition{%else%}🥗 Voeding{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}Zucker und stark verarbeitete Lebensmittel erhöhen Entzündungen und Stress{%elif lang=="en"%}Sugar and highly processed foods increase inflammation and stress{%else%}Suiker en sterk bewerkte voeding verhogen ontstekingen en stress{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Omega-3-Fettsäuren (Fisch, Nüsse) unterstützen das Nervensystem{%elif lang=="en"%}Omega-3 fatty acids (fish, nuts) support the nervous system{%else%}Omega-3 vetzuren (vis, noten) ondersteunen het zenuwstelsel{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Ausreichend Wasser trinken — Dehydrierung erhöht den Stresspegel{%elif lang=="en"%}Drink enough water — dehydration increases stress levels{%else%}Voldoende water drinken — uitdroging verhoogt het stressniveau{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Koffein mit Maß — zu viel stört den Schlaf und erhöht die Herzfrequenz{%elif lang=="en"%}Caffeine in moderation — too much disturbs sleep and raises heart rate{%else%}Cafeïne met mate — te veel verstoort slaap en verhoogt hartslag{%endif%}</div>
+    </div>
+    <div class="os-section">
+      <h3>{%if lang=="de"%}👥 Soziale Kontakte{%elif lang=="en"%}👥 Social contacts{%else%}👥 Sociale contacten{%endif%}</h3>
+      <div class="tip-item">{%if lang=="de"%}Positive soziale Kontakte aktivieren das parasympathische System{%elif lang=="en"%}Positive social contacts activate the parasympathetic system{%else%}Positieve sociale contacten activeren het parasympathische systeem{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Einsamkeit erhöht Cortisol und senkt die HRV{%elif lang=="en"%}Loneliness raises cortisol and lowers HRV{%else%}Eenzaamheid verhoogt cortisol en verlaagt de HRV{%endif%}</div>
+      <div class="tip-item">{%if lang=="de"%}Grenzen setzen — toxische Beziehungen sind ein chronischer Stressor{%elif lang=="en"%}Set boundaries — toxic relationships are a chronic stressor{%else%}Grenzen stellen — toxische relaties zijn een chronische stressor{%endif%}</div>
+    </div>
+  </div>
+
+  <a href="/menu" class="back-link">← {%if lang=="de"%}Zurück zum Menü{%elif lang=="en"%}Back to menu{%else%}Terug naar menu{%endif%}</a>
+</div>
+<script>
+function showTab(id){
+  ['stress','ri','ontspanning','leefstijl'].forEach(function(c){
+    document.getElementById('cat_'+c).style.display=c===id?'block':'none';
+    var b=document.getElementById('tab_'+c);
+    b.style.background=c===id?'#2a9d8f':'#f0ebe4';
+    b.style.color=c===id?'#fff':'#6B5360';
+  });
+}
+</script>
+{% endblock %}

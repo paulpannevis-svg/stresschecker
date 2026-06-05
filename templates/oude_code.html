@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{% if lang=="de" %}Alte StressChecker-Code{% elif lang=="en" %}Old StressChecker Code{% else %}Oude StressChecker-code{% endif %}{% endblock %}
+{% block content %}
+<div class="screen" style="max-width:420px;margin:0 auto;padding:2rem 1rem">
+  <div style="text-align:center;margin-bottom:1.5rem">
+    <div style="font-size:2rem">🔓</div>
+    <h2 style="font-size:1.2rem;font-weight:700;color:#333;margin:.5rem 0 .25rem">
+      {% if lang=="de" %}Alte StressChecker-Code{% elif lang=="en" %}Old StressChecker Code{% else %}Oude StressChecker-code{% endif %}
+    </h2>
+    <p style="font-size:.82rem;color:#777">
+      {% if lang=="de" %}Geben Sie Ihren 32-stelligen Code ein (Format: XXXX-XXXX-…){% elif lang=="en" %}Enter your 32-character code (format: XXXX-XXXX-…){% else %}Voer je 32-tekens code in (formaat: XXXX-XXXX-…){% endif %}
+    </p>
+  </div>
+
+  {% if error %}
+  <div style="background:#fee;border:1px solid #fcc;border-radius:8px;padding:.7rem 1rem;margin-bottom:1rem;font-size:.82rem;color:#c00">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  <form method="post">
+    <input type="text" name="code" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+      style="width:100%;padding:.7rem 1rem;border:1px solid #ddd;border-radius:10px;font-size:.82rem;font-family:monospace;box-sizing:border-box;margin-bottom:.75rem"
+      autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+    <button type="submit" style="width:100%;padding:.75rem;background:#E8344E;color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">
+      {% if lang=="de" %}Code prüfen{% elif lang=="en" %}Check code{% else %}Code controleren{% endif %}
+    </button>
+  </form>
+
+  <div style="text-align:center;margin-top:1.2rem">
+    <a href="{{ url_for('welcome') }}" style="font-size:.78rem;color:#999;text-decoration:none">
+      ← {% if lang=="de" %}Zurück{% elif lang=="en" %}Back{% else %}Terug{% endif %}
+    </a>
+  </div>
+</div>
+{% endblock %}

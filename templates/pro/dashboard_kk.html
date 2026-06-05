@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}StressChecker® — {% if lang=='de' %}Krankenkasse — Admin-Übersicht{% elif lang=='en' %}Krankenkasse — Admin Overview{% else %}Krankenkasse — Admin-overzicht{% endif %}{% endblock %}
+
+{% block content %}
+<style>
+  .kk-admin-wrap { max-width: 980px; margin: 0 auto; padding: 1rem; }
+  .kk-admin-wrap h1 { font-size: 1.4rem; margin: .2rem 0 .1rem; }
+  .kk-admin-wrap .sub { color: #555; margin: 0 0 1.2rem; font-size: .95rem; }
+  .kk-admin-wrap .badge {
+    background: #1565c0; color: #fff; font-size: .65rem; font-weight: 700;
+    padding: 2px 8px; border-radius: 10px; vertical-align: middle; margin-right: .3rem;
+  }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .8rem; margin-bottom: 1.4rem; }
+  .kpi {
+    background: #fff; border: 1px solid #e5e5e5; border-radius: 8px;
+    padding: .9rem 1rem; text-align: left;
+  }
+  .kpi .num { font-size: 1.7rem; font-weight: 700; color: #1565c0; line-height: 1.1; }
+  .kpi .lbl { font-size: .82rem; color: #555; margin-top: .2rem; }
+  .actions { display: flex; gap: .6rem; flex-wrap: wrap; margin-bottom: 1.4rem; }
+  .actions a {
+    background: #1565c0; color: #fff; text-decoration: none;
+    padding: .55rem 1rem; border-radius: 6px; font-size: .95rem;
+  }
+  .actions a.secondary { background: #fff; color: #1565c0; border: 1px solid #1565c0; }
+  .section { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 1rem; margin-bottom: 1.2rem; }
+  .section h2 { margin: 0 0 .8rem; font-size: 1.05rem; color: #333; }
+  table.kk-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  table.kk-table th, table.kk-table td { padding: .45rem .6rem; border-bottom: 1px solid #f0f0f0; text-align: left; }
+  table.kk-table th { font-weight: 600; color: #555; background: #fafafa; }
+  table.kk-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .inactive { color: #999; }
+  .opwelcome {
+    background: #fff8e1; border: 1px solid #f0c987; border-radius: 8px;
+    padding: .9rem 1rem; margin-bottom: 1.2rem;
+  }
+  .opwelcome code {
+    background: #fff; padding: 2px 6px; border-radius: 4px; font-family: monospace;
+  }
+  .footer-link { text-align: center; margin-top: 1.5rem; font-size: .88rem; }
+  .footer-link a { color: #1565c0; text-decoration: none; }
+</style>
+
+<div class="kk-admin-wrap">
+  <h1>
+    <span class="badge">KK</span>
+    {% if lang=='de' %}Krankenkasse — Admin-Übersicht{% elif lang=='en' %}Krankenkasse — Admin Overview{% else %}Krankenkasse — Admin-overzicht{% endif %}
+  </h1>
+  <p class="sub">
+    {% if lang=='de' %}Lizenz {{ license_code }} ({{ tier_label }}). Hier sehen Sie die aggregierten Kennzahlen Ihrer Standorte.{% elif lang=='en' %}License {{ license_code }} ({{ tier_label }}). Here you see the aggregated metrics for your locations.{% else %}Licentie {{ license_code }} ({{ tier_label }}). Hier ziet u de samengevatte cijfers van uw locaties.{% endif %}
+  </p>
+
+  {% if operator_welcome %}
+  <div class="opwelcome">
+    <strong>
+      {% if lang=='de' %}Operator-Konto erstellt{% elif lang=='en' %}Operator account created{% else %}Operator-account aangemaakt{% endif %}
+    </strong><br>
+    {% if lang=='de' %}Bitte geben Sie diese Zugangsdaten an Ihren Operator weiter — sie werden danach nicht erneut angezeigt:{% elif lang=='en' %}Please share these credentials with your operator — they will not be shown again:{% else %}Geef deze gegevens door aan uw operator — ze worden hierna niet meer getoond:{% endif %}
+    <ul style="margin: .4rem 0 0 1.2rem; padding: 0;">
+      <li>{% if lang=='de' %}E-Mail{% elif lang=='en' %}E-mail{% else %}E-mail{% endif %}: <code>{{ operator_welcome.email }}</code></li>
+      <li>{% if lang=='de' %}Passwort{% elif lang=='en' %}Password{% else %}Wachtwoord{% endif %}: <code>{{ operator_welcome.password }}</code></li>
+    </ul>
+  </div>
+  {% endif %}
+
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="num">{{ active_count }}{% if total_offices != active_count %} <span style="color:#999;font-size:.7em;">/ {{ total_offices }}</span>{% endif %}</div>
+      <div class="lbl">
+        {% if lang=='de' %}aktive Standorte{% elif lang=='en' %}active locations{% else %}actieve locaties{% endif %}
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="num">{{ total_metingen }}</div>
+      <div class="lbl">
+        {% if lang=='de' %}Messungen gesamt{% elif lang=='en' %}total measurements{% else %}metingen totaal{% endif %}
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="num">{{ unique_clients }}</div>
+      <div class="lbl">
+        {% if lang=='de' %}Versicherte{% elif lang=='en' %}clients{% else %}verzekerden{% endif %}
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="num">{{ '%.1f' % ri_average if ri_average is not none else '–' }}</div>
+      <div class="lbl">
+        {% if lang=='de' %}Durchschnittlicher Relax Index{% elif lang=='en' %}average Relax Index{% else %}gemiddelde Relax Index{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <a href="{{ url_for('kk_locaties_beheren') }}">
+      {% if lang=='de' %}Standorte verwalten{% elif lang=='en' %}Manage locations{% else %}Locaties beheren{% endif %}
+    </a>
+    <a href="{{ url_for('pro_rapport_form') }}">
+      {% if lang=='de' %}Berichte{% elif lang=='en' %}Reports{% else %}Rapporten{% endif %}
+    </a>
+    <a href="{{ url_for('kk_admin_messen_standort') }}" class="secondary">
+      {% if lang=='de' %}Direkt messen ▶{% elif lang=='en' %}Measure directly ▶{% else %}Direct meten ▶{% endif %}
+    </a>
+  </div>
+
+  <div class="section">
+    <h2>{% if lang=='de' %}Ihre Standorte{% elif lang=='en' %}Your locations{% else %}Uw locaties{% endif %}</h2>
+    {% if offices %}
+    <table class="kk-table">
+      <thead>
+        <tr>
+          <th>{% if lang=='de' %}Standort{% elif lang=='en' %}Location{% else %}Locatie{% endif %}</th>
+          <th>{% if lang=='de' %}Region{% elif lang=='en' %}Region{% else %}Regio{% endif %}</th>
+          <th class="num">{% if lang=='de' %}Messungen{% elif lang=='en' %}Measurements{% else %}Metingen{% endif %}</th>
+          <th class="num">M</th>
+          <th class="num">{% if lang=='de' %}W{% else %}V{% endif %}</th>
+          <th class="num">D</th>
+          <th>{% if lang=='de' %}Status{% elif lang=='en' %}Status{% else %}Status{% endif %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in offices %}
+        <tr class="{% if not o.active %}inactive{% endif %}">
+          <td>{{ o.office_name }}</td>
+          <td>{{ o.region or '–' }}</td>
+          <td class="num">{{ o.total_metingen }}</td>
+          <td class="num">{{ o.male }}</td>
+          <td class="num">{{ o.female }}</td>
+          <td class="num">{{ o.other }}</td>
+          <td>
+            {% if o.active %}
+              {% if lang=='de' %}aktiv{% elif lang=='en' %}active{% else %}actief{% endif %}
+            {% else %}
+              {% if lang=='de' %}inaktiv{% elif lang=='en' %}inactive{% else %}inactief{% endif %}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#888;margin:0;">
+      {% if lang=='de' %}Noch keine Standorte konfiguriert.{% elif lang=='en' %}No locations configured yet.{% else %}Nog geen locaties geconfigureerd.{% endif %}
+    </p>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <h2>{% if lang=='de' %}Letzte Messungen (anonym){% elif lang=='en' %}Recent measurements (anonymous){% else %}Recente metingen (anoniem){% endif %}</h2>
+    {% if recent %}
+    <table class="kk-table">
+      <thead>
+        <tr>
+          <th>{% if lang=='de' %}Zeitpunkt{% elif lang=='en' %}Time{% else %}Tijdstip{% endif %}</th>
+          <th>{% if lang=='de' %}Standort{% elif lang=='en' %}Location{% else %}Locatie{% endif %}</th>
+          <th class="num">RI</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in recent %}
+        <tr>
+          <td>{{ m.ts }}</td>
+          <td>{{ m.office_label }}</td>
+          <td class="num">{{ '%.1f' % m.ri if m.ri is not none else '–' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#888;margin:0;">
+      {% if lang=='de' %}Noch keine Messungen verfügbar.{% elif lang=='en' %}No measurements available yet.{% else %}Nog geen metingen beschikbaar.{% endif %}
+    </p>
+    {% endif %}
+  </div>
+
+  <div class="footer-link">
+    <a href="{{ url_for('kk_operatoren_lijst') }}">
+      ⚙ {% if lang=='de' %}Operatoren verwalten{% elif lang=='en' %}Manage operators{% else %}Operatoren beheren{% endif %} →
+    </a>
+  </div>
+</div>
+{% endblock %}

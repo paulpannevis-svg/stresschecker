@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}StressChecker®{% endblock %}
+{% block content %}
+<style>
+  body{background:#626268 !important;}
+  .eggs-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:20px;background:#626268 !important;}
+  #eggsCanvas{display:block;}
+  #zin{max-width:320px;text-align:center;color:#fff;font-style:italic;font-size:.95rem;line-height:1.5;margin:1rem 0 0;min-height:1.5rem;}
+  .eggs-btn{margin-top:1.5rem;background:transparent;border:1px solid rgba(255,255,255,.6);color:#fff;padding:.6rem 1.4rem;border-radius:8px;text-decoration:none;font-size:.9rem;transition:background .15s;}
+  .eggs-btn:hover{background:rgba(255,255,255,.12);}
+</style>
+<div class="eggs-wrap" style="background:#626268 !important">
+  <div id="scores" style="display:flex;justify-content:center;
+gap:32px;margin-bottom:8px;font-size:13px;
+color:rgba(255,255,255,0.5);letter-spacing:0.05em;
+font-family:Georgia,serif;font-style:italic">
+    <span id="score-ri"></span>
+    <span id="score-sz"></span>
+  </div>
+  <canvas id="eggsCanvas" width="320" height="320"></canvas>
+  <p style="font-size:11px;letter-spacing:0.08em;color:rgba(255,255,255,0.55);text-align:center;margin-top:8px">○ lichaam &nbsp;&nbsp; ● gevoel</p>
+  <p id="zin"></p>
+  <a href="/kwadrant{% if client_id %}?cid={{ client_id }}{% endif %}" class="eggs-btn">{% if lang=='de' %}Zum Quadrant →{% elif lang=='en' %}View quadrant →{% else %}Bekijk kwadrant →{% endif %}</a>
+</div>
+<script>
+(function(){
+  var RI = {{ ri|tojson }};
+  var SZ = {{ sz|tojson }};
+  console.log('[eggs] RI=', RI, 'SZ=', SZ, 'canvas=', document.getElementById('eggsCanvas') && document.getElementById('eggsCanvas').width);
+  var pcid = parseInt('{{ client_id|default(0) }}') || 0;
+
+  function drawBg(){
+    const c=document.getElementById('eggsCanvas');
+    const ctx=c.getContext('2d');
+    const W=320,H=320;
+    ctx.fillStyle='#626268';
+    ctx.fillRect(0,0,W,H);
+    for(let i=0;i<3000;i++){
+      const x=Math.random()*W,y=Math.random()*H;
+      const b=Math.random()>0.5?8:-8;
+      ctx.fillStyle=`rgba(${98+b},${98+b},${104+b},${Math.random()*0.06})`;
+      ctx.fillRect(x,y,Math.random()*3+1,Math.random()*3+1);
+    }
+  }
+
+  function drawEgg(ctx, cx, cy, w, h, baseColor, highlightColor){
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + h*0.55, w*0.42, h*0.09, 0, 0, 2*Math.PI);
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.filter = 'blur(5px)';
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.beginPath();
+    ctx.moveTo(0, -h*0.55);
+    ctx.bezierCurveTo(w*0.55, -h*0.55, w*0.58, h*0.55, 0, h*0.55);
+    ctx.bezierCurveTo(-w*0.58, h*0.55, -w*0.55, -h*0.55, 0, -h*0.55);
+    var grad = ctx.createRadialGradient(-w*0.18, -h*0.28, w*0.05, 0, 0, w*0.85);
+    grad.addColorStop(0, highlightColor);
+    grad.addColorStop(0.55, baseColor);
+    grad.addColorStop(1, baseColor);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawEggs(ri, sz){
+    var cv = document.getElementById('eggsCanvas');
+    if(!cv) return;
+    var ctx = cv.getContext('2d');
+    drawBg();
+    document.getElementById('score-ri').textContent = 'lichaam  ' + ri.toFixed(1);
+    document.getElementById('score-sz').textContent = 'gevoel  ' + sz;
+    var cx = 160, cy = 160;
+    var eggW = 60, eggH = 78;
+    if(sz == null || isNaN(sz)){
+      drawEgg(ctx, cx, cy, eggW, eggH, '#e8e8e8', '#ffffff');
+      return;
+    }
+    var spread = Math.abs(ri - sz) / 9 * 88 + 14;
+    var midY = cv.height / 2;
+    var riX = cx - spread/2;
+    var szX = cx + spread/2;
+    drawEgg(ctx, riX, midY, eggW, eggH, '#e8e8e8', '#ffffff');
+    drawEgg(ctx, szX, midY, eggW, eggH, '#4a8f5a', '#a8d4b3');
+  }
+
+  drawEggs(RI, SZ);
+
+  if(SZ != null && !isNaN(SZ) && Math.abs(RI - SZ) > 1.5){
+    fetch('/api/feedback' + (pcid>0?'?cid='+pcid:'')).then(function(r){return r.json();}).then(function(fb){
+      if(fb && fb.question){ document.getElementById('zin').textContent = fb.question; }
+    }).catch(function(){});
+  }
+})();
+</script>
+{% endblock %}

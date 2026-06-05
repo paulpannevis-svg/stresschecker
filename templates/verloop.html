@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.vl-wrap{max-width:1050px;margin:1.5rem auto;padding:0 1rem;}
+.vl-title{font-size:1.1rem;font-weight:700;color:#C4280D;margin-bottom:1rem;text-align:center;letter-spacing:.05em;}
+.vl-filters{display:flex;gap:.5rem;justify-content:center;margin-bottom:1.2rem;flex-wrap:wrap;}
+.vl-btn{padding:.4rem 1.1rem;border-radius:20px;border:2px solid #E8344E;background:transparent;color:#C4280D;font-weight:700;cursor:pointer;font-size:.85rem;transition:.2s;}
+.vl-btn.active{background:#E8344E;color:#fff;}
+.vl-card{background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.08);padding:1.2rem;margin-bottom:1.2rem;}
+.vl-canvas-wrap{position:relative;width:100%;height:220px;}
+#verlChart{width:100%;height:100%;}
+.vl-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem;margin-top:1rem;}
+.vl-stat{text-align:center;padding:.6rem;background:#FDE8EB;border-radius:10px;}
+.vl-stat-val{font-size:1.4rem;font-weight:700;color:#C4280D;}
+.vl-stat-lbl{font-size:.65rem;color:#999;text-transform:uppercase;letter-spacing:.05em;}
+.vl-empty{text-align:center;color:#aaa;padding:2rem;font-size:.9rem;}
+.vl-footer{text-align:center;margin-top:1.5rem;}
+.vl-footer a{color:#E8344E;text-decoration:none;font-weight:700;}
+</style>
+
+<div class="vl-wrap">
+  <div class="vl-title">📈 {%if lang=="de"%}DETAIL INFORMATIONEN MESSUNGEN{%elif lang=="en"%}DETAIL INFORMATION MEASUREMENTS{%else%}DETAIL INFORMATIE METINGEN{%endif%}</div>
+
+  
+  <div class="vl-stats" id="verlStats"></div>
+
+  <div id="metingList" style="margin-top:1rem;"></div>
+  <div class="vl-footer">
+    <a href="{{ url_for('menu') }}">← {%if lang=="de"%}Menü{%elif lang=="en"%}Menu{%else%}Menu{%endif%}</a> &nbsp;&nbsp;
+    <a href="{{ url_for('meetkeuze') }}">► {%if lang=="de"%}Neue Messung{%elif lang=="en"%}New reading{%else%}Nieuwe meting{%endif%}</a>
+  </div>
+</div>
+
+<script>
+var allData = [];
+
+function renderList(data) {
+  var list=document.getElementById('metingList');
+  var lang='{{ lang }}';
+  var hDatum=lang=='de'?'DATUM':lang=='en'?'DATE':'DATUM';
+  var hTijd=lang=='de'?'ZEIT':lang=='en'?'TIME':'TIJD';
+  var hMeting=lang=='de'?'MESSUNG':lang=='en'?'TYPE':'METING';
+  var hLabel=lang=='de'?'BEZEICHNUNG':lang=='en'?'LABEL':'LABEL';
+  var COLORS=['#c0392b','#c0392b','#e67e22','#e67e22','#f1c40f','#f1c40f','#2ecc71','#2ecc71','#27ae60','#27ae60','#27ae60'];
+  var html='<div style="background:#fff;border-radius:12px;padding:1.25rem 1.5rem;width:100%;box-sizing:border-box;overflow-x:auto;">';
+  html+='<table class="meting-tabel"><tr><th>'+hDatum+'</th><th>'+hTijd+'</th><th>RI</th><th>BPM</th><th>HRV%</th><th>RMSSD</th><th>'+hMeting+'</th><th>'+hLabel+'</th></tr>';
+  data.forEach(function(r){
+    var dt=r.ts?new Date(r.ts).toISOString():'';
+    var date=dt?dt.substring(0,10):'';
+    var tijd=dt?dt.substring(11,16):'';
+    var ri=r.ri!=null?parseFloat(r.ri).toFixed(1):'-';
+    var z=r.ri!=null?Math.min(10,Math.max(0,Math.floor(r.ri))):0;
+    var col=COLORS[z]||'#999';
+    var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+col+';margin-right:4px;"></span>';
+    var ctx_html = '';
+    if(r.subjectief_score!=null || r.ctx_vitaliteit!=null || r.ctx_dimensie) {
+      var lang2 = '{{ lang }}';
+      var lOntsp = lang2=='de'?'Ontspanning':lang2=='en'?'Relaxation':'Ontspanning';
+      var lVit = lang2=='de'?'Authentizität':lang2=='en'?'Authenticity':'Authenticiteit';
+      var lDim = lang2=='de'?'Was beschäftigt Sie':lang2=='en'?'What is going on':'Wat speelt er';
+      var dimNL={lichamelijk:'Lichamelijk',mentaal:'Mentaal',emotioneel:'Emotioneel',spiritueel:'Spiritueel',weet_niet:'?'};
+      var dimDE={lichamelijk:'Körperlich',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spirituell',weet_niet:'?'};
+      var dimEN={lichamelijk:'Physical',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spiritual',weet_niet:'?'};
+      var dimMap = lang2=='de'?dimDE:lang2=='en'?dimEN:dimNL;
+      var dimLabel = r.ctx_dimensie ? (dimMap[r.ctx_dimensie]||r.ctx_dimensie) : '';
+      ctx_html = '<tr class="ctx-detail" id="ctx-'+r.id+'" style="display:none"><td colspan="8"><div style="padding:.5rem 1rem;background:#f9f5f0;border-radius:8px;margin:.2rem 0;display:flex;gap:1.5rem;font-size:.82rem;color:#555;">'
+        + (r.subjectief_score!=null ? '<span><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#c0862a\" stroke-width=\"2.5\" stroke-linecap=\"round\"><path d=\"M2 12 Q7 7 12 12 Q17 17 22 12\"/><path d=\"M2 17 Q7 12 12 17 Q17 22 22 17\" opacity=\".4\"/></svg> '+lOntsp+': <b>'+r.subjectief_score+'/10</b></span>' : '')
+        + (r.ctx_vitaliteit!=null ? '<span><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"#c0862a\"><path d=\"M13 2L3 14h8l-1 8 11-13h-8z\"/></svg> '+lVit+': <b>'+r.ctx_vitaliteit+'/10</b></span>' : '')
+        + (dimLabel ? '<span><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#c0862a\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"12\" r=\"3\" fill=\"#c0862a\" stroke=\"none\"/><line x1=\"12\" y1=\"2\" x2=\"12\" y2=\"5\"/><line x1=\"12\" y1=\"19\" x2=\"12\" y2=\"22\"/></svg> '+lDim+': <b>'+dimLabel+'</b></span>' : '')
+        + '</div></td></tr>';
+    }
+    var hasCtx = (r.subjectief_score!=null || r.ctx_vitaliteit!=null || r.ctx_dimensie) ? 1 : 0;
+    var rowStyle = hasCtx ? 'cursor:pointer;' : '';
+    var rowClick = hasCtx ? 'onclick="toggleCtx('+r.id+')"' : '';
+    html+='<tr style="'+rowStyle+'" '+rowClick+'><td>'+date+'</td><td>'+tijd+'</td><td>'+dot+ri+'</td><td>'+(r.bpm||'-')+'</td><td>'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td>'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td>'+(r.meting_type||'')+'</td><td style="padding-left:1.5rem">'+(r.notes||'')+'</td></tr>'+ctx_html;
+  });
+  html+='</table></div>';
+  list.innerHTML=html;
+}
+var currentPeriod = 'maand';
+
+function loadVerloop(period) {
+  currentPeriod = period;
+  document.querySelectorAll('.vl-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  drawChart(period);
+}
+
+function lastPerDay(data) {
+  // Laatste meting per dag (data gesorteerd DESC van server)
+  var seen = {}, result = [];
+  data.forEach(function(d) {
+    var d2=new Date(d.ts); var day=d2.getFullYear()+"-"+("0"+(d2.getMonth()+1)).slice(-2)+"-"+("0"+d2.getDate()).slice(-2);
+    if (!seen[day]) { seen[day] = true; result.push(d); }
+  });
+  return result.sort(function(a,b){ return a.ts - b.ts; });
+}
+
+function drawChart(period) {
+  var cv = document.getElementById('verlChart');
+  var ctx = cv.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  cv.width = (cv.parentElement.clientWidth || 700) * dpr;
+  cv.height = 220 * dpr;
+  ctx.scale(dpr, dpr);
+  var W = cv.parentElement.clientWidth || 700;
+  var H = 220;
+  var P = {l:42, r:16, t:16, b:28};
+  ctx.clearRect(0, 0, W, H);
+
+  var now = new Date();
+  var maanden = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+
+  // --- X-as definitie per periode ---
+  var xStart, xEnd, xLabels = [];
+  if (period === 'week') {
+    xEnd = new Date(now); xEnd.setHours(23,59,59,999);
+    xStart = new Date(xEnd); xStart.setDate(xStart.getDate() - 6); xStart.setHours(0,0,0,0);
+    for (var d=0; d<7; d++) {
+      var dd = new Date(xStart); dd.setDate(dd.getDate() + d);
+        var dagen = {% if lang=="de" %}["So","Mo","Di","Mi","Do","Fr","Sa"]{% elif lang=="en" %}["Su","Mo","Tu","We","Th","Fr","Sa"]{% else %}["zo","ma","di","wo","do","vr","za"]{% endif %};
+      xLabels.push({ label: dagen[dd.getDay()] + ' ' + dd.getDate(), frac: d/6 });
+    }
+  } else if (period === 'maand') {
+    xEnd = new Date(now); xEnd.setHours(23,59,59,999);
+    xStart = new Date(xEnd); xStart.setDate(xStart.getDate() - 29); xStart.setHours(0,0,0,0);
+    for (var w=0; w<5; w++) {
+      var wd = new Date(xStart); wd.setDate(wd.getDate() + w*7);
+      xLabels.push({ label: wd.getDate() + ' ' + maanden[wd.getMonth()], frac: w/4 });
+    }
+  } else if (period === 'jaar') {
+    xStart = new Date(now.getFullYear(), 0, 1);
+    xEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+    for (var m=0; m<12; m++) {
+      xLabels.push({ label: maanden[m], frac: m/11 });
+    }
+  } else { // alles: 2026-2028
+    xStart = new Date(2026, 0, 1);
+    xEnd = new Date(2028, 11, 31, 23, 59, 59);
+    var totalMs = xEnd - xStart;
+    [2026,2027,2028].forEach(function(yr) {
+      var yrDate = new Date(yr, 0, 1);
+      xLabels.push({ label: String(yr), frac: (yrDate - xStart) / totalMs });
+    });
+  }
+
+  var xSpan = xEnd - xStart;
+  function xPos(ts) { return P.l + ((ts - xStart) / xSpan) * (W - P.l - P.r); }
+  function yPos(ri) { return H - P.b - (ri / 10) * (H - P.t - P.b); }
+
+  // --- Zones ---
+  var zones = [
+    {min:0, max:2, col:'rgba(200,40,40,.80)'},
+    {min:2, max:4, col:'rgba(210,100,20,.72)'},
+    {min:4, max:7, col:'rgba(210,170,10,.68)'},
+    {min:7, max:10, col:'rgba(20,170,70,.72)'}
+  ];
+  zones.forEach(function(z) {
+    ctx.fillStyle = z.col;
+    ctx.fillRect(P.l, yPos(z.max), W-P.l-P.r, yPos(z.min)-yPos(z.max));
+  });
+
+  // --- X-as labels ---
+  ctx.fillStyle = '#666'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+  xLabels.forEach(function(xl) {
+    var x = P.l + xl.frac * (W - P.l - P.r);
+    ctx.fillText(xl.label, x, H - P.b + 11);
+  });
+
+  // --- Y-as labels ---
+  ctx.textAlign = 'right';
+  [0,2,4,6,8,10].forEach(function(v) {
+    ctx.fillStyle = '#888'; ctx.font = '9px sans-serif';
+    ctx.fillText(v, P.l - 3, yPos(v) + 3);
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(P.l, yPos(v)); ctx.lineTo(W-P.r, yPos(v)); ctx.stroke();
+  });
+
+  // --- Filter data op periode (chart: uitsluitend basismetingen) ---
+  var basisData = allData.filter(function(r){ return (r.meting_type||'').toLowerCase()==='basismeting'; });
+  var filtered = lastPerDay(basisData.filter(function(d) {
+    return d.ts >= xStart.getTime() && d.ts <= xEnd.getTime();
+  }));
+
+  if (filtered.length === 0) {
+    ctx.fillStyle = '#aaa'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(lang==='de'?'Keine Messungen in diesem Zeitraum':'Geen metingen in deze periode', W/2, H/2 - 8);
+    document.getElementById('verlStats').innerHTML = '';
+    return;
+  }
+
+  // --- Baseline (na 7 basismetingen) ---
+  var basisMetingen = allData.filter(function(d){ return d.meting_type === 'basismeting'; });
+  if (basisMetingen.length >= 7) {
+    var first7 = basisMetingen.slice(-Math.max(basisMetingen.length,7)).slice(0,7);
+    var baseline = first7.reduce(function(s,d){ return s + (d.ri||0); },0) / 7;
+    ctx.strokeStyle = 'rgba(141,110,99,0.7)'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    ctx.moveTo(P.l, yPos(baseline)); ctx.lineTo(W-P.r, yPos(baseline));
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(141,110,99,0.9)'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('gem ' + baseline.toFixed(1), P.l + 2, yPos(baseline) - 3);
+  }
+
+  // --- RI lijn ---
+  var riPts = filtered.filter(function(d){ return d.ri != null; });
+  if (riPts.length > 0) {
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.setLineDash([]);
+    ctx.beginPath();
+    riPts.forEach(function(d,i) {
+      var x = xPos(d.ts), y = yPos(d.ri);
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    riPts.forEach(function(d) {
+      var ri = d.ri||0;
+      var col = ri>=7?'#2ecc71':ri>=4?'#f1c40f':ri>=2?'#e67e22':'#e74c3c';
+      ctx.beginPath(); ctx.arc(xPos(d.ts), yPos(d.ri), 4, 0, Math.PI*2);
+      ctx.fillStyle = col; ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    });
+  }
+
+  // --- Zelfgevoel lijn ---
+  var zjPts = lastPerDay(basisData.filter(function(d){ return d.ts >= xStart.getTime() && d.ts <= xEnd.getTime() && d.subjectief_score != null; }));
+    if (zjPts.length > 0) {
+    if (zjPts.length > 0) {
+    ctx.strokeStyle = '#0078ff'; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
+    ctx.beginPath();
+    zjPts.forEach(function(d,i) {
+      var x = xPos(d.ts), y = yPos(d.subjectief_score);
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke(); ctx.setLineDash([]);
+    }
+    zjPts.forEach(function(d) {
+      ctx.beginPath(); ctx.arc(xPos(d.ts), yPos(d.subjectief_score), 5, 0, Math.PI*2);
+      ctx.fillStyle = '#0078ff'; ctx.fill();
+    });
+  }
+
+  // --- Stats ---
+  var riVals = riPts.map(function(d){ return d.ri; });
+  var avg = riVals.length ? (riVals.reduce(function(a,b){return a+b;},0)/riVals.length).toFixed(1) : '-';
+  var hi = riVals.length ? Math.max.apply(null,riVals).toFixed(1) : '-';
+  var lo = riVals.length ? Math.min.apply(null,riVals).toFixed(1) : '-';
+  var lang = '{{ lang }}';
+  document.getElementById('verlStats').innerHTML =
+    '<div class="vl-stat"><div class="vl-stat-val">'+filtered.length+'</div><div class="vl-stat-lbl">'+(lang==='de'?'Messungen':lang==='en'?'Readings':'Metingen')+'</div></div>'+
+    '<div class="vl-stat"><div class="vl-stat-val" style="color:#2ecc71">'+hi+'</div><div class="vl-stat-lbl">'+(lang==='de'?'Höchste RI':lang==='en'?'Highest RI':'Hoogste RI')+'</div></div>'+
+    '<div class="vl-stat"><div class="vl-stat-val" style="color:#e74c3c">'+lo+'</div><div class="vl-stat-lbl">'+(lang==='de'?'Niedrigste RI':lang==='en'?'Lowest RI':'Laagste RI')+'</div></div>'+
+    '<div class="vl-stat"><div class="vl-stat-val">'+avg+'</div><div class="vl-stat-lbl">'+(lang==='de'?'Durchschnitt':lang==='en'?'Average':'Gemiddeld')+'</div></div>';
+}
+
+// Laad data
+function toggleCtx(id) {
+  var el = document.getElementById('ctx-'+id);
+  if (el) el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+fetch('/api/metingen?limit=500').then(r=>r.json()).then(function(data){
+  allData = Array.isArray(data) ? data : [];
+  renderList(allData);
+}).catch(function(){
+  console.log('Fout bij laden data');
+});
+</script>
+{% endblock %}

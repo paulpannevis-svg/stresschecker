@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.vl-wrap{max-width:900px;margin:1.5rem auto;padding:0 1rem;}
+.vl-title{font-size:1.1rem;font-weight:700;color:#C4280D;margin-bottom:1rem;text-align:center;letter-spacing:.05em;}
+.vl-filters{display:flex;gap:.5rem;justify-content:center;margin-bottom:1.2rem;flex-wrap:wrap;}
+.vl-btn{padding:.4rem 1.1rem;border-radius:20px;border:2px solid #E8344E;background:transparent;color:#C4280D;font-weight:700;cursor:pointer;font-size:.85rem;transition:.2s;}
+.vl-btn.active{background:#E8344E;color:#fff;}
+  <div id="patroonTekst" style="font-size:.9rem;color:#2C2C2C;line-height:1.6;"></div>
+</div>
+.vl-card{background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.08);padding:1.2rem;margin-bottom:1.2rem;}
+.vl-canvas-wrap{position:relative;width:100%;height:220px;}
+#verlChart{width:100%;height:100%;}
+.vl-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem;margin-top:1rem;}
+.vl-stat{text-align:center;padding:.6rem;background:#FDE8EB;border-radius:10px;}
+.vl-stat-val{font-size:1.4rem;font-weight:700;color:#C4280D;}
+.vl-stat-lbl{font-size:.65rem;color:#999;text-transform:uppercase;letter-spacing:.05em;}
+.vl-empty{text-align:center;color:#aaa;padding:2rem;font-size:.9rem;}
+.vl-footer{text-align:center;margin-top:1.5rem;}
+.vl-footer a{color:#E8344E;text-decoration:none;font-weight:700;}
+</style>
+<div id="patroonBlok" style="display:none;background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.08);padding:1rem 1.2rem;margin-bottom:1.2rem;"><div style="font-size:.7rem;font-weight:700;letter-spacing:.08em;color:#E8344E;margin-bottom:.5rem;">JOUW PATROON</div><div id="patroonTekst" style="font-size:.9rem;color:#2C2C2C;line-height:1.6;"></div><div id="patroonVraag" style="margin-top:.7rem;font-size:.9rem;color:#E8344E;font-style:italic;"></div></div>
+
+<div class="vl-wrap">
+  <div class="vl-title">📈 {%if lang=="de"%}DETAIL INFORMATIONEN MESSUNGEN{%elif lang=="en"%}DETAIL INFORMATION MEASUREMENTS{%else%}DETAIL INFORMATIE METINGEN{%endif%}</div>
+
+  <div class="vl-filters">
+    <button class="vl-btn" onclick="loadVerloop('week')">{%if lang=="de"%}Woche{%elif lang=="en"%}Week{%else%}Week{%endif%}</button>
+    <button class="vl-btn active" onclick="loadVerloop('maand')">{%if lang=="de"%}Monat{%elif lang=="en"%}Month{%else%}Maand{%endif%}</button>
+    <button class="vl-btn" onclick="loadVerloop('jaar')">{%if lang=="de"%}Jahr{%elif lang=="en"%}Year{%else%}Jaar{%endif%}</button>
+    <button class="vl-btn" onclick="loadVerloop('alles')">{%if lang=="de"%}Alles{%elif lang=="en"%}All{%else%}Alles{%endif%}</button>
+  </div>
+
+  <div class="vl-card">
+    <div class="vl-canvas-wrap"><canvas id="verlChart"></canvas></div>
+  </div>
+
+  <div class="vl-stats" id="verlStats"></div>
+
+  <div id="metingList" style="margin-top:1rem;"></div>
+  <div class="vl-footer">
+    <a href="{{ url_for('menu') }}">← {%if lang=="de"%}Menü{%elif lang=="en"%}Menu{%else%}Menu{%endif%}</a> &nbsp;&nbsp;
+    <a href="{{ url_for('meetkeuze') }}">► {%if lang=="de"%}Neue Messung{%elif lang=="en"%}New reading{%else%}Nieuwe meting{%endif%}</a>
+  </div>
+</div>
+
+<script>
+var allData = [];
+
+function renderList(data) {
+  var list=document.getElementById('metingList');
+  var COLORS=['#c0392b','#c0392b','#e67e22','#e67e22','#f1c40f','#f1c40f','#2ecc71','#2ecc71','#27ae60','#27ae60','#27ae60'];
+  var dagen=['zo','ma','di','wo','do','vr','za'];
+  var maanden=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+  var html='';
+  data.forEach(function(m){
+    var ri=m.ri!=null?parseFloat(m.ri).toFixed(1):'-';
+    var z=m.ri!=null?Math.min(10,Math.max(0,Math.floor(m.ri))):0;
+    var col=COLORS[z]||'#999';
+    var lbl=m.ri!=null?(m.ri>=8?'VEERKRACHTIG':m.ri>=6?'IN BALANS':m.ri>=4?'LICHTE STRESS':m.ri>=2?'STRESS':'ZWARE STRESS'):'';
+    var dt=m.ts?new Date(m.ts):null;
+    var ds=dt?dagen[dt.getDay()]+' '+dt.getDate()+' '+maanden[dt.getMonth()]+' '+String(dt.getFullYear()).slice(2)+' '+dt.toISOString().substring(11,16):'';
+    var subj=m.subjectief_score!=null?'<p style="font-size:.8rem;color:#888;margin:.3rem 0 0;">&#128172; Zelfgevoel: '+m.subjectief_score+'/10</p>':'';
+    var kub=m.rr_intervals?'<a href="/api/kubios/download/'+m.id+'" target="_blank" style="font-size:.75rem;color:#0078ff;text-decoration:none;margin-top:4px;display:inline-block;">&#8599; Kubios export</a>':'';
+    html+='<div class="vl-card"><div style="display:flex;align-items:flex-start;gap:1rem;"><div style="font-size:2rem;font-weight:700;color:'+col+';">'+ri+'</div><div style="flex:1;"><strong>'+(m.meting_type||'Basismeting')+'</strong> &middot; <span style="color:'+col+';font-weight:600;">'+lbl+'</span><br><small style="color:#999;">'+ds+'</small><br><small>'+(m.bpm||'-')+' BPM &middot; '+(m.hrv_pct!=null?m.hrv_pct+'%':'-')+' HRV &middot; '+(m.rmssd!=null?parseFloat(m.rmssd).toFixed(0):'-')+'% MK</small>'+subj+kub+'</div></div></div>';
+  });
+  list.innerHTML=html;
+}
+var currentPeriod = 'maand';
+
+function loadVerloop(period) {
+  currentPeriod = period;
+  document.querySelectorAll('.vl-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  drawChart(period);
+}
+
+function lastPerDay(data) {
+  // Laatste meting per dag (data gesorteerd DESC van server)
+  var seen = {}, result = [];
+  data.forEach(function(d) {
+    var day = new Date(d.ts).toISOString().slice(0,10);
+    if (!seen[day]) { seen[day] = true; result.push(d); }
+  });
+  return result.sort(function(a,b){ return a.ts - b.ts; });
+}
+
+function drawChart(period) {
+  var cv = document.getElementById('verlChart');
+  var ctx = cv.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  cv.width = (cv.parentElement.clientWidth || 700) * dpr;
+  cv.height = 220 * dpr;
+  ctx.scale(dpr, dpr);
+  var W = cv.parentElement.clientWidth || 700;
+  var H = 220;
+  var P = {l:42, r:16, t:16, b:28};
+  ctx.clearRect(0, 0, W, H);ctx.fillStyle="#999";ctx.font="9px sans-serif";ctx.textAlign="right";for(var yi=0;yi<=10;yi+=2){ctx.fillText(yi,P.l-2,yPos(yi)+3);}
+
+  var now = new Date();
+  var maanden = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+
+  // --- X-as definitie per periode ---
+  var xStart, xEnd, xLabels = [];
+  if (period === 'week') {
+    xEnd = new Date(now); xEnd.setHours(23,59,59,999);
+    xStart = new Date(xEnd); xStart.setDate(xStart.getDate() - ((xStart.getDay()+6)%7)); xStart.setHours(0,0,0,0);
+    for (var d=0; d<7; d++) {
+      var dd = new Date(xStart); dd.setDate(dd.getDate() + d);
+        var dagen = {% if lang=="de" %}["So","Mo","Di","Mi","Do","Fr","Sa"]{% elif lang=="en" %}["Su","Mo","Tu","We","Th","Fr","Sa"]{% else %}["zo","ma","di","wo","do","vr","za"]{% endif %};
+      xLabels.push({ label: dagen[dd.getDay()] + ' ' + dd.getDate(), frac: d/6 });
+    }
+  } else if (period === 'maand') {
+    xEnd = new Date(now); xEnd.setHours(23,59,59,999);
+    xStart = new Date(xEnd); xStart.setDate(xStart.getDate() - 29); xStart.setHours(0,0,0,0);
+    for (var w=0; w<5; w++) {
+      var wd = new Date(xStart); wd.setDate(wd.getDate() + w*7);
+      xLabels.push({ label: wd.getDate() + ' ' + maanden[wd.getMonth()], frac: w/4 });
+    }
+  } else if (period === 'jaar') {
+    xStart = new Date(now.getFullYear(), 0, 1);
+    xEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+    for (var m=0; m<12; m++) {
+      xLabels.push({ label: maanden[m], frac: m/11 });
+    }
+  } else { // alles: 2026-2028
+    xStart = allData.length ? new Date(Math.min.apply(null, allData.map(function(d){return d.ts;}))) : new Date(2024, 0, 1);
+    xEnd = new Date(2028, 11, 31, 23, 59, 59);
+    var totalMs = xEnd - xStart;
+    [2026,2027,2028].forEach(function(yr) {
+      var yrDate = new Date(yr, 0, 1);
+      xLabels.push({ label: String(yr), frac: (yrDate - xStart) / totalMs });
+    });
+  }
+
+  var xSpan = xEnd - xStart;
+  function xPos(ts) { return P.l + ((ts - xStart) / xSpan) * (W - P.l - P.r); }
+  function yPos(ri) { return H - P.b - (ri / 10) * (H - P.t - P.b); }
+
+  // --- Zones ---
+  var zones = [
+    {min:0, max:2, col:'rgba(169,50,38,.75)'},
+    {min:2, max:4, col:'rgba(186,74,0,.70)'},
+    {min:4, max:6, col:'rgba(185,150,10,.70)'},
+    {min:6, max:8, col:'rgba(30,150,80,.65)'},
+    {min:8, max:10, col:'rgba(20,110,60,.70)'}
+  ];
+  zones.forEach(function(z) {
+    ctx.fillStyle = z.col;
+    ctx.fillRect(P.l, yPos(z.max), W-P.l-P.r, yPos(z.min)-yPos(z.max));
+  });
+
+  // --- X-as labels ---
+  ctx.fillStyle = '#666'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+  xLabels.forEach(function(xl) {
+    var x = P.l + xl.frac * (W - P.l - P.r);
+    ctx.fillText(xl.label, x, H - P.b + 11);
+  });
+
+  // --- Y-as labels ---
+  ctx.textAlign = 'right';
+  [0,2,4,6,8,10].forEach(function(v) {
+    ctx.fillStyle = '#888'; ctx.font = '9px sans-serif';
+    ctx.fillText(v, P.l - 3, yPos(v) + 3);
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(P.l, yPos(v)); ctx.lineTo(W-P.r, yPos(v)); ctx.stroke();
+  });
+
+  // --- Filter data op periode (chart: uitsluitend basismetingen) ---
+  console.log("draw start, allData:", allData.length, "xStart:", xStart);
+  var basisData = allData.filter(function(r){ return (r.meting_type||'').toLowerCase()==='basismeting'; });
+  var filtered = lastPerDay(basisData.filter(function(d) {
+    return d.ts >= xStart.getTime() && d.ts <= xEnd.getTime();
+  }));
+  var firstTs = filtered.length ? filtered[0].ts : null;
+  if (firstTs && new Date(firstTs) > xStart) {
+    xStart = new Date(firstTs); xStart.setHours(0,0,0,0); xSpan = xEnd - xStart;
+  }
+
+  if (filtered.length === 0) {
+    ctx.fillStyle = '#aaa'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Geen metingen in deze periode', W/2, H/2 - 8);
+    document.getElementById('verlStats').innerHTML = '';
+    return;
+  }
+
+  // --- Baseline (na 7 basismetingen) ---
+  var basisMetingen = allData.filter(function(d){ return d.meting_type === 'basismeting'; });
+  if (basisMetingen.length >= 7) {
+    var first7 = basisMetingen.slice(-Math.max(basisMetingen.length,7)).slice(0,7);
+    var baseline = first7.reduce(function(s,d){ return s + (d.ri||0); },0) / 7;
+    ctx.strokeStyle = 'rgba(141,110,99,0.7)'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    ctx.moveTo(P.l, yPos(baseline)); ctx.lineTo(W-P.r, yPos(baseline));
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(141,110,99,0.9)'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('gem ' + baseline.toFixed(1), P.l + 2, yPos(baseline) - 3);
+  }
+
+  // --- RI lijn ---
+  var riPts = filtered.filter(function(d){ return d.ri != null; });
+  if (riPts.length > 0) {
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.setLineDash([]);
+    ctx.beginPath();
+    riPts.forEach(function(d,i) {
+      var x = xPos(d.ts), y = yPos(d.ri);
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    riPts.forEach(function(d) {
+      ctx.beginPath(); ctx.arc(xPos(d.ts), yPos(d.ri), 4, 0, Math.PI*2);
+      ctx.fillStyle = '#fff'; ctx.fill();
+      ctx.strokeStyle = '#333333'; ctx.lineWidth = 1.5; ctx.stroke();
+    });
+  }
+
+  // --- Zelfgevoel lijn ---
+  var zjPts = basisData.filter(function(d){ return d.ts >= xStart.getTime() && d.ts <= xEnd.getTime(); }).filter(function(d){ return d.subjectief_score != null; });
+  console.log("zjPts:", zjPts.length, "allData:", allData.length); if (zjPts.length > 0) {
+    ctx.strokeStyle = '#0078ff'; ctx.lineWidth = 2; ctx.setLineDash([6,3]);
+    ctx.beginPath();
+    zjPts.forEach(function(d,i) {
+      var x = xPos(d.ts), y = yPos(d.subjectief_score);
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke(); ctx.setLineDash([]);
+    zjPts.forEach(function(d) {
+      ctx.beginPath(); ctx.arc(xPos(d.ts), yPos(d.subjectief_score), 5, 0, Math.PI*2);
+      ctx.fillStyle = '#0078ff'; ctx.fill();
+    });
+  }
+
+  // --- Stats ---
+  var riVals = riPts.map(function(d){ return d.ri; });
+  var avg = riVals.length ? (riVals.reduce(function(a,b){return a+b;},0)/riVals.length).toFixed(1) : '-';
+  var hi = riVals.length ? Math.max.apply(null,riVals).toFixed(1) : '-';
+  var lo = riVals.length ? Math.min.apply(null,riVals).toFixed(1) : '-';
+  var lang = '{{ lang }}';
+  document.getElementById('verlStats').innerHTML =
+    '<div class="vl-stat"><div class="vl-stat-val">'+filtered.length+'</div><div class="vl-stat-lbl">'+(lang==='de'?'Messungen':lang==='en'?'Readings':'Metingen')+'</div></div>'+
+    '<div class="vl-stat"><div class="vl-stat-val" style="color:#2ecc71">'+hi+'</div><div class="vl-stat-lbl">'+(lang==='de'?'Höchste RI':lang==='en'?'Highest RI':'Hoogste RI')+'</div></div>'+
+    '<div class="vl-stat"><div class="vl-stat-val" style="color:#e74c3c">'+lo+'</div><div class="vl-stat-lbl">'+(lang==='de'?'Niedrigste RI':lang==='en'?'Lowest RI':'Laagste RI')+'</div></div>'+
+    '<div class="vl-stat"><div class="vl-stat-val">'+avg+'</div><div class="vl-stat-lbl">'+(lang==='de'?'Durchschnitt':lang==='en'?'Average':'Gemiddeld')+'</div></div>';
+}
+
+// Laad data
+fetch((typeof cid !== 'undefined' && cid) ? '/api/pro/client/'+cid+'/metingen' : '/api/metingen?limit=500').then(r=>r.json()).then(function(data){
+
+fetch("/api/metingen/patroon").then(r=>r.json()).then(function(p){
+  if(!p||p.count<3)return;
+  var lng="{{lang}}";
+  var delen=[]; var vraag="";
+  if(p.trend==="up"&&p.avg_recent&&p.avg_older){
+    delen.push(lng==="de"?"Ihr Koerper erholt sich diese Woche — RI stieg von "+p.avg_older+" auf "+p.avg_recent+".": lng==="en"?"Your body is relaxing more — RI rose from "+p.avg_older+" to "+p.avg_recent+".": "Je lichaam ontspant deze week iets meer — je RI steeg van "+p.avg_older+" naar "+p.avg_recent+".");
+    vraag=lng==="de"?"Was haben Sie diese Woche anders gemacht — und können Sie davon mehr tun?": lng==="en"?"What did you do differently this week — and can you do more of it?": "Wat deed je anders deze week — en kun je daar meer van doen?";
+  } else if(p.trend==="down"&&p.avg_recent&&p.avg_older){
+    delen.push(lng==="de"?"RI sank von "+p.avg_older+" auf "+p.avg_recent+". Ihr Koerper meldet sich.": lng==="en"?"RI dropped from "+p.avg_older+" to "+p.avg_recent+". Your body is asking for attention.": "Je RI daalde van "+p.avg_older+" naar "+p.avg_recent+". Je lichaam vraagt om aandacht.");
+    vraag=lng==="de"?"Was kostet sich gerade am meisten Energie — und was koenntest Sie loslassen?": lng==="en"?"What is costing you the most energy right now — and what could you let go?": "Wat kost je op dit moment de meeste energie — en wat zou je kunnen loslaten?";
+  }
+  if(p.top_dim&&p.top_dim_count>=2){
+    var dm={lichamelijk:{nl:"lichamelijks",de:"Koerperliches",en:"something physical"},mentaal:{nl:"mentaals",de:"Mentales",en:"something mental"},emotioneel:{nl:"emotioneeels",de:"Emotionales",en:"something emotional"},spiritueel:{nl:"spiritueels",de:"Spirituelles",en:"something deeper"}};
+    var dn=dm[p.top_dim]?dm[p.top_dim][lng]||p.top_dim:p.top_dim;
+    delen.push(lng==="de"?"Bei "+p.top_dim_count+" von "+p.top_dim_total+" Messungen spielt "+dn+" eine Rolle. Wiederkehrendes Signal.": lng==="en"?"In "+p.top_dim_count+" of "+p.top_dim_total+" readings, "+dn+" is at play. A recurring signal.": "Bij "+p.top_dim_count+" van je laatste "+p.top_dim_total+" metingen speelt er iets "+dn+". Dat is een terugkerend signaal.");
+    var dv={lichamelijk:{nl:"Wat zegt je lichaam dat je nog niet hardop hebt gezegd?",de:"Was sagt Ihnen Ihr Koerper, das Sie noch nicht ausgesprochen haben?",en:"What is your body telling you that you have not said out loud yet?"},mentaal:{nl:"Welke gedachte draait steeds terug — en klopt die eigenlijk wel?",de:"Welcher Gedanke kehrt immer wieder — und stimmt er wirklich?",en:"Which thought keeps returning — and is it actually true?"},emotioneel:{nl:"Welk gevoel wacht op aandacht?",de:"Welches Gefuehl wartet auf Aufmerksamkeit?",en:"Which feeling is waiting for your attention?"},spiritueel:{nl:"Handel je vanuit wat je echt belangrijk vindt?",de:"Handeln Sie aus dem, was Ihnen wirklich wichtig ist?",en:"Are you acting from what truly matters to you?"}};
+    if(dv[p.top_dim])vraag=dv[p.top_dim][lng]||dv[p.top_dim].nl;
+  }
+  if(delen.length>0){
+    var eT=document.getElementById("patroonTekst");
+    var eV=document.getElementById("patroonVraag");
+    var eB=document.getElementById("patroonBlok");
+    if(eT)eT.textContent=delen.join(" ");
+    if(eV&&vraag)eV.textContent="→ "+vraag;
+    if(eB)eB.style.display="block";
+  }
+});
+
+
+
+  allData = Array.isArray(data) ? data : [];
+  renderList(allData);
+  drawChart(currentPeriod);
+}).catch(function(){
+  console.log('Fout bij laden data');
+});
+</script>
+{% endblock %}

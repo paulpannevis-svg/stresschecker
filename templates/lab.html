@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Lab — StressChecker{% endblock %}
+{% block content %}
+<style>
+.lab-wrap{max-width:720px;margin:0 auto;padding:1.5rem 1rem;}
+.lab-banner{background:#1a1a2e;color:#fff;border-radius:12px;padding:1.2rem 1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:1rem;}
+.lab-banner-icon{font-size:1.6rem;background:rgba(255,255,255,.12);width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;}
+.lab-banner h1{font-size:1.1rem;margin:0;font-weight:700;letter-spacing:.03em;}
+.lab-banner p{margin:4px 0 0;font-size:.78rem;color:#aaa;line-height:1.4;}
+.lab-section{background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.06);margin-bottom:1.2rem;overflow:hidden;}
+.lab-section-head{padding:1rem 1.2rem .6rem;border-bottom:1px solid #f0f0f0;}
+.lab-section-head h2{margin:0;font-size:.95rem;font-weight:700;color:#333;}
+.lab-section-head p{margin:4px 0 0;font-size:.75rem;color:#999;}
+.lab-persp{display:flex;gap:.8rem;padding:1rem 1.2rem;flex-wrap:wrap;}
+.lab-card{flex:1;min-width:180px;background:#fafafa;border-radius:10px;padding:1rem;border:1px solid #eee;}
+.lab-card-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:.6rem;}
+.lab-card-score{font-size:1.6rem;font-weight:900;line-height:1;}
+.lab-card-label{font-size:.78rem;font-weight:600;margin-top:.2rem;}
+.lab-card-desc{font-size:.72rem;color:#777;margin-top:.5rem;line-height:1.5;}
+.lab-card.reserve .lab-card-title{color:#3498db;}
+.lab-card.prestatie .lab-card-title{color:#e67e22;}
+.lab-card.kompas .lab-card-title{color:#27ae60;}
+.lab-no-data{padding:1.5rem;text-align:center;color:#999;font-size:.85rem;}
+.lab-raw{padding:.8rem 1.2rem;border-top:1px solid #f0f0f0;font-size:.72rem;color:#aaa;display:flex;gap:1.5rem;flex-wrap:wrap;}
+.lab-nav{margin-top:1rem;}
+.lab-nav a{display:inline-flex;align-items:center;gap:.4rem;background:#eee;color:#555;padding:.5rem 1.2rem;border-radius:8px;text-decoration:none;font-size:.85rem;font-weight:600;}
+</style>
+
+<div class="lab-wrap">
+  <div class="lab-banner">
+    <div class="lab-banner-icon">&#9879;</div>
+    <div>
+      <h1>Lab &mdash; experimentele functies</h1>
+      <p>Testomgeving voor nieuwe StressChecker-concepten. Niet zichtbaar voor gebruikers.</p>
+    </div>
+  </div>
+
+  <div class="lab-section">
+    <div class="lab-section-head">
+      <h2>Perspectieven</h2>
+      <p>Drie lenzen op dezelfde meting: Reserve (parasympathisch herstel), Prestatie (sympathische activatie), Kompas (balans ANS).</p>
+    </div>
+
+    {% if meting %}
+    <div class="lab-persp" id="perspCards"></div>
+    <div class="lab-raw" id="perspRaw"></div>
+    {% else %}
+    <div class="lab-no-data">{%if lang=='de'%}Keine Messungen gefunden. Führe zuerst eine Messung durch.{%elif lang=='en'%}No readings found. Do a reading first.{%else%}Geen metingen gevonden. Doe eerst een meting.{%endif%}</div>
+    {% endif %}
+  </div>
+
+  <div class="lab-nav">
+    <a href="{{ url_for('menu') }}">&larr; Menu</a>
+  </div>
+</div>
+
+{% if meting %}
+<script src="/static/js/hrv.js?v=4"></script>
+<script>
+(function(){
+  var ri = {{ meting.ri|default(0) }};
+  var bpm = {{ meting.bpm|default(70) }};
+  var hrv = {{ meting.hrv_pct|default(0) }};
+  var rmssd = {{ meting.rmssd|default(0) }};
+  var sdnn = {{ meting.sdnn|default(0) }};
+  var kw = {{ meting.kwaliteit|default(100) }};
+  var ts = {{ meting.ts|default(0) }};
+
+  // --- Reserve perspectief (parasympathisch) ---
+  // HRV% is already age/gender-normalised: how much parasympathetic reserve?
+  var resScore, resLabel, resColor, resDesc;
+  if (hrv >= 100) { resScore = '+++'; resLabel = 'Ruime reserve'; resColor = '#27ae60';
+    resDesc = 'Je parasympathisch zenuwstelsel heeft veel herstelvermogen. Je lichaam kan goed omgaan met belasting.';
+  } else if (hrv >= 70) { resScore = '++'; resLabel = 'Goede reserve'; resColor = '#2ecc71';
+    resDesc = 'Je hebt voldoende parasympathische reserve. Je herstelvermogen is op niveau.';
+  } else if (hrv >= 45) { resScore = '+'; resLabel = 'Matige reserve'; resColor = '#f1c40f';
+    resDesc = 'Je parasympathische reserve is beperkt. Je lichaam heeft minder ruimte om te herstellen.';
+  } else if (hrv >= 20) { resScore = '-'; resLabel = 'Lage reserve'; resColor = '#e67e22';
+    resDesc = 'Je herstelvermogen is duidelijk verminderd. Extra rust en herstel zijn belangrijk.';
+  } else { resScore = '--'; resLabel = 'Uitgeput'; resColor = '#c0392b';
+    resDesc = 'Je parasympathisch zenuwstelsel is sterk belast. Prioriteer rust en raadpleeg een professional bij aanhouden.';
+  }
+
+  // --- Prestatie perspectief (sympathisch) ---
+  // BPM indicates sympathetic activation; lower resting BPM = better readiness
+  var preScore, preLabel, preColor, preDesc;
+  if (bpm <= 55) { preScore = '+++'; preLabel = 'Topconditie'; preColor = '#27ae60';
+    preDesc = 'Zeer lage rusthartslag wijst op uitstekende cardiovasculaire conditie en prestatiegereedheid.';
+  } else if (bpm <= 65) { preScore = '++'; preLabel = 'Goed'; preColor = '#2ecc71';
+    preDesc = 'Rusthartslag duidt op goede conditie. Je sympathisch zenuwstelsel is niet overactief.';
+  } else if (bpm <= 75) { preScore = '+'; preLabel = 'Normaal'; preColor = '#f1c40f';
+    preDesc = 'Normale sympathische activatie. Geschikt voor reguliere activiteiten, geen topprestatie verwachten.';
+  } else if (bpm <= 90) { preScore = '-'; preLabel = 'Verhoogd'; preColor = '#e67e22';
+    preDesc = 'Verhoogde sympathische activatie. Je lichaam is in een staat van alertheid of spanning.';
+  } else { preScore = '--'; preLabel = 'Hoog belast'; preColor = '#c0392b';
+    preDesc = 'Hoge rusthartslag. Mogelijk stress, inspanning of medische oorzaak. Niet geschikt voor zware belasting.';
+  }
+
+  // --- Kompas perspectief (ANS-balans via RI) ---
+  var komScore = ri.toFixed(1);
+  var komLabel, komColor, komDesc;
+  if (ri >= 8) { komLabel = 'Veerkrachtig'; komColor = '#27ae60';
+    komDesc = 'Je autonome zenuwstelsel is in optimale balans. Sympathicus en parasympathicus werken harmonieus samen.';
+  } else if (ri >= 6) { komLabel = 'In balans'; komColor = '#2ecc71';
+    komDesc = 'Goede ANS-balans. Je zenuwstelsel functioneert evenwichtig.';
+  } else if (ri >= 4) { komLabel = 'Lichte stress'; komColor = '#f1c40f';
+    komDesc = 'Milde disbalans. Je sympathisch zenuwstelsel domineert licht. Bewuste ontspanning kan helpen.';
+  } else if (ri >= 2) { komLabel = 'Stress'; komColor = '#e67e22';
+    komDesc = 'Duidelijke disbalans richting sympathische dominantie. Je lichaam is in stressmodus.';
+  } else { komLabel = 'Risico'; komColor = '#c0392b';
+    komDesc = 'Ernstige ANS-disbalans. Zowel herstelvermogen als belasting zijn buiten de gezonde bandbreedte.';
+  }
+
+  var html = '';
+  html += '<div class="lab-card reserve">';
+  html += '<div class="lab-card-title">Reserve (parasympathisch)</div>';
+  html += '<div class="lab-card-score" style="color:'+resColor+'">'+resScore+'</div>';
+  html += '<div class="lab-card-label" style="color:'+resColor+'">'+resLabel+'</div>';
+  html += '<div class="lab-card-desc">'+resDesc+'</div>';
+  html += '<div class="lab-card-desc" style="margin-top:.4rem;color:#bbb;">HRV% = '+hrv+'</div>';
+  html += '</div>';
+
+  html += '<div class="lab-card prestatie">';
+  html += '<div class="lab-card-title">Prestatie (sympathisch)</div>';
+  html += '<div class="lab-card-score" style="color:'+preColor+'">'+preScore+'</div>';
+  html += '<div class="lab-card-label" style="color:'+preColor+'">'+preLabel+'</div>';
+  html += '<div class="lab-card-desc">'+preDesc+'</div>';
+  html += '<div class="lab-card-desc" style="margin-top:.4rem;color:#bbb;">BPM = '+bpm+'</div>';
+  html += '</div>';
+
+  html += '<div class="lab-card kompas">';
+  html += '<div class="lab-card-title">Kompas (ANS-balans)</div>';
+  html += '<div class="lab-card-score" style="color:'+komColor+'">'+komScore+'</div>';
+  html += '<div class="lab-card-label" style="color:'+komColor+'">'+komLabel+'</div>';
+  html += '<div class="lab-card-desc">'+komDesc+'</div>';
+  html += '<div class="lab-card-desc" style="margin-top:.4rem;color:#bbb;">RI = '+ri.toFixed(1)+'</div>';
+  html += '</div>';
+
+  document.getElementById('perspCards').innerHTML = html;
+
+  // Raw data footer
+  var d = new Date(ts);
+  var ds = d.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  var raw = '<span>Meting: '+ds+'</span>';
+  raw += '<span>BPM: '+bpm+'</span><span>HRV%: '+hrv+'</span><span>RI: '+ri.toFixed(1)+'</span>';
+  raw += '<span>RMSSD: '+rmssd.toFixed(1)+'</span><span>SDNN: '+sdnn.toFixed(1)+'</span>';
+  raw += '<span>Kwaliteit: '+kw+'%</span>';
+  document.getElementById('perspRaw').innerHTML = raw;
+})();
+</script>
+{% endif %}
+{% endblock %}

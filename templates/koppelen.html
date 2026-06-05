@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.kp-wrap{max-width:420px;margin:2rem auto;padding:1rem;}
+.kp-title{font-size:1.1rem;font-weight:700;color:#E8344E;margin-bottom:.25rem;}
+.kp-sub{font-size:.8rem;color:#888;margin-bottom:1.5rem;}
+.kp-card{background:#fff;border-radius:16px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.08);margin-bottom:1rem;}
+.kp-input{width:100%;padding:.7rem 1rem;border:2px solid #f9d0d5;border-radius:12px;font-size:1rem;font-family:monospace;letter-spacing:.1em;text-transform:uppercase;box-sizing:border-box;margin-bottom:1rem;}
+.kp-input:focus{outline:none;border-color:#E8344E;}
+.kp-btn{width:100%;padding:.7rem;background:#E8344E;color:#fff;border:none;border-radius:12px;font-weight:700;font-size:.9rem;cursor:pointer;}
+.kp-btn:hover{background:#C4253C;}
+.kp-active{background:#f9f5f0;border-radius:12px;padding:1rem;margin-top:.5rem;}
+.kp-active-name{font-weight:700;color:#E8344E;}
+.kp-revoke{background:none;border:none;color:#e74c3c;font-size:.8rem;cursor:pointer;text-decoration:underline;margin-top:.5rem;}
+.kp-msg{padding:.7rem 1rem;border-radius:10px;font-size:.85rem;margin-bottom:1rem;display:none;}
+.kp-msg.ok{background:#e8f5e9;color:#2e7d32;}
+.kp-msg.err{background:#fdecea;color:#c62828;}
+</style>
+<div class="kp-wrap">
+  <div class="kp-title">{% if lang=="de" %}Mit Profi verbinden{% elif lang=="en" %}Connect with professional{% else %}Koppelen met professional{% endif %}</div>
+  <div class="kp-sub">{% if lang=="de" %}Geben Sie den Code ein, den Ihr Berater Ihnen gegeben hat{% elif lang=="en" %}Enter the code your coach provided{% else %}Voer de koppelcode in die je begeleider je heeft gegeven{% endif %}</div>
+
+  <div class="kp-card">
+    <div id="kpMsg" class="kp-msg"></div>
+    <input class="kp-input" id="kpCode" type="text" placeholder="SC-PAIR-XXXX" maxlength="12">
+    <button class="kp-btn" onclick="koppelIn()">{% if lang=="de" %}VERBINDEN{% elif lang=="en" %}CONNECT{% else %}KOPPELEN{% endif %}</button>
+  </div>
+
+  {% if active_pairings %}
+  <div class="kp-card">
+    <div style="font-weight:700;color:#E8344E;margin-bottom:.75rem;">{% if lang=="de" %}Aktive Verbindungen{% elif lang=="en" %}Active connections{% else %}Actieve koppelingen{% endif %}</div>
+    {% for p in active_pairings %}
+    <div class="kp-active">
+      <div class="kp-active-name">{{ p.pro_name or 'Professional' }}</div>
+      <div style="font-size:.75rem;color:#999;">{% if lang=="de" %}Verbunden seit{% elif lang=="en" %}Connected since{% else %}Gekoppeld sinds{% endif %} {{ p.activated_at[:10] if p.activated_at else '?' }}</div>
+      <button class="kp-revoke" onclick="ontkoppel('{{ p.code }}')">{% if lang=="de" %}Verbindung trennen{% elif lang=="en" %}Disconnect{% else %}Koppeling verbreken{% endif %}</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if not session.get('license_valid') %}
+  <div class="kp-card" id="regForm" style="margin-top:1rem;">
+    <div style="font-weight:700;color:#E8344E;margin-bottom:.5rem;">{%if lang=='de'%}Noch kein Konto? Jetzt registrieren{%elif lang=='en'%}No account yet? Register now{%else%}Nog geen account? Registreer direct{%endif%}</div>
+    <input class="kp-input" id="regName" type="text" placeholder="{%if lang=='de'%}Ihr Name{%elif lang=='en'%}Your name{%else%}Uw naam{%endif%}">
+    <input class="kp-input" id="regEmail" type="email" placeholder="{%if lang=='de'%}E-Mail-Adresse{%elif lang=='en'%}Email address{%else%}E-mailadres{%endif%}" style="margin-top:.5rem;">
+    <input class="kp-input" id="regPw" type="password" placeholder="{%if lang=='de'%}Passwort (min. 6 Zeichen){%elif lang=='en'%}Password (min. 6 characters){%else%}Wachtwoord (min. 6 tekens){%endif%}" style="margin-top:.5rem;">
+    <input class="kp-input" id="regCode" type="text" placeholder="SC-PAIR-XXXX" maxlength="12" style="margin-top:.5rem;">
+    <div id="regMsg" class="kp-msg"></div>
+    <button class="kp-btn" onclick="registerKoppel()" style="margin-top:.5rem;">ACCOUNT AANMAKEN &amp; KOPPELEN</button>
+  </div>
+  {% endif %}
+</div>
+<script>
+function koppelIn(){
+  var code = document.getElementById('kpCode').value.trim().toUpperCase();
+  if(!code){return;}
+  fetch('/api/pairing/redeem',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code})})
+  .then(r=>r.json()).then(function(d){
+    var el=document.getElementById('kpMsg');
+    el.style.display='block';
+    if(d.ok){el.className='kp-msg ok';el.textContent='{% if lang=="de" %}Erfolgreich verbunden!{% elif lang=="en" %}Successfully connected!{% else %}Koppeling geslaagd!{% endif %}';setTimeout(()=>location.reload(),1500);}
+    else{el.className='kp-msg err';el.textContent=d.error||'Fout';}
+  });
+}
+
+function registerKoppel(){
+  var name=document.getElementById('regName').value.trim();
+  var email=document.getElementById('regEmail').value.trim();
+  var pw=document.getElementById('regPw').value.trim();
+  var code=document.getElementById('regCode').value.trim().toUpperCase();
+  var el=document.getElementById('regMsg');
+  if(!name||!email||!pw||!code){el.style.display='block';el.className='kp-msg err';el.textContent='Vul alle velden in.';return;}
+  fetch('/api/pairing/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,email:email,password:pw,code:code})})
+  .then(r=>r.json()).then(function(d){
+    el.style.display='block';
+    if(d.ok){el.className='kp-msg ok';el.textContent='Account aangemaakt en gekoppeld!';setTimeout(()=>location.href='/sensor-en-meten',1500);}
+    else{el.className='kp-msg err';el.textContent=d.error||'Fout';}
+  });
+}
+
+function ontkoppel(code){
+  if(!confirm('{% if lang=="de" %}Verbindung wirklich trennen?{% elif lang=="en" %}Really disconnect?{% else %}Koppeling echt verbreken?{% endif %}'))return;
+  fetch('/api/pairing/revoke',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code})})
+  .then(r=>r.json()).then(function(d){if(d.ok)location.reload();});
+}
+</script>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width:500px;margin:3rem auto;text-align:center;padding:0 1rem;">
+  <h2>{% if lang=='de' %}Abonnement kündigen{% elif lang=='en' %}Cancel subscription{% else %}Abonnement opzeggen{% endif %}</h2>
+  <p style="margin:1.5rem 0;color:#555;">
+    {% if lang=='de' %}Sind Sie sicher, dass Sie Ihr Abonnement kündigen möchten? Es bleibt bis zum Ende der aktuellen Periode aktiv.
+    {% elif lang=='en' %}Are you sure you want to cancel your subscription? It will remain active until the end of the current period.
+    {% else %}Weet je zeker dat je je abonnement wilt opzeggen? Het blijft actief tot het einde van de huidige periode.{% endif %}
+  </p>
+  <form method="POST" action="/abonnement/opzeggen">
+    <input type="hidden" name="lang" value="{{ lang }}">
+    <button type="submit" style="background:#c0392b;color:#fff;border:none;padding:.85rem 2.5rem;border-radius:8px;font-size:1rem;cursor:pointer;margin-right:1rem;">
+      {% if lang=='de' %}Ja, kündigen{% elif lang=='en' %}Yes, cancel{% else %}Ja, opzeggen{% endif %}
+    </button>
+    <a href="/menu" style="display:inline-block;padding:.85rem 2rem;border-radius:8px;border:1px solid #aaa;color:#555;text-decoration:none;font-size:1rem;">
+      {% if lang=='de' %}Zurück{% elif lang=='en' %}Back{% else %}Terug{% endif %}
+    </a>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}StressChecker® — {% if lang=='de' %}Operatoren verwalten{% elif lang=='en' %}Manage operators{% else %}Operatoren beheren{% endif %}{% endblock %}
+
+{% block content %}
+<style>
+  .op-wrap { max-width: 760px; margin: 0 auto; padding: 1rem; }
+  .op-wrap h1 { font-size: 1.3rem; margin: .2rem 0 .8rem; }
+  .op-wrap .badge {
+    background: #1565c0; color: #fff; font-size: .65rem; font-weight: 700;
+    padding: 2px 8px; border-radius: 10px; vertical-align: middle; margin-right: .3rem;
+  }
+  .op-section { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 1rem; margin-bottom: 1.2rem; }
+  .op-section h2 { margin: 0 0 .8rem; font-size: 1.05rem; color: #333; }
+  table.op-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  table.op-table th, table.op-table td { padding: .45rem .6rem; border-bottom: 1px solid #f0f0f0; text-align: left; }
+  table.op-table th { font-weight: 600; color: #555; background: #fafafa; }
+  form.add-op label { display: block; margin-bottom: .6rem; }
+  form.add-op input[type=email], form.add-op input[type=text] {
+    width: 100%; max-width: 380px; padding: .45rem .55rem; border: 1px solid #ccc; border-radius: 4px; font-size: .95rem;
+  }
+  form.add-op button {
+    background: #1565c0; color: #fff; border: 0; padding: .55rem 1.2rem; border-radius: 6px; font-size: .95rem; cursor: pointer; margin-top: .4rem;
+  }
+  .alert-success {
+    background: #fff8e1; border: 1px solid #f0c987; border-radius: 8px; padding: .9rem 1rem; margin-bottom: 1.2rem;
+  }
+  .alert-error {
+    background: #fdecea; color: #b71c1c; border: 1px solid #f5b4b4; border-radius: 8px; padding: .7rem 1rem; margin-bottom: 1rem; font-size: .92rem;
+  }
+  .alert-success code { background: #fff; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+  .back-link { text-align: center; margin-top: 1.4rem; font-size: .88rem; }
+  .back-link a { color: #1565c0; text-decoration: none; }
+</style>
+
+<div class="op-wrap">
+  <h1>
+    <span class="badge">KK</span>
+    {% if lang=='de' %}Operatoren verwalten{% elif lang=='en' %}Manage operators{% else %}Operatoren beheren{% endif %}
+  </h1>
+
+  {% if new_credentials %}
+  <div class="alert-success">
+    <strong>{% if lang=='de' %}Operator-Konto erstellt{% elif lang=='en' %}Operator account created{% else %}Operator-account aangemaakt{% endif %}</strong><br>
+    {% if lang=='de' %}Bitte notieren Sie diese Zugangsdaten — sie werden danach nicht erneut angezeigt:{% elif lang=='en' %}Please note these credentials — they will not be shown again:{% else %}Noteer deze gegevens — ze worden hierna niet meer getoond:{% endif %}
+    <ul style="margin: .4rem 0 0 1.2rem; padding: 0;">
+      <li>{% if lang=='de' %}E-Mail{% elif lang=='en' %}E-mail{% else %}E-mail{% endif %}: <code>{{ new_credentials.email }}</code></li>
+      <li>{% if lang=='de' %}Passwort{% elif lang=='en' %}Password{% else %}Wachtwoord{% endif %}: <code>{{ new_credentials.password }}</code></li>
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if error == 'email_format' %}
+  <div class="alert-error">
+    {% if lang=='de' %}Ungültiges E-Mail-Format.{% elif lang=='en' %}Invalid e-mail format.{% else %}Ongeldig e-mailformaat.{% endif %}
+  </div>
+  {% elif error == 'email_exists' %}
+  <div class="alert-error">
+    {% if lang=='de' %}Diese E-Mail-Adresse ist bereits registriert.{% elif lang=='en' %}This e-mail address is already registered.{% else %}Dit e-mailadres is al geregistreerd.{% endif %}
+  </div>
+  {% endif %}
+
+  <div class="op-section">
+    <h2>{% if lang=='de' %}Bestehende Operatoren{% elif lang=='en' %}Existing operators{% else %}Bestaande operatoren{% endif %}</h2>
+    {% if operators %}
+    <table class="op-table">
+      <thead>
+        <tr>
+          <th>{% if lang=='de' %}E-Mail{% elif lang=='en' %}E-mail{% else %}E-mail{% endif %}</th>
+          <th>{% if lang=='de' %}Name{% elif lang=='en' %}Name{% else %}Naam{% endif %}</th>
+          <th>{% if lang=='de' %}Erstellt{% elif lang=='en' %}Created{% else %}Aangemaakt{% endif %}</th>
+          <th>{% if lang=='de' %}Letzter Login{% elif lang=='en' %}Last login{% else %}Laatste login{% endif %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for op in operators %}
+        <tr>
+          <td>{{ op.email }}</td>
+          <td>{{ op.display_name or '–' }}</td>
+          <td>{{ op.created_at[:10] if op.created_at else '–' }}</td>
+          <td>{{ op.last_login[:10] if op.last_login else '–' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#888;margin:0;">
+      {% if lang=='de' %}Noch keine Operatoren angelegt.{% elif lang=='en' %}No operators created yet.{% else %}Nog geen operatoren aangemaakt.{% endif %}
+    </p>
+    {% endif %}
+  </div>
+
+  <div class="op-section">
+    <h2>{% if lang=='de' %}Neuen Operator anlegen{% elif lang=='en' %}Create new operator{% else %}Nieuwe operator aanmaken{% endif %}</h2>
+    <p style="color:#555;font-size:.88rem;margin-top:0;">
+      {% if lang=='de' %}Operatoren melden sich mit E-Mail und Passwort an (ohne 2FA, Sitzungsdauer 24 Stunden). Das Passwort wird nach dem Anlegen einmalig angezeigt.{% elif lang=='en' %}Operators log in with e-mail and password (no 2FA, 24-hour session). The password is shown once after creation.{% else %}Operatoren loggen in met e-mail en wachtwoord (geen 2FA, sessie 24 uur). Het wachtwoord wordt eenmalig getoond na aanmaken.{% endif %}
+    </p>
+    <form class="add-op" method="POST" action="{{ url_for('kk_operatoren_toevoegen') }}">
+      <label>
+        {% if lang=='de' %}E-Mail-Adresse{% elif lang=='en' %}E-mail address{% else %}E-mailadres{% endif %}
+        <input type="email" name="email" required autocomplete="off">
+      </label>
+      <label>
+        {% if lang=='de' %}Name (optional){% elif lang=='en' %}Name (optional){% else %}Naam (optioneel){% endif %}
+        <input type="text" name="display_name" maxlength="80" autocomplete="off">
+      </label>
+      <button type="submit">
+        {% if lang=='de' %}Operator anlegen{% elif lang=='en' %}Create operator{% else %}Operator aanmaken{% endif %}
+      </button>
+    </form>
+  </div>
+
+  <div class="back-link">
+    <a href="/pro/admin">&#8592; {% if lang=='de' %}Zurück zur Admin-Übersicht{% elif lang=='en' %}Back to admin overview{% else %}Terug naar admin-overzicht{% endif %}</a>
+  </div>
+</div>
+{% endblock %}
