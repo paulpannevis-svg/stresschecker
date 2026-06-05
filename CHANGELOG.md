@@ -1,5 +1,45 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-05 — Detail-Info Messungen (/mijn-metingen): titel, meting-type & situatie render-time vertaald
+
+Vervolg op de menu.html-zonefix (ed64acf). De pagina toonde NL op de DE/EN-UI:
+(1) titel/kop/Terug zonder EN-tak, (2) kolom MESSUNG via een incomplete client-side
+JS-map (geen `biofeedback`, leeg voor EN, lowercase), (3) situatie-label (`notes`)
+als rauwe opgeslagen NL-tekst ("Na sport").
+
+### Fix (single source of truth in analytics.py)
+- `analytics.py`:
+  - `MEASUREMENT_TYPE_LABELS` + `meting_type_label(code, lang)` — basismeting/
+    situatiemeting/biofeedback × NL/DE/EN (DE: Basismessung/Situationsmessung/Biofeedback).
+  - `SITUATION_CHIP_LABELS` (6 meetflow-chips) + `situation_label_translate(notes, lang)` —
+    best-effort: herkent een bekende chip-frase in elke taalvariant en toont 'm in de
+    actieve locale; vrije tekst ("test", "10 min ademoefening") blijft verbatim.
+- `app.py` `/mijn-metingen`: per rij `meting_type_label` + render-time vertaalde `notes`.
+- `templates/mijn_metingen.html`: titel/kop/Terug drietalig (EN-tak toegevoegd);
+  `mtMap`/`mtLabel`-JS verwijderd; kolom toont `r.meting_type_label`.
+- Drift-guard-comment bij de chip-blokken in `sensor_en_meten.html` + `measure.html`
+  die naar `analytics.SITUATION_CHIP_LABELS` verwijst (nieuwe chip → ook in de tabel).
+
+Geen DB-wijziging: opslag is al locale-onafhankelijk (meting_type-code + vrije tekst),
+dus geen migratie. Buiten scope: `pro/eigen_metingen.html` (eigen correcte inline-map,
+staat in CLEANUP_TODO als consolidatiepunt) en `hlm/`.
+
+### Verificatie
+- `python3 -m py_compile app.py analytics.py` — schoon.
+- `tests/test_mijn_metingen_i18n.py` (nieuw, 6 tests) — groen: meting_type_label 3×3,
+  chip-vertaling bidirectioneel + case-insensitive, vrije tekst verbatim, render DE
+  (titel + data 'Basismessung'/'Nach Sport', geen mtMap), render EN (titel/Back +
+  'Baseline'/'After sport'), chip-tabel dekt de meetflow.
+- `tests/run_all.sh` — 21/1 (alleen B3, pre-existent), geen regressie.
+- `kill -HUP` gunicorn-master 1523232 → workers gerecycled; `GET /mijn-metingen` → 302.
+
+### Geraakte bestanden
+- `analytics.py`, `app.py`, `templates/mijn_metingen.html`,
+  `templates/sensor_en_meten.html`, `templates/measure.html`
+- `tests/test_mijn_metingen_i18n.py` (nieuw), `I18N_TODO.md`, `CHANGELOG.md`
+
+Pre-fix backup: `backup.sh` → snapshot `20260605-1647`.
+
 ## 2026-06-05 — Vervalmail-taal: get_lang gebruikt opgeslagen voorkeur (EN-bug) + i18n-inventarisatie
 
 ### Bug — EN-abonnees kregen NL-vervalmails

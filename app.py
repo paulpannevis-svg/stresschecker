@@ -1989,6 +1989,10 @@ def mijn_metingen():
     ).fetchall()
     metingen_chart = [dict(r) for r in metingen]
     lang = session.get('lang','nl')
+    import analytics as _analytics
+    for r in metingen_chart:
+        r['meting_type_label'] = _analytics.meting_type_label(r.get('meting_type'), lang)
+        r['notes'] = _analytics.situation_label_translate(r.get('notes'), lang)
     return render_template('mijn_metingen.html', metingen_chart=metingen_chart, lang=lang)
 
 @app.route("/biofeedback")

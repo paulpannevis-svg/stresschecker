@@ -5,7 +5,7 @@
 - **Testbaseline:** `tests/run_all.sh` = **21/1** (alleen B3 faalt, pre-existent).
 - **Al gefixt vandaag:**
   - `templates/menu.html` — zone-label render-time vertaald NL/DE/EN (commit **ed64acf**).
-  - `templates/mijn_metingen.html` — meting_type + situatie-label + titel-EN (lopende mijn_metingen-sessie; dekt de Tier 1 EN-gap op regel 2/5/7 hieronder).
+  - `templates/mijn_metingen.html` — ✅ **GEFIXT** (deze sessie): titel/kop/Terug drietalig (EN-tak toegevoegd), meting_type render-time vertaald via `analytics.meting_type_label`, situatie-label via `analytics.situation_label_translate` (best-effort chip-mapping); `mtMap`/`mtLabel`-JS verwijderd. Drift-guard-comment bij de chips in `sensor_en_meten.html` + `measure.html`. Test: `tests/test_mijn_metingen_i18n.py` (6 groen). Dekt de Tier 1 EN-gap op regel 2/5/7 + de meting_type/notes-symptomen.
   - `license_notifications.py:get_lang` — **OPGELOST** (zie onderaan "Afgehandeld"); EN-abonnees kregen NL-vervalmails. Aparte fix + `tests/test_license_notifications_lang.py`.
 - **Scope rest:** geplande fixsessie **vóór de Machtfit-livegang**. `hlm/` is een apart spoor (zie `CLEANUP_TODO.md`).
 

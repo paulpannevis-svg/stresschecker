@@ -94,6 +94,62 @@ def zone_description(zone_key, lang='nl'):
     return z.get(lang, z['nl'])
 
 
+# Meting-type: opgeslagen code (metingen.meting_type) → label per locale.
+MEASUREMENT_TYPE_LABELS = {
+    'basismeting':    {'nl': 'Basismeting',    'de': 'Basismessung',      'en': 'Baseline'},
+    'situatiemeting': {'nl': 'Situatiemeting', 'de': 'Situationsmessung', 'en': 'Situational'},
+    'biofeedback':    {'nl': 'Biofeedback',    'de': 'Biofeedback',       'en': 'Biofeedback'},
+}
+
+
+def meting_type_label(code, lang='nl'):
+    """metingen.meting_type-code → label in actieve locale. Onbekende code verbatim."""
+    if not code:
+        return '-'
+    m = MEASUREMENT_TYPE_LABELS.get(str(code).strip().lower())
+    if not m:
+        return str(code)
+    return m.get(lang, m['nl'])
+
+
+# Situatie-label is een VRIJ TEKSTVELD met snelkeuze-chips. De chips vullen
+# locale-tekst in op het moment van meten, dus een meting onder NL slaat "Na sport"
+# op, onder DE "Nach Sport". Best-effort: herken de bekende chip-frases in elke
+# taalvariant en toon ze in de actieve locale; alles wat geen chip is (echte vrije
+# tekst zoals "test", "10 min ademoefening") blijft verbatim staan.
+#
+# SINGLE SOURCE OF TRUTH voor de chip-frases. Deze lijst MOET synchroon blijven met
+# de snelkeuze-knoppen in templates/sensor_en_meten.html en templates/measure.html
+# (setBiofeedLabel-chips). Voeg een nieuwe/gewijzigde chip hier óók toe, anders
+# drift de vertaling weg.
+SITUATION_CHIP_LABELS = [
+    {'nl': 'Voor activiteit', 'de': 'Vor Aktivität',  'en': 'Before activity'},
+    {'nl': 'Na activiteit',   'de': 'Nach Aktivität', 'en': 'After activity'},
+    {'nl': 'Ochtend',         'de': 'Morgens',        'en': 'Morning'},
+    {'nl': 'Avond',           'de': 'Abends',         'en': 'Evening'},
+    {'nl': 'Na sport',        'de': 'Nach Sport',     'en': 'After sport'},
+    {'nl': 'Na meditatie',    'de': 'Nach Meditation', 'en': 'After meditation'},
+]
+
+# Opgebouwde lookup: genormaliseerde frase (elke taal) → chip-rij.
+_SITUATION_CHIP_INDEX = {
+    chip[l].strip().lower(): chip
+    for chip in SITUATION_CHIP_LABELS
+    for l in ('nl', 'de', 'en')
+}
+
+
+def situation_label_translate(notes, lang='nl'):
+    """Best-effort: herken een bekende chip-frase (in welke taal dan ook) en geef
+    die terug in de actieve locale. Vrije tekst / onbekend → ongewijzigd terug."""
+    if not notes:
+        return notes
+    chip = _SITUATION_CHIP_INDEX.get(str(notes).strip().lower())
+    if not chip:
+        return notes
+    return chip.get(lang, chip['nl'])
+
+
 def age_category(birth_year, ref_year=None):
     """birth_year → '<30'|'30-45'|'45-60'|'>60'|'unknown'. ref_year default=huidig jaar."""
     if not birth_year:

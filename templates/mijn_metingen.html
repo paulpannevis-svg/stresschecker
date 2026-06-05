@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{% if lang=='de' %}Detail-Info Messungen{% elif lang=='en' %}Detail Info Measurements{% else %}Detail Informatie Metingen{% endif %}{% endblock %}
+{% block content %}
+<div style="max-width:900px;margin:0 auto;padding:1rem;">
+  <h2 style="text-align:center;color:#c0392b;font-size:1.1rem;letter-spacing:.08em;margin-bottom:1.5rem;">📋 {% if lang=='de' %}VERLAUF BASISMESSUNG &amp; ÜBERSICHT MESSUNGEN{% elif lang=='en' %}BASELINE TREND &amp; MEASUREMENT OVERVIEW{% else %}VERLOOP BASISMETING &amp; OVERZICHT METINGEN{% endif %}</h2>
+  <div id="metingenLijst"></div>
+  <a href="/" style="display:inline-block;margin-top:1.5rem;color:#c0392b;text-decoration:none;font-size:.9rem;">&#8592; {% if lang=='de' %}Zurück{% elif lang=='en' %}Back{% else %}Terug{% endif %}</a>
+</div>
+<script>
+var data = {{ metingen_chart | tojson }};
+var lang2 = "{{ session.get('lang','nl') }}";
+var hDatum=lang2=='de'?'DATUM':lang2=='en'?'DATE':'DATUM';
+var hTijd=lang2=='de'?'ZEIT':lang2=='en'?'TIME':'TIJD';
+var hMeting=lang2=='de'?'MESSUNG':lang2=='en'?'READING':'METING';
+// meting-type-label wordt server-side vertaald (analytics.meting_type_label) en
+// komt mee als r.meting_type_label; situatie-label (r.notes) idem (situation_label_translate).
+var list=document.getElementById('metingenLijst');
+if(!data||!data.length){list.innerHTML='<p style="text-align:center;color:#888;">'+(lang2=='de'?'Noch keine Messungen.':lang2=='en'?'No readings yet.':'Nog geen metingen.')+'</p>';}
+else{
+  var html='<div class="table-responsive"><table class="meting-tabel" style="width:100%;border-collapse:collapse;font-size:.88rem;">';
+  html+='<tr style="background:#f8f8f6;"><th style="padding:.6rem .8rem;text-align:left;border-bottom:2px solid #dde3ea;">'+hDatum+'</th><th style="padding:.6rem .8rem;text-align:left;border-bottom:2px solid #dde3ea;">'+hTijd+'</th><th style="padding:.6rem .8rem;text-align:left;border-bottom:2px solid #dde3ea;">RI</th><th style="padding:.6rem .8rem;text-align:left;border-bottom:2px solid #dde3ea;">BPM</th><th style="padding:.6rem .8rem;text-align:left;border-bottom:2px solid #dde3ea;">HRV%</th><th style="padding:.6rem .8rem;text-align:left;border-bottom:2px solid #dde3ea;">RMSSD</th><th style="padding:.6rem .8rem;text-align:left;border-bottom:2px solid #dde3ea;">'+hMeting+'</th><th style="padding:.6rem .8rem;text-align:left;border-bottom:2px solid #dde3ea;">LABEL</th><th style="padding:.6rem .8rem;text-align:left;border-bottom:2px solid #dde3ea;">'+(lang2=='de'?'Was beschäftigt Sie':lang2=='en'?'What is going on':'Wat speelt er')+'</th><th style="padding:.6rem .8rem;text-align:left;border-bottom:2px solid #dde3ea;">Kubios</th></tr>';
+  data.forEach(function(r){
+    var dt=r.ts?new Date(r.ts):null;
+    var date=dt?dt.toLocaleDateString('nl-NL',{year:'numeric',month:'2-digit',day:'2-digit'}):'';
+    var tijd=dt?dt.toTimeString().substring(0,5):'';
+    var ri=r.ri||0;
+    var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+(ri<2?'#e74c3c':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#2ecc71':'#27ae60')+'"></span>';
+    html+='<tr style="border-bottom:1px solid #eef0f3;"><td style="padding:.55rem .8rem;">'+date+'</td><td style="padding:.55rem .8rem;">'+tijd+'</td><td style="padding:.55rem .8rem;">'+dot+ri+'</td><td style="padding:.55rem .8rem;">'+(r.bpm||'-')+'</td><td style="padding:.55rem .8rem;">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td style="padding:.55rem .8rem;">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td style="padding:.55rem .8rem;">'+(r.meting_type_label||'-')+'</td><td style="padding:.55rem .8rem;">'+(r.dimensie||'-')+'</td><td style="padding:.55rem .8rem;">'+(r.notes||'')+'</td><td style="padding:.55rem .8rem;">'+(r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" style="font-size:.75rem;color:#0078ff;text-decoration:none;">↓ Kubios export</a>':'')+'</td></tr>';
+  });
+  html+='</table></div>';
+  list.innerHTML=html;
+}
+</script>
+{% endblock %}
