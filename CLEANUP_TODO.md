@@ -53,6 +53,17 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
       binnen 20 min aangemaakt) een dode dubbele is. Deze apps zijn provider-gegenereerd en
       stonden NIET in de tarball — bewust laten staan tot uitgezocht.
 
+- [ ] **KK-operator-laag — credentialmodel herzien bij heractivering (06-06-2026)**:
+  - **Gedaan 06-06:** operator-account id=30 (`paulpannevis+kkoperator@gmail.com`) gedeactiveerd —
+    onbekend lang random bcrypt-wachtwoord + `deleted_at` gezet (genoteerde credential was dood-risico,
+    operator-login skipt 2FA). DB-wijziging, niet in git.
+  - **Open (read-only plan gepresenteerd, wacht op akkoord):** operator-login + 2FA-skip + beheerroutes
+    achter een feature-flag `KK_OPERATOR_ENABLED=False` zetten tot KK-workstream echt live gaat
+    (3 sites: `app.py:1247` login-skip, `1457-1480` auto-create, `/pro/operatoren(+/toevoegen)`).
+  - **Bij heractivering KK-laag:** het hele operator-credentialmodel herzien — eenmalig gegenereerd
+    wachtwoord + 2FA-skip + 24u-sessie is voor een **Krankenkassen-context te mager**; 2FA hoort
+    óók voor operators te gelden. Zie [[project_uncommitted_kk_operator_workstream]].
+
 - [x] **Untracked dirs git-tracken** — UITGEVOERD 06-06-2026 (Fase 1 git-sanering, zie CHANGELOG). Getrackt: `scripts/`, `static/` (excl. video's/backup-tarball), `templates/` (consumer+pro), `tests/`. BEWUST GEPARKEERD: `hlm/`+`templates/hlm/` (apart spoor, beslissen bij HLM-activering), `email_templates/` (verweesd, verwijderkandidaat), `license_notifications.py`+`weekly_email.py` (Fase 2 secrets).
 - [x] **Docs-organisatie** — UITGEVOERD 06-06-2026: `LAUNCH_LOG.md`, `PWRESET_PLAN.md`, `RMSSD_HERBEREKENING_OVERZICHT.md`, `STAGING_OPZET_PLAN.md`, `TODO.md` → `docs/`. `SYSTEM_REFERENCE.md` BLIJFT in root (backup.sh:4 kopieert vanaf root-pad) — verplaatskandidaat zodra backup.sh meeverhuist. `docs/kontakt_v3_backup.html` = verwijderkandidaat (J).
 
