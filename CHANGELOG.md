@@ -1,5 +1,17 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-06 — Ops: --no-control-socket op stresschecker.service (gunicorn-fork-hang)
+
+gunicorn 25.1.0 start standaard een control-socket-thread in de master; bij `fork()` kan een
+worker in `futex_wait` blijven hangen tijdens post-fork init (poort luistert, maar geen antwoord —
+intermittent, ~50% van de (her)starts). Ontdekt bij de staging-opzet; `--no-control-socket` lost
+het volledig op (10/10 restarts groen).
+
+- **`stresschecker.service`** (live; `/etc/systemd/system/`, niet in deze repo): `--no-control-socket`
+  aan ExecStart toegevoegd + `systemctl daemon-reload`. **Bewust geen restart uitgevoerd** — de vlag
+  pakt vanzelf bij de eerstvolgende restart; tot dan draaien de huidige workers ongewijzigd.
+- Idem op de nieuwe **staging**-unit (`stresschecker-staging.service`, `test.stresschecker.com` / :8090).
+
 ## 2026-06-06 — Fix: RangeError-recursie op pro/eigen_metingen.html (RI-grafiek)
 
 De RI-grafiek op `/pro/mijn-metingen` (`pro/eigen_metingen.html`) brak ná de baseline-toevoeging
