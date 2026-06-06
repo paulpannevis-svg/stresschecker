@@ -4,7 +4,7 @@
 |---|---|
 | **Incident-ID** | 2026-06-06_backup_exposure |
 | **Classificatie** | Hoog — secrets + bijzondere persoonsgegevens (AVG art. 9) publiek blootgesteld |
-| **Status** | In behandeling (containment voltooid, rotatie + AVG-afweging lopend) |
+| **Status** | **AFGESLOTEN 2026-06-06** (containment + rotaties + AVG-afweging + vernietiging voltooid; opruim-restpunten in CLEANUP_TODO) |
 | **Ontdekt** | 2026-06-06 (tijdens Fase 2 opruim-/securitysessie) |
 | **Opgesteld** | 2026-06-06, Paul Pannevis |
 | **Containment** | Voltooid 2026-06-06 |
@@ -213,6 +213,28 @@ Aanbeveling: deze afweging formeel dateren, ondertekenen en archiveren.
 > **Afweging uitgevoerd en geaccordeerd door Paul Pannevis, verwerkingsverantwoordelijke,
 > 6 juni 2026, 11:00 CET. Conclusie: geen melding ex art. 33/34 AVG vereist (nul externe
 > betrokkenen, onderbouwing §10).**
+
+## 11. Afsluiting — vernietiging quarantaine
+
+Na lezing en accordering van dit document (Paul Pannevis) is de gequarantainede tarball
+inclusief de uitgepakte inspectie-kopieën **veilig vernietigd**.
+
+- **Tijdstip:** 2026-06-06 11:03:27 CEST
+- **Methode:** `shred -u -z -n 3` (3× overschrijven + nullen + unlink) per bestand, daarna
+  `rm -rf /root/quarantine`.
+- **Vernietigd (6 bestanden, ~66 MB):**
+  - `backup-download.tar.gz` (67.070.843 bytes — de blootgestelde tarball)
+  - `inspect/opt/ic-license-server/.env` (1.047 b)
+  - `inspect/opt/stresschecker/.env` (304 b)
+  - `inspect/opt/ic-license-server/data/stripe_keys.conf` (190 b)
+  - `inspect/opt/ic-license-server/data/saas_licenses.db` (1.245.184 b — DB-snapshot)
+  - `inspect/opt/stresschecker/data/saas_licenses.db` (0 b — lege stub)
+- **Verificatie:** `/root/quarantine/` bestaat niet meer.
+
+Hiermee is het incident afgehandeld; resterende opruim-/uitfaseringspunten staan in
+`CLEANUP_TODO.md` (PayPal-uitfasering, dode secrets, `.env`-backups, wachtwoord-hashing).
+
+**Status incident: AFGESLOTEN (2026-06-06).**
 
 ---
 *Dit document bevat bewust geen secret-waarden of individuele persoonsgegevens.*
