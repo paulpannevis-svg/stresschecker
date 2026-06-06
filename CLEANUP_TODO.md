@@ -33,6 +33,14 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
 
 ## TODO — voor latere sessies
 
+- [x] **Security-flag `static/backup-download.tar.gz`** — AFGEHANDELD 06-06-2026. Stond publiek
+  downloadbaar; verplaatst naar `/root/quarantine/` (0700), URL nu 404. Volledige analyse +
+  secret-rotaties in `INCIDENT_2026-06-06_backup_exposure.md`. **Vervolg-opruimacties uit het
+  incident (aparte sessie):** dode secrets verwijderen (`INTERNAL_API_KEY` in `ic .env`,
+  `/opt/ic-license-server/data/api_key.conf`, ongebruikte `SECRET_KEY` in `ic .env`); 4×
+  `/opt/ic-license-server/.env.bak_*` opruimen; wachtwoord-hashing-formaat beoordelen
+  (hex-digest zonder salt-prefix); besluit vernietiging tarball + `/root/quarantine/inspect/`.
+
 - [x] **Untracked dirs git-tracken** — UITGEVOERD 06-06-2026 (Fase 1 git-sanering, zie CHANGELOG). Getrackt: `scripts/`, `static/` (excl. video's/backup-tarball), `templates/` (consumer+pro), `tests/`. BEWUST GEPARKEERD: `hlm/`+`templates/hlm/` (apart spoor, beslissen bij HLM-activering), `email_templates/` (verweesd, verwijderkandidaat), `license_notifications.py`+`weekly_email.py` (Fase 2 secrets).
 - [x] **Docs-organisatie** — UITGEVOERD 06-06-2026: `LAUNCH_LOG.md`, `PWRESET_PLAN.md`, `RMSSD_HERBEREKENING_OVERZICHT.md`, `STAGING_OPZET_PLAN.md`, `TODO.md` → `docs/`. `SYSTEM_REFERENCE.md` BLIJFT in root (backup.sh:4 kopieert vanaf root-pad) — verplaatskandidaat zodra backup.sh meeverhuist. `docs/kontakt_v3_backup.html` = verwijderkandidaat (J).
 

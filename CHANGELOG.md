@@ -1,5 +1,30 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-06 — Beveiligingsincident: publieke backup-tarball + secret-rotaties
+
+`static/backup-download.tar.gz` (64 MB, 10 apr geplaatst) bleek publiek downloadbaar via de
+nginx `/static/`-alias en bevatte secrets + klant-/gezondheidsdata. Volledige analyse in
+`INCIDENT_2026-06-06_backup_exposure.md`.
+
+**Containment:** tarball → `/root/quarantine/` (0700), URL nu 404; geen script/cron maakt hem aan.
+
+**Bevindingen (kort):** Stripe-LIVE-secrets in de snapshot waren *placeholders* (geen werkende
+live-credentials gelekt); enige echte nog-actieve gelekte credential = **PayPal live**
+(rotatie open). De feitelijk gebruikte license-server-sleutels stonden op publieke *defaults*.
+Persoonsgegevens beperkt (≤6 profielen, deels test) maar inclusief gezondheidsdata (3 HRV-
+metingen) → AVG-afweging open. nginx-logs (23 mei–6 jun): 0 downloads; ~43 dagen ervoor ongedekt.
+
+**Rotaties/hardening uitgevoerd 06-06:**
+- Stripe LIVE secret + webhook signing secret gerold (`stripe_keys.conf`); read-only getest.
+- `SC_SECRET_KEY` (was zwakke `sc-secret-2026`) → sterke random; systemd + `.env`; restart.
+- `IC_ADMIN_KEY` (was default `admin-secret`) → sterke random; getest 200 vs 401. Sluit
+  beveiligings-inventarisatie punt 1.
+- `IC_SECRET_KEY` (was default `change-this-in-production`) → sterke random.
+- nginx: `404` op archief-/db-/conf-/secret-extensies onder `/static/` (`nginx -t` + reload, getest).
+
+**Open:** PayPal-live-rotatie (hoog), Stripe-TEST (laag), dode secrets opruimen
+(`INTERNAL_API_KEY`, `api_key.conf`, `.env.bak_*`), AVG-meldplicht-beoordeling, wachtwoord-hashing.
+
 ## 2026-06-06 — Git-sanering Fase 2: secrets uit code, 2FA-codes uit logging
 
 Vervolg op Fase 1 (read-only plan → akkoord per stap → uitvoering). Doel: hardcoded
