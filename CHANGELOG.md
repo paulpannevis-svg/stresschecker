@@ -1,5 +1,20 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-06 — Fix: RangeError-recursie op pro/eigen_metingen.html (RI-grafiek)
+
+De RI-grafiek op `/pro/mijn-metingen` (`pro/eigen_metingen.html`) brak ná de baseline-toevoeging
+met `RangeError: Maximum call stack size exceeded` (chart.min.js), ná de eerste draw: de baseline
+werd post-constructie via `datasets.push()` + een tweede `riChart.update()` toegevoegd, wat —
+samen met Chart.js' resize-observer in de responsive container — een re-entrante render/resize
+gaf. Gevolg: de grafiek tekende wél, maar de baseline-lijn, het legenda-item én de metingen-tabel
+eronder (de rest van het script) stierven mee.
+
+- **Fix:** baseline-dataset + tooltip-footer worden nu **inline bij `new Chart()`** meegegeven
+  (één render-cyclus, geen tweede `update()`). Grafiek + baseline + legenda + tabel weer compleet
+  (Week/Maand, NL/DE/EN).
+- De HLM-kopie `templates/hlm/consumer_metingen.html` bevat dezelfde bug nog (dormant spoor) —
+  bewust **niet** mee-gepatcht, genoteerd in `CLEANUP_TODO.md`.
+
 ## 2026-06-06 — Baseline-referentielijn (stap 4 + AFRONDING): pro/verloop + single source
 
 Sluitstuk: de cliënt-trendgrafiek + de laatste eigen baseline-berekeningen geconsolideerd,
