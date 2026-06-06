@@ -26,8 +26,11 @@
 Verificatie: `run_all.sh` 21/1; render-checks 3 talen (results.html legenda+title; verloop schoon);
 `/api/metingen`-smoke; `kill -HUP` reload, /verloop + /resultaten → 302.
 
-Nog open: visuele check /resultaten + /kwadrant (correcte baseline + lijn/legenda). De pro/eigen
-+ consumer-grafieken delen nu dezelfde canonieke bron; geen verdere RI-verloopgrafieken open.
+Nog open: visuele check /resultaten + /kwadrant (correcte baseline + lijn/legenda).
+**Nog te doen (stap 4):** `pro/verloop.html` — de cliënt-trendgrafiek (Pro bekijkt cliënt,
+custom canvas, voedt zich uit `/api/pro/client/<cid>/metingen`). Vereist: baseline toevoegen
+aan dat endpoint (zelfde `compute_baseline`) + lijn + legenda op het canvas. Dezelfde
+legenda-/lijn-afspraak als /resultaten.
 
 ## 2026-06-06 — Baseline-referentielijn (stap 2): pro/eigen_metingen.html (pagina 1)
 
