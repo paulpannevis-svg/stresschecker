@@ -172,5 +172,43 @@ geverifieerd dat geen script/cron de tarball opnieuw aanmaakt.
   documenteer de afweging ook als besloten wordt **niet** te melden. De beperkte populatie
   en het ontbreken van misbruik-indicatie wegen mee.
 
+## 10. Betrokkenen-analyse (onderbouwing AVG-conclusie)
+
+Vastgesteld op de tarball-DB-kopie (snapshot 2026-04-09), read-only. Verfijnt de
+"deels testaccounts"-inschatting uit §4/§9 met concrete identiteits- en betaalverificatie.
+
+**Volledige profielen (`users`, 6× — mét password_hash, geboortejaar/geslacht):**
+uitsluitend eigen / familie / bedrijf — **geen externe betrokkenen**:
+- 2× Paul Pannevis (eigen accounts: gmail + lifestylemonitors.com)
+- `paul@hlmpro.nl` — **niet-bestaand testadres** (geen echte mailbox)
+- 2× Steven Pannevis (familie; lifestylemonitors.com + persoonlijk hotmail)
+- 1× `sales@lifestylemonitors.com` (bedrijfsrol-adres)
+
+**Bijzondere categorie (gezondheid):** alle **3 HRV-basismetingen** (15-03-2026) + beide
+**hlm_morning-welzijnsscores** (15-03 + 24-03) horen bij **één persoon: Paul Pannevis zelf**
+(user_id 1). Geen gezondheidsgegevens van derden.
+
+**License-records (`licenses`, alleen e-mail + sleutel + order-id; geen wachtwoord/gezondheid):**
+de drie aanvankelijk ambigue gmail-adressen objectief geverifieerd via order-id/betaalsporen
+(gepseudonimiseerd):
+
+| Adres | license_key | origin | order-id | betaling | aangemaakt | conclusie |
+|---|---|---|---|---|---|---|
+| j***e@gmail.com | TRIAL-… | trial | (leeg) | **nee** | 2026-03-28 09:29 | test/demo |
+| j*b@gmail.com | TRIAL-… | trial | (leeg) | **nee** | 2026-03-28 10:20 | test/demo |
+| p***r@gmail.com | TRIAL-… | trial | (leeg) | **nee** | 2026-03-28 10:19 | test/demo |
+
+Alle drie zijn **trial-licenties zonder order-id en zonder enige betaling**, aangemaakt binnen
+~1 uur in één testsessie op 28-03-2026. In de héle DB: `billing_events` = 0, `subscriptions` = 0,
+0 PayPal-subscription-id's. De enige 2 records mét order-id (`origin=shop`) zijn eveneens intern:
+`TEST-001` (Paul's gmail, expliciet test) en order `10062` (Paul's eigen lifestylemonitors-adres,
+status `available` / nooit geactiveerd).
+
+**Conclusie:** de blootgestelde snapshot bevat **nul externe betrokkenen**. Alle profielen,
+inloggegevens en gezondheidsgegevens betreffen de verwerkingsverantwoordelijke zelf, familie en
+bedrijfsadressen; alle overige records zijn test/trial zonder betaling. Dit ondersteunt de
+afweging dat melding aan de AP (art. 33) én aan betrokkenen (art. 34) **niet vereist** is.
+Aanbeveling: deze afweging formeel dateren, ondertekenen en archiveren.
+
 ---
 *Dit document bevat bewust geen secret-waarden of individuele persoonsgegevens.*
