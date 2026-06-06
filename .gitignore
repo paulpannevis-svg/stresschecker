@@ -50,3 +50,7 @@ toegepast
 static/img/*.mp4
 static/backup-download.tar.gz
 reports/
+
+# Staging-config (secrets / lokaal, nooit in VCS)
+.env.staging
+data/stripe_keys*.conf

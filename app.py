@@ -25,6 +25,8 @@ MAIL_PASSWORD = '55Bumper@#'
 import random, os
 
 def send_verification_code(email, code, lang='nl'):
+    if os.environ.get('SC_ENV') == 'staging':
+        print(f'[STAGING-MAIL] verification to={email} code={code}', flush=True); return True
     try:
         import sendgrid
         from sendgrid.helpers.mail import Mail
@@ -47,6 +49,8 @@ def send_verification_code(email, code, lang='nl'):
 
 
 def send_password_reset_email(email, code, lang='nl'):
+    if os.environ.get('SC_ENV') == 'staging':
+        print(f'[STAGING-MAIL] password-reset to={email} code={code}', flush=True); return True
     try:
         import sendgrid
         from sendgrid.helpers.mail import Mail
@@ -163,6 +167,8 @@ def build_activation_confirmation_body(lang, consent_ts):
 def send_activation_confirmation_email(email, lang, consent_ts):
     """Verstuur de activeringsbevestiging (duurzame drager) ná succesvolle
     activering. Best-effort: een mailfout mag de activering niet breken."""
+    if os.environ.get('SC_ENV') == 'staging':
+        print(f'[STAGING-MAIL] activation-confirmation to={email}', flush=True); return True
     subject, body = build_activation_confirmation_body(lang, consent_ts)
     try:
         import sendgrid
@@ -235,6 +241,34 @@ def _full_name_filter(obj, surname=None):
 DB_PATH        = os.environ.get('SC_DB_PATH', '/opt/ic-license-server/data/saas_licenses.db')
 METING_DB_PATH = os.environ.get('SC_METING_DB', '/opt/stresschecker/data/sc_measurements.db')
 PRO_DB_PATH    = os.environ.get('SC_PRO_DB', '/opt/stresschecker/data/sc_pro.db')
+
+# ─── STAGING-startup-guards ──────────────────────────────────────────────────
+# No-op in productie (SC_ENV is daar niet 'staging'). Twee harde asserties die
+# staging weigeren te booten als de data niet veilig is (zie docs/STAGING_OPZET_PLAN.md).
+if os.environ.get('SC_ENV') == 'staging':
+    # (a) Geen enkel DB-pad mag naar de LIVE-data wijzen (val-terug-op-default-val §2d).
+    _LIVE_PREFIXES = ('/opt/stresschecker/data/', '/opt/ic-license-server/data/')
+    for _p in (DB_PATH, METING_DB_PATH, PRO_DB_PATH):
+        assert not any(_p.startswith(_x) for _x in _LIVE_PREFIXES), \
+            f'STAGING WEIGERT live-DB-pad: {_p}'
+    # (b) De license-DB moet gescrubd zijn: een verse, ONGESCRUBDE kopie mag niet serveren.
+    #     Elk niet-whitelist, niet-*.invalid e-mailadres in users/licenses = ongescrubde PII.
+    _SCRUB_WL = {'paulpannevis@gmail.com', 'paulpannevis@lifestylemonitors.com',
+                 'test-rifix@lifestylemonitors.com', 'test-rifix-divers@lifestylemonitors.com'}
+    try:
+        import sqlite3 as _sq3
+        _cn = _sq3.connect(f'file:{DB_PATH}?mode=ro', uri=True)
+        _bad = 0
+        for (_em,) in _cn.execute(
+                "SELECT email FROM users WHERE email IS NOT NULL "
+                "UNION ALL SELECT email FROM licenses WHERE email IS NOT NULL"):
+            _e = (_em or '').lower()
+            if '@' in _e and not _e.endswith('.invalid') and _e not in _SCRUB_WL:
+                _bad += 1
+        _cn.close()
+        assert _bad == 0, f'STAGING WEIGERT ongescrubde license-DB: {_bad} echte e-mailadressen (draai scrub_pii.py)'
+    except _sq3.OperationalError:
+        pass  # schema nog niet aanwezig — refresh_data.sh draait de scrub vóór de eerste start
 
 # Aantal eerste metingen waarbij educatieve blokken standaard openstaan voor
 # nieuwe consumenten. Pas aan op basis van gebruikersonderzoek.
@@ -1034,6 +1068,8 @@ def _gen_kk_license_code():
 def send_kk_activation_email(to_email, contact_name, license_code, tier_label, lang='de'):
     """Welkomstmail naar Krankenkasse-contactpersoon. Zakelijke DE-tekst,
     Reply-To info@lifestylemonitors.de voor DE-context."""
+    if os.environ.get('SC_ENV') == 'staging':
+        print(f'[STAGING-MAIL] kk-activation to={to_email}', flush=True); return True
     try:
         import sendgrid
         from sendgrid.helpers.mail import Mail, ReplyTo
@@ -2774,6 +2810,8 @@ def _license_pro_key(license_code):
 
 def send_report_ready_email(to_email, uuid_str, lang='nl'):
     """Mail: rapport klaar + download-link."""
+    if os.environ.get('SC_ENV') == 'staging':
+        print(f'[STAGING-MAIL] report-ready to={to_email}', flush=True); return True
     try:
         import sendgrid
         from sendgrid.helpers.mail import Mail
@@ -2807,6 +2845,8 @@ def send_report_ready_email(to_email, uuid_str, lang='nl'):
 
 
 def send_report_failed_email(to_email, lang, err_summary):
+    if os.environ.get('SC_ENV') == 'staging':
+        print(f'[STAGING-MAIL] report-failed to={to_email}', flush=True); return True
     try:
         import sendgrid
         from sendgrid.helpers.mail import Mail
@@ -6312,7 +6352,7 @@ def opzeg_abonnement():
 
 # ── Spoor 3: Stripe Customer Portal ──────────────────────────────────────────
 SPOOR3_PORTAL_CONFIGURATION = 'bpc_1TVpFcHD28PM4o1K18URnQAI'
-SPOOR3_STRIPE_KEYS_FILE     = '/opt/ic-license-server/data/stripe_keys.conf'
+SPOOR3_STRIPE_KEYS_FILE     = os.environ.get('SC_STRIPE_KEYS_FILE', '/opt/ic-license-server/data/stripe_keys.conf')
 
 
 def _load_stripe_secret():
