@@ -371,7 +371,7 @@ def get_user_key():
                 session['user_key'] = cached
                 return cached
             try:
-                cn = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+                cn = sqlite3.connect(DB_PATH)
                 row = cn.execute("SELECT email FROM licenses WHERE license_key=?", (lc,)).fetchone()
                 cn.close()
                 if row and row[0]:
@@ -418,7 +418,7 @@ def validate_license(code, email):
     if len(code_clean) == 32 and not code.startswith('SC'):
         # Legacy code formaat: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
         code = '-'.join([code_clean[i:i+4] for i in range(0, 32, 4)])
-    db_path = '/opt/ic-license-server/data/saas_licenses.db'
+    db_path = DB_PATH
     try:
         db = sqlite3.connect(db_path)
         db.row_factory = sqlite3.Row
@@ -909,7 +909,7 @@ def activate():
                     'Deze code is verlopen.' if lang=='nl'
                     else ('Dieser Code ist abgelaufen.' if lang=='de'
                     else 'This code has expired.'))))
-            _bind_cn = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _bind_cn = sqlite3.connect(DB_PATH)
             _bind_cn.row_factory = sqlite3.Row
             # Resolve plan_id voor plan-driven expiry
             _lic_row = _bind_cn.execute(
@@ -965,7 +965,7 @@ def activate():
         }
 
         import sqlite3 as _sq2
-        _cn = _sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
+        _cn = _sq2.connect(DB_PATH)
         _cn.row_factory = _sq2.Row
         existing = _cn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
 
@@ -1059,7 +1059,7 @@ def _admin_kk_authorized():
 def _gen_kk_license_code():
     """Format: SC-KK-XXXX-XXXX (hex). Garandeert uniciteit tegen licenses-tabel."""
     import secrets
-    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db = sqlite3.connect(DB_PATH)
     try:
         for _ in range(20):
             code = 'SC-KK-' + secrets.token_hex(2).upper() + '-' + secrets.token_hex(2).upper()
@@ -1133,7 +1133,7 @@ def admin_kk_new():
         now_iso = _dt.datetime.utcnow().isoformat()
         valid_until = (_dt.datetime.utcnow() + _dt.timedelta(days=365)).isoformat()
         code_expires_at = (_dt.datetime.utcnow() + _dt.timedelta(days=60)).isoformat()
-        db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+        db = sqlite3.connect(DB_PATH)
         try:
             db.execute(
                 "INSERT INTO licenses (license_key, product, type, status, origin, max_profiles, "
@@ -1169,7 +1169,7 @@ def admin_kk_offices(license_code):
     if not _admin_kk_authorized():
         return ('Unauthorized — provide X-Admin-Token header or ?token=… query parameter.', 401)
     license_code = license_code.strip().upper()
-    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row
     lic = db.execute(
         "SELECT l.license_key, l.email, l.notes, l.product, l.product_name, p.tier "
@@ -1203,7 +1203,7 @@ def admin_kk_office_deactivate(license_code, oid):
     if not _admin_kk_authorized():
         return ('Unauthorized', 401)
     license_code = license_code.strip().upper()
-    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db = sqlite3.connect(DB_PATH)
     db.execute("UPDATE krankenkasse_offices SET active=0 WHERE id=? AND license_code=?",
                (oid, license_code))
     db.commit()
@@ -1217,7 +1217,7 @@ def admin_kk_send_welcome(license_code):
     if not _admin_kk_authorized():
         return ('Unauthorized', 401)
     license_code = license_code.strip().upper()
-    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row
     lic = db.execute(
         "SELECT l.license_key, l.email, l.notes, p.tier FROM licenses l "
@@ -1271,7 +1271,7 @@ def sc_login():
         if not email or not password:
             error = ('E-Mail und Passwort eingeben.' if lang=='de' else 'Enter email and password.' if lang=='en' else 'Vul e-mail en wachtwoord in.')
             return render_template('sc_login.html', lang=lang, error=error, email=email)
-        _cn = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+        _cn = _sq.connect(DB_PATH)
         _cn.row_factory = _sq.Row
         user = _cn.execute("SELECT * FROM users WHERE email=? COLLATE NOCASE", (email,)).fetchone()
         _cn.close()
@@ -1285,7 +1285,7 @@ def sc_login():
             return render_template('sc_login.html', lang=lang, error=error, email=email)
         if is_legacy:
             # Transparante migratie: SHA-256-hash bij succesvolle login eenmalig her-hashen naar bcrypt.
-            _cn3 = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _cn3 = _sq.connect(DB_PATH)
             _cn3.execute("UPDATE users SET password_hash=? WHERE email=? COLLATE NOCASE", (hash_password(password), email))
             _cn3.commit()
             _cn3.close()
@@ -1299,7 +1299,7 @@ def sc_login():
                          else 'De KK-operatorfunctie is momenteel niet beschikbaar.')
                 return render_template('sc_login.html', lang=lang, error=error, email=email)
             import time as _opt_t  # noqa: F811  — sc_login bevat een latere lokale `import time`
-            _cn_op = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _cn_op = _sq.connect(DB_PATH)
             _cn_op.row_factory = _sq.Row
             op_lic = _cn_op.execute(
                 "SELECT l.license_key, l.product, l.type, l.user_key "
@@ -1329,7 +1329,7 @@ def sc_login():
             session['_last_activity']  = _opt_t.time()
             return redirect(url_for('pro_locatie'))
         # Inloggen gelukt — 2FA code sturen
-        _cn2 = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+        _cn2 = _sq.connect(DB_PATH)
         _cn2.row_factory = _sq.Row
         lic = _cn2.execute(
             "SELECT type, license_key, product FROM licenses WHERE email=? AND status='activated' AND (license_key LIKE 'SC-%' OR type IN ('consumer','pro')) AND license_key NOT LIKE 'HLM%' ORDER BY created_at DESC LIMIT 1",
@@ -1377,7 +1377,7 @@ def verify_2fa():
             if _pending_pw:
                 import sqlite3 as _sq_pw
                 _pwc_email = session.get('2fa_email','')
-                _pwc = _sq_pw.connect('/opt/ic-license-server/data/saas_licenses.db')
+                _pwc = _sq_pw.connect(DB_PATH)
                 _existing_u = _pwc.execute("SELECT id FROM users WHERE email=?", (_pwc_email,)).fetchone()
                 if _existing_u:
                     _pwc.execute("UPDATE users SET password_hash=? WHERE email=?", (_pending_pw, _pwc_email))
@@ -1396,7 +1396,7 @@ def verify_2fa():
                 import sqlite3 as _sq_pair
                 _pair_email = session.get('2fa_email','')
                 _pair_name  = session.get('2fa_name','')
-                _pdb = _sq_pair.connect('/opt/ic-license-server/data/saas_licenses.db')
+                _pdb = _sq_pair.connect(DB_PATH)
                 _pdb.row_factory = _sq_pair.Row
                 _new_user = _pdb.execute("SELECT id FROM users WHERE email=? COLLATE NOCASE", (_pair_email,)).fetchone()
                 if _new_user:
@@ -1441,7 +1441,7 @@ def verify_2fa():
             # hun birth_year/gender kregen → profile_setup-redirect bij elke login.
             try:
                 import sqlite3 as _sq3
-                _uc = _sq3.connect('/opt/ic-license-server/data/saas_licenses.db')
+                _uc = _sq3.connect(DB_PATH)
                 _uc.row_factory = _sq3.Row
                 _ur = _uc.execute("SELECT display_name, birth_year, gender, sensor_pref, language, surname, profile_completed FROM users WHERE email=?", (em,)).fetchone()
                 # display_name-override alleen wanneer 2FA geen echte naam meegaf
@@ -1475,7 +1475,7 @@ def verify_2fa():
             if session['audience'] == 'krankenkasse':
                 try:
                     import sqlite3 as _sq_r
-                    _rc = _sq_r.connect('/opt/ic-license-server/data/saas_licenses.db')
+                    _rc = _sq_r.connect(DB_PATH)
                     _rr = _rc.execute("SELECT role FROM users WHERE email=?", (em,)).fetchone()
                     _rc.close()
                     if _rr and _rr[0]:
@@ -1489,7 +1489,7 @@ def verify_2fa():
             session.permanent = True
             session['_last_activity'] = time.time()
             # Link license to email and mark as activated
-            import sqlite3 as _sq2; _ldb2=_sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
+            import sqlite3 as _sq2; _ldb2=_sq2.connect(DB_PATH)
             if _lic_code:
                 _pre = _ldb2.execute("SELECT status FROM licenses WHERE license_key=?", (_lic_code,)).fetchone()
                 _is_fresh_activation = bool(_pre and _pre[0] == 'available')
@@ -1571,7 +1571,7 @@ def password_forgot():
             else 'Als dit account bestaat, hebben we een resetcode per e-mail verstuurd.'
         )
         if email and '@' in email:
-            _cn = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _cn = _sq.connect(DB_PATH)
             _cn.row_factory = _sq.Row
             # strftime i.p.v. datetime() — created_at/expires_at zijn Python isoformat (met 'T'),
             # SQLite datetime('now') heeft spatie — lexicografisch ongelijk op positie 10.
@@ -1621,7 +1621,7 @@ def password_reset_form():
             err = ('Wachtwoorden komen niet overeen.' if lang=='nl' else 'Passwörter stimmen nicht überein.' if lang=='de' else 'Passwords do not match.')
         if err:
             return render_template('wachtwoord_reset.html', lang=lang, error=err, email=email, code=code)
-        _cn = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+        _cn = _sq.connect(DB_PATH)
         _cn.row_factory = _sq.Row
         # Geldige code: niet gebruikt, niet verlopen. strftime-format matcht Python isoformat (zie Fase 5 fix).
         row = _cn.execute(
@@ -1669,7 +1669,7 @@ def save_profile():
     session['profile_completed']  = _completed
     # Persisteer + zet activated_at/license_expires alleen bij eerste keer
     import sqlite3 as _sq2, datetime as _dt2
-    _cn2 = _sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
+    _cn2 = _sq2.connect(DB_PATH)
     _now = _dt2.datetime.utcnow()
     if session.get('legacy_migrated'):
         _exp = _dt2.datetime(2027, 1, 1)
@@ -1709,7 +1709,7 @@ def menu():
     if session.get('license_valid') and not session.get('demo_mode') and not session.get('free_trial'):
         try:
             import sqlite3 as _sq_exp, datetime as _dt_exp
-            _exp_cn = _sq_exp.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _exp_cn = _sq_exp.connect(DB_PATH)
             _exp_cn.row_factory = _sq_exp.Row
             _exp_row = _exp_cn.execute("SELECT license_expires FROM users WHERE email=?", (session.get('email',''),)).fetchone()
             _exp_cn.close()
@@ -1752,7 +1752,7 @@ def oude_code():
         # Valideer tegen legacy_keys tabel
         try:
             import sqlite3 as _sqlite3
-            legacy_db = _sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+            legacy_db = _sqlite3.connect(DB_PATH)
             legacy_db.row_factory = _sqlite3.Row
             row = legacy_db.execute(
                 "SELECT * FROM legacy_keys WHERE license_key=?", (code,)
@@ -1786,7 +1786,7 @@ def oude_code_keuze():
         # Markeer code als migrated
         try:
             import sqlite3 as _sqlite3
-            legacy_db = _sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+            legacy_db = _sqlite3.connect(DB_PATH)
             legacy_db.execute(
                 "UPDATE legacy_keys SET status='migrated', migrated_at=datetime('now') WHERE license_key=?",
                 (session.get('legacy_code'),)
@@ -1861,7 +1861,7 @@ def sensor_en_meten():
                 return redirect(url_for('pro_client_detail', cid=_cid) + '?reason=profiel_incompleet')
         else:
             import sqlite3 as _sq_blk
-            _cn_blk = _sq_blk.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _cn_blk = _sq_blk.connect(DB_PATH)
             _by_row = _cn_blk.execute("SELECT birth_year, gender, profile_completed FROM users WHERE email=?",
                                       (session.get('email',''),)).fetchone()
             _cn_blk.close()
@@ -2001,7 +2001,7 @@ def settings():
     if email:
         try:
             import sqlite3 as _sq2
-            _cn2 = _sq2.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _cn2 = _sq2.connect(DB_PATH)
             _cn2.row_factory = _sq2.Row
             _r2 = _cn2.execute("SELECT birth_year, gender, sensor_pref FROM users WHERE email=?", (email,)).fetchone()
             if _r2:
@@ -2057,7 +2057,7 @@ def biofeedback():
     _bf_ok = True
     if not session.get("demo_mode"):
         import sqlite3 as _sq_bf
-        _cn_bf = _sq_bf.connect('/opt/ic-license-server/data/saas_licenses.db')
+        _cn_bf = _sq_bf.connect(DB_PATH)
         _r_bf = _cn_bf.execute("SELECT birth_year, gender, profile_completed FROM users WHERE email=?",
                                (session.get('email',''),)).fetchone()
         _cn_bf.close()
@@ -2090,7 +2090,7 @@ def pro_menu():
     if session.get('license_valid') and not session.get('demo_mode') and not session.get('free_trial'):
         try:
             import sqlite3 as _sq_exp, datetime as _dt_exp
-            _exp_cn = _sq_exp.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _exp_cn = _sq_exp.connect(DB_PATH)
             _exp_cn.row_factory = _sq_exp.Row
             _exp_row = _exp_cn.execute("SELECT license_expires FROM users WHERE email=?", (session.get('email',''),)).fetchone()
             _exp_cn.close()
@@ -2244,7 +2244,7 @@ def pro_locatie():
         return redirect(url_for('welcome'))
     lang = session.get('lang', 'nl')
     license_code = session.get('license_code', '')
-    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row
     if request.method == 'POST':
         chosen = (request.form.get('office_name','') or '').strip()
@@ -2281,7 +2281,7 @@ def _kk_require():
 
 
 def _kk_db():
-    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row
     return db
 
@@ -2345,7 +2345,7 @@ def _log_kk_action(license_code, action, details):
     try:
         ip = (request.remote_addr or '')[:64]
         ua = (request.headers.get('User-Agent', '') or '')[:200]
-        db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+        db = sqlite3.connect(DB_PATH)
         db.execute(
             "INSERT INTO activation_log (license_key, product, action, ip_address, user_agent, details) "
             "VALUES (?, 'sc', ?, ?, ?, ?)",
@@ -2405,7 +2405,7 @@ def kk_admin_messen_standort():
     POST → kk_office in sessie → redirect /pro/meting."""
     lang = session.get('lang', 'nl')
     license_code = session.get('license_code', '')
-    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row
     if request.method == 'POST':
         chosen = (request.form.get('office_name','') or '').strip()
@@ -2433,7 +2433,7 @@ def kk_operatoren_lijst():
         abort(404)
     lang = session.get('lang', 'nl')
     license_code = session.get('license_code', '')
-    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row
     rows = db.execute(
         "SELECT u.id, u.email, u.display_name, u.created_at, u.last_login "
@@ -2468,7 +2468,7 @@ def kk_operatoren_toevoegen():
     display_name = (request.form.get('display_name','') or '').strip()[:80] or 'KK Operator'
     if not _re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email_raw):
         return redirect(url_for('kk_operatoren_lijst', error='email_format'))
-    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row
     if db.execute("SELECT 1 FROM users WHERE email=? COLLATE NOCASE", (email_raw,)).fetchone():
         db.close()
@@ -2792,7 +2792,7 @@ def zone_desc_jinja(zone_key, lang):
 
 
 def _report_db():
-    db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
+    db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row
     return db
 
@@ -3239,7 +3239,7 @@ def api_save_settings():
     if email:
         try:
             import sqlite3 as _sq
-            _cn = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+            _cn = _sq.connect(DB_PATH)
             _cn.execute("UPDATE users SET display_name=?, surname=?, birth_year=?, gender=?, language=?, sensor_pref=? WHERE email=?", (
                 session.get('profile_name',''),
                 (session.get('profile_surname','').strip() or None),
@@ -6068,7 +6068,7 @@ def api_license_status():
     if not license_key:
         return jsonify({'ok': False, 'error': 'Key required'}), 400
 
-    db_path = '/opt/ic-license-server/data/saas_licenses.db'
+    db_path = DB_PATH
     try:
         db = sqlite3.connect(db_path)
         db.row_factory = sqlite3.Row
@@ -6128,7 +6128,7 @@ def api_migrate_license():
     if not pw_hash:
         return jsonify({'ok': False, 'error': 'Wachtwoord ontbreekt'})
     lang = session.get('legacy_pending_lang') or session.get('lang', 'nl')
-    db_path = '/opt/ic-license-server/data/saas_licenses.db'
+    db_path = DB_PATH
     try:
         db = sqlite3.connect(db_path)
         db.row_factory = sqlite3.Row
@@ -6215,7 +6215,7 @@ def api_generate_license():
 
     # Genereer unieke code
     chars = string.ascii_uppercase + string.digits
-    db_path = '/opt/ic-license-server/data/saas_licenses.db'
+    db_path = DB_PATH
     try:
         db = sqlite3.connect(db_path)
         while True:
@@ -6517,7 +6517,7 @@ def get_pro_tier_summary(email, lang='nl'):
     if not email:
         return None
     import sqlite3 as _sq
-    cn = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+    cn = _sq.connect(DB_PATH)
     cn.row_factory = _sq.Row
     try:
         lic = cn.execute(
@@ -6609,7 +6609,7 @@ def get_active_pairings_count(pro_key):
     if not pro_key:
         return 0
     import sqlite3 as _sq
-    cn = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
+    cn = _sq.connect(DB_PATH)
     try:
         return cn.execute(
             "SELECT COUNT(*) FROM pairing_codes "
