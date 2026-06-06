@@ -210,5 +210,9 @@ bedrijfsadressen; alle overige records zijn test/trial zonder betaling. Dit onde
 afweging dat melding aan de AP (art. 33) én aan betrokkenen (art. 34) **niet vereist** is.
 Aanbeveling: deze afweging formeel dateren, ondertekenen en archiveren.
 
+> **Afweging uitgevoerd en geaccordeerd door Paul Pannevis, verwerkingsverantwoordelijke,
+> 6 juni 2026, 11:00 CET. Conclusie: geen melding ex art. 33/34 AVG vereist (nul externe
+> betrokkenen, onderbouwing §10).**
+
 ---
 *Dit document bevat bewust geen secret-waarden of individuele persoonsgegevens.*
