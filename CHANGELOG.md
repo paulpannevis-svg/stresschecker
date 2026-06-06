@@ -1,5 +1,37 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-06 — Git-sanering Fase 2: secrets uit code, 2FA-codes uit logging
+
+Vervolg op Fase 1 (read-only plan → akkoord per stap → uitvoering). Doel: hardcoded
+SendGrid-keys elimineren en plaintext-secrets uit logs halen.
+
+**2A — SendGrid-keys naar `.env`:**
+- `license_notifications.py`: hardcoded key (suffix `…Ixc0`) → `os.environ['SENDGRID_API_KEY']`
+  + `load_dotenv('/opt/stresschecker/.env')` (expliciet pad: cron draait vanuit `/root`).
+- `weekly_email.py`: hardcoded fallback (suffix `…9Amg`) weg → idem `os.environ` + `load_dotenv`.
+- root crontab: inline `SENDGRID_API_KEY=…9Amg`-prefix uit de weekly_email-regel verwijderd.
+
+**2B — key-rotatie (Paul):** nieuwe key in `.env`, gunicorn-workers herladen (`kill -HUP`),
+2FA-mail via echt verzendpad ontvangen ter bevestiging, álle oude keys (`…Ixc0`, `…9Amg`,
+`…8UuY`) ingetrokken in het SendGrid-dashboard.
+
+**2D — 2FA-codes uit logging:** 4 logsites in `app.py` (`:971/:994/:1304/:6082`) van
+`warning("2FA CODE…{code}")` → `info("2FA-code verzonden aan {email}")`. Event blijft,
+code-inhoud weg. 2FA-flow ongewijzigd; live sinds de 2B `kill -HUP`.
+
+**Nu wel getrackt:** `license_notifications.py` (incl. de eerder op schijf gemaakte
+`get_lang`-vervalmail-taalfix) + `weekly_email.py` — keys zijn eruit, dus veilig in git.
+
+**Bewust buiten scope (→ CLEANUP_TODO, MEDIUM):** licentiecodes in debug-`print` op
+`app.py:370/788/6143` — eigen afweging (debug-nut vs. risico), aparte sessie.
+
+**Notitie:** `weekly_email` verstuurt momenteel 0 mails (`user_profiles` is leeg); de
+ingetrokken `…9Amg`-key gaf daarom nooit een 401 en er zijn geen maandagmails gemist.
+Eerste echte cron-vervalmail (`license_notifications`) is ~60 dagen weg.
+
+Verificatie: NL/DE/EN-vervalmails mock-gerenderd (OK), `run_all.sh` = 21/1 (alleen B3,
+pre-existent), `test_license_notifications_lang` = 6/6.
+
 ## 2026-06-06 — Git-sanering Fase 1: untracked bron in git, docs georganiseerd
 
 Opruimsessie Fase 1 (read-only inventarisatie → per-groep akkoord → uitvoering).

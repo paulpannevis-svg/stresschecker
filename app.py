@@ -968,7 +968,7 @@ def activate():
             session['2fa_lang']         = lang
             session['2fa_expires']      = time.time() + 600
             send_verification_code(email, _2fa_code, lang)
-            import logging; logging.getLogger().warning(f"2FA CODE: {_2fa_code if '_2fa_code' in dir() else code}")
+            import logging; logging.getLogger().info(f"2FA-code verzonden aan {email}")
             return redirect(url_for('verify_2fa'))
         else:
             # Nieuw account of bestaand account zonder display_name
@@ -991,7 +991,7 @@ def activate():
             session["2fa_lang"]         = lang
             session["2fa_expires"]      = time.time() + 600
             send_verification_code(email, _2fa_code, lang)
-            import logging; logging.getLogger().warning(f"2FA CODE for {email}: {_2fa_code}")
+            import logging; logging.getLogger().info(f"2FA-code verzonden aan {email}")
             _cn.close()
             return redirect(url_for("verify_2fa"))
 
@@ -1301,7 +1301,7 @@ def sc_login():
         session['2fa_expires']      = time.time() + 600  # 10 min
         session['2fa_login_type'] = request.form.get('type', request.args.get('type', 'consumer'))
         send_verification_code(email, code, lang)
-        import logging; logging.getLogger().warning(f"2FA CODE: {_2fa_code if "_2fa_code" in dir() else code}")
+        import logging; logging.getLogger().info(f"2FA-code verzonden aan {email}")
         return redirect(url_for('verify_2fa'))
     return render_template('sc_login.html', lang=lang, error=error)
 
@@ -6079,7 +6079,7 @@ def api_migrate_license():
         session.pop('legacy_pending_pw_hash', None)
         session.pop('legacy_pending_lang', None)
         send_verification_code(email, _2fa, lang)
-        import logging; logging.getLogger().warning(f"2FA CODE for {email}: {_2fa}")
+        import logging; logging.getLogger().info(f"2FA-code verzonden aan {email}")
         return jsonify({'ok': True, 'new_code': new_code, 'type': choice, 'valid_until': valid_until, 'redirect': url_for('verify_2fa')})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})

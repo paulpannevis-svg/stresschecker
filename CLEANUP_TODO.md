@@ -52,11 +52,24 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
 
     Tot die sessie blijven `weekly_email.py` en `license_notifications.py` untracked; geen acute git-leak-risico.
 
+    **Update 2026-06-06 (Fase 2A — code-zijde UITGEVOERD):** alle hardcoded keys uit de code/crontab verwijderd:
+    - `license_notifications.py`: regel 12 → `os.environ['SENDGRID_API_KEY']` + `load_dotenv('/opt/stresschecker/.env')` (expliciet pad: cron-cwd = `/root`).
+    - `weekly_email.py`: regel 8 fallback weg → `os.environ['SENDGRID_API_KEY']` + `load_dotenv('/opt/stresschecker/.env')`. (`override=True` bleek niet nodig: de crontab-prefix is óók verwijderd, dus er is geen concurrerende env-var meer.)
+    - root crontab: inline `SENDGRID_API_KEY=…9Amg`-prefix uit de weekly_email-regel verwijderd.
+    - Geverifieerd zonder verzenden: beide scripts resolven vanuit `/root` de `.env`-key (suffix `8UuY`) via module-import; `main()`/`send_weekly()` staan achter `__main__`-guard.
+    - **Nog open (Paul, 2B):** read-only testverzending met `.env`-key + daarna in SendGrid-dashboard (account u60716759) **ALLE** oude keys deactiveren — zowel `…Ixc0` als `…9Amg` (beide stonden plaintext, `…9Amg` ook in crontab + getoond in terminal). Daarna afrondende commit (`license_notifications.py` + `weekly_email.py` nu committen, keys zijn eruit).
+
     **Update 2026-06-05:** `license_notifications.py:get_lang` is op schijf gefixt (EN-abonnees kregen NL-vervalmails — zie I18N_TODO.md / CHANGELOG). Het bestand blijft **untracked** wegens de hardcoded key op regel 12; de get_lang-fix wordt pas mee-gecommit zodra deze secret-rotatie-sessie de key naar `os.environ` verhuist. Tot dan leeft de fix alleen op schijf (cron draait het schijf-bestand, dus productie is correct).
 
 ### Toegevoegd 22-05-2026 na RI birth_year/gender uitvraag-sessie
 
-- [ ] **2FA-codes plaintext in journalctl** *(HIGH PRIORITY)*: herbevestigd 22-05; oorspronkelijk gemeld 12-05 in gen_context.py follow-ups. Voorbeeld vandaag: `gunicorn[1369644]: 2FA CODE for test-rifix@lifestylemonitors.com: 902758`. Log-redactie of verwijderen van de print-statement nodig (`app.py:671`, `app.py:692`). Productie-security-issue. Eerstvolgende cleanup-sessie aanpakken.
+- [x] **2FA-codes plaintext in journalctl** *(HIGH PRIORITY)* — UITGEVOERD 06-06-2026 (Fase 2D). Bij hercontrole bleken het **4** logsites te zijn (niet 2; de oude regelnummers 671/692 waren verschoven): `app.py:971`, `:994`, `:1304`, `:6082`. Alle vier `logging.getLogger().warning("2FA CODE…{code}")` vervangen door `logging.getLogger().info(f"2FA-code verzonden aan {email}")` — event blijft, code-inhoud weg. 2FA-flow ongewijzigd. **Live-deploy (kill -HUP) gebeurt bij de afrondende Fase 2C/2E-commit ná Paul's 2B**; tot dan draait de oude code nog in geheugen.
+
+- [ ] **Licentiecodes plaintext in logs (06-06-2026)** *(MEDIUM PRIORITY)*: tijdens Fase 2D-2FA-onderzoek aangetroffen, **bewust buiten die commit gehouden** — eigen afweging (debug-nut vs. risico). Licentiecodes zijn ook secrets. Drie debug-`print`-statements loggen de code:
+    - `app.py:370` — `print(f"VALIDATE START: code={code}", flush=True)`
+    - `app.py:788` — `print(f"[ACTIVEER DEBUG] code='{code}' legacy='{legacy}' email='{email}'", flush=True)`
+    - `app.py:6143` — `print(f"LICENSE GENERATED: {new_code} type=… email=… order=…", flush=True)`
+    Aparte sessie: per regel beslissen redacten/verwijderen (versus tijdelijk debug-nut). Anders dan 2FA-codes (eenmalig, 10 min geldig) zijn licentiecodes langlevend.
 
 - [ ] **Norm-tabel-consolidatie**: `hrv.js` N-array (13 buckets, ~5-jarig) en `hlm/meting_src.html` rmssdReference (7 buckets, 10-jarig) divergeren materieel — tot 1.3 RI-punten verschil voor jong-volwassenen bij identieke meting. Beide claimen Lifelines Cohort. Wetenschappelijke beslissing nodig over baseline. Aparte sessie.
 
