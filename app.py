@@ -2105,7 +2105,9 @@ def pro_eigen_metingen():
             d['datum'] = '-'
             d['tijd'] = '-'
         metingen_list.append(d)
-    resp = make_response(render_template('pro/eigen_metingen.html', lang=lang, metingen=metingen_list, metingen_chart=metingen_chart))
+    import analytics as _an
+    baseline = _an.compute_baseline(metingen_chart)
+    resp = make_response(render_template('pro/eigen_metingen.html', lang=lang, metingen=metingen_list, metingen_chart=metingen_chart, baseline=baseline))
     resp.headers["Cache-Control"] = "no-store, no-cache"
     return resp
 

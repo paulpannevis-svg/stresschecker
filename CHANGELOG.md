@@ -1,5 +1,26 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-06 — Baseline-referentielijn (stap 2): pro/eigen_metingen.html (pagina 1)
+
+Eerste grafiek met de referentielijn — `pro/eigen_metingen.html` (route `/pro/mijn-metingen`),
+gekozen omdat die al Chart.js + de annotation-plugin gebruikt → de lijn is puur additief.
+- `app.py` (`pro_eigen_metingen`): `baseline = analytics.compute_baseline(metingen_chart)` server-side
+  berekend en als `baseline` aan de template meegegeven.
+- `templates/pro/eigen_metingen.html`: `var BASELINE`/`BASELINE_TIP` (3 talen) + een
+  baseline-annotatielijn die **ná** chart-constructie wordt toegevoegd
+  (`riChart.options.plugins.annotation.annotations.base`), zodat de RI- en
+  Zelfinschatting-datasets en de bestaande zone-annotaties onaangeroerd blijven. Dunne
+  gestippelde neutraal-grijze lijn, label rechts "Baseline" (zelfde term 3 talen), hover →
+  taal-specifieke toelichting. Geen lijn bij < 7 meetdagen (`BASELINE=null`).
+- Test `tests/test_baseline_view.py` (20/20): label + tooltip × NL/DE/EN, datasets intact,
+  null-pad. Live-route-smoke: 21-dagen-user → BASELINE 5.9, 1-dag-user → null.
+- `run_all.sh` 21/1; `kill -HUP` reload, `/pro/mijn-metingen` → 302.
+
+Nog te doen: `/api/metingen` op `compute_baseline()` zetten (→ /resultaten-stat + /kwadrant
+gaan dan over op de correcte waarde — zie stap-1-notitie), lijn op /resultaten en op
+`verloop.html` incl. opruimen dode `drawChart`, plus Kompas `baseline_ri` consolideren.
+Tot dan tonen /resultaten-stat + /kwadrant nog de oude baseline (interim-inconsistentie).
+
 ## 2026-06-06 — Baseline-referentielijn (stap 1): canonieke compute_baseline()
 
 Herinvoering van de baseline-referentielijn in de RI-verloopgrafieken, incrementeel
