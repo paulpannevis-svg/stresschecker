@@ -1,5 +1,29 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-06 — Staging volledig operationeel + nieuwe werkstroom (STANDAARD bouwen op staging)
+
+`test.stresschecker.com` is nu een volwaardige staging-omgeving. **Vanaf nu bouwen
+CC-sessies STANDAARD op de staging-worktree, tenzij expliciet anders gevraagd.**
+
+**Staging-stack:**
+- **Worktree** `/opt/stresschecker-staging` op branch `staging`; aparte systemd-unit
+  `stresschecker-staging.service` (gunicorn :8090, `--no-control-socket`, `EnvironmentFile=.env.staging`
+  met `SC_ENV=staging`).
+- **nginx** `test.stresschecker.com` (TLS via Certbot) met **Basic-Auth** (`auth_basic`,
+  `/etc/nginx/.htpasswd-staging`, user `paul`; wachtwoord in `/root/staging_basic_auth.txt`).
+- **Gescrubde DB's** onder `/opt/stresschecker-staging/data/` (0 echte e-mails); hervulbaar via
+  `refresh_data.sh`. SC_ENV-guards in `app.py` onderdrukken mail-verzending op staging
+  (`[STAGING-MAIL]`-print i.p.v. SendGrid).
+- **TEST-banner**: rode, drietalige waarschuwingsbalk in `templates/base.html`, gegate op
+  `is_staging` (context-processor `_inject_staging_flag`). Op prod (geen SC_ENV) rendert die nooit.
+
+**Werkstroom (zie ook `DEPLOY.md`):**
+1. Bouwen + lokaal verifiëren op de **staging-worktree** (branch `staging`).
+2. **Paul checkt** op `test.stresschecker.com`.
+3. **Merge `staging` → `main`**.
+4. **Promotie naar prod** (`/opt/stresschecker`): checkout/merge van main, daarna
+   `kill -HUP <master>` (template/route-reload) of `systemctl restart stresschecker`.
+
 ## 2026-06-06 — Ops: --no-control-socket op stresschecker.service (gunicorn-fork-hang)
 
 gunicorn 25.1.0 start standaard een control-socket-thread in de master; bij `fork()` kan een

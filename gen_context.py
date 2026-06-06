@@ -56,6 +56,12 @@ if os.path.exists(_CHANGELOG_PATH):
     out.append('\n')
 
 out.append("## Werkwijze & Leerpunten\n")
+out.append("- **STAGING-FIRST (06-06-2026):** CC-sessies bouwen STANDAARD op de staging-worktree "
+           "(`/opt/stresschecker-staging`, branch `staging`), NIET direct in prod, tenzij expliciet "
+           "anders gevraagd. Werkstroom: bouwen+verifiëren op staging → Paul checkt op "
+           "test.stresschecker.com → merge `staging`→`main` → promotie prod (HUP of restart). "
+           "Promotie-procedure staat in `DEPLOY.md`. Prod-tweaks (hotfix) blijven mogelijk maar zijn "
+           "de uitzondering, niet de regel.\n")
 out.append("- Begin elke sessie met upload van CONTEXT.md\n")
 out.append("- Backup altijd via: /opt/stresschecker/backup.sh\n")
 out.append("- Bij templates: ALLEEN invoegen, nooit verwijderen+vervangen in een stap\n")
