@@ -34,10 +34,12 @@ def render(lang, baseline):
 for lang in ('nl', 'de', 'en'):
     html = render(lang, 6.5)
     check(f"[{lang}] BASELINE-waarde in JS", 'var BASELINE = 6.5' in html, "")
-    check(f"[{lang}] label 'Baseline' (zelfde term)", "content:'Baseline'" in html, "")
-    check(f"[{lang}] juiste tooltip-tekst", TIPS[lang] in html, "")
-    check(f"[{lang}] annotatie-lijn additief (na constructie)",
-          'annotation.annotations.base' in html and "type:'line'" in html, "")
+    check(f"[{lang}] baseline als legenda-dataset (label 'Baseline', zelfde term)",
+          "datasets.push" in html and "label:'Baseline'" in html, "")
+    check(f"[{lang}] gestippeld + neutrale kleur", 'borderDash:[5,4]' in html and 'rgba(110,110,110' in html, "")
+    check(f"[{lang}] toelichting via tooltip-footer", TIPS[lang] in html and 'callbacks.footer' in html, "")
+    check(f"[{lang}] additief ná constructie (geen annotation-label)",
+          'content:\'Baseline\'' not in html, "")
     # datasets intact
     check(f"[{lang}] RI-dataset intact", "label:'Relax Index'" in html, "")
     check(f"[{lang}] Zelfinschatting-dataset intact",

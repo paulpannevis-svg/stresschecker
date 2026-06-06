@@ -12,9 +12,15 @@ gekozen omdat die al Chart.js + de annotation-plugin gebruikt → de lijn is puu
   Zelfinschatting-datasets en de bestaande zone-annotaties onaangeroerd blijven. Dunne
   gestippelde neutraal-grijze lijn, label rechts "Baseline" (zelfde term 3 talen), hover →
   taal-specifieke toelichting. Geen lijn bij < 7 meetdagen (`BASELINE=null`).
-- Test `tests/test_baseline_view.py` (20/20): label + tooltip × NL/DE/EN, datasets intact,
-  null-pad. Live-route-smoke: 21-dagen-user → BASELINE 5.9, 1-dag-user → null.
-- `run_all.sh` 21/1; `kill -HUP` reload, `/pro/mijn-metingen` → 302.
+- **Stap 2b (legenda):** de annotation-lijn vervangen door een vlakke **dummy-dataset**
+  ("Baseline", grijs gestippeld, `pointRadius:0`, `order:99`) die ná constructie wordt
+  toegevoegd → verschijnt **automatisch in de legenda** (lijnsymbool + "Baseline", 3 talen)
+  naast RI en Zelfinschatting. Toelichting via tooltip-**footer** (per taal); het losse
+  rechter lijn-label (rendereonbetrouwbaar + dubbelop met legenda) is vervallen.
+- Test `tests/test_baseline_view.py` (23/23): legenda-dataset + gestippeld/neutraal + tooltip
+  × NL/DE/EN, datasets intact, null-pad. Live-route-smoke: 21-dagen-user → BASELINE 5.9 +
+  legenda-dataset aanwezig, 1-dag-user → null.
+- `run_all.sh` 21/1; `kill -HUP` reload, service active.
 
 Nog te doen: `/api/metingen` op `compute_baseline()` zetten (→ /resultaten-stat + /kwadrant
 gaan dan over op de correcte waarde — zie stap-1-notitie), lijn op /resultaten en op

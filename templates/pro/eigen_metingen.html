@@ -112,17 +112,21 @@ function buildChart(labels, vals, szVdata){
   var pR=isSingle?6:4;var pHR=isSingle?8:6;
   var szLabel=_L==='de'?'Selbsteinschätzung':_L==='en'?'Self-assessment':'Zelfinschatting';
   riChart=new Chart(ctx,{type:'line',data:{labels:labels,datasets:[{label:'Relax Index',data:vals,borderColor:'#ffffff',backgroundColor:'rgba(0,0,0,.0)',tension:.3,pointRadius:pR,pointHoverRadius:pHR,borderWidth:2.5,pointBackgroundColor:'#ffffff',pointBorderColor:'#333333',pointBorderWidth:1.5,spanGaps:true},{label:szLabel,data:szVdata||[],borderColor:"#0078ff",backgroundColor:"#0078ff",tension:.3,pointRadius:5,borderWidth:2,borderDash:[6,3],pointBackgroundColor:"#0078ff",pointBorderColor:"#0078ff",spanGaps:true}]},options:{scales:{y:{beginAtZero:true,min:0,max:10,ticks:{stepSize:2},grid:{color:'rgba(0,0,0,.07)'}},x:{offset:true,grid:{color:'rgba(0,0,0,.07)'},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:16}}},plugins:{legend:{display:true,position:"top",labels:{color:"#555",font:{size:11},boxWidth:20,boxHeight:2,padding:12,generateLabels:function(chart){var items=Chart.defaults.plugins.legend.labels.generateLabels(chart);items.forEach(function(l){if(l.text==='Relax Index'){l.strokeStyle='#666666';l.fillStyle='#666666';}});return items;}}},annotation:{annotations:{z1:{type:'box',yMin:0,yMax:2,backgroundColor:'rgba(169,50,38,.75)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z2:{type:'box',yMin:2,yMax:4,backgroundColor:'rgba(186,74,0,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z3:{type:'box',yMin:4,yMax:6,backgroundColor:'rgba(185,150,10,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z4:{type:'box',yMin:6,yMax:8,backgroundColor:'rgba(30,150,80,.65)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z5:{type:'box',yMin:8,yMax:10,backgroundColor:'rgba(20,110,60,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'}}}},responsive:true,maintainAspectRatio:false}});
-  // Baseline-referentielijn — additief toegevoegd ná constructie, zodat de RI- en
-  // Zelfinschatting-datasets en de bestaande zone-annotaties onaangeroerd blijven.
+  // Baseline-referentielijn — als losse (vlakke) dataset toegevoegd ná constructie:
+  // verschijnt automatisch in de legenda (grijs gestippeld lijnsymbool + "Baseline",
+  // zelfde term 3 talen) en raakt de RI-/Zelfinschatting-datasets niet. Geen los
+  // lijn-label (vermijdt dubbeling met legenda). Toelichting via tooltip-footer per taal.
   if(BASELINE != null){
-    riChart.options.plugins.annotation.annotations.base = {
-      type:'line', yMin:BASELINE, yMax:BASELINE,
+    riChart.data.datasets.push({
+      label:'Baseline',
+      data: labels.map(function(){return BASELINE;}),
       borderColor:'rgba(110,110,110,0.95)', borderWidth:1.5, borderDash:[5,4],
-      drawTime:'beforeDatasetsDraw',
-      label:{display:true, content:'Baseline', position:'end', xAdjust:-2,
-             backgroundColor:'rgba(110,110,110,0.92)', color:'#fff', font:{size:10}, padding:3},
-      enter:function(c){ c.element.options.label.content=BASELINE_TIP; c.chart.update(); return true; },
-      leave:function(c){ c.element.options.label.content='Baseline'; c.chart.update(); return true; }
+      pointRadius:0, pointHoverRadius:0, fill:false, tension:0, spanGaps:true, order:99
+    });
+    riChart.options.plugins.tooltip = riChart.options.plugins.tooltip || {};
+    riChart.options.plugins.tooltip.callbacks = riChart.options.plugins.tooltip.callbacks || {};
+    riChart.options.plugins.tooltip.callbacks.footer = function(items){
+      return items.some(function(it){return it.dataset && it.dataset.label==='Baseline';}) ? BASELINE_TIP : '';
     };
     riChart.update();
   }
