@@ -1,5 +1,26 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-06 — Baseline-referentielijn (stap 1): canonieke compute_baseline()
+
+Herinvoering van de baseline-referentielijn in de RI-verloopgrafieken, incrementeel
+en additief (de implementatie van maart brak destijds de Zelfinschatting-lijn → die
+les: niet de datasets/chart-config herstructureren, alleen additief).
+
+**Stap 1 — berekening als losse, canonieke functie** (`analytics.py`):
+- `compute_baseline(rows)` = gemiddelde RI van de **laatste 7 kalenderdagen met een
+  basismeting**, per dag alleen de **laatste** basismeting; alleen `meting_type='basismeting'`
+  (biofeedback/situatie nooit); < 7 meetdagen → `None`. Plus `baseline_day_values()`.
+- Wordt de single source of truth voor: `/api/metingen` (baseline+delta → /resultaten-stat
+  + /kwadrant), de verloop-referentielijnen (consumer + pro) en de Kompas `baseline_ri`.
+- Test `tests/test_baseline.py` (9/9): alleen basismetingen, laatste-per-dag, laatste 7
+  dagen, <7 → None, >7 → laatste 7, grenswaarde.
+- `run_all.sh` 21/1 (B3 pre-existent), geen regressie.
+
+Volgende stappen (additief per pagina): `/api/metingen` op `compute_baseline()` zetten +
+lijn op `pro/eigen_metingen.html`, daarna /resultaten, daarna `verloop.html` incl. opruimen
+dode `drawChart`. ⚠️ Bij die stap verschuift de baseline-waarde op /resultaten-stat + /kwadrant
+naar de correcte waarde (de oude berekening nam de oudste 7 metingen, zonder type-/per-dag-filter).
+
 ## 2026-06-06 — KK-operator-laag achter feature-flag (UIT tot KK-go-live)
 
 De KK-operator-login (incl. 2FA-skip + 24u-sessie) stond live maar hoort bij de bewust

@@ -150,6 +150,70 @@ def situation_label_translate(notes, lang='nl'):
     return chip.get(lang, chip['nl'])
 
 
+# ============================================================================
+# Baseline-referentielijn — canonieke berekening (single source of truth).
+#
+# Baseline = gemiddelde RI van de laatste BASELINE_MIN_DAYS kalenderdagen met een
+# basismeting, waarbij per dag uitsluitend de LAATSTE basismeting van die dag telt.
+# Alleen meting_type 'basismeting' telt mee (biofeedback/situatiemeting nooit —
+# zelfde filterles als de grafiekfix van 21 april). Pas vanaf >= BASELINE_MIN_DAYS
+# zulke meetdagen een waarde; daaronder None (geen lijn).
+#
+# Eén bron voor: /api/metingen (baseline+delta → /resultaten-stat + /kwadrant),
+# de RI-verloop-referentielijnen (consumer + pro) en de Kompas baseline_ri.
+# Dagindeling in Europe/Amsterdam (operationele tijdzone), overschrijfbaar.
+# NB: vervangt de oude berekening (oudste 7 metingen, geen type-/per-dag-filter).
+# ============================================================================
+BASELINE_MIN_DAYS = 7
+_BASELINE_TZ = 'Europe/Amsterdam'
+
+
+def _g(row, key):
+    """Veilige veld-toegang voor dict én sqlite3.Row (mist → None)."""
+    try:
+        return row[key]
+    except (KeyError, IndexError):
+        return None
+
+
+def _day_key(ts_ms, tz_name=_BASELINE_TZ):
+    """Kalenderdag 'YYYY-MM-DD' voor epoch-milliseconden in tijdzone tz_name."""
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(tz_name)
+    except Exception:
+        tz = datetime.timezone.utc
+    return datetime.datetime.fromtimestamp(ts_ms / 1000, tz).strftime('%Y-%m-%d')
+
+
+def baseline_day_values(rows, max_days=BASELINE_MIN_DAYS, tz_name=_BASELINE_TZ):
+    """rows: iterable van dict/sqlite3.Row met 'ts' (epoch ms), 'ri', 'meting_type'.
+    Geeft de RI's van de laatste `max_days` kalenderdagen met een basismeting,
+    één per dag (de laatste meting van die dag), chronologisch (oud→nieuw)."""
+    per_day = {}  # day_key -> (ts, ri) van de laatste basismeting die dag
+    for r in rows:
+        if str(_g(r, 'meting_type') or '').lower() != 'basismeting':
+            continue
+        ri, ts = _g(r, 'ri'), _g(r, 'ts')
+        if ri is None or ts is None:
+            continue
+        ts = int(ts)
+        day = _day_key(ts, tz_name)
+        prev = per_day.get(day)
+        if prev is None or ts >= prev[0]:
+            per_day[day] = (ts, float(ri))
+    last_days = sorted(per_day)[-max_days:]
+    return [per_day[d][1] for d in last_days]
+
+
+def compute_baseline(rows, min_days=BASELINE_MIN_DAYS, tz_name=_BASELINE_TZ):
+    """Canonieke baseline-waarde (RI, 1 decimaal) of None bij < min_days meetdagen."""
+    vals = baseline_day_values(rows, max_days=min_days, tz_name=tz_name)
+    if len(vals) < min_days:
+        return None
+    return round(sum(vals) / len(vals), 1)
+
+
 def age_category(birth_year, ref_year=None):
     """birth_year → '<30'|'30-45'|'45-60'|'>60'|'unknown'. ref_year default=huidig jaar."""
     if not birth_year:
