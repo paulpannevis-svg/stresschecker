@@ -41,6 +41,18 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
   `/opt/ic-license-server/.env.bak_*` opruimen; wachtwoord-hashing-formaat beoordelen
   (hex-digest zonder salt-prefix); besluit vernietiging tarball + `/root/quarantine/inspect/`.
 
+- [ ] **PayPal-opruiming na app-verwijdering (06-06-2026)** — de Live-app "Lifestyle Monitors"
+  is verwijderd (zie incidentdoc). Vervolg:
+    - **Dode `PAYPAL_*` in `/opt/ic-license-server/.env`** (client_id `AbU7cY…`, geeft nu 401):
+      óf vervangen door een nieuwe PayPal-app, óf het PayPal-pad uitfaseren en deze regels +
+      bijbehorende code-routes (`get_paypal_token`, `/api/webhooks/paypal`) opschonen. Beslissing open.
+    - **22 verweesde PayPal billing plans** opruimen in het PayPal Business Dashboard
+      (achtergebleven na app-verwijdering).
+    - **Provider-app-inventaris opschonen**: uitzoeken of **Buckaroo** (26-11-22) en **Mollie**
+      (24-01-26) nog ergens voor dienen, en of één van de **3× MyApp_WooCommerce** (12-01-26,
+      binnen 20 min aangemaakt) een dode dubbele is. Deze apps zijn provider-gegenereerd en
+      stonden NIET in de tarball — bewust laten staan tot uitgezocht.
+
 - [x] **Untracked dirs git-tracken** — UITGEVOERD 06-06-2026 (Fase 1 git-sanering, zie CHANGELOG). Getrackt: `scripts/`, `static/` (excl. video's/backup-tarball), `templates/` (consumer+pro), `tests/`. BEWUST GEPARKEERD: `hlm/`+`templates/hlm/` (apart spoor, beslissen bij HLM-activering), `email_templates/` (verweesd, verwijderkandidaat), `license_notifications.py`+`weekly_email.py` (Fase 2 secrets).
 - [x] **Docs-organisatie** — UITGEVOERD 06-06-2026: `LAUNCH_LOG.md`, `PWRESET_PLAN.md`, `RMSSD_HERBEREKENING_OVERZICHT.md`, `STAGING_OPZET_PLAN.md`, `TODO.md` → `docs/`. `SYSTEM_REFERENCE.md` BLIJFT in root (backup.sh:4 kopieert vanaf root-pad) — verplaatskandidaat zodra backup.sh meeverhuist. `docs/kontakt_v3_backup.html` = verwijderkandidaat (J).
 

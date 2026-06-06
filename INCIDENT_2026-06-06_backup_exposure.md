@@ -135,9 +135,14 @@ geverifieerd dat geen script/cron de tarball opnieuw aanmaakt.
 
 ## 8b. Nog openstaand
 
-- [ ] **PayPal LIVE** (`PAYPAL_CLIENT_ID`+`PAYPAL_SECRET`) — **de enige echte, nog-actieve
-      gelekte credential.** Roteren in PayPal-developer-dashboard; daarna `.env` bijwerken +
-      `restart ic-license-server`. **Prioriteit hoog.**
+- [x] **PayPal LIVE** (`PAYPAL_CLIENT_ID`+`PAYPAL_SECRET`) — **INGETROKKEN i.p.v. geroteerd**
+      (2026-06-06): de Live-app "Lifestyle Monitors" (`AbU7cY…`, aangemaakt 19-02-26) is
+      verwijderd in het PayPal-dashboard → tarball-credentials definitief ongeldig
+      (read-only bevestigd: OAuth-token nu HTTP 401). **Gevolg:** de `PAYPAL_*` in
+      `/opt/ic-license-server/.env` zijn nu dood; `get_paypal_token()` faalt. Geen recent
+      PayPal-webhookverkeer in de logs (alleen scanner-ruis; Stripe = 124 hits) → integratie
+      lijkt dormant. **Open beslissing:** nieuwe PayPal-app aanmaken + creds bedraden, óf
+      het PayPal-pad bewust uitfaseren en de dode `PAYPAL_*` uit `.env` verwijderen.
 - [ ] **Stripe TEST** (`sk_test`/`whsec_test`) — niet in de tarball, lage prioriteit; rollen
       indien gewenst voor volledigheid.
 - [ ] **Dode secrets opruimen**: `INTERNAL_API_KEY` (.env) + `api_key.conf` (beide nergens
