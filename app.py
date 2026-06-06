@@ -3320,15 +3320,22 @@ def api_get_metingen():
         db = get_meting_db()
         rows = db.execute('SELECT * FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT ?',
                           (get_user_key(), limit)).fetchall()
-        all_rows = db.execute("SELECT ri FROM metingen WHERE user_key=? ORDER BY ts ASC LIMIT 7",
-                              (get_user_key(),)).fetchall()
+        # Canonieke baseline (analytics.compute_baseline): laatste 7 meetdagen, per dag de
+        # laatste basismeting, alleen meting_type='basismeting'. Vervangt de oude berekening
+        # (oudste 7 metingen, geen type-/per-dag-filter) die /resultaten-stat + /kwadrant voedde.
+        baseline_rows = db.execute(
+            "SELECT ts, ri, meting_type FROM metingen WHERE user_key=? "
+            "AND lower(coalesce(meting_type,''))='basismeting' AND ri IS NOT NULL "
+            "ORDER BY ts DESC LIMIT 200",
+            (get_user_key(),)).fetchall()
         db.close()
-        baseline = round(sum(r[0] for r in all_rows)/len(all_rows),1) if len(all_rows)>=7 else None
+        import analytics as _an
+        baseline = _an.compute_baseline([dict(r) for r in baseline_rows])
         result = []
         for r in rows:
             d = dict(r)
             d['baseline'] = baseline
-            d['delta'] = round(d['ri']-baseline,1) if baseline else None
+            d['delta'] = round(d['ri']-baseline,1) if (baseline is not None and d.get('ri') is not None) else None
             result.append(d)
         from datetime import datetime, timezone
         resp = jsonify(result)
@@ -4300,15 +4307,23 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
             ctx['phase'] = 'phase3' if count >= 15 else ('phase2' if count >= 5 else 'phase1')
 
         elif mt == 'situatiemeting':
+            # Canonieke baseline (analytics.compute_baseline): laatste 7 meetdagen, per dag
+            # de laatste basismeting. Zodat lijn, /resultaten-stat, /kwadrant én deze
+            # AI-tekst over hetzelfde getal praten. (Was: gem. van laatste 7 basismetingen
+            # zonder per-dag-filter.) baseline_ri/range pas vanaf 7 meetdagen, anders ongezet.
+            import analytics as _an
             bl_rows = db.execute(
-                f"SELECT ri FROM {tbl} WHERE {where_key} AND meting_type='basismeting' "
-                f"AND ri IS NOT NULL ORDER BY ts DESC LIMIT 7",
+                f"SELECT ts, ri, meting_type FROM {tbl} WHERE {where_key} "
+                f"AND lower(coalesce(meting_type,''))='basismeting' AND ri IS NOT NULL "
+                f"ORDER BY ts DESC LIMIT 200",
                 (key_val,)
             ).fetchall()
-            ri_vals = [float(r[0]) for r in bl_rows if r[0] is not None]
-            if ri_vals:
-                ctx['baseline_ri'] = round(sum(ri_vals) / len(ri_vals), 1)
-                ctx['baseline_range'] = {'min': round(min(ri_vals), 1), 'max': round(max(ri_vals), 1)}
+            _bl_dicts = [dict(r) for r in bl_rows]
+            _bl = _an.compute_baseline(_bl_dicts)
+            if _bl is not None:
+                _vals = _an.baseline_day_values(_bl_dicts)
+                ctx['baseline_ri'] = _bl
+                ctx['baseline_range'] = {'min': round(min(_vals), 1), 'max': round(max(_vals), 1)}
 
         else:
             # basismeting (default) + fallbacks voor bio-zonder-pre / situ-zonder-label

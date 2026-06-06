@@ -1,5 +1,34 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-06 — Baseline-referentielijn (stap 3): consolidatie + uitrol + opruiming
+
+- **3a — `/api/metingen` consolidatie (`app.py`):** de oude server-side baseline
+  (oudste 7 metingen, geen type-/per-dag-filter) vervangen door `analytics.compute_baseline`.
+  ⚠️ **Gevolg (de afgesproken α-correctie):** `/resultaten`-stat (`statBaseline`) én
+  `/kwadrant` (`cur.baseline`/`delta`) tonen nu de **correcte** baseline (laatste 7 meetdagen,
+  laatste-per-dag, alleen basismeting) — een correctie, geen regressie. Geverifieerd:
+  21-dagen-user → 5.9 (consistent met de pro-pagina), <7 dagen → null.
+- **3b — lijn + legenda op `/resultaten` (`results.html`, custom canvas):** dunne gestippelde
+  neutraal-grijze horizontale lijn op `data[0].baseline`; legenda-item "Baseline" (grijs
+  gestippeld symbool, 3 talen) met `title`-toelichting per taal; beide verschijnen alleen bij
+  ≥7 meetdagen. RI- en Zelfinschatting-tekencode onaangeroerd.
+- **3c — `verloop.html` opgeruimd:** de volledige **dode `drawChart`** (nooit aangeroepen —
+  /verloop is een tabelpagina zonder canvas) + exclusieve helpers (`loadVerloop`, `lastPerDay`,
+  `currentPeriod`) + de **oude baseline-restcode** (`'gem '+baseline`, foute eerste-7-logica) +
+  verweesde canvas/stats-CSS + lege `verlStats`-div verwijderd (14KB→5.5KB). Levende tabel
+  (`renderList`/`toggleCtx`/`fetch`) intact.
+- **3d — Kompas-consolidatie (`app.py` `_gather_kompas_context`):** `baseline_ri` + `baseline_range`
+  (situatiemeting-context) gaan over op `compute_baseline`/`baseline_day_values`, zodat lijn,
+  stats én AI-tekst over hetzelfde getal praten. `recent_basis`/`baseline_ri_history`/`phase`
+  bewust ongemoeid (distincte prompt-inputs). NB: `baseline_ri` verschijnt nu vanaf 7 meetdagen
+  (was: vanaf 1 basismeting) — consistent met de lijn/stat.
+
+Verificatie: `run_all.sh` 21/1; render-checks 3 talen (results.html legenda+title; verloop schoon);
+`/api/metingen`-smoke; `kill -HUP` reload, /verloop + /resultaten → 302.
+
+Nog open: visuele check /resultaten + /kwadrant (correcte baseline + lijn/legenda). De pro/eigen
++ consumer-grafieken delen nu dezelfde canonieke bron; geen verdere RI-verloopgrafieken open.
+
 ## 2026-06-06 — Baseline-referentielijn (stap 2): pro/eigen_metingen.html (pagina 1)
 
 Eerste grafiek met de referentielijn — `pro/eigen_metingen.html` (route `/pro/mijn-metingen`),

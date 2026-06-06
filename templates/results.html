@@ -91,6 +91,7 @@
 <div style="display:flex;gap:1.5rem;margin-top:.5rem;font-size:.75rem;color:#666;">
   <span><span style="display:inline-block;width:20px;height:3px;background:#ffffff;border:1px solid #ccc;vertical-align:middle;margin-right:4px;"></span>{% if lang=="de" %}Relax Index (ANS){% elif lang=="en" %}Relax Index (ANS){% else %}Relax Index (ANS){% endif %}</span>
   <span><span style="display:inline-block;width:20px;height:2px;background:#0078ff;vertical-align:middle;margin-right:4px;border-top:2px dashed #0078ff;"></span>{% if lang=="de" %}Selbsteinschätzung{% elif lang=="en" %}Self-assessment{% else %}Zelfinschatting{% endif %}</span>
+  <span id="blLegend" style="display:none;" title="{% if lang=='de' %}der Durchschnitt Ihrer letzten 7 Basismessungen (eine pro Tag){% elif lang=='en' %}the average of your last 7 baseline measurements (one per day){% else %}het gemiddelde van je laatste 7 basismetingen (één per dag){% endif %}"><span style="display:inline-block;width:20px;height:2px;background:rgba(110,110,110,.95);vertical-align:middle;margin-right:4px;border-top:2px dashed rgba(110,110,110,.95);"></span>Baseline</span>
 </div></div>
 
 <div style="font-size:.95rem;font-style:italic;color:#a09890;line-height:1.5;margin-top:1.2rem;padding-top:.5rem;">{%if lang=='de'%}Wie Sie das lesen, wird auch davon beeinflusst, wie Sie sich jetzt fühlen — das ist selbst auch Information.{%elif lang=='en'%}How you read this is also influenced by how you feel right now — that itself is information too.{%else%}Hoe je dit leest wordt mede bepaald door hoe je je nu voelt — dat is zelf ook informatie.{%endif%}</div>
@@ -189,6 +190,7 @@ fetch("/api/metingen/patroon").then(r=>r.json()).then(function(p){
       if(data[0].baseline !== null && data[0].baseline !== undefined){
         document.getElementById('baselineStat').style.display='';
         document.getElementById('statBaseline').textContent = data[0].baseline;
+        var _blL=document.getElementById('blLegend'); if(_blL) _blL.style.display='';
       }
       loadFeedback();
     }
@@ -393,6 +395,9 @@ for(var yi=0;yi<=10;yi+=2){ctx.fillText(yi,P.l-2,yP(yi)+3);}
     ctx.stroke();ctx.setLineDash([]);
   }
   szV.forEach(function(v,i){if(v==null)return;ctx.beginPath();ctx.arc(xP(i),yP(v),5,0,2*Math.PI);ctx.fillStyle='#0078ff';ctx.fill();ctx.strokeStyle='#0078ff';ctx.lineWidth=1;ctx.stroke();});
+  // Baseline-referentielijn (canoniek, uit /api/metingen -> data[0].baseline)
+  var _bl=(window._consAllData&&window._consAllData.length)?window._consAllData[0].baseline:null;
+  if(_bl!=null){ctx.strokeStyle='rgba(110,110,110,.95)';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(P.l,yP(_bl));ctx.lineTo(W-P.r,yP(_bl));ctx.stroke();ctx.setLineDash([]);}
 }
 
 </script>
