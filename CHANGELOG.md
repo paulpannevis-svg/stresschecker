@@ -1,5 +1,34 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-06 — Baseline-referentielijn (stap 4 + AFRONDING): pro/verloop + single source
+
+Sluitstuk: de cliënt-trendgrafiek + de laatste eigen baseline-berekeningen geconsolideerd,
+zodat **`analytics.compute_baseline()` de enige baseline-bron is** (geverifieerd via grep).
+
+- **`pro/verloop.html` (cliënt-trend, Pro bekijkt cliënt):** de **oude restcode** (`slice(0,7)`
+  + `'gem '+baseline`, foute eerste-7-logica) op deze **live** grafiek vervangen door de
+  canonieke lijn (neutraal-grijs gestippeld, uit `allData[0].baseline`). **Legenda toegevoegd**
+  (3 items: Relax Index / Zelfinschatting / Baseline, 3 talen, title-toelichting) — die ontbrak
+  hier volledig. Baseline toegevoegd aan endpoint `/api/pro/client/<cid>/metingen`.
+- **`personal_baseline`** (situatiemeting, **lokale** feedbacktekst, `app.py`): was AVG van de
+  laatste 10 basismetingen → nu `compute_baseline` (laatste 7 meetdagen, laatste-per-dag), zodat
+  de lokale tekst hetzelfde getal noemt als grafiek/stat/Kompas.
+
+**Eindcontrole (grep):** geen andere RI-baseline-berekening meer in `app.py`/`analytics.py`/
+templates/`hrv.js`. Bewuste uitzondering: `_baseline_avg` (biofeedback AI-prompt) = gemiddelde
+van `recent_basis` — afgeleid van de bewust-ongemoeide `recent_basis`-prompt-input, daarom niet
+geconsolideerd (genoteerd in CLEANUP_TODO). De `AVG(ri)`-aggregaten elders zijn week-gemiddelden/
+trends (ander concept).
+
+**Feature compleet — overzicht.** `compute_baseline()` (canoniek: laatste 7 meetdagen, per dag de
+laatste basismeting, alleen basismeting; <7 → geen lijn) voedt nu:
+- Grafieken met referentielijn + legenda: `pro/eigen_metingen.html`, `/resultaten`, `pro/verloop.html`.
+- Stat + kwadrant: `/resultaten`-`statBaseline`, `/kwadrant` (`baseline`/`delta`) — correctie t.o.v. oud.
+- AI Kompas `baseline_ri`/`baseline_range` + lokale feedback `personal_baseline`.
+- `verloop.html`: dode `drawChart`+oude restcode opgeruimd.
+Verificatie totaal: `test_baseline.py` 9/9, `test_baseline_view.py` 23/23, render-checks NL/DE/EN
+op 3 grafiekpagina's, `/api/metingen` + cliënt-endpoint smoke (5.9 / 5.5 / null), `run_all.sh` 21/1.
+
 ## 2026-06-06 — Baseline-referentielijn (stap 3): consolidatie + uitrol + opruiming
 
 - **3a — `/api/metingen` consolidatie (`app.py`):** de oude server-side baseline
@@ -27,10 +56,7 @@ Verificatie: `run_all.sh` 21/1; render-checks 3 talen (results.html legenda+titl
 `/api/metingen`-smoke; `kill -HUP` reload, /verloop + /resultaten → 302.
 
 Nog open: visuele check /resultaten + /kwadrant (correcte baseline + lijn/legenda).
-**Nog te doen (stap 4):** `pro/verloop.html` — de cliënt-trendgrafiek (Pro bekijkt cliënt,
-custom canvas, voedt zich uit `/api/pro/client/<cid>/metingen`). Vereist: baseline toevoegen
-aan dat endpoint (zelfde `compute_baseline`) + lijn + legenda op het canvas. Dezelfde
-legenda-/lijn-afspraak als /resultaten.
+`pro/verloop.html` (stap 4) is in de afrondingsentry hierboven afgehandeld.
 
 ## 2026-06-06 — Baseline-referentielijn (stap 2): pro/eigen_metingen.html (pagina 1)
 

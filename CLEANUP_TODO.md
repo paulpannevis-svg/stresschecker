@@ -111,6 +111,18 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
     - `app.py:6143` — `print(f"LICENSE GENERATED: {new_code} type=… email=… order=…", flush=True)`
     Aparte sessie: per regel beslissen redacten/verwijderen (versus tijdelijk debug-nut). Anders dan 2FA-codes (eenmalig, 10 min geldig) zijn licentiecodes langlevend.
 
+- [ ] **Kompas-tekst basismeting — baseline expliciet benoemen (06-06-2026, GEPARKEERD)**:
+  overwegen om in de Innerlijk-Kompas-tekst bij basismetingen de baseline expliciet te noemen
+  (bijv. "daarmee zit je net boven je baseline"), zodat de tekst en de grafiek/legenda over
+  hetzelfde getal praten. De data is er al (`compute_baseline` voedt `baseline_ri`/`baseline_range`
+  + `personal_baseline`); dit is een tekst-/prompt-keuze, geen berekening. Niet bouwen tot besloten.
+
+- [ ] **`_baseline_avg` (biofeedback AI-prompt) consolidatie-restpunt (06-06-2026)**: bij de
+  baseline-consolidatie bewust NIET meegenomen — het is het gemiddelde van `recent_basis` (laatste
+  basismetingen, niet laatste-per-dag), afgeleid van de bewust-ongemoeide `recent_basis`-prompt-input
+  (`app.py:~4894`). Bij een latere Kompas-prompt-herziening overwegen of de biofeedback-baseline
+  ook naar `compute_baseline` moet, zodat álle AI-baselines één getal delen.
+
 - [ ] **Norm-tabel-consolidatie**: `hrv.js` N-array (13 buckets, ~5-jarig) en `hlm/meting_src.html` rmssdReference (7 buckets, 10-jarig) divergeren materieel — tot 1.3 RI-punten verschil voor jong-volwassenen bij identieke meting. Beide claimen Lifelines Cohort. Wetenschappelijke beslissing nodig over baseline. Aparte sessie.
 
 - [ ] **kwadrant.html:347-350 referentiewaarde-display gebruikt lokale binary norm-keuze (`female ? f : m`)** terwijl hrv.js Diff E (commit a1107a2 22-05-2026) divers/unspecified als gemiddelde m+f behandelt. Inconsistentie voor display in details-tabel: berekend HRV% klopt, maar getoonde referentiewaarde matcht niet. Aparte fix nodig om kwadrant.html lokale norm-keuze uit te breiden met divers/unspecified-pad. Impact in productie: 1 test-fixture id=26 SC-TEST-RIFIX-002 (geen echte klanten). Past mogelijk in hetzelfde moment als norm-tabel-consolidatie (hrv.js vs hlm/meting_src.html) omdat alle drie norm-tabel-aanrakingen tegelijk genomen kunnen worden.

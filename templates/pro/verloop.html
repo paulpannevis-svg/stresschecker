@@ -33,6 +33,11 @@
 
   <div class="vl-card">
     <div class="vl-canvas-wrap"><canvas id="verlChart"></canvas></div>
+    <div style="display:flex;gap:1.5rem;justify-content:center;margin-top:.6rem;font-size:.75rem;color:#666;flex-wrap:wrap;">
+      <span><span style="display:inline-block;width:20px;height:3px;background:#ffffff;border:1px solid #ccc;vertical-align:middle;margin-right:4px;"></span>Relax Index</span>
+      <span><span style="display:inline-block;width:20px;height:2px;background:#0078ff;vertical-align:middle;margin-right:4px;border-top:2px dashed #0078ff;"></span>{%if lang=="de"%}Selbsteinschätzung{%elif lang=="en"%}Self-assessment{%else%}Zelfinschatting{%endif%}</span>
+      <span id="blLegend" style="display:none;" title="{%if lang=='de'%}der Durchschnitt Ihrer letzten 7 Basismessungen (eine pro Tag){%elif lang=='en'%}the average of your last 7 baseline measurements (one per day){%else%}het gemiddelde van je laatste 7 basismetingen (één per dag){%endif%}"><span style="display:inline-block;width:20px;height:2px;background:rgba(110,110,110,.95);vertical-align:middle;margin-right:4px;border-top:2px dashed rgba(110,110,110,.95);"></span>Baseline</span>
+    </div>
   </div>
 
   <div class="vl-stats" id="verlStats"></div>
@@ -184,18 +189,16 @@ function drawChart(period) {
     return;
   }
 
-  // --- Baseline (na 7 basismetingen) ---
-  var basisMetingen = allData.filter(function(d){ return d.meting_type === 'basismeting'; });
-  if (basisMetingen.length >= 7) {
-    var first7 = basisMetingen.slice(-Math.max(basisMetingen.length,7)).slice(0,7);
-    var baseline = first7.reduce(function(s,d){ return s + (d.ri||0); },0) / 7;
-    ctx.strokeStyle = 'rgba(141,110,99,0.7)'; ctx.lineWidth = 1.5;
-    ctx.setLineDash([6,4]);
+  // --- Baseline (canoniek: uit endpoint -> allData[0].baseline, analytics.compute_baseline;
+  //     laatste 7 meetdagen, laatste-per-dag, alleen basismeting). Label via legenda. ---
+  var _bl = (allData && allData.length) ? allData[0].baseline : null;
+  if (_bl != null) {
+    ctx.strokeStyle = 'rgba(110,110,110,0.95)'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([5,4]);
     ctx.beginPath();
-    ctx.moveTo(P.l, yPos(baseline)); ctx.lineTo(W-P.r, yPos(baseline));
+    ctx.moveTo(P.l, yPos(_bl)); ctx.lineTo(W-P.r, yPos(_bl));
     ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(141,110,99,0.9)'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left';
-    ctx.fillText('gem ' + baseline.toFixed(1), P.l + 2, yPos(baseline) - 3);
+    var _blL = document.getElementById('blLegend'); if (_blL) _blL.style.display = '';
   }
 
   // --- RI lijn ---

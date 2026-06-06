@@ -4829,23 +4829,27 @@ def api_feedback():
         except:
             pass
 
-    # Voor situatiemeting: persoonlijke basislijn (gemiddelde RI van laatste 10 basismetingen)
+    # Voor situatiemeting: persoonlijke baseline via analytics.compute_baseline (laatste 7
+    # meetdagen, laatste-per-dag) zodat de lokale feedbacktekst hetzelfde getal noemt als
+    # grafiek/stat/Kompas. (Was: AVG van de laatste 10 basismetingen, geen per-dag-filter.)
     personal_baseline = None
     if is_situatie:
         try:
+            import analytics as _an
             if cid and _is_pro_or_demo_pro():
                 db2 = get_pro_db()
-                bl_row = db2.execute(
-                    "SELECT AVG(ri) FROM (SELECT ri FROM client_metingen WHERE client_id=? AND meting_type='basismeting' ORDER BY ts DESC LIMIT 10)",
-                    (cid,)).fetchone()
+                _bl_rows = db2.execute(
+                    "SELECT ts, ri, meting_type FROM client_metingen WHERE client_id=? "
+                    "AND lower(coalesce(meting_type,''))='basismeting' AND ri IS NOT NULL "
+                    "ORDER BY ts DESC LIMIT 200", (cid,)).fetchall()
             else:
                 db2 = get_meting_db()
-                bl_row = db2.execute(
-                    "SELECT AVG(ri) FROM (SELECT ri FROM metingen WHERE user_key=? AND meting_type='basismeting' ORDER BY ts DESC LIMIT 10)",
-                    (get_user_key(),)).fetchone()
-            if bl_row and bl_row[0] is not None:
-                personal_baseline = round(float(bl_row[0]), 1)
+                _bl_rows = db2.execute(
+                    "SELECT ts, ri, meting_type FROM metingen WHERE user_key=? "
+                    "AND lower(coalesce(meting_type,''))='basismeting' AND ri IS NOT NULL "
+                    "ORDER BY ts DESC LIMIT 200", (get_user_key(),)).fetchall()
             db2.close()
+            personal_baseline = _an.compute_baseline([dict(r) for r in _bl_rows])
         except:
             pass
 
@@ -5466,8 +5470,20 @@ def api_pro_client_metingen(cid):
         db.close()
         return jsonify({'error': 'Niet gevonden'}), 404
     rows = db.execute("SELECT * FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 100", (cid,)).fetchall()
+    baseline_rows = db.execute(
+        "SELECT ts, ri, meting_type FROM client_metingen WHERE client_id=? "
+        "AND lower(coalesce(meting_type,''))='basismeting' AND ri IS NOT NULL "
+        "ORDER BY ts DESC LIMIT 200", (cid,)).fetchall()
     db.close()
-    return jsonify([dict(r) for r in rows])
+    import analytics as _an
+    baseline = _an.compute_baseline([dict(r) for r in baseline_rows])
+    out = []
+    for r in rows:
+        d = dict(r)
+        d['baseline'] = baseline
+        d['delta'] = round(d['ri'] - baseline, 1) if (baseline is not None and d.get('ri') is not None) else None
+        out.append(d)
+    return jsonify(out)
 
 
 @app.route('/api/kubios/download/<int:mid>')
