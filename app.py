@@ -207,8 +207,14 @@ def verify_password(password, stored_hash):
 
 MAIL_FROM     = 'StressChecker <noreply@lifestylemonitors.com>'
 
-from hlm.routes import hlm as hlm_blueprint
-app.register_blueprint(hlm_blueprint)
+# HLM-blueprint is optioneel: de hlm/-module is bewust untracked/geparkeerd in git, dus
+# afwezig in de staging-worktree. Op live (hlm/ aanwezig) laadt dit normaal; op staging
+# wordt het netjes overgeslagen — staging heeft de /hlm/*-routes niet nodig.
+try:
+    from hlm.routes import hlm as hlm_blueprint
+    app.register_blueprint(hlm_blueprint)
+except ModuleNotFoundError:
+    app.logger.warning('HLM-blueprint niet geladen (hlm/-module afwezig) — /hlm/* routes uit.')
 app.secret_key = os.environ.get('SC_SECRET_KEY', 'change-this-in-production')
 
 @app.template_filter('full_name')
