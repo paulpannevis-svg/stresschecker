@@ -59,9 +59,10 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
   - **Gedaan 06-06:** operator-account id=30 (`paulpannevis+kkoperator@gmail.com`) gedeactiveerd —
     onbekend lang random bcrypt-wachtwoord + `deleted_at` gezet (genoteerde credential was dood-risico,
     operator-login skipt 2FA). DB-wijziging, niet in git.
-  - **Open (read-only plan gepresenteerd, wacht op akkoord):** operator-login + 2FA-skip + beheerroutes
-    achter een feature-flag `KK_OPERATOR_ENABLED=False` zetten tot KK-workstream echt live gaat
-    (3 sites: `app.py:1247` login-skip, `1457-1480` auto-create, `/pro/operatoren(+/toevoegen)`).
+  - ✅ **GEDAAN 06-06:** feature-flag `KK_OPERATOR_ENABLED=False` (`app.py:18`) over 3 sites —
+    operator-login **harde weigering** (geen 2FA-doorval), auto-create overgeslagen, beheerroutes
+    `abort(404)`. Getest (run_all 21/1 + test_client: login geweigerd, routes 404). Bij KK-go-live:
+    vlag op `True`.
   - **Bij heractivering KK-laag:** het hele operator-credentialmodel herzien — eenmalig gegenereerd
     wachtwoord + 2FA-skip + 24u-sessie is voor een **Krankenkassen-context te mager**; 2FA hoort
     óók voor operators te gelden. Zie [[project_uncommitted_kk_operator_workstream]].

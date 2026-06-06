@@ -1,5 +1,20 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-06 — KK-operator-laag achter feature-flag (UIT tot KK-go-live)
+
+De KK-operator-login (incl. 2FA-skip + 24u-sessie) stond live maar hoort bij de bewust
+geparkeerde, ongeteste KK-workstream. Achter één vlag `KK_OPERATOR_ENABLED = False` (`app.py:18`)
+gezet over 3 plekken:
+- **Operator-login** (`app.py:~1247`): met vlag uit **harde weigering** ("KK-operatorfunctie niet
+  beschikbaar"), géén doorval naar de normale 2FA-flow.
+- **Auto-create** operator-account bij verse `SC-KK-`-activatie (`~1463`): overgeslagen.
+- **Beheerroutes** `/pro/operatoren` + `/pro/operatoren/toevoegen`: `abort(404)`.
+Vooraf gedeactiveerd: het enige operator-account (id=30) kreeg een onbekend random wachtwoord +
+`deleted_at`. Bij heractivering: credentialmodel herzien (2FA óók voor operators).
+
+Getest: `run_all.sh` = 21/1 (B3 pre-existent); test_client — operator-login geweigerd (geen sessie),
+beide beheerroutes → 404 met geldige KK-admin-sessie.
+
 ## 2026-06-06 — PayPal-pad uitgefaseerd (license-server, A2)
 
 Vervolg op het backup-incident: de PayPal-Live-app was ingetrokken (creds dood, pad dormant —

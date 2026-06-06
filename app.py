@@ -12,6 +12,10 @@ app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 SESSION_IDLE_TIMEOUT_SECONDS = 30 * 60
 SESSION_IDLE_TIMEOUT_OPERATOR_SECONDS = 24 * 60 * 60
+# KK-operator-laag (login-skip 2FA + 24u-sessie + auto-create + beheerroutes) is bewust
+# geparkeerde, ongeteste workstream. Vlag UIT tot KK-go-live; bij heractivering het hele
+# operator-credentialmodel herzien (2FA hoort óók voor operators). Zie CLEANUP_TODO 2026-06-06.
+KK_OPERATOR_ENABLED = False
 # SMTP configuratie voor 2FA verificatiecodes
 MAIL_SERVER   = 'mailout.hostnet.nl'
 MAIL_PORT     = 587
@@ -1245,6 +1249,13 @@ def sc_login():
             _cn3.close()
         # KK-operator: 2FA overslaan, sessie direct opzetten (24u-window)
         if user['role'] == 'operator':
+            if not KK_OPERATOR_ENABLED:
+                # Workstream geparkeerd: operator-login (incl. 2FA-skip) hard weigeren,
+                # géén doorval naar de normale 2FA-flow.
+                error = ('Die KK-Operator-Funktion ist derzeit nicht verfügbar.' if lang=='de'
+                         else 'The KK operator function is currently unavailable.' if lang=='en'
+                         else 'De KK-operatorfunctie is momenteel niet beschikbaar.')
+                return render_template('sc_login.html', lang=lang, error=error, email=email)
             import time as _opt_t  # noqa: F811  — sc_login bevat een latere lokale `import time`
             _cn_op = _sq.connect('/opt/ic-license-server/data/saas_licenses.db')
             _cn_op.row_factory = _sq.Row
@@ -1460,7 +1471,7 @@ def verify_2fa():
                     _ldb2.commit()  # commit admin-role los van operator-create-tak
                     session['role'] = 'admin'
                     _op_email = _derive_operator_email(em)
-                    if not _ldb2.execute("SELECT 1 FROM users WHERE email=? COLLATE NOCASE", (_op_email,)).fetchone():
+                    if KK_OPERATOR_ENABLED and not _ldb2.execute("SELECT 1 FROM users WHERE email=? COLLATE NOCASE", (_op_email,)).fetchone():
                         import secrets as _opsec
                         _op_pw = _opsec.token_urlsafe(12)
                         _op_hash = hash_password(_op_pw)
@@ -2374,6 +2385,8 @@ def kk_admin_messen_standort():
 @require_kk_admin
 def kk_operatoren_lijst():
     """Lijst alle operator-accounts gekoppeld aan deze KK-licentie via user_licenses."""
+    if not KK_OPERATOR_ENABLED:
+        abort(404)
     lang = session.get('lang', 'nl')
     license_code = session.get('license_code', '')
     db = sqlite3.connect('/opt/ic-license-server/data/saas_licenses.db')
@@ -2403,6 +2416,8 @@ def kk_operatoren_toevoegen():
     - INSERT users + INSERT user_licenses
     - audit-log via _log_kk_action
     """
+    if not KK_OPERATOR_ENABLED:
+        abort(404)
     import secrets as _sec, re as _re
     license_code = session.get('license_code', '')
     email_raw = (request.form.get('email','') or '').strip().lower()
