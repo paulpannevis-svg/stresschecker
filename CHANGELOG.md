@@ -1,5 +1,16 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-06 — PayPal-pad uitgefaseerd (license-server, A2)
+
+Vervolg op het backup-incident: de PayPal-Live-app was ingetrokken (creds dood, pad dormant —
+geen webhookverkeer, betalingen via Stripe/WooCommerce). Daarom het PayPal-pad uitgefaseerd
+(optie A2). **`/opt/ic-license-server` staat niet onder git**, dus hier gedocumenteerd:
+- `server.py`: verwijderd `get_paypal_token()`, `plan_id_from_paypal()`, route
+  `/api/webhooks/paypal`, route `/api/webhooks/paypal/test`; dode `_requests`-import opgeruimd.
+- `.env`: `PAYPAL_ENV/CLIENT_ID/SECRET/WEBHOOK_ID` (4 regels) verwijderd.
+- `cancel_paypal_subscription()` bewust behouden — self-guard't op ontbrekende creds → no-op.
+- Getest: beide endpoints → 404 (GET+POST), `restart ic-license-server`, admin/stats → 200.
+
 ## 2026-06-06 — Beveiligingsincident: publieke backup-tarball + secret-rotaties
 
 `static/backup-download.tar.gz` (64 MB, 10 apr geplaatst) bleek publiek downloadbaar via de

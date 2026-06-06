@@ -43,9 +43,11 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
 
 - [ ] **PayPal-opruiming na app-verwijdering (06-06-2026)** — de Live-app "Lifestyle Monitors"
   is verwijderd (zie incidentdoc). Vervolg:
-    - **Dode `PAYPAL_*` in `/opt/ic-license-server/.env`** (client_id `AbU7cY…`, geeft nu 401):
-      óf vervangen door een nieuwe PayPal-app, óf het PayPal-pad uitfaseren en deze regels +
-      bijbehorende code-routes (`get_paypal_token`, `/api/webhooks/paypal`) opschonen. Beslissing open.
+    - ✅ **GEDAAN 06-06 (optie A2):** dode `PAYPAL_*` (4 regels) uit `/opt/ic-license-server/.env`
+      verwijderd + code-routes weg uit `server.py` (`get_paypal_token`, `plan_id_from_paypal`,
+      `/api/webhooks/paypal`, `/api/webhooks/paypal/test`) + dode `_requests`-import opgeruimd.
+      Getest: beide endpoints → 404, server gezond (admin/stats 200). `cancel_paypal_subscription`
+      bewust behouden als self-guarding no-op. (server.py niet in git — zie versiebeheer-gat hieronder.)
     - **22 verweesde PayPal billing plans** opruimen in het PayPal Business Dashboard
       (achtergebleven na app-verwijdering).
     - **Provider-app-inventaris opschonen**: uitzoeken of **Buckaroo** (26-11-22) en **Mollie**
@@ -63,6 +65,12 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
   - **Bij heractivering KK-laag:** het hele operator-credentialmodel herzien — eenmalig gegenereerd
     wachtwoord + 2FA-skip + 24u-sessie is voor een **Krankenkassen-context te mager**; 2FA hoort
     óók voor operators te gelden. Zie [[project_uncommitted_kk_operator_workstream]].
+
+- [ ] **Versiebeheer-gat `/opt/ic-license-server` (06-06-2026)**: de hele license-server-backend
+  (`server.py`, `database.py`, confs) staat **niet onder git**. Daardoor zijn wijzigingen daar
+  (Stripe-key-rotatie, IC_ADMIN/IC_SECRET, PayPal-uitfasering) alleen in de stresschecker-CHANGELOG
+  gedocumenteerd, niet als diff traceerbaar. Overweeg `git init` op ic-license-server (met
+  `.gitignore` voor `.env`/`data/*.db`/`*.conf`-secrets) in een aparte sessie.
 
 - [x] **Untracked dirs git-tracken** — UITGEVOERD 06-06-2026 (Fase 1 git-sanering, zie CHANGELOG). Getrackt: `scripts/`, `static/` (excl. video's/backup-tarball), `templates/` (consumer+pro), `tests/`. BEWUST GEPARKEERD: `hlm/`+`templates/hlm/` (apart spoor, beslissen bij HLM-activering), `email_templates/` (verweesd, verwijderkandidaat), `license_notifications.py`+`weekly_email.py` (Fase 2 secrets).
 - [x] **Docs-organisatie** — UITGEVOERD 06-06-2026: `LAUNCH_LOG.md`, `PWRESET_PLAN.md`, `RMSSD_HERBEREKENING_OVERZICHT.md`, `STAGING_OPZET_PLAN.md`, `TODO.md` → `docs/`. `SYSTEM_REFERENCE.md` BLIJFT in root (backup.sh:4 kopieert vanaf root-pad) — verplaatskandidaat zodra backup.sh meeverhuist. `docs/kontakt_v3_backup.html` = verwijderkandidaat (J).
