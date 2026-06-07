@@ -1,5 +1,26 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-07 — getColor() gelijkgetrokken met getLabel()-grenzen (2/4/6/8) (STAGING)
+
+`hrv.js getColor()` gebruikte eigen kleur-grenzen (3/5/7/8.5), ~1 punt uit de pas met de
+zone-labels (`getLabel`/`analytics.zone_for_ri`, grenzen 2/4/6/8). Kleur en label vertelden zo niet
+hetzelfde verhaal (o.a. RI 6.x = geel getal naast label "In balans"). Geen bewuste keuze → gelijkgetrokken.
+
+- **`static/js/hrv.js`:** `getColor` nu `r>=8 #27ae60; r>=6 #2ecc71; r>=4 #f1c40f; r>=2 #e67e22; else #c0392b`
+  (zelfde 5 kleuren, grenzen exact = getLabel). Alle vier de grenzen mee: RI 2–2.9 rood→oranje,
+  4–4.9 oranje→geel, **6–6.9 geel→groen**, 8–8.4 groen→donkergroen.
+- **Effect:** het RI-getal op de meetschermen valt nu samen met het label ernaast. Vindplaatsen
+  (de enige `HRV.getColor`-aanroepen, HLM uitgesloten): `sensor_en_meten.html` (riEl live + riEndEl
+  uitslag, basis-/situatiemeting) en `measure.html` (riEl + riEndEl, biofeedback).
+- **Geen code rekende op de oude grenzen** (geen conditie op `getColor`-retour of op `ri>=7`);
+  server-side rapport-kleuren hangen al aan `zone_for_ri` (grens 6).
+- **Cache-bump:** `hrv.js?v=4 → ?v=5` in alle 3 de includes (`sensor_en_meten`, `measure`, `lab`);
+  geverifieerd dat geen template op `?v=4` achterblijft.
+- **HLM uitgesloten:** `hlm/meting_src.html` heeft een eigen inline-kopie (apart spoor) — ongemoeid.
+- **Tests:** `tests/test_getcolor.py` (16/16, node) — getColor↔getLabel zelfde zone bij 5.9/6.0/6.1/7.0
+  + alle randen. Battery groen (prediction 34, voorvragen 48, adaptief 40, baseline 9); js-smoke 18/18.
+- Resterende tint-verschillen tussen kleurbronnen genoteerd in CLEANUP_TODO (palet-unificatie, los).
+
 ## 2026-06-07 — Fix: tabel-stipkleur op /resultaten naar canonieke zone-grens (STAGING)
 
 De stipkleur in de metingen-tabel (`results.html`) kwam uit een **losse hardcoded 11-elementen

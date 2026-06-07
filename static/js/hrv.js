@@ -84,7 +84,9 @@ function getLabel(r){var L=({
   en:["Heavily strained","Strained","Lightly strained","In balance","Resilient"]
 })[window.SC_LANG]||["Zwaar belast","Belast","Licht belast","In balans","Veerkrachtig"];
 if(r>=8)return L[4];if(r>=6)return L[3];if(r>=4)return L[2];if(r>=2)return L[1];return L[0];}
-function getColor(r){if(r>=8.5)return "#27ae60";if(r>=7)return "#2ecc71";if(r>=5)return "#f1c40f";if(r>=3)return "#e67e22";return "#c0392b";}
+// Kleur-grenzen exact gelijk aan getLabel (2/4/6/8): kleur en label vertellen hetzelfde
+// zone-verhaal. Canonieke grens "Licht belast → In balans" = RI 6.0.
+function getColor(r){if(r>=8)return "#27ae60";if(r>=6)return "#2ecc71";if(r>=4)return "#f1c40f";if(r>=2)return "#e67e22";return "#c0392b";}
 function getMeetKwaliteit(r){if(r&&r.length>30)r=r.slice(15);if(!r||r.length<3)return 100;return filterRR(r).quality;}
 function calculateSDNN(r){var res=filterRR(r);var f=res.filtered;if(!f||f.length<2)return 0;var m=f.reduce(function(a,b){return a+b;},0)/f.length;return Math.round(Math.sqrt(f.reduce(function(a,b){return a+Math.pow(b-m,2);},0)/f.length)*10)/10;}
 function calculatePNN50(r){var res=filterRR(r);var f=res.filtered;if(!f||f.length<2)return 0;var n=0;for(var i=1;i<f.length;i++)if(Math.abs(f[i]-f[i-1])>50)n++;return Math.round((n/(f.length-1))*1000)/10;}
