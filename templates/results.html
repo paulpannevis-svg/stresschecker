@@ -249,13 +249,16 @@ function renderResults(results) {
   const hLabel = LANG=='de'?'BEZEICHNUNG':LANG=='en'?'LABEL':'LABEL';
   var html = '<div class="table-responsive" style="background:#fff;border-radius:12px;padding:1.25rem 1.5rem;width:100%;box-sizing:border-box;">';
   html += '<table class="meting-tabel mt-results"><tr><th>'+hDatum+'</th><th>'+hTijd+'</th><th>RI</th><th>BPM</th><th class="hide-on-tablet">HRV%</th><th class="hide-on-tablet">RMSSD</th><th>'+hMeting+'</th><th style="padding:.4rem .6rem;text-align:left;border-bottom:2px solid #dde3ea;">'+ hDim +'</th><th>'+hLabel+'</th></tr>';
-  const COLORS=['#c0392b','#c0392b','#e67e22','#e67e22','#f1c40f','#f1c40f','#f1c40f','#2ecc71','#2ecc71','#2ecc71','#2ecc71'];
+  // Stipkleur via de canonieke zone-indeling (zone(): grenzen 2/4/6/8 — In balans vanaf RI 6.0),
+  // zelfde 5-zone-palet als de grafiek hierboven. Was: losse 11-elementen array op floor(ri),
+  // die groen pas vanaf RI 7 gaf (6.1 onterecht geel t.o.v. gauge/labels).
+  const COLORS=['#E53935','#FF7043','#FFCA28','#9CCC65','#66BB6A'];
   results.forEach(function(r){
     var dt=r.ts?new Date(r.ts):new Date(r.created_at);
     var date=dt?dt.toISOString().substring(0,10):'';
     var tijd=('0'+dt.getHours()).slice(-2)+':'+('0'+dt.getMinutes()).slice(-2);
     var ri=r.ri!=null?parseFloat(r.ri).toFixed(1):'-';
-    var z=r.ri!=null?Math.min(10,Math.max(0,Math.floor(r.ri))):0;
+    var z=r.ri!=null?zone(r.ri):0;
     var col=COLORS[z]||'#999';
     var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+col+';margin-right:4px;"></span>';
         var ctx_html2='';

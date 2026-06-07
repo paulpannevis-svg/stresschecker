@@ -1,55 +1,164 @@
 # StressChecker — Recente wijzigingen
 
-## 2026-06-06 — Staging volledig operationeel + nieuwe werkstroom (STANDAARD bouwen op staging)
+## 2026-06-07 — Fix: tabel-stipkleur op /resultaten naar canonieke zone-grens (STAGING)
 
-`test.stresschecker.com` is nu een volwaardige staging-omgeving. **Vanaf nu bouwen
-CC-sessies STANDAARD op de staging-worktree, tenzij expliciet anders gevraagd.**
+De stipkleur in de metingen-tabel (`results.html`) kwam uit een **losse hardcoded 11-elementen
+array** op `Math.floor(ri)`, met groen pas vanaf **RI 7.0** — terwijl de canonieke zone-indeling
+(`analytics.zone_for_ri` / `hrv.getLabel` / kwadrant-gauge) "In balans" vanaf **RI 6.0** legt.
+Gevolg: RI 6.1 kreeg een gele stip terwijl de gauge 'm groen/"In balans" toont.
 
-**Staging-stack:**
-- **Worktree** `/opt/stresschecker-staging` op branch `staging`; aparte systemd-unit
-  `stresschecker-staging.service` (gunicorn :8090, `--no-control-socket`, `EnvironmentFile=.env.staging`
-  met `SC_ENV=staging`).
-- **nginx** `test.stresschecker.com` (TLS via Certbot) met **Basic-Auth** (`auth_basic`,
-  `/etc/nginx/.htpasswd-staging`, user `paul`; wachtwoord in `/root/staging_basic_auth.txt`).
-- **Gescrubde DB's** onder `/opt/stresschecker-staging/data/` (0 echte e-mails); hervulbaar via
-  `refresh_data.sh`. SC_ENV-guards in `app.py` onderdrukken mail-verzending op staging
-  (`[STAGING-MAIL]`-print i.p.v. SendGrid).
-- **TEST-banner**: rode, drietalige waarschuwingsbalk in `templates/base.html`, gegate op
-  `is_staging` (context-processor `_inject_staging_flag`). Op prod (geen SC_ENV) rendert die nooit.
+- **Fix:** stip nu via de bestaande `zone()` (grenzen 2/4/6/8) + het 5-zone-palet van de grafiek op
+  dezelfde pagina — één bron, consistent met gauge en labels. 6.1→groen, 8.4→groen, 4.7→geel.
+- **Geen B3:** dit is een kleur-drempel in de tabel, niet de RMSSD/RI-normtabel-divergentie
+  (de RI-waarde was overal identiek).
+- **Verwante, niet-gefixte bevinding:** `hrv.js getColor()` hanteert zélf `≥7 → groen` (vs `getLabel`
+  op 6) — die kleur-grens-divergentie raakt o.a. de inline FASE 3-uitslag (`HRV.getColor`); apart van
+  B3, apart te beslissen.
+- `smoke_js_syntax.py` dekt nu ook `/resultaten`.
 
-**Werkstroom (zie ook `DEPLOY.md`):**
-1. Bouwen + lokaal verifiëren op de **staging-worktree** (branch `staging`).
-2. **Paul checkt** op `test.stresschecker.com`.
-3. **Merge `staging` → `main`**.
-4. **Promotie naar prod** (`/opt/stresschecker`): checkout/merge van main, daarna
-   `kill -HUP <master>` (template/route-reload) of `systemctl restart stresschecker`.
+## 2026-06-07 — UI-fix: baseline-legendasymbool gestippeld (results + pro/verloop) (STAGING)
 
-## 2026-06-06 — Ops: --no-control-socket op stresschecker.service (gunicorn-fork-hang)
+Het legenda-symbool "Baseline" was een doorgetrokken balk (`background` + `height:2px`) terwijl de
+baseline-lijn in de grafiek gestippeld is. Symbool nu een **stippellijn** (`height:0`, alleen de
+`border-top:2px dashed`), consistent met de grafiek. Geraakt: `templates/results.html` (consument)
+en `templates/pro/verloop.html` (Pro cliënt-trend). Alleen het symbool; kleur/tekst/3 talen ongemoeid.
+`pro/eigen_metingen.html` gebruikt een Chart.js-dummydataset-legenda (ander mechanisme) — buiten scope.
 
-gunicorn 25.1.0 start standaard een control-socket-thread in de master; bij `fork()` kan een
-worker in `futex_wait` blijven hangen tijdens post-fork init (poort luistert, maar geen antwoord —
-intermittent, ~50% van de (her)starts). Ontdekt bij de staging-opzet; `--no-control-socket` lost
-het volledig op (10/10 restarts groen).
+## 2026-06-07 — Nieuwe vragenset basismeting — FASE 3: adaptieve na-vragen V6–V8 (STAGING)
 
-- **`stresschecker.service`** (live; `/etc/systemd/system/`, niet in deze repo): `--no-control-socket`
-  aan ExecStart toegevoegd + `systemctl daemon-reload`. **Bewust geen restart uitgevoerd** — de vlag
-  pakt vanzelf bij de eerstvolgende restart; tot dan draaien de huidige workers ongewijzigd.
-- Idem op de nieuwe **staging**-unit (`stresschecker-staging.service`, `test.stresschecker.com` / :8090).
+Sluitstuk, **alleen op staging**. Op afwijkende/herstel-dagen verschijnen op het uitslagscherm
+(`kwadrant.html`) extra vragen; op gewone dagen niets. Alleen eigen/consument-basismeting; AI-Kompas
+ongewijzigd. Schema **alleen via staging-env** toegepast (prod blijft schoon — geverifieerd).
 
-## 2026-06-06 — Fix: RangeError-recursie op pro/eigen_metingen.html (RI-grafiek)
+- **Datamodel (additief):** `recovery_feel INTEGER (1-3)` op beide metingen-tabellen + nieuwe
+  koppeltabel **`meting_triggers`** (`id, meting_id, chip, is_recovery, created_at`) in
+  `sc_measurements.db` (idempotent in `get_meting_db`).
+- **Trigger-logica — `analytics.adaptive_state(rows)`** (pure functie): elke meting wordt
+  geklasseerd tegen de band van de **7 dagen ER VÓÓR** (band-as-of-then) — cruciaal, want een band
+  die de meting zelf bevat kan 'm nooit als 'onder band' classificeren. Vlaggen:
+  - **V6** "Wat speelt er?" — huidige meting **buiten band** (boven óf onder).
+  - **V7** "Voel je je opgeladen vergeleken met je vorige meting?" — **vorige** meting was onder-band.
+  - **V8** "Wat heeft je geholpen, denk je?" — huidige **binnen band én vorige onder-band** (herstel).
+  - Binnen band, geen dip → niets. `<7` meetdagen → geen band → geen adaptieve vragen.
+- **`/api/metingen`** geeft voor de laatste basismeting `adaptive{band,cur,prev_under,v6,v7,v8}` +
+  bestaande `triggers` (prefill) mee. **`kwadrant.html`**: V7 (1 tik, eerst) + V6/V8-chipblok
+  (6 chips, meerdere tikbaar) + vrij tekstveld eronder (de in Fase 2 verplaatste toelichting).
+  Auto-save per interactie via nieuw endpoint **`/api/meting/adaptief`** (idempotent her-tikken,
+  eigendomscheck op user_key, partiële payloads). Prefill bij herbezoek. Drietalig, DE Sie.
+  Chips→`meting_triggers` (is_recovery 0/1), vrije tekst→`ctx_vrije_tekst`, V7→`recovery_feel`.
+- **Testen zonder slechte dag — `tests/seed_adaptief.py`** (staging-only, weigert live-DB): seedt
+  onder een **apart** account (`test-rifix@lifestylemonitors.com`, raakt jouw eigen historie niet)
+  een complete historie zodat elk pad op `/kwadrant` verschijnt. Door de baseline te seeden bepaal
+  je waar de huidige meting t.o.v. de band valt — geen band-override in app-code. Scenario's:
+  `v6-boven`, `v6-onder`, `herstel` (V7+V8), `dip` (V6+V7); plus `clean` en `list`.
+  Gebruik: `python3 tests/seed_adaptief.py <scenario>` → inloggen als test-rifix → `/kwadrant`;
+  na afloop `python3 tests/seed_adaptief.py clean`.
+- **Tests:** `tests/test_adaptief.py` (40/40) — adaptive_state (4 scenario's + randgevallen),
+  templates 3 talen, endpoint/tabel-aanwezigheid. `test_prediction` 33/33 · `test_voorvragen` 48/48 ·
+  `test_baseline` 9/9 · `smoke_js_syntax` 15/15. Live staging-smoke: 4 scenario's geven de juiste
+  vlaggen; endpoint opslag + idempotent her-tikken + eigendomscheck (404 voor andere user).
 
-De RI-grafiek op `/pro/mijn-metingen` (`pro/eigen_metingen.html`) brak ná de baseline-toevoeging
-met `RangeError: Maximum call stack size exceeded` (chart.min.js), ná de eerste draw: de baseline
-werd post-constructie via `datasets.push()` + een tweede `riChart.update()` toegevoegd, wat —
-samen met Chart.js' resize-observer in de responsive container — een re-entrante render/resize
-gaf. Gevolg: de grafiek tekende wél, maar de baseline-lijn, het legenda-item én de metingen-tabel
-eronder (de rest van het script) stierven mee.
+## 2026-06-07 — Fix: JS-syntaxfout in voorbereiden.html-voor-flow + structurele guard (STAGING)
 
-- **Fix:** baseline-dataset + tooltip-footer worden nu **inline bij `new Chart()`** meegegeven
-  (één render-cyclus, geen tweede `update()`). Grafiek + baseline + legenda + tabel weer compleet
-  (Week/Maand, NL/DE/EN).
-- De HLM-kopie `templates/hlm/consumer_metingen.html` bevat dezelfde bug nog (dormant spoor) —
-  bewust **niet** mee-gepatcht, genoteerd in `CLEANUP_TODO.md`.
+Bug (door Paul gevonden via browserconsole): een quoting-fout in de back-navigatie-init van
+`voorbereiden.html` brak het hele inline `<script>` → `setSleep`/`setLoad`/`_vvMeaningTouched`
+ongedefinieerd, dus V1/V2-chips zetten geen state (gate bleef dicht) en V3's touched-vlag
+registreerde niet.
+
+- **Fix:** de chip-herstel-selector `.vv-chip[onclick*="setSleep('+sq+','"]` had een losse
+  quote (`','"]'` → JS las een nieuwe string + dangling `"`). Gecorrigeerd naar `',"]'` voor
+  zowel `setSleep` als `setLoad`.
+- **Structurele guard:** `tests/smoke_js_syntax.py` toegevoegd — haalt de gerenderde pagina's
+  op (voorbereiden/sensor-en-meten/kwadrant × NL/DE/EN) en draait `node --check` op elk inline
+  `<script>`. Deze klasse fout (geldige strings aanwezig, maar kapotte JS) ontging de
+  content-tests; de smoke vangt 'm nu (geverifieerd: faalde op de buggy template, groen na fix).
+  De content-tests bleven 48/48 — daarom deze aanvulling.
+
+## 2026-06-07 — Nieuwe vragenset basismeting — FASE 2: de voorvragen V1–V3 (STAGING)
+
+Tweede fase, **alleen op staging**. De voor-flow van de basismeting (consument + Pro
+eigen meting) herzien: terugkijken → invoelen → (op het sensorscherm) voorspellen. Netto
+**korter** dan voorheen (5 kaarten → 4). Situatie/biofeedback ongemoeid; AI-Kompas ongewijzigd.
+
+- **Datamodel (additief):** `sleep_quality INTEGER (1-3)`, `load_prev_day INTEGER (1-3)`,
+  `meaning_score REAL` op **beide** metingen-tabellen (idempotent `ALTER`). Deze keer **alleen via
+  de staging-env toegepast** — prod blijft schoon (les uit Fase 1 toegepast).
+- **`voorbereiden.html` (basismeting-only blok):** nieuwe volgorde **V1 → V2 → V3 → V4**:
+  - **V1** "Hoe heb je geslapen?" [Goed/Matig/Slecht] → chips 1-3 → `sleep_quality`.
+  - **V2** "Hoe zwaar was gisteren voor je?" [Lichter/Normaal/Zwaarder] → chips 1-3 → `load_prev_day`.
+  - **V3** "In welke mate was je gisteren bezig met dingen die er voor jou toe doen?" — slider 0-10
+    (ankers nauwelijks/deels/grotendeels, zelfde vormgeving als ontspannenheid) → `meaning_score`.
+    **NULL tot aanraking** (touched-tracking via input + pointerdown) zodat "bewust" vs "default
+    laten staan" later te onderscheiden is.
+  - **V4** bestaande ontspannenheid-slider, ongewijzigd, verplaatst naar ná V1–V3. Onaangeraakt =
+    bewuste 5 (bestaande afspraak, géén NULL).
+  - **Vervallen** (basismeting-flow): "Hoeveel ongemak voel je?" en "Wat speelt er vooral?"
+    (dimensie → gaat op in de Fase 3-trigger-chips). Kolommen `ctx_ongemak`/`ctx_dimensie`/
+    `ctx_vitaliteit` blijven bestaan (oude data) maar worden voor nieuwe basismetingen **NULL**
+    i.p.v. nepwaarde 5/"" geschreven.
+  - **Vrije-tekstveld** uit de basismeting-voor-flow (conditie nu `['biofeedback','situatiemeting']`);
+    keert in Fase 3 terug op het uitslagscherm onder de chips.
+  - **Continue-gate:** "Verder naar sensor" vrij zodra **V1 + V2** beantwoord zijn (vervangt de oude
+    dimensie-gate); V3/V4-sliders gelden als beantwoord via default.
+  - Educatieve "Waarom de vragen vooraf?"-tekst (DE/EN/NL) herschreven naar V1–V4.
+- **Save (`sensor_en_meten.html` + `/api/meting/opslaan`):** payload stuurt `sleep_quality`/
+  `load_prev_day`/`meaning_score` (alleen basismeting; anders null) en zet voor basismeting
+  `ctx_vitaliteit`/`ctx_ongemak`/`ctx_dimensie` op **null**. Server parse't + slaat de drie nieuwe
+  kolommen NULL-veilig op; `ctx_dimensie` opgeschoond (None i.p.v. de string 'None' bij JSON-null).
+- **Gevolg (akkoord):** het "WAT SPEELT ER"-duidingsblok op `/kwadrant` rendert niet meer voor
+  nieuwe basismetingen (gebruikte `ctx_dimensie`/`ctx_vitaliteit`) — consistent met de verschuiving
+  naar Fase 3.
+- **Tests:** `tests/test_voorvragen.py` (48/48) — V1–V3 in 3 talen, vervallen vragen afwezig,
+  vrije-tekst-conditie, gate, touched-tracking, payload-velden. `test_prediction.py` 33/33 +
+  `test_baseline.py` 9/9 (geen regressie). Live staging-smoke (`:8090`): render 3 talen
+  (V1–V4 aanwezig, ongemak/dimensie/vrije-tekst weg, gate+chips), opslag NULL-veilig
+  (basismeting met/zonder voorvragen, gecombineerd met de voorspelvraag), situatiemeting ongemoeid.
+
+## 2026-06-07 — Nieuwe vragenset basismeting — FASE 1: de voorspelvraag (STAGING)
+
+Eerste fase van de uitgebreide meetflow (meer inzicht in spanningsgevoeligheid/herstel).
+**Alleen op staging (branch `staging`); productie ongemoeid.** AI-duiding (Kompas) ongewijzigd —
+dit is uitsluitend de vraag, de opslag en één deterministische terugkoppelregel.
+
+- **Datamodel (additief):** `prediction INTEGER` (1=boven/hoger, 2=rond/gelijk, 3=onder/lager,
+  NULL=overgeslagen/oude flow) + `prediction_hit INTEGER` (0/1, server-berekend, NULL bij geen
+  voorspelling) op **beide** metingen-tabellen (`metingen` + `client_metingen`), via het bestaande
+  idempotente `ALTER TABLE … try/except`-patroon in `get_meting_db`/`get_pro_db` (`app.py`).
+  Bestaande kolommen ongewijzigd.
+- **De vraag (V5), `templates/sensor_en_meten.html`:** laatste kaart in FASE 1, **direct vóór de
+  Start-knop** (`btnStartMeasure`). Alleen eigen/consument-basismeting (`client_id==0`, niet voor
+  cliëntmetingen/situatie/biofeedback). Drietalig NL/DE/EN (DE Sie-vorm), formuleringen vast.
+  Twee varianten: ≥7 meetdagen → "Wat verwacht je van je meting?" (boven/rond/onder gebruikelijk
+  niveau); <7 → "…hogere of lagere meting dan de vorige keer?" (hoger/gelijk/lager). **Meting 1
+  (geen eerdere basismeting) → vraag overslaan.** Start-knop gegate tot de vraag beantwoord is
+  (`_predReady`); keuze in `sessionStorage('sc_prediction')`, meegestuurd in de save-payload.
+- **Opslag + hit (`app.py` `/api/meting/opslaan`):** `prediction_hit` deterministisch berekend
+  vóór de INSERT, tegen de **eigen historie** (alleen eerdere metingen) via de nieuwe pure functie
+  `analytics.prediction_outcome()`. Band = min/max van de per-dag-waarden uit
+  `analytics.baseline_day_values()` ('rond' = binnen de band) — **zelfde bron als grafiek/Kompas**;
+  <7 meetdagen → vergelijk met de vorige meting, ±`PRED_EQUAL_TOL` (0.5 RI, constante in
+  `analytics.py`). Voorspelling alleen bij `meting_type=='basismeting'`.
+- **Terugkoppelregel (`templates/kwadrant.html`):** kleine, visueel ondergeschikte cursieve regel
+  boven de uitslag (deterministisch, geen AI, neutrale toon). Raak/mis × baseline-/vorige-variant,
+  drietalig. Server levert `pred_actual`/`pred_variant` mee in `/api/metingen` (historie-only,
+  consistent met opslag); **NULL-veilig** — geen voorspelling/referentie → regel verborgen, geen fout.
+- **Service worker:** geen actie nodig — `static/sw.js` cachet geen HTML (geen fetch-handler).
+- **Vervallen aannames in de opdracht:** `waarschuwing.html` wordt door geen route gerenderd
+  (dood); `measure.html` is uitsluitend biofeedback. De basismeting-flow loopt via
+  `voorbereiden.html` → `sensor_en_meten.html` → `/kwadrant`.
+- **Tests:** `tests/test_prediction.py` (33/33) — hit 3 gevallen (boven/rond/onder), geen-baseline-
+  variant incl. ±0.5-grenswaarden, meting-1/geen-referentie, NULL-veiligheid, tolerantie-constante,
+  drietalige template-strings. `tests/test_baseline.py` 9/9 (geen analytics-regressie). Live
+  staging-smoke (`:8090`): opslag + hit + `/api/metingen` (band-/prev-variant + 7-totaal-grens) +
+  render van de kaart (3 talen, beide varianten, meting-1-skip). NB: de integratiesuite
+  (`run_all.sh`) wijst naar `:8080`/live en is daarom hier bewust niet gedraaid.
+- **⚠️ Prod-notitie (incident):** bij een ad-hoc `python3 -c "import app"` vanuit de prod-werkmap
+  **zonder de staging-env** vielen de DB-paden terug op de live-defaults; het `ALTER TABLE`-patroon
+  draait als import-bijwerking en voegde `prediction` + `prediction_hit` daardoor al toe aan de
+  **productie**-DB's (`/opt/stresschecker/data/sc_measurements.db` + `sc_pro.db`). Kolommen zijn
+  **leeg en inert** (nullable, 0 niet-NULL; de live-code refereert er nergens aan) en zijn het zijn
+  exact de kolommen die prod bij de Fase 1-promotie tóch krijgt → **bewust laten staan** (geen
+  DROP). Structurele les (schema-migraties uit het import-pad) staat in `CLEANUP_TODO.md`.
 
 ## 2026-06-06 — Baseline-referentielijn (stap 4 + AFRONDING): pro/verloop + single source
 
