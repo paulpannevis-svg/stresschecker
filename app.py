@@ -1235,21 +1235,6 @@ def admin_kk_send_welcome(license_code):
                             mail='sent' if sent else 'failed'))
 
 
-@app.route('/admin-login-bypass-9x7k')
-def admin_bypass():
-    session.clear()
-    session['logged_in'] = True
-    session['license_type'] = 'pro'
-    session['audience'] = 'pro'
-    session['email'] = 'paulpannevis@gmail.com'
-    session['profile_name'] = 'Paul'
-    session['profile_surname'] = 'Pannevis'
-    session['lang'] = 'nl'
-    session['user_key'] = 'aae4793deb05b378a68140eb40979c32'
-    session['license_valid'] = True
-    session['license_type'] = 'pro'
-    return redirect(url_for('pro_menu'))
-
 @app.route('/login', methods=['GET', 'POST'])
 def sc_login():
     lang = request.args.get('lang', session.get('lang', 'nl'))
