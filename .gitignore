@@ -46,10 +46,11 @@ CONTEXT.md.bak*
 toegepast
 
 # Grote media + runtime-output (Fase 1 git-sanering 06-06-2026)
-# Video's en backup-tarball zijn te groot/geen bron; reports/ is gegenereerde PDF-output.
+# Video's en backup-tarball zijn te groot/geen bron; /reports/ is gegenereerde PDF-output.
 static/img/*.mp4
 static/backup-download.tar.gz
-reports/
+# Anker op root: alleen de PDF-OUTPUTmap negeren, NIET templates/reports/ (bronbestanden).
+/reports/
 
 # Staging-config (secrets / lokaal, nooit in VCS)
 .env.staging
