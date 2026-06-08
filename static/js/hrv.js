@@ -74,8 +74,7 @@ function filterRR(rr, threshold, windowSize) {
     return {filtered: result, quality: qualityPct};
 }
 
-function calculateRMSSD(r){if(r&&r.length>15)r=r.slice(15);var res=filterRR(r);r=res.filtered;if(!r||r.length<2)return 0;var s=0;for(var i=1;i<r.length;i++){var d=r[i]-r[i-1];s+=d*d;}return Math.sqrt(s/(r.length-1))/2.5;}
-function _removed(r){if(!r||r.length<2)return 0;var s=0;for(var i=1;i<r.length;i++){var d=r[i]-r[i-1];s+=d*d;}return Math.sqrt(s/(r.length-1))/2.5;}
+function calculateRMSSD(r){if(r&&r.length>15)r=r.slice(15);var res=filterRR(r);r=res.filtered;if(!r||r.length<2)return 0;var s=0;for(var i=1;i<r.length;i++){var d=r[i]-r[i-1];s+=d*d;}return Math.sqrt(s/(r.length-1));}
 function calculateHRVPercent(r,age,gen){if(!r||r.length<2)return 0;var a=age||50,g=gen||"male";var ms=calculateRMSSD(r);var n=N[N.length-1];for(var i=0;i<N.length;i++){if(a<=N[i].a){n=N[i];break;}}var nv;if(g==="female")nv=n.f;else if(g==="divers"||g==="unspecified")nv=(n.m+n.f)/2;else nv=n.m;return Math.min(220,Math.max(0,Math.round((ms/nv)*100)));}
 function lookupRelaxIndex(bpm,h){if(!bpm||h===undefined)return 1.0;var br=B.length-1;for(var i=0;i<B.length;i++){if(bpm<=B[i]){br=i;break;}}var ci=C.length-1;for(var j=0;j<C.length;j++){if(h<=C[j]){ci=j;break;}}return Math.min(10, Math.round((T[br][ci]/12)*10)/10);}
 function getLabel(r){var L=({

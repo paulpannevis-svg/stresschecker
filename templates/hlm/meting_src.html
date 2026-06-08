@@ -6091,7 +6091,7 @@ async function refreshProQuestionConfig() {
 const BLE_HEART_RATE_SERVICE = 0x180D;
 const BLE_HEART_RATE_MEASUREMENT = 0x2A37;
 const USB_SENSOR = { vendorId: 0x0B9C, productId: 0x0315 };
-const SENSOR_CORRECTION_FACTOR = 2.5; // PPG-sensor → ECG-equivalent (Kubios-validated)
+const SENSOR_CORRECTION_FACTOR = 1.0; // ÷2,5 verwijderd 2026-06-08 (spurieus; TNO ~5%, Verveen ECG≈PPG). Zie docs/MIGRATIE_PLAN_DIV25_VERWIJDEREN.md
 
 // --- Sensor state ---
 let relaxBleDevice = null, relaxBleChar = null, relaxUsbDevice = null;
