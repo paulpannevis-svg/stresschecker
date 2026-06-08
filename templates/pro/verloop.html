@@ -61,7 +61,9 @@ function renderList(data) {
   data.forEach(function(m){
     var ri=m.ri!=null?parseFloat(m.ri).toFixed(1):'-';
     var z=m.ri!=null?Math.min(10,Math.max(0,Math.floor(m.ri))):0;
-    var col=COLORS[z]||'#999';
+    // Kwaliteits-gate (besluit 2a): grijs RI-getal + label bij kwaliteit <85.
+    var _kwlow=(m.kwaliteit!=null&&!isNaN(Number(m.kwaliteit))&&Number(m.kwaliteit)<85);
+    var col=_kwlow?'#bfbfbf':(COLORS[z]||'#999');
     var lbl=m.ri!=null?(m.ri>=8?'VEERKRACHTIG':m.ri>=6?'IN BALANS':m.ri>=4?'LICHTE STRESS':m.ri>=2?'STRESS':'ZWARE STRESS'):'';
     var dt=m.ts?new Date(m.ts):null;
     var ds=dt?dagen[dt.getDay()]+' '+dt.getDate()+' '+maanden[dt.getMonth()]+' '+String(dt.getFullYear()).slice(2)+' '+dt.toISOString().substring(11,16):'';

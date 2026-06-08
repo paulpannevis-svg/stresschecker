@@ -37,6 +37,7 @@
   .dot-red{background:#E8344E}
   .dot-orange{background:#FF9800}
   .dot-green{background:#4CAF50}
+  .dot-gray{background:#bfbfbf}
 </style>
 
 <!-- PRO Navigation Bar -->
@@ -175,7 +176,7 @@ function showConsumerMetingen(cid){
       data.forEach(function(m){
         var date = m.created_at ? m.created_at.substring(0,10) : '';
         var tijd = m.created_at ? m.created_at.substring(11,16) : '';
-        var cls = m.ri < 4 ? 'dot-red' : m.ri < 7 ? 'dot-orange' : 'dot-green';
+        var cls = (m.kwaliteit!=null&&!isNaN(Number(m.kwaliteit))&&Number(m.kwaliteit)<85) ? 'dot-gray' : (m.ri < 4 ? 'dot-red' : m.ri < 7 ? 'dot-orange' : 'dot-green');
         html += '<tr><td>'+date+'</td><td><span class="ri-dot '+cls+'"></span> '+m.ri+'</td><td>'+m.bpm+'</td><td>'+m.hrv_pct+'%</td><td>'+(m.rmssd||0).toFixed(1)+'</td><td>'+(m.ctx_dimensie||'')+"'</td><td>'"+(m.meting_type||'')+'</td><td>'+(m.notes||'')+'</td></tr>';
       });
       html += '</table>';
@@ -380,7 +381,7 @@ window.verlDraw();
   {% for m in metingen %}
   <tr>
     <td>{{ m.created_at[:10] if m.created_at else '' }}</td><td>{{ m.created_at[11:16] if m.created_at else "" }}</td>
-    <td><span class="ri-dot {% if m.ri < 4 %}dot-red{% elif m.ri < 7 %}dot-orange{% else %}dot-green{% endif %}"></span> {{ m.ri }}</td>
+    <td><span class="ri-dot {% if m.kwaliteit is not none and m.kwaliteit < 85 %}dot-gray{% elif m.ri < 4 %}dot-red{% elif m.ri < 7 %}dot-orange{% else %}dot-green{% endif %}"></span> {{ m.ri }}</td>
     <td>{{ m.bpm }}</td>
     <td>{{ m.hrv_pct }}%</td>
     <td>{{ "%.1f"|format(m.rmssd) }}</td><td class="col-dimension">{% set _d=m.ctx_dimensie or "" %}{% if lang=="de" %}{% if _d=="mentaal" %}mental{% elif _d=="emotioneel" %}emotional{% elif _d=="lichamelijk" %}körperlich{% elif _d=="spiritueel" %}spirituell{% else %}{{ _d }}{% endif %}{% elif lang=="en" %}{% if _d=="mentaal" %}mental{% elif _d=="emotioneel" %}emotional{% elif _d=="lichamelijk" %}physical{% elif _d=="spiritueel" %}spiritual{% else %}{{ _d }}{% endif %}{% else %}{{ _d }}{% endif %}</td>

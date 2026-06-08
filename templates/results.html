@@ -259,7 +259,9 @@ function renderResults(results) {
     var tijd=('0'+dt.getHours()).slice(-2)+':'+('0'+dt.getMinutes()).slice(-2);
     var ri=r.ri!=null?parseFloat(r.ri).toFixed(1):'-';
     var z=r.ri!=null?zone(r.ri):0;
-    var col=COLORS[z]||'#999';
+    // Kwaliteits-gate (besluit 2a): stip grijs bij kwaliteit <85 — geen stellige zonekleur op een onbetrouwbare meting.
+    var _kwlow=(r.kwaliteit!=null&&!isNaN(Number(r.kwaliteit))&&Number(r.kwaliteit)<85);
+    var col=_kwlow?'#bfbfbf':(COLORS[z]||'#999');
     var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+col+';margin-right:4px;"></span>';
         var ctx_html2='';
         if(r.subjectief_score!=null||r.ctx_vitaliteit!=null||r.ctx_dimensie){

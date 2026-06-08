@@ -5502,7 +5502,7 @@ def api_pro_client_metingen(cid):
         return jsonify({'error': 'Niet gevonden'}), 404
     rows = db.execute("SELECT * FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 100", (cid,)).fetchall()
     baseline_rows = db.execute(
-        "SELECT ts, ri, meting_type FROM client_metingen WHERE client_id=? "
+        "SELECT ts, ri, meting_type, kwaliteit FROM client_metingen WHERE client_id=? "
         "AND lower(coalesce(meting_type,''))='basismeting' AND ri IS NOT NULL "
         "ORDER BY ts DESC LIMIT 200", (cid,)).fetchall()
     db.close()
