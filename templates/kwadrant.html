@@ -135,7 +135,7 @@ function drawGauge(cv,ri,gated){
   
   ctx.beginPath();ctx.arc(cx,cy,6,0,2*Math.PI);ctx.fillStyle="#fff";ctx.fill();
 }
-function drawQuadrant(cv,cur,prev,gated){
+function drawQuadrant(cv,cur,prev,gated,ringCol){
 var ctx=cv.getContext('2d');var W=cv.width,H=cv.height;
 var P={l:40,t:10,r:20,b:40};var CW=W-P.l-P.r,CH=H-P.t-P.b;
 var C=[-20,-10,0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100,105,110,115,120,125,130,135,140,145,150,155,160,165,170,175,180,185,190,220];
@@ -228,6 +228,8 @@ ctx.save();ctx.translate(8,P.t+CH*0.43);ctx.rotate(-Math.PI/2);ctx.textAlign='ce
 
 function drawDot(x,y,main){
     ctx.save();
+    // Zone-ring rond de huidige stip = systeem-van-record (cur.ri-zone via ringCol; grijs bij gate).
+    if(main&&ringCol){ctx.beginPath();ctx.arc(x,y,14,0,2*Math.PI);ctx.strokeStyle=ringCol;ctx.lineWidth=3;ctx.stroke();}
     ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=8;
     ctx.beginPath();ctx.arc(x,y,11,0,2*Math.PI);
     ctx.fillStyle=(main&&gated)?'#9aa0a6':main?'#1a1a1a':'rgba(160,160,40,0.95)';ctx.fill();
@@ -261,12 +263,12 @@ var vit=5;
   // Kwaliteits-gate: bij beperkte/onbetrouwbare kwaliteit stip + gauge-naald grijzen (één verhaal, geen schijn-positief in het groen).
   var _kwv=(cur.kwaliteit===null||cur.kwaliteit===undefined||cur.kwaliteit==='')?100:Number(cur.kwaliteit);
   var _gated=!isNaN(_kwv)&&_kwv<85;
-  try{drawQuadrant(document.getElementById('quadrantCanvas'),cur,prev,_gated);}catch(e){console.error('Kwadrant fout:',e);}
-  // LAAG 1: stip-zone consistent met achtergrondkleur onder de stip (getRaw op bpm/hrv_pct)
-  var _zoneRi=(typeof window.getRaw==='function')?Math.min(10,Math.round((window.getRaw(bpm,hrv)/12)*10)/10):ri;
-  // LAAG 2: biofeedback toont eindwaarde (getRaw op opgeslagen bpm/hrv) i.p.v. tijdsgemiddelde cur.ri
+  // Eén systeem-van-record (cur.ri) voor label/stip-ring/gauge/getal — zelfde zone overal.
+  // Biofeedback: getRaw-eindwaarde (bewuste uitzondering; window-mean-vs-eindwaarde = losse open kwestie, RMSSD_HERBEREKENING_OVERZICHT).
   var displayRi=(cur.meting_type==='biofeedback'&&typeof window.getRaw==='function')?Math.min(10,Math.round((window.getRaw(bpm,hrv)/12)*10)/10):ri;
-  const zi=getZone(_zoneRi);
+  const zi=getZone(displayRi);
+  var _ringCol=_gated?'#bfbfbf':ZC[zi];
+  try{drawQuadrant(document.getElementById('quadrantCanvas'),cur,prev,_gated,_ringCol);}catch(e){console.error('Kwadrant fout:',e);}
   drawGauge(document.getElementById('gaugeCanvas'),displayRi,_gated);
 
   var _lng='{{lang}}';
