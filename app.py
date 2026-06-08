@@ -2119,7 +2119,7 @@ def pro_eigen_metingen():
         "SELECT * FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 100",
         (pro_key,)).fetchall()
     db.close()
-    metingen_chart = [{'id': r['id'], 'ts': r['ts'], 'ri': r['ri'], 'bpm': r['bpm'], 'hrv_pct': r['hrv_pct'], 'rmssd': r['rmssd'], 'notes': r['notes'] if 'notes' in r.keys() else '', 'meting_type': r['meting_type'] if 'meting_type' in r.keys() else '', 'rr_intervals': r['rr_intervals'] if 'rr_intervals' in r.keys() else '', 'dimensie': r['ctx_dimensie'] if 'ctx_dimensie' in r.keys() else '', 'subjectief_score': r['subjectief_score'] if 'subjectief_score' in r.keys() else None} for r in metingen]
+    metingen_chart = [{'id': r['id'], 'ts': r['ts'], 'ri': r['ri'], 'bpm': r['bpm'], 'hrv_pct': r['hrv_pct'], 'rmssd': r['rmssd'], 'notes': r['notes'] if 'notes' in r.keys() else '', 'meting_type': r['meting_type'] if 'meting_type' in r.keys() else '', 'rr_intervals': r['rr_intervals'] if 'rr_intervals' in r.keys() else '', 'dimensie': r['ctx_dimensie'] if 'ctx_dimensie' in r.keys() else '', 'subjectief_score': r['subjectief_score'] if 'subjectief_score' in r.keys() else None, 'kwaliteit': r['kwaliteit'] if 'kwaliteit' in r.keys() else None} for r in metingen]
     from datetime import datetime
     metingen_list = []
     for r in metingen:
@@ -3355,7 +3355,7 @@ def api_get_metingen():
         # laatste basismeting, alleen meting_type='basismeting'. Vervangt de oude berekening
         # (oudste 7 metingen, geen type-/per-dag-filter) die /resultaten-stat + /kwadrant voedde.
         baseline_rows = db.execute(
-            "SELECT ts, ri, meting_type FROM metingen WHERE user_key=? "
+            "SELECT ts, ri, meting_type, kwaliteit FROM metingen WHERE user_key=? "
             "AND lower(coalesce(meting_type,''))='basismeting' AND ri IS NOT NULL "
             "ORDER BY ts DESC LIMIT 200",
             (get_user_key(),)).fetchall()

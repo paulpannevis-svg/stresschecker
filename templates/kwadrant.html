@@ -68,6 +68,7 @@ body{background:#f5f5f5;margin:0;}
     <div style="text-align:center;"><div id="gaugeRI" style="font-size:1.8rem;font-weight:900;line-height:1;">-</div><div id="zoneLabel" style="font-size:.7rem;font-weight:700;letter-spacing:.05em;">-</div><div style="font-size:.6rem;color:#bbb;">Relax Index</div></div>
     <div class="kw-m hrv"><div class="kw-m-val" id="hrvVal">-</div><div class="kw-m-lbl">HRV %</div></div>
   </div>
+  <div id="riCaveat" style="display:none;margin-top:.5rem;padding:.4rem .6rem;background:rgba(241,196,15,0.12);border:1px solid rgba(241,196,15,0.35);border-radius:6px;font-size:.7rem;line-height:1.5;color:#f1c40f;text-align:center;"></div>
   <div class="kw-delta-row" id="deltaRow"></div>
   <div id="kompasHint" onclick="kwOpslaan()" style="margin-top:.8rem;font-size:.82rem;color:#888;text-align:center;cursor:pointer;text-decoration:underline;">{% if lang=="de" %}Deine ausführliche Deutung findest du auf der Ergebnisseite.{% elif lang=="en" %}Your full interpretation is on the Results page.{% else %}Je volledige duiding vind je op de Resultaten-pagina.{% endif %}</div>
     <div id="qualityBadge" style="display:flex;align-items:center;justify-content:center;gap:.3rem;margin-top:.6rem;padding:.4rem .4rem;background:rgba(0,255,255,0.12);border:1px solid rgba(0,255,255,0.3);border-radius:6px;position:relative;width:100%;box-sizing:border-box;">
@@ -310,6 +311,24 @@ var vit=5;
   }
   document.getElementById('gaugeRI').textContent=displayRi;document.getElementById('gaugeRI').style.color=ZC[zi];
   document.getElementById('zoneLabel').textContent=ZL[zi];document.getElementById('zoneLabel').style.color=ZC[zi];
+  // === Kwaliteits-gate op de RI/zone-WEERGAVE (display-only; opgeslagen RI ongemoeid) ===
+  // KWALITEITS_GATE_ONTWERP.md: <70 onderdrukken; 70-84 voorbehoud + blokkeer positieve "Veerkrachtig".
+  (function(){
+    // kwaliteit -> vertrouwbaarheid (inline; kwadrant laadt hrv.js niet). >=85 trusted / 70-84 limited / <70 untrusted; ontbrekend=trusted (legacy).
+    var _kwv=(cur.kwaliteit===null||cur.kwaliteit===undefined||cur.kwaliteit==='')?100:Number(cur.kwaliteit);
+    var _conf=isNaN(_kwv)?'trusted':(_kwv>=85?'trusted':_kwv>=70?'limited':'untrusted');
+    var _g=document.getElementById('gaugeRI'),_z=document.getElementById('zoneLabel'),_c=document.getElementById('riCaveat');
+    if(_conf==='untrusted'){
+      _g.textContent='–';_g.style.color='#999';
+      _z.textContent={de:'Messung unzuverlässig',en:'Reading unreliable',nl:'Meting onbetrouwbaar'}[_lng]||'Meting onbetrouwbaar';_z.style.color='#999';
+      if(_c){_c.textContent={de:'Messqualität zu niedrig — bitte unter ruhigen Bedingungen wiederholen.',en:'Reading quality too low — please repeat under calm conditions.',nl:'Meetkwaliteit te laag — herhaal onder rustige omstandigheden.'}[_lng]||'';_c.style.display='block';}
+    } else if(_conf==='limited'){
+      if(zi===4){ // positieve "Veerkrachtig" niet stellig claimen bij beperkte kwaliteit
+        _z.textContent={de:'Messqualität begrenzt — unsicher',en:'Reading quality limited — uncertain',nl:'Meetkwaliteit beperkt — onzeker'}[_lng]||'Meetkwaliteit beperkt — onzeker';_z.style.color='#f1c40f';
+      }
+      if(_c){_c.textContent={de:'Messqualität begrenzt — Ergebnis mit Vorsicht interpretieren.',en:'Reading quality limited — interpret with caution.',nl:'Meetkwaliteit beperkt — interpreteer met voorzichtigheid.'}[_lng]||'';_c.style.display='block';}
+    } else if(_c){_c.style.display='none';}
+  })();
   document.getElementById('bpmVal').textContent=bpm;document.getElementById('hrvVal').textContent=hrv+'%';
   if(document.getElementById('qualityPct'))document.getElementById('qualityPct').textContent=kw+'%';
   if(document.getElementById('qualityStars'))document.getElementById('qualityStars').textContent=kw>=90?'★★★':kw>=70?'★★☆':'★☆☆';

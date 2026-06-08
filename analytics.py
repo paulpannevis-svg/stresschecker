@@ -194,6 +194,16 @@ def baseline_day_values(rows, max_days=BASELINE_MIN_DAYS, tz_name=_BASELINE_TZ):
     for r in rows:
         if str(_g(r, 'meting_type') or '').lower() != 'basismeting':
             continue
+        # Kwaliteits-gate (besluit 3): alleen VERTROUWDE metingen (kwaliteit >= 85) in de
+        # baseline/trend, anders vervuilt één aritmie-/lage-kwaliteit-meting de baseline.
+        # Ontbrekende kwaliteit (legacy/niet meegegeven) telt as-is mee (besluit 5: legacy=vertrouwd).
+        _kw = _g(r, 'kwaliteit')
+        if _kw is not None:
+            try:
+                if float(_kw) < 85:
+                    continue
+            except (TypeError, ValueError):
+                pass
         ri, ts = _g(r, 'ri'), _g(r, 'ts')
         if ri is None or ts is None:
             continue
