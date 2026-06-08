@@ -24,7 +24,9 @@ else{
     var date=dt?dt.toLocaleDateString('nl-NL',{year:'numeric',month:'2-digit',day:'2-digit'}):'';
     var tijd=dt?dt.toTimeString().substring(0,5):'';
     var ri=r.ri||0;
-    var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+(ri<2?'#e74c3c':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#2ecc71':'#27ae60')+'"></span>';
+    // Kwaliteits-gate (besluit 2a): grijze stip bij kwaliteit <85.
+    var _kwlow=(r.kwaliteit!=null&&!isNaN(Number(r.kwaliteit))&&Number(r.kwaliteit)<85);
+    var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+(_kwlow?'#bfbfbf':(ri<2?'#e74c3c':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#2ecc71':'#27ae60'))+'"></span>';
     html+='<tr style="border-bottom:1px solid #eef0f3;"><td style="padding:.55rem .8rem;">'+date+'</td><td style="padding:.55rem .8rem;">'+tijd+'</td><td style="padding:.55rem .8rem;">'+dot+ri+'</td><td style="padding:.55rem .8rem;">'+(r.bpm||'-')+'</td><td style="padding:.55rem .8rem;">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td style="padding:.55rem .8rem;">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td style="padding:.55rem .8rem;">'+(r.meting_type_label||'-')+'</td><td style="padding:.55rem .8rem;">'+(r.dimensie||'-')+'</td><td style="padding:.55rem .8rem;">'+(r.notes||'')+'</td><td style="padding:.55rem .8rem;">'+(r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" style="font-size:.75rem;color:#0078ff;text-decoration:none;">↓ Kubios export</a>':'')+'</td></tr>';
   });
   html+='</table></div>';

@@ -36,3 +36,13 @@
 <p class="zone-bar-empty">{% if lang=='de' %}Keine Daten.{% elif lang=='en' %}No data.{% else %}Geen data.{% endif %}</p>
 {% endif %}
 {% endmacro %}
+
+{# Kwaliteits-notitie: meld expliciet hoeveel metingen buiten het zone-oordeel vielen
+   (besluit C/D/E optie i — niet stil weglaten). Toont niets als er 0 uitgesloten zijn. #}
+{% macro quality_note(overall, lang) %}
+{% if overall.low_quality_excluded and overall.low_quality_excluded > 0 %}
+<p style="font-size:.8rem;color:#666;font-style:italic;margin:.4rem 0 0;">
+  {% if lang=='de' %}Bei {{ overall.low_quality_excluded }} von {{ overall.total_metingen }} Messungen war die Messqualität zu niedrig für eine zuverlässige Beurteilung; diese sind aus der Zonenverteilung und dem RI-Durchschnitt ausgeschlossen.{% elif lang=='en' %}On {{ overall.low_quality_excluded }} of {{ overall.total_metingen }} readings the measurement quality was too low for a reliable assessment; these are excluded from the zone distribution and RI average.{% else %}Op {{ overall.low_quality_excluded }} van {{ overall.total_metingen }} metingen was de kwaliteit te laag voor een betrouwbaar oordeel; deze zijn buiten de zoneverdeling en het RI-gemiddelde gehouden.{% endif %}
+</p>
+{% endif %}
+{% endmacro %}

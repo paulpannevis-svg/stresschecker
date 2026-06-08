@@ -2022,7 +2022,7 @@ def mijn_metingen():
         return redirect(url_for('sc_login'))
     cn = get_meting_db()
     metingen = cn.execute(
-        "SELECT id, ts, ri, bpm, hrv_pct, rmssd, meting_type, notes, rr_intervals FROM metingen WHERE user_key=? ORDER BY ts DESC",
+        "SELECT id, ts, ri, bpm, hrv_pct, rmssd, kwaliteit, meting_type, notes, rr_intervals FROM metingen WHERE user_key=? ORDER BY ts DESC",
         (user_key,)
     ).fetchall()
     metingen_chart = [dict(r) for r in metingen]

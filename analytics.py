@@ -293,6 +293,12 @@ def period_bounds_ms(period_start, period_end):
 def _empty_aggregate():
     return {
         'total_metingen': 0,
+        # Kwaliteits-gate (besluit C/D/E optie i): lage-kwaliteit-metingen tellen NIET mee in
+        # zone-distributie / RI-gemiddelde / modale klant-zone, maar worden WEL geteld + gerapporteerd.
+        'reliable_metingen': 0,
+        'low_quality_excluded': 0,
+        'clients_no_reliable': 0,
+        'reliable_clients': 0,
         'gender_distribution': {k: 0 for k in GENDER_KEYS},
         'age_categories':      {k: 0 for k in AGE_CATS},
         'ri_average': None,
@@ -328,7 +334,7 @@ def _fetch_metingen(pro_key, period_start_ms, period_end_ms, filter=None):
             where.append("cm.client_id=?")
             params.append(int(filter['client_id']))
     sql = f"""
-        SELECT cm.id, cm.client_id, cm.ri, cm.ts, cm.office_label,
+        SELECT cm.id, cm.client_id, cm.ri, cm.ts, cm.office_label, cm.kwaliteit,
                c.gender, c.birth_year, c.name AS client_name, c.surname AS client_surname
         FROM client_metingen cm
         LEFT JOIN clients c ON c.id = cm.client_id
@@ -355,40 +361,60 @@ def _aggregate_rows(rows):
     out['total_metingen'] = len(rows)
     ri_sum = 0.0
     ri_count = 0
-    # Per-klant accumulator: client_id → {gender, birth_year, zone_counts: {zone:n}}
+    low_q = 0
+    # Per-klant accumulator: client_id → {gender, birth_year, zone_counts, reliable}
     per_client = {}
     for r in rows:
-        # Gender
+        # Gender + leeftijd = demografie van wie gemeten is → ALLE metingen (kwaliteit-onafhankelijk).
         out['gender_distribution'][_gender_bucket(r.get('gender'))] += 1
-        # Age category
         out['age_categories'][age_category(r.get('birth_year'))] += 1
-        # Zone
-        out['zone_distribution'][zone_for_ri(r.get('ri'))] += 1
-        # RI gemiddelde
-        try:
-            ri_sum += float(r['ri'])
-            ri_count += 1
-        except (TypeError, ValueError, KeyError):
-            pass
-        # Per-klant index — None client_id → één bucket
+        # Per-klant index (demografie) — None client_id → één bucket
         cid = r.get('client_id')
         if cid not in per_client:
             per_client[cid] = {
                 'gender': r.get('gender'),
                 'birth_year': r.get('birth_year'),
                 'zone_counts': {k: 0 for k in ZONE_KEYS},
+                'reliable': 0,
             }
+        # Kwaliteits-gate: zone/RI-oordeel alleen op VERTROUWDE metingen (kwaliteit >= 85).
+        # Ontbrekende kwaliteit telt as-is mee (besluit 5: legacy = vertrouwd).
+        _kw = r.get('kwaliteit')
+        try:
+            _low = (_kw is not None and float(_kw) < 85)
+        except (TypeError, ValueError):
+            _low = False
+        if _low:
+            low_q += 1
+            continue
+        # Zone + RI-gemiddelde (alleen betrouwbaar)
+        out['zone_distribution'][zone_for_ri(r.get('ri'))] += 1
+        try:
+            ri_sum += float(r['ri'])
+            ri_count += 1
+        except (TypeError, ValueError, KeyError):
+            pass
         per_client[cid]['zone_counts'][zone_for_ri(r.get('ri'))] += 1
+        per_client[cid]['reliable'] += 1
+    out['low_quality_excluded'] = low_q
+    out['reliable_metingen'] = len(rows) - low_q
     out['ri_average'] = round(ri_sum / ri_count, 2) if ri_count else None
 
     # Klant-aggregatie afronden
     out['unique_clients'] = len(per_client)
+    clients_no_reliable = 0
     for cid, info in per_client.items():
         out['gender_distribution_client'][_gender_bucket(info['gender'])] += 1
         out['age_categories_client'][age_category(info['birth_year'])] += 1
-        # Modale zone — bij gelijkspel valt de eerste in ZONE_KEYS-volgorde (van zwaar→vital).
+        if info['reliable'] == 0:
+            # Geen enkele betrouwbare meting → niet in zone-per-klant classificeren.
+            clients_no_reliable += 1
+            continue
+        # Modale zone over de BETROUWBARE metingen — bij gelijkspel eerste in ZONE_KEYS-volgorde.
         modal_zone = max(ZONE_KEYS, key=lambda z: info['zone_counts'][z])
         out['zone_distribution_client'][modal_zone] += 1
+    out['clients_no_reliable'] = clients_no_reliable
+    out['reliable_clients'] = out['unique_clients'] - clients_no_reliable
     return out
 
 

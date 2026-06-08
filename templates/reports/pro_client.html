@@ -1,4 +1,5 @@
 {% extends "reports/base.html" %}
+{% import "reports/_macros.html" as rmacros %}
 {% block title %}Cliëntrapport — {{ client.name }}{% endblock %}
 {% block content %}
 
@@ -30,10 +31,11 @@
   <tr class="zone-row">
     <td class="label zone-{{ z }}">{{ zone_label(z, lang) }}</td>
     <td>{{ overall.zone_distribution[z] }}</td>
-    <td>{{ pct(overall.zone_distribution[z], overall.total_metingen) }}</td>
+    <td>{{ pct(overall.zone_distribution[z], overall.reliable_metingen) }}</td>
   </tr>
   {% endfor %}
 </table>
+{{ rmacros.quality_note(overall, lang) }}
 
 <h2>{% if lang=='de' %}Verlauf{% elif lang=='en' %}Time series{% else %}Tijdreeks{% endif %}</h2>
 {% if series %}
