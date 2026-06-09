@@ -134,7 +134,7 @@ function buildChart(labels, vals, szVdata, marked){
   // render/resize gaf → RangeError: Maximum call stack size exceeded (ná de eerste draw).
   // De baseline verschijnt automatisch in de legenda (grijs gestippeld lijnsymbool +
   // "Baseline", zelfde term 3 talen) en raakt de RI-/Zelfinschatting-datasets niet.
-  var datasets=[{label:'Relax Index',data:vals,borderColor:'#ffffff',backgroundColor:'rgba(0,0,0,.0)',tension:.3,pointRadius:pR,pointHoverRadius:pHR,borderWidth:2.5,pointBackgroundColor:'#ffffff',pointBorderColor:marked.map(function(m){return m?'#999999':'#333333';}),pointBorderWidth:1.5,spanGaps:true},{label:szLabel,data:szVdata||[],borderColor:"#0078ff",backgroundColor:"#0078ff",tension:.3,pointRadius:5,borderWidth:2,borderDash:[6,3],pointBackgroundColor:"#0078ff",pointBorderColor:"#0078ff",spanGaps:true}];
+  var datasets=[{label:'Relax Index',data:vals,borderColor:'#ffffff',backgroundColor:'rgba(0,0,0,.0)',tension:.3,pointRadius:marked.map(function(m){return m?(pR+2):pR;}),pointHoverRadius:pHR,borderWidth:2.5,pointBackgroundColor:'#ffffff',pointBorderColor:'#333333',pointBorderWidth:marked.map(function(m){return m?2.5:1.5;}),spanGaps:true},{label:szLabel,data:szVdata||[],borderColor:"#0078ff",backgroundColor:"#0078ff",tension:.3,pointRadius:5,borderWidth:2,borderDash:[6,3],pointBackgroundColor:"#0078ff",pointBorderColor:"#0078ff",spanGaps:true}];
   if(BASELINE != null){
     datasets.push({label:'Baseline',data:labels.map(function(){return BASELINE;}),borderColor:'rgba(110,110,110,0.95)',borderWidth:1.5,borderDash:[5,4],pointRadius:0,pointHoverRadius:0,fill:false,tension:0,spanGaps:true,order:99});
   }
@@ -149,8 +149,9 @@ function buildChart(labels, vals, szVdata, marked){
   // VOORLOPIG plafond-voorschot: klein grijs ⚠ boven gemarkeerde RI-punten (lijn/aggregaten ongemoeid).
   var _provWarnPlugin={id:'provWarn',afterDatasetsDraw:function(chart){
     var meta=chart.getDatasetMeta(0), ds=chart.data.datasets[0], c=chart.ctx;
-    c.save();c.fillStyle='#999999';c.font='10px sans-serif';c.textAlign='center';
-    meta.data.forEach(function(pt,i){ if(marked[i] && ds.data[i]!=null){ c.fillText('⚠', pt.x, pt.y-9); } });
+    // ⚠ ONDER het punt (plafond-punten staan bovenin) + witte halo voor contrast op elke zoneband
+    c.save();c.font='bold 13px sans-serif';c.textAlign='center';c.lineWidth=3;c.strokeStyle='#fff';
+    meta.data.forEach(function(pt,i){ if(marked[i] && ds.data[i]!=null){ c.strokeText('⚠', pt.x, pt.y+17); c.fillStyle='#333333'; c.fillText('⚠', pt.x, pt.y+17); } });
     c.restore();
   }};
   riChart=new Chart(ctx,{type:'line',data:{labels:labels,datasets:datasets},options:{scales:{y:{beginAtZero:true,min:0,max:10,ticks:{stepSize:2},grid:{color:'rgba(0,0,0,.07)'}},x:{offset:true,grid:{color:'rgba(0,0,0,.07)'},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:16}}},plugins:{legend:{display:true,position:"top",labels:{color:"#555",font:{size:11},boxWidth:20,boxHeight:2,padding:12,generateLabels:function(chart){var items=Chart.defaults.plugins.legend.labels.generateLabels(chart);items.forEach(function(l){if(l.text==='Relax Index'){l.strokeStyle='#666666';l.fillStyle='#666666';}});return items;}}},annotation:{annotations:{z1:{type:'box',yMin:0,yMax:2,backgroundColor:'rgba(169,50,38,.75)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z2:{type:'box',yMin:2,yMax:4,backgroundColor:'rgba(186,74,0,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z3:{type:'box',yMin:4,yMax:6,backgroundColor:'rgba(185,150,10,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z4:{type:'box',yMin:6,yMax:8,backgroundColor:'rgba(30,150,80,.65)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z5:{type:'box',yMin:8,yMax:10,backgroundColor:'rgba(20,110,60,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'}}},tooltip:tooltipCfg},responsive:true,maintainAspectRatio:false},plugins:[_provWarnPlugin]});

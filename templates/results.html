@@ -413,9 +413,10 @@ for(var yi=0;yi<=10;yi+=2){ctx.fillText(yi,P.l-2,yP(yi)+3);}
   ctx.strokeStyle="#ffffff";ctx.lineWidth=2.5;ctx.beginPath();var s=false;
   vals.forEach(function(v,i){if(v==null)return;if(!s){ctx.moveTo(xP(i),yP(v));s=true;}else ctx.lineTo(xP(i),yP(v));});ctx.stroke();
   vals.forEach(function(v,i){if(v==null)return;ctx.beginPath();ctx.arc(xP(i),yP(v),4,0,2*Math.PI);ctx.fillStyle="#fff";ctx.fill();
-    if(markedBucket[i]){ // VOORLOPIG plafond-voorschot: grijze OPEN cirkel + klein grijs ⚠ (lijn ongemoeid, aggregaten ongemoeid)
-      ctx.strokeStyle="#999999";ctx.lineWidth=1.5;ctx.stroke();
-      ctx.fillStyle="#999999";ctx.font="9px sans-serif";ctx.textAlign="center";ctx.fillText("⚠",xP(i),yP(v)-7);
+    if(markedBucket[i]){ // VOORLOPIG plafond-voorschot: GROOT wit punt + dikke donkere ring + donker vet ⚠ — duidelijk tegen elke zonekleur (lijn/aggregaten ongemoeid)
+      ctx.beginPath();ctx.arc(xP(i),yP(v),6,0,2*Math.PI);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#333333";ctx.lineWidth=2.5;ctx.stroke();
+      // ⚠ ONDER het punt (plafond-punten staan bovenin → boven zou afkappen) + witte halo voor contrast op elke zoneband
+      ctx.font="bold 13px sans-serif";ctx.textAlign="center";ctx.lineWidth=3;ctx.strokeStyle="#fff";ctx.strokeText("⚠",xP(i),yP(v)+16);ctx.fillStyle="#333333";ctx.fillText("⚠",xP(i),yP(v)+16);
     }else{ ctx.strokeStyle="#333333";ctx.lineWidth=1.5;ctx.stroke(); }
   });
   // Zelfinschatting lijn tekenen
