@@ -261,7 +261,24 @@ function renderResults(results) {
     var z=r.ri!=null?zone(r.ri):0;
     // Kwaliteits-gate (besluit 2a): stip grijs bij kwaliteit <85 — geen stellige zonekleur op een onbetrouwbare meting.
     var _kwlow=(r.kwaliteit!=null&&!isNaN(Number(r.kwaliteit))&&Number(r.kwaliteit)<85);
-    var col=_kwlow?'#bfbfbf':(COLORS[z]||'#999');
+    // ── VOORLOPIG conservatief plafond-VOORSCHOT (GEEN definitieve gate) ──────────────────────
+    // Alleen tabel-markering van de evidente plafond-onzin: SD1/SD2 >= PROV_SD1SD2 EN HRV% >=
+    // PROV_HRV_PLAFOND (volledige RR). GEEN aggregaat-uitsluiting, GEEN trendlijn, GEEN Kompas.
+    // De DEFINITIEVE drempel volgt uit de 30-06-herijking op de prod-gate_metrics. Benoemde constanten.
+    var PROV_SD1SD2=1.05, PROV_HRV_PLAFOND=200, _provFlag=false;
+    try{ if((r.hrv_pct||0)>=PROV_HRV_PLAFOND){ var _pr=r.rr_intervals; if(typeof _pr==='string')_pr=JSON.parse(_pr);
+      if(_pr&&_pr.length>=20){
+        var _pn=_pr.length,_pm=0; for(var _pi=0;_pi<_pn;_pi++)_pm+=_pr[_pi]; _pm/=_pn;
+        var _pss=0; for(var _pi=0;_pi<_pn;_pi++){var _pdv=_pr[_pi]-_pm; _pss+=_pdv*_pdv;} var _psdnn=Math.sqrt(_pss/_pn);
+        var _ps=0,_pmd=0; for(var _pi=1;_pi<_pn;_pi++){var _pd=_pr[_pi]-_pr[_pi-1]; _ps+=_pd*_pd; _pmd+=_pd;} var _pnd=_pn-1; _pmd/=_pnd;
+        var _psx=0; for(var _pi=1;_pi<_pn;_pi++){var _pd2=(_pr[_pi]-_pr[_pi-1])-_pmd; _psx+=_pd2*_pd2;} var _psdsd=Math.sqrt(_psx/_pnd);
+        var _psd1=Math.sqrt(0.5)*_psdsd,_psd2=Math.sqrt(Math.max(2*_psdnn*_psdnn-0.5*_psdsd*_psdsd,0));
+        var _pratio=_psd2>0?_psd1/_psd2:99; _provFlag=(_pratio>=PROV_SD1SD2);
+      }}}catch(e){}
+    var _provN=(LANG=='de'?'zu unregelmäßig für eine zuverlässige Bewertung':LANG=='en'?'too irregular to score reliably':'te onregelmatig om betrouwbaar te scoren');
+    var _provWarn=_provFlag?'<span title="'+_provN+'" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
+    var _provLine=_provFlag?'<div style="font-size:.66rem;color:#c0392b;line-height:1.2;margin-top:1px;">'+_provN+'</div>':'';
+    var col=(_kwlow||_provFlag)?'#bfbfbf':(COLORS[z]||'#999');
     var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+col+';margin-right:4px;"></span>';
         var ctx_html2='';
         if(r.subjectief_score!=null||r.ctx_vitaliteit!=null||r.ctx_dimensie){
@@ -278,7 +295,7 @@ function renderResults(results) {
         var mTYPE=LANG=='de'?{basismeting:'Basismessung',biofeedback:'Biofeedback',situatiemeting:'Situationsmessung'}:LANG=='en'?{basismeting:'Baseline measurement',biofeedback:'Biofeedback',situatiemeting:'Situation measurement'}:{};
         var mTypeL=mTYPE[mType.toLowerCase()]||mType;
         var dimL=r.ctx_dimensie?(dDIM[r.ctx_dimensie]||r.ctx_dimensie):'-';
-        html+='<tr style="'+(hC?'cursor:pointer;':'')+'" '+(hC?'onclick="toggleCtx2('+r.id+')"':'')+'>'+'<td>'+date+'</td><td>'+tijd+'</td><td>'+dot+ri+'</td><td>'+(r.bpm||'-')+'</td><td class="hide-on-tablet">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td class="hide-on-tablet">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td>'+mTypeL+'</td><td>'+dimL+'</td><td>'+(r.notes||'')+'</td></tr>'+ctx_html2;
+        html+='<tr style="'+(hC?'cursor:pointer;':'')+'" '+(hC?'onclick="toggleCtx2('+r.id+')"':'')+'>'+'<td>'+date+'</td><td>'+tijd+'</td><td>'+_provWarn+dot+ri+_provLine+'</td><td>'+(r.bpm||'-')+'</td><td class="hide-on-tablet">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td class="hide-on-tablet">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td>'+mTypeL+'</td><td>'+dimL+'</td><td>'+(r.notes||'')+'</td></tr>'+ctx_html2;
   });
   html+='</table></div>';
   list.innerHTML=html;

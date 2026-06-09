@@ -179,10 +179,26 @@ else{
     var ri=r.ri||0;
     // Kwaliteits-gate (besluit 2a): grijze stip bij kwaliteit <85.
     var _kwlow=(r.kwaliteit!=null&&!isNaN(Number(r.kwaliteit))&&Number(r.kwaliteit)<85);
-    var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+(_kwlow?'#bfbfbf':(ri<2?'#c0392b':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#27ae60':'#1e8449'))+'"></span>';
+    // ── VOORLOPIG conservatief plafond-VOORSCHOT (GEEN definitieve gate) — alleen tabel-markering.
+    // SD1/SD2 >= PROV_SD1SD2 EN HRV% >= PROV_HRV_PLAFOND (volledige RR). GEEN aggregaat/trend/Kompas.
+    // Definitieve drempel volgt uit de 30-06-herijking op de prod-gate_metrics. Benoemde constanten.
+    var PROV_SD1SD2=1.05, PROV_HRV_PLAFOND=200, _provFlag=false;
+    try{ if((r.hrv_pct||0)>=PROV_HRV_PLAFOND){ var _pr=r.rr_intervals; if(typeof _pr==='string')_pr=JSON.parse(_pr);
+      if(_pr&&_pr.length>=20){
+        var _pn=_pr.length,_pm=0; for(var _pi=0;_pi<_pn;_pi++)_pm+=_pr[_pi]; _pm/=_pn;
+        var _pss=0; for(var _pi=0;_pi<_pn;_pi++){var _pdv=_pr[_pi]-_pm; _pss+=_pdv*_pdv;} var _psdnn=Math.sqrt(_pss/_pn);
+        var _ps=0,_pmd=0; for(var _pi=1;_pi<_pn;_pi++){var _pd=_pr[_pi]-_pr[_pi-1]; _ps+=_pd*_pd; _pmd+=_pd;} var _pnd=_pn-1; _pmd/=_pnd;
+        var _psx=0; for(var _pi=1;_pi<_pn;_pi++){var _pd2=(_pr[_pi]-_pr[_pi-1])-_pmd; _psx+=_pd2*_pd2;} var _psdsd=Math.sqrt(_psx/_pnd);
+        var _psd1=Math.sqrt(0.5)*_psdsd,_psd2=Math.sqrt(Math.max(2*_psdnn*_psdnn-0.5*_psdsd*_psdsd,0));
+        var _pratio=_psd2>0?_psd1/_psd2:99; _provFlag=(_pratio>=PROV_SD1SD2);
+      }}}catch(e){}
+    var _provN=(_L=='de'?'zu unregelmäßig für eine zuverlässige Bewertung':_L=='en'?'too irregular to score reliably':'te onregelmatig om betrouwbaar te scoren');
+    var _provWarn=_provFlag?'<span title="'+_provN+'" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
+    var _provLine=_provFlag?'<div style="font-size:.66rem;color:#c0392b;line-height:1.2;margin-top:1px;">'+_provN+'</div>':'';
+    var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+((_kwlow||_provFlag)?'#bfbfbf':(ri<2?'#c0392b':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#27ae60':'#1e8449'))+'"></span>';
     var mt=r.meting_type||'-';var mtL=mTYPE[mt.toLowerCase()]||mt;
     var dimL=r.dimensie?(dDIM[r.dimensie]||r.dimensie):'-';
-    html+='<tr style="border-bottom:1px solid #eef0f3;"><td style="'+cTD+'white-space:nowrap;">'+date+'</td><td style="'+cTD+'white-space:nowrap;">'+tijd+'</td><td style="'+cTD+'white-space:nowrap;">'+dot+ri+'</td><td style="'+cNUM+'">'+(r.bpm||'-')+'</td><td style="'+cNUM+'">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td style="'+cNUM+'">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td style="'+cTD+'">'+mtL+'</td><td style="'+cTD+'">'+(r.notes||'')+'</td><td style="'+cTD+'">'+dimL+'</td><td style="'+cTD+'white-space:nowrap;">'+(r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" style="font-size:.75rem;color:#0078ff;text-decoration:none;">&darr; Kubios</a>':'')+'</td></tr>';
+    html+='<tr style="border-bottom:1px solid #eef0f3;"><td style="'+cTD+'white-space:nowrap;">'+date+'</td><td style="'+cTD+'white-space:nowrap;">'+tijd+'</td><td style="'+cTD+'white-space:nowrap;">'+_provWarn+dot+ri+_provLine+'</td><td style="'+cNUM+'">'+(r.bpm||'-')+'</td><td style="'+cNUM+'">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td style="'+cNUM+'">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td style="'+cTD+'">'+mtL+'</td><td style="'+cTD+'">'+(r.notes||'')+'</td><td style="'+cTD+'">'+dimL+'</td><td style="'+cTD+'white-space:nowrap;">'+(r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" style="font-size:.75rem;color:#0078ff;text-decoration:none;">&darr; Kubios</a>':'')+'</td></tr>';
   });
   html+='</table></div>';
   list.innerHTML=html;
