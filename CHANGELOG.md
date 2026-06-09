@@ -1,5 +1,24 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-09 — PROD: plafond-voorschot óók in de grafiek (tabel/grafiek consistent)
+
+Vervolg op de tabel-markering: een door het voorschot gemarkeerde meting krijgt nu ook in de
+trendgrafiek een afwijkend punt, zodat tabel en grafiek hetzelfde verhaal tonen. Bewust minimaal —
+hoort bij het voorlopige plafond-voorschot, niet bij de 30-06-behandeling.
+
+- **Eén bron van waarheid:** de PROV-conditie (`SD1/SD2 >= 1.05` ÉN `HRV% >= 200`) is uit de tabel-
+  code gehaald naar één gedeelde top-level helper `_provPlafond(rr, hrv)` per pagina; tabel én grafiek
+  roepen exact dezelfde helper/constanten aan (geen tweede drempel-definitie).
+- **Grafiek-markering:** een tijdsbucket waarin ≥1 gemarkeerde meting valt krijgt een **open grijze
+  cirkel + klein grijs ⚠️** i.p.v. de normale gevulde stip (`/resultaten` canvas én `/pro/eigen_metingen`
+  Chart.js, identiek). Bewust **grijs, niet rood** — een fel accent in een rustig lijnbeeld zou
+  alarmerend ogen; grijs houdt de boodschap zonder schrik. Tooltip met dezelfde neutrale tekst.
+- **Nadrukkelijk NIET gewijzigd:** de trendlijn loopt onveranderd door het punt (geen punten uit de
+  lijn, GEEN rode segmenten, geen gaten); aggregaten/Kompas/gemiddelde/baseline blijven exact zoals nu
+  (gemarkeerde metingen tellen voorlopig gewoon mee). Alleen het PUNT-uiterlijk verandert.
+- **Verificatie:** geïsoleerde test_client-render + node --check beide pagina's × 3 talen (groen);
+  helper functioneel — id523/524 (02-06-bucket) gemarkeerd, id525/526/527 + 360/333/368 niet.
+
 ## 2026-06-09 — PROD: conservatief plafond-VOORSCHOT — tabel-markering (GEEN definitieve gate)
 
 Beperkt voorschot op prod: een minimale tabel-markering die ALLEEN de evidente plafond-onzin vangt,
