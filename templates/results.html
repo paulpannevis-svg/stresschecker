@@ -261,20 +261,8 @@ function renderResults(results) {
     var z=r.ri!=null?zone(r.ri):0;
     // Kwaliteits-gate (besluit 2a): stip grijs bij kwaliteit <85 — geen stellige zonekleur op een onbetrouwbare meting.
     var _kwlow=(r.kwaliteit!=null&&!isNaN(Number(r.kwaliteit))&&Number(r.kwaliteit)<85);
-    // ── VOORLOPIG conservatief plafond-VOORSCHOT (GEEN definitieve gate) ──────────────────────
-    // Alleen tabel-markering van de evidente plafond-onzin: SD1/SD2 >= PROV_SD1SD2 EN HRV% >=
-    // PROV_HRV_PLAFOND (volledige RR). GEEN aggregaat-uitsluiting, GEEN trendlijn, GEEN Kompas.
-    // De DEFINITIEVE drempel volgt uit de 30-06-herijking op de prod-gate_metrics. Benoemde constanten.
-    var PROV_SD1SD2=1.05, PROV_HRV_PLAFOND=200, _provFlag=false;
-    try{ if((r.hrv_pct||0)>=PROV_HRV_PLAFOND){ var _pr=r.rr_intervals; if(typeof _pr==='string')_pr=JSON.parse(_pr);
-      if(_pr&&_pr.length>=20){
-        var _pn=_pr.length,_pm=0; for(var _pi=0;_pi<_pn;_pi++)_pm+=_pr[_pi]; _pm/=_pn;
-        var _pss=0; for(var _pi=0;_pi<_pn;_pi++){var _pdv=_pr[_pi]-_pm; _pss+=_pdv*_pdv;} var _psdnn=Math.sqrt(_pss/_pn);
-        var _ps=0,_pmd=0; for(var _pi=1;_pi<_pn;_pi++){var _pd=_pr[_pi]-_pr[_pi-1]; _ps+=_pd*_pd; _pmd+=_pd;} var _pnd=_pn-1; _pmd/=_pnd;
-        var _psx=0; for(var _pi=1;_pi<_pn;_pi++){var _pd2=(_pr[_pi]-_pr[_pi-1])-_pmd; _psx+=_pd2*_pd2;} var _psdsd=Math.sqrt(_psx/_pnd);
-        var _psd1=Math.sqrt(0.5)*_psdsd,_psd2=Math.sqrt(Math.max(2*_psdnn*_psdnn-0.5*_psdsd*_psdsd,0));
-        var _pratio=_psd2>0?_psd1/_psd2:99; _provFlag=(_pratio>=PROV_SD1SD2);
-      }}}catch(e){}
+    // VOORLOPIG conservatief plafond-voorschot — gedeelde helper (zelfde conditie/constanten als de grafiek).
+    var _provFlag=_provPlafond(r.rr_intervals, r.hrv_pct);
     var _provN=(LANG=='de'?'zu unregelmäßig für eine zuverlässige Bewertung':LANG=='en'?'too irregular to score reliably':'te onregelmatig om betrouwbaar te scoren');
     var _provWarn=_provFlag?'<span title="'+_provN+'" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
     var _provLine=_provFlag?'<div style="font-size:.66rem;color:#c0392b;line-height:1.2;margin-top:1px;">'+_provN+'</div>':'';
@@ -375,18 +363,34 @@ function consVerlPeriod(days){
   if(!window._consAllData)return;
   if(days===0){drawVerlChart(window._consAllData);}else{var c=Date.now()-days*86400000;drawVerlChart(window._consAllData.filter(function(d){return d.ts>=c;}));}
 }
+// ── VOORLOPIG conservatief plafond-VOORSCHOT — ÉÉN bron van waarheid voor tabel én grafiek. ──────
+// Markeer als SD1/SD2 >= PROV_SD1SD2 EN HRV% >= PROV_HRV_PLAFOND (volledige RR). Benoemde constanten.
+// GEEN aggregaat-uitsluiting, GEEN trendlijn-herberekening, GEEN Kompas — alleen visuele markering.
+// Definitieve drempel volgt uit de 30-06-herijking op de prod-gate_metrics.
+var PROV_SD1SD2=1.05, PROV_HRV_PLAFOND=200;
+function _provPlafond(rr, hrv){
+  if((hrv||0)<PROV_HRV_PLAFOND) return false;
+  try{ if(typeof rr==='string')rr=JSON.parse(rr); }catch(e){ return false; }
+  if(!rr||rr.length<20) return false;
+  var n=rr.length,m=0; for(var i=0;i<n;i++)m+=rr[i]; m/=n;
+  var ss=0; for(var i=0;i<n;i++){var dv=rr[i]-m; ss+=dv*dv;} var sdnn=Math.sqrt(ss/n);
+  var s=0,md=0; for(var i=1;i<n;i++){var d=rr[i]-rr[i-1]; s+=d*d; md+=d;} var nd=n-1; md/=nd;
+  var sx=0; for(var i=1;i<n;i++){var d2=(rr[i]-rr[i-1])-md; sx+=d2*d2;} var sdsd=Math.sqrt(sx/nd);
+  var sd1=Math.sqrt(0.5)*sdsd, sd2=Math.sqrt(Math.max(2*sdnn*sdnn-0.5*sdsd*sdsd,0));
+  return (sd2>0?sd1/sd2:99) >= PROV_SD1SD2;
+}
 function drawVerlChart(data){
   var lang="{{ lang }}";var mn=lang==="de"?["Jan","Feb","Mrz","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"]:lang==="en"?["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]:["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
   var days=window._consVerlDays||0;
-  var VA=data.map(function(r){return{ts:r.ts,ri:r.ri,sz:r.subjectief_score};}).filter(function(r){return r.ri!=null;}).reverse();
+  var VA=data.map(function(r){return{ts:r.ts,ri:r.ri,sz:r.subjectief_score,_prov:_provPlafond(r.rr_intervals,r.hrv_pct)};}).filter(function(r){return r.ri!=null;}).reverse();
   if(VA.length<1)return;
   var bMs,fL;
   if(days>0&&days<=365){bMs=days<=30?86400000:7*86400000;if(days<=7){fL=function(t){var d=new Date(t);return ["Zo","Ma","Di","Wo","Do","Vr","Za"][d.getDay()];};bMs=86400000;}else if(days<=365){fL=function(t){var d=new Date(t);return d.getDate()+" "+mn[d.getMonth()];};}else{fL=function(t){var d=new Date(t);return mn[d.getMonth()]+" "+d.getFullYear().toString().slice(2);};};}
   else{bMs=null;}
-  var labels=[],vals=[],szV=[];
-  if(days===7){var _now=Date.now(),_day=86400000;for(var _di=6;_di>=0;_di--){var _dt=new Date(_now-_di*_day);var _t0=new Date(_dt.getFullYear(),_dt.getMonth(),_dt.getDate()).getTime();var _t1=_t0+_day;var _pts=VA.filter(function(d){return d.ts>=_t0&&d.ts<_t1;});labels.push((lang==="de"?["So","Mo","Di","Mi","Do","Fr","Sa"]:lang==="en"?["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]:["Zo","Ma","Di","Wo","Do","Vr","Za"])[_dt.getDay()]);vals.push(_pts.length?Math.round(_pts.reduce(function(s,x){return s+x.ri;},0)/_pts.length*10)/10:null);var _sp=_pts.filter(function(d){return d.sz!=null;});szV.push(_sp.length?_sp.reduce(function(s,x){return s+x.sz;},0)/_sp.length:null);}}
-  else if(days===30){var _n=Date.now(),_d=86400000;for(var _i=29;_i>=0;_i--){var _dt=new Date(_n-_i*_d);var _t0=new Date(_dt.getFullYear(),_dt.getMonth(),_dt.getDate()).getTime();var _pts=VA.filter(function(d){return d.ts>=_t0&&d.ts<_t0+_d;});labels.push(_dt.getDate()+(_i%5===0||_i===0?" "+mn[_dt.getMonth()]:""));vals.push(_pts.length?Math.round(_pts.reduce(function(s,x){return s+x.ri;},0)/_pts.length*10)/10:null);var _sp2=_pts.filter(function(d){return d.sz!=null;});szV.push(_sp2.length?_sp2.reduce(function(s,x){return s+x.sz;},0)/_sp2.length:null);}}
-  else if(days===365||days===0){var _n2=Date.now();for(var _m=11;_m>=0;_m--){var _d2=new Date(_n2);_d2.setDate(1);_d2.setMonth(_d2.getMonth()-_m);var _ms=new Date(_d2.getFullYear(),_d2.getMonth(),1).getTime();var _me=new Date(_d2.getFullYear(),_d2.getMonth()+1,1).getTime();var _p=VA.filter(function(d){return d.ts>=_ms&&d.ts<_me;});labels.push(mn[_d2.getMonth()]);vals.push(_p.length?Math.round(_p.reduce(function(s,x){return s+x.ri;},0)/_p.length*10)/10:null);var _sp3=_p.filter(function(d){return d.sz!=null;});szV.push(_sp3.length?_sp3.reduce(function(s,x){return s+x.sz;},0)/_sp3.length:null);}}
+  var labels=[],vals=[],szV=[],markedBucket=[];
+  if(days===7){var _now=Date.now(),_day=86400000;for(var _di=6;_di>=0;_di--){var _dt=new Date(_now-_di*_day);var _t0=new Date(_dt.getFullYear(),_dt.getMonth(),_dt.getDate()).getTime();var _t1=_t0+_day;var _pts=VA.filter(function(d){return d.ts>=_t0&&d.ts<_t1;});labels.push((lang==="de"?["So","Mo","Di","Mi","Do","Fr","Sa"]:lang==="en"?["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]:["Zo","Ma","Di","Wo","Do","Vr","Za"])[_dt.getDay()]);vals.push(_pts.length?Math.round(_pts.reduce(function(s,x){return s+x.ri;},0)/_pts.length*10)/10:null);markedBucket.push(_pts.some(function(x){return x._prov;}));var _sp=_pts.filter(function(d){return d.sz!=null;});szV.push(_sp.length?_sp.reduce(function(s,x){return s+x.sz;},0)/_sp.length:null);}}
+  else if(days===30){var _n=Date.now(),_d=86400000;for(var _i=29;_i>=0;_i--){var _dt=new Date(_n-_i*_d);var _t0=new Date(_dt.getFullYear(),_dt.getMonth(),_dt.getDate()).getTime();var _pts=VA.filter(function(d){return d.ts>=_t0&&d.ts<_t0+_d;});labels.push(_dt.getDate()+(_i%5===0||_i===0?" "+mn[_dt.getMonth()]:""));vals.push(_pts.length?Math.round(_pts.reduce(function(s,x){return s+x.ri;},0)/_pts.length*10)/10:null);markedBucket.push(_pts.some(function(x){return x._prov;}));var _sp2=_pts.filter(function(d){return d.sz!=null;});szV.push(_sp2.length?_sp2.reduce(function(s,x){return s+x.sz;},0)/_sp2.length:null);}}
+  else if(days===365||days===0){var _n2=Date.now();for(var _m=11;_m>=0;_m--){var _d2=new Date(_n2);_d2.setDate(1);_d2.setMonth(_d2.getMonth()-_m);var _ms=new Date(_d2.getFullYear(),_d2.getMonth(),1).getTime();var _me=new Date(_d2.getFullYear(),_d2.getMonth()+1,1).getTime();var _p=VA.filter(function(d){return d.ts>=_ms&&d.ts<_me;});labels.push(mn[_d2.getMonth()]);vals.push(_p.length?Math.round(_p.reduce(function(s,x){return s+x.ri;},0)/_p.length*10)/10:null);markedBucket.push(_p.some(function(x){return x._prov;}));var _sp3=_p.filter(function(d){return d.sz!=null;});szV.push(_sp3.length?_sp3.reduce(function(s,x){return s+x.sz;},0)/_sp3.length:null);}}
   else if(bMs){
     var t=Math.floor(VA[0].ts/bMs)*bMs,last=new Date().getTime();
     while(t<=last+bMs){var pts=VA.filter(function(d){return d.ts>=t&&d.ts<t+bMs;});if(pts.length){labels.push(fL(t));vals.push(Math.round(pts.reduce(function(s,x){return s+x.ri;},0)/pts.length*10)/10);var _sp=pts.filter(function(d){return d.sz!=null;});szV.push(_sp.length?_sp.reduce(function(s,x){return s+x.sz;},0)/_sp.length:null);}else{szV.push(null);}t+=bMs;}var _td=new Date();labels[labels.length-1]=("0"+_td.getDate()).slice(-2)+" "+["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"][_td.getMonth()];
@@ -408,7 +412,12 @@ for(var yi=0;yi<=10;yi+=2){ctx.fillText(yi,P.l-2,yP(yi)+3);}
   vals.forEach(function(v,i){if(i%step==0||i==N-1){ctx.textAlign=i==0?"left":(i==N-1?"right":"center");ctx.fillText(labels[i],xP(i),H-6);}});
   ctx.strokeStyle="#ffffff";ctx.lineWidth=2.5;ctx.beginPath();var s=false;
   vals.forEach(function(v,i){if(v==null)return;if(!s){ctx.moveTo(xP(i),yP(v));s=true;}else ctx.lineTo(xP(i),yP(v));});ctx.stroke();
-  vals.forEach(function(v,i){if(v==null)return;ctx.beginPath();ctx.arc(xP(i),yP(v),4,0,2*Math.PI);ctx.fillStyle="#fff";ctx.fill();ctx.strokeStyle="#333333";ctx.lineWidth=1.5;ctx.stroke();});
+  vals.forEach(function(v,i){if(v==null)return;ctx.beginPath();ctx.arc(xP(i),yP(v),4,0,2*Math.PI);ctx.fillStyle="#fff";ctx.fill();
+    if(markedBucket[i]){ // VOORLOPIG plafond-voorschot: grijze OPEN cirkel + klein grijs ⚠ (lijn ongemoeid, aggregaten ongemoeid)
+      ctx.strokeStyle="#999999";ctx.lineWidth=1.5;ctx.stroke();
+      ctx.fillStyle="#999999";ctx.font="9px sans-serif";ctx.textAlign="center";ctx.fillText("⚠",xP(i),yP(v)-7);
+    }else{ ctx.strokeStyle="#333333";ctx.lineWidth=1.5;ctx.stroke(); }
+  });
   // Zelfinschatting lijn tekenen
   console.log("szV:",szV);if(szV.length > 1) {
     ctx.strokeStyle='#0078ff';ctx.lineWidth=2;ctx.setLineDash([6,3]);

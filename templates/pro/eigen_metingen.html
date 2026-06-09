@@ -58,11 +58,27 @@ var mndNL=_L==='de'?['Jan','Feb','Mrz','Apr','Mai','Jun','Jul','Aug','Sep','Okt'
 
 function padDate(d){return ('0'+d).slice(-2);}
 
+// ── VOORLOPIG conservatief plafond-VOORSCHOT — ÉÉN bron van waarheid voor tabel én grafiek. ──────
+// Markeer als SD1/SD2 >= PROV_SD1SD2 EN HRV% >= PROV_HRV_PLAFOND (volledige RR). Benoemde constanten.
+// GEEN aggregaat-uitsluiting, GEEN trendlijn-herberekening, GEEN Kompas — alleen visuele markering.
+// Definitieve drempel volgt uit de 30-06-herijking op de prod-gate_metrics.
+var PROV_SD1SD2=1.05, PROV_HRV_PLAFOND=200;
+function _provPlafond(rr, hrv){
+  if((hrv||0)<PROV_HRV_PLAFOND) return false;
+  try{ if(typeof rr==='string')rr=JSON.parse(rr); }catch(e){ return false; }
+  if(!rr||rr.length<20) return false;
+  var n=rr.length,m=0; for(var i=0;i<n;i++)m+=rr[i]; m/=n;
+  var ss=0; for(var i=0;i<n;i++){var dv=rr[i]-m; ss+=dv*dv;} var sdnn=Math.sqrt(ss/n);
+  var s=0,md=0; for(var i=1;i<n;i++){var d=rr[i]-rr[i-1]; s+=d*d; md+=d;} var nd=n-1; md/=nd;
+  var sx=0; for(var i=1;i<n;i++){var d2=(rr[i]-rr[i-1])-md; sx+=d2*d2;} var sdsd=Math.sqrt(sx/nd);
+  var sd1=Math.sqrt(0.5)*sdsd, sd2=Math.sqrt(Math.max(2*sdnn*sdnn-0.5*sdsd*sdsd,0));
+  return (sd2>0?sd1/sd2:99) >= PROV_SD1SD2;
+}
 // Bouw volledige tijdlijn met nulls waar geen meting is
 // Chart toont uitsluitend basismetingen — biofeedback/situatiemetingen blijven buiten de trend
 function buildFullTimeline(period){
   var now = new Date(); now.setHours(23,59,59,0);
-  var labels=[], vals=[], szV=[];
+  var labels=[], vals=[], szV=[], marked=[];
   var sortedBasis = sorted.filter(function(r){ return (r.meting_type||'').toLowerCase()==='basismeting'; });
 
   if(period=='week'){
@@ -72,7 +88,7 @@ function buildFullTimeline(period){
       var label=dgnNL[d.getDay()]+' '+padDate(d.getDate())+'/'+padDate(d.getMonth()+1);
       labels.push(label);
       var match=sortedBasis.filter(function(r){var rd=new Date(r.ts);return rd.getDate()==d.getDate()&&rd.getMonth()==d.getMonth()&&rd.getFullYear()==d.getFullYear();});
-      vals.push(match.length?match[match.length-1].ri:null);var _spd=match.filter(function(dd){return dd.subjectief_score!=null;});szV.push(_spd.length?_spd[_spd.length-1].subjectief_score:null);
+      vals.push(match.length?match[match.length-1].ri:null);marked.push(match.some(function(r){return _provPlafond(r.rr_intervals,r.hrv_pct);}));var _spd=match.filter(function(dd){return dd.subjectief_score!=null;});szV.push(_spd.length?_spd[_spd.length-1].subjectief_score:null);
     }
   } else if(period=='maand'){
     // Alle dagen van huidige maand
@@ -82,7 +98,7 @@ function buildFullTimeline(period){
       var label=dgnNL[d.getDay()]+' '+padDate(d.getDate());
       labels.push(label);
       var match=sortedBasis.filter(function(r){var rd=new Date(r.ts);return rd.getDate()==d.getDate()&&rd.getMonth()==d.getMonth()&&rd.getFullYear()==d.getFullYear();});
-      vals.push(match.length?match[match.length-1].ri:null);var _spd=match.filter(function(d){return d.subjectief_score!=null;});szV.push(_spd.length?_spd[_spd.length-1].subjectief_score:null);
+      vals.push(match.length?match[match.length-1].ri:null);marked.push(match.some(function(r){return _provPlafond(r.rr_intervals,r.hrv_pct);}));var _spd=match.filter(function(d){return d.subjectief_score!=null;});szV.push(_spd.length?_spd[_spd.length-1].subjectief_score:null);
     }
   } else if(period=='jaar'){
     // Jan-Dec huidig jaar
@@ -91,21 +107,22 @@ function buildFullTimeline(period){
       var label=mndNL[d.getMonth()]+' '+d.getFullYear();
       labels.push(label);
       var match=sortedBasis.filter(function(r){var rd=new Date(r.ts);return rd.getMonth()==d.getMonth()&&rd.getFullYear()==d.getFullYear();});
-      if(match.length){var avg=match.reduce(function(s,r){return s+(r.ri||0);},0)/match.length;vals.push(Math.round(avg*10)/10);var _sp2=match.filter(function(d){return d.subjectief_score!=null;});szV.push(_sp2.length?_sp2.reduce(function(s,x){return s+x.subjectief_score;},0)/_sp2.length:null);}else{vals.push(null);szV.push(null);}
+      if(match.length){var avg=match.reduce(function(s,r){return s+(r.ri||0);},0)/match.length;vals.push(Math.round(avg*10)/10);var _sp2=match.filter(function(d){return d.subjectief_score!=null;});szV.push(_sp2.length?_sp2.reduce(function(s,x){return s+x.subjectief_score;},0)/_sp2.length:null);}else{vals.push(null);szV.push(null);}marked.push(match.length>0&&match.some(function(r){return _provPlafond(r.rr_intervals,r.hrv_pct);}));
     }
   } else {
     // Alles: 2026, 2027, 2028 per jaar
     [2026,2027,2028].forEach(function(yr){
       labels.push(String(yr));
       var match=sortedBasis.filter(function(r){return new Date(r.ts).getFullYear()==yr;});
-      if(match.length){var avg=match.reduce(function(s,r){return s+(r.ri||0);},0)/match.length;vals.push(Math.round(avg*10)/10);var _sp2=match.filter(function(d){return d.subjectief_score!=null;});szV.push(_sp2.length?_sp2.reduce(function(s,x){return s+x.subjectief_score;},0)/_sp2.length:null);}else{vals.push(null);szV.push(null);}
+      if(match.length){var avg=match.reduce(function(s,r){return s+(r.ri||0);},0)/match.length;vals.push(Math.round(avg*10)/10);var _sp2=match.filter(function(d){return d.subjectief_score!=null;});szV.push(_sp2.length?_sp2.reduce(function(s,x){return s+x.subjectief_score;},0)/_sp2.length:null);}else{vals.push(null);szV.push(null);}marked.push(match.length>0&&match.some(function(r){return _provPlafond(r.rr_intervals,r.hrv_pct);}));
     });
   }
-  return {labels:labels, vals:vals, szV:szV};
+  return {labels:labels, vals:vals, szV:szV, marked:marked};
 }
 
-function buildChart(labels, vals, szVdata){
+function buildChart(labels, vals, szVdata, marked){
   if(riChart) riChart.destroy();
+  marked=marked||[];
   var ctx=document.getElementById('riChart').getContext('2d');
   var nonNull=vals.filter(function(v){return v!==null;});
   var isSingle=nonNull.length<=1;
@@ -117,14 +134,26 @@ function buildChart(labels, vals, szVdata){
   // render/resize gaf → RangeError: Maximum call stack size exceeded (ná de eerste draw).
   // De baseline verschijnt automatisch in de legenda (grijs gestippeld lijnsymbool +
   // "Baseline", zelfde term 3 talen) en raakt de RI-/Zelfinschatting-datasets niet.
-  var datasets=[{label:'Relax Index',data:vals,borderColor:'#ffffff',backgroundColor:'rgba(0,0,0,.0)',tension:.3,pointRadius:pR,pointHoverRadius:pHR,borderWidth:2.5,pointBackgroundColor:'#ffffff',pointBorderColor:'#333333',pointBorderWidth:1.5,spanGaps:true},{label:szLabel,data:szVdata||[],borderColor:"#0078ff",backgroundColor:"#0078ff",tension:.3,pointRadius:5,borderWidth:2,borderDash:[6,3],pointBackgroundColor:"#0078ff",pointBorderColor:"#0078ff",spanGaps:true}];
+  var datasets=[{label:'Relax Index',data:vals,borderColor:'#ffffff',backgroundColor:'rgba(0,0,0,.0)',tension:.3,pointRadius:pR,pointHoverRadius:pHR,borderWidth:2.5,pointBackgroundColor:'#ffffff',pointBorderColor:marked.map(function(m){return m?'#999999':'#333333';}),pointBorderWidth:1.5,spanGaps:true},{label:szLabel,data:szVdata||[],borderColor:"#0078ff",backgroundColor:"#0078ff",tension:.3,pointRadius:5,borderWidth:2,borderDash:[6,3],pointBackgroundColor:"#0078ff",pointBorderColor:"#0078ff",spanGaps:true}];
   if(BASELINE != null){
     datasets.push({label:'Baseline',data:labels.map(function(){return BASELINE;}),borderColor:'rgba(110,110,110,0.95)',borderWidth:1.5,borderDash:[5,4],pointRadius:0,pointHoverRadius:0,fill:false,tension:0,spanGaps:true,order:99});
   }
   // Tooltip-footer (baseline-toelichting per taal) inline; geen los lijn-label (vermijdt
   // dubbeling met legenda). Leeg object wanneer er geen baseline is.
-  var tooltipCfg=(BASELINE != null)?{callbacks:{footer:function(items){return items.some(function(it){return it.dataset && it.dataset.label==='Baseline';}) ? BASELINE_TIP : '';}}}:{};
-  riChart=new Chart(ctx,{type:'line',data:{labels:labels,datasets:datasets},options:{scales:{y:{beginAtZero:true,min:0,max:10,ticks:{stepSize:2},grid:{color:'rgba(0,0,0,.07)'}},x:{offset:true,grid:{color:'rgba(0,0,0,.07)'},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:16}}},plugins:{legend:{display:true,position:"top",labels:{color:"#555",font:{size:11},boxWidth:20,boxHeight:2,padding:12,generateLabels:function(chart){var items=Chart.defaults.plugins.legend.labels.generateLabels(chart);items.forEach(function(l){if(l.text==='Relax Index'){l.strokeStyle='#666666';l.fillStyle='#666666';}});return items;}}},annotation:{annotations:{z1:{type:'box',yMin:0,yMax:2,backgroundColor:'rgba(169,50,38,.75)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z2:{type:'box',yMin:2,yMax:4,backgroundColor:'rgba(186,74,0,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z3:{type:'box',yMin:4,yMax:6,backgroundColor:'rgba(185,150,10,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z4:{type:'box',yMin:6,yMax:8,backgroundColor:'rgba(30,150,80,.65)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z5:{type:'box',yMin:8,yMax:10,backgroundColor:'rgba(20,110,60,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'}}},tooltip:tooltipCfg},responsive:true,maintainAspectRatio:false}});
+  var _provTipN=(_L=='de'?'zu unregelmäßig für eine zuverlässige Bewertung':_L=='en'?'too irregular to score reliably':'te onregelmatig om betrouwbaar te scoren');
+  var tooltipCfg={callbacks:{footer:function(items){
+    var t=(BASELINE!=null && items.some(function(it){return it.dataset && it.dataset.label==='Baseline';}))?BASELINE_TIP:'';
+    if(items.some(function(it){return it.datasetIndex===0 && marked[it.dataIndex];})) t=(t?t+'  ·  ':'')+'⚠ '+_provTipN;
+    return t;
+  }}};
+  // VOORLOPIG plafond-voorschot: klein grijs ⚠ boven gemarkeerde RI-punten (lijn/aggregaten ongemoeid).
+  var _provWarnPlugin={id:'provWarn',afterDatasetsDraw:function(chart){
+    var meta=chart.getDatasetMeta(0), ds=chart.data.datasets[0], c=chart.ctx;
+    c.save();c.fillStyle='#999999';c.font='10px sans-serif';c.textAlign='center';
+    meta.data.forEach(function(pt,i){ if(marked[i] && ds.data[i]!=null){ c.fillText('⚠', pt.x, pt.y-9); } });
+    c.restore();
+  }};
+  riChart=new Chart(ctx,{type:'line',data:{labels:labels,datasets:datasets},options:{scales:{y:{beginAtZero:true,min:0,max:10,ticks:{stepSize:2},grid:{color:'rgba(0,0,0,.07)'}},x:{offset:true,grid:{color:'rgba(0,0,0,.07)'},ticks:{maxRotation:45,autoSkip:true,maxTicksLimit:16}}},plugins:{legend:{display:true,position:"top",labels:{color:"#555",font:{size:11},boxWidth:20,boxHeight:2,padding:12,generateLabels:function(chart){var items=Chart.defaults.plugins.legend.labels.generateLabels(chart);items.forEach(function(l){if(l.text==='Relax Index'){l.strokeStyle='#666666';l.fillStyle='#666666';}});return items;}}},annotation:{annotations:{z1:{type:'box',yMin:0,yMax:2,backgroundColor:'rgba(169,50,38,.75)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z2:{type:'box',yMin:2,yMax:4,backgroundColor:'rgba(186,74,0,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z3:{type:'box',yMin:4,yMax:6,backgroundColor:'rgba(185,150,10,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z4:{type:'box',yMin:6,yMax:8,backgroundColor:'rgba(30,150,80,.65)',borderWidth:0,drawTime:'beforeDatasetsDraw'},z5:{type:'box',yMin:8,yMax:10,backgroundColor:'rgba(20,110,60,.70)',borderWidth:0,drawTime:'beforeDatasetsDraw'}}},tooltip:tooltipCfg},responsive:true,maintainAspectRatio:false},plugins:[_provWarnPlugin]});
   var hint=document.getElementById('chartHint');
   if(hint){hint.style.display=isSingle?'block':'none';}
 }
@@ -139,7 +168,8 @@ function filterData(period){
   var trimL=tl.labels.slice(firstIdx,lastIdx+1);
   var trimV=tl.vals.slice(firstIdx,lastIdx+1);
   var trimS=tl.szV.slice(firstIdx,lastIdx+1);
-  buildChart(trimL, trimV, trimS);
+  var trimM=tl.marked.slice(firstIdx,lastIdx+1);
+  buildChart(trimL, trimV, trimS, trimM);
 }
 
 filterData('alles');
@@ -179,19 +209,8 @@ else{
     var ri=r.ri||0;
     // Kwaliteits-gate (besluit 2a): grijze stip bij kwaliteit <85.
     var _kwlow=(r.kwaliteit!=null&&!isNaN(Number(r.kwaliteit))&&Number(r.kwaliteit)<85);
-    // ── VOORLOPIG conservatief plafond-VOORSCHOT (GEEN definitieve gate) — alleen tabel-markering.
-    // SD1/SD2 >= PROV_SD1SD2 EN HRV% >= PROV_HRV_PLAFOND (volledige RR). GEEN aggregaat/trend/Kompas.
-    // Definitieve drempel volgt uit de 30-06-herijking op de prod-gate_metrics. Benoemde constanten.
-    var PROV_SD1SD2=1.05, PROV_HRV_PLAFOND=200, _provFlag=false;
-    try{ if((r.hrv_pct||0)>=PROV_HRV_PLAFOND){ var _pr=r.rr_intervals; if(typeof _pr==='string')_pr=JSON.parse(_pr);
-      if(_pr&&_pr.length>=20){
-        var _pn=_pr.length,_pm=0; for(var _pi=0;_pi<_pn;_pi++)_pm+=_pr[_pi]; _pm/=_pn;
-        var _pss=0; for(var _pi=0;_pi<_pn;_pi++){var _pdv=_pr[_pi]-_pm; _pss+=_pdv*_pdv;} var _psdnn=Math.sqrt(_pss/_pn);
-        var _ps=0,_pmd=0; for(var _pi=1;_pi<_pn;_pi++){var _pd=_pr[_pi]-_pr[_pi-1]; _ps+=_pd*_pd; _pmd+=_pd;} var _pnd=_pn-1; _pmd/=_pnd;
-        var _psx=0; for(var _pi=1;_pi<_pn;_pi++){var _pd2=(_pr[_pi]-_pr[_pi-1])-_pmd; _psx+=_pd2*_pd2;} var _psdsd=Math.sqrt(_psx/_pnd);
-        var _psd1=Math.sqrt(0.5)*_psdsd,_psd2=Math.sqrt(Math.max(2*_psdnn*_psdnn-0.5*_psdsd*_psdsd,0));
-        var _pratio=_psd2>0?_psd1/_psd2:99; _provFlag=(_pratio>=PROV_SD1SD2);
-      }}}catch(e){}
+    // VOORLOPIG conservatief plafond-voorschot — gedeelde helper (zelfde conditie/constanten als de grafiek).
+    var _provFlag=_provPlafond(r.rr_intervals, r.hrv_pct);
     var _provN=(_L=='de'?'zu unregelmäßig für eine zuverlässige Bewertung':_L=='en'?'too irregular to score reliably':'te onregelmatig om betrouwbaar te scoren');
     var _provWarn=_provFlag?'<span title="'+_provN+'" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
     var _provLine=_provFlag?'<div style="font-size:.66rem;color:#c0392b;line-height:1.2;margin-top:1px;">'+_provN+'</div>':'';
