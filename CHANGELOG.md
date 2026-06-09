@@ -1,5 +1,15 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-09 — PROD: /kwadrant Details — neutrale regel bij lege mini-grafiekjes
+
+De drie mini-grafiekjes (RMSSD/HRV%/BPM) op de Details-tab blijven grijs bij < 2 timeseries-punten
+(korte meting, of te weinig slagen/zwak signaal). Toegevoegd: **één** neutrale regel ónder het grid
+van de drie vakken, die alleen verschijnt bij < 2 punten en verdwijnt zodra de grafieken getekend
+worden (zelfde gate `tsData.length>1`). NL "Nog te weinig meetpunten voor een verloop" · DE "Noch zu
+wenige Messpunkte für einen Verlauf" · EN "Not enough data points yet for a trend". **Niet conditioneel**
+(geen te-kort/te-zwak-onderscheid — zwak signaal heeft al de bestaande "Meting onbetrouwbaar"-melding).
+Alleen het `kwNoTrend`-element + 1 toggle-regel; lijn/aggregaten/getallen/tabel/Kompas/RI ongemoeid.
+
 ## 2026-06-09 — PROD: /kwadrant Details-tab — info-kaarten accordion + onderste tooltip omhoog
 
 Twee kleine UI-fixes op de Details-tab (`templates/kwadrant.html`), taal-onafhankelijk (NL/DE/EN),
