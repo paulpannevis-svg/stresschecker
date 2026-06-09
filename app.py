@@ -307,7 +307,7 @@ def get_meting_db():
         ctx_vitaliteit REAL,
         created_at  TEXT DEFAULT CURRENT_TIMESTAMP
     )''')
-    for col, coltype in [('ctx_dimensie', 'TEXT'), ('ctx_vitaliteit', 'REAL'), ('feedback_cache', 'TEXT')]:
+    for col, coltype in [('ctx_dimensie', 'TEXT'), ('ctx_vitaliteit', 'REAL'), ('feedback_cache', 'TEXT'), ('gate_metrics', 'TEXT')]:
         try: conn.execute(f'ALTER TABLE metingen ADD COLUMN {col} {coltype}')
         except: pass
     conn.commit()
@@ -352,7 +352,7 @@ def get_pro_db():
         created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (client_id) REFERENCES clients(id)
     )''')
-    for col, coltype in [('ctx_dimensie', 'TEXT'), ('ctx_vitaliteit', 'REAL'), ('feedback_cache', 'TEXT')]:
+    for col, coltype in [('ctx_dimensie', 'TEXT'), ('ctx_vitaliteit', 'REAL'), ('feedback_cache', 'TEXT'), ('gate_metrics', 'TEXT')]:
         try: conn.execute(f'ALTER TABLE client_metingen ADD COLUMN {col} {coltype}')
         except: pass
     conn.commit()
@@ -3273,20 +3273,26 @@ def api_save_meting():
                 return None
         _ctx_ongemak = _ctx_int(data.get('ctx_ongemak'))
         _ctx_vrije_tekst = (str(data.get('ctx_vrije_tekst') or '')).strip()[:100] or None
+        # Ruwe gate-maten-logging (ALLEEN opslag — geen gate-evaluatie, geen markering, geen UI-effect):
+        # full-RR sd1sd2/rmssd/pnn50 via analytics.gate_metrics (zelfde math als de staging-gate).
+        # < 20 RR → None → kolom blijft NULL. Slice-15-kolommen rmssd/pnn50 blijven ongemoeid.
+        import analytics as _an_gm, json as _json_gm
+        _gmd = _an_gm.gate_metrics(str(data.get('rr_intervals', '')))
+        _gate_metrics_json = _json_gm.dumps(_gmd) if _gmd else None
         if client_id > 0 and _is_pro_or_demo_pro():
             db = get_pro_db()
             # office_label vult alleen bij Krankenkasse-sessie; voor reguliere Pro blijft de kolom NULL
             _office = session.get('kk_office') if is_krankenkasse_session() else None
-            _vals=(int(client_id),get_user_key(),int(data.get('ts',__import__('datetime').datetime.now().timestamp()*1000)),float(data.get('ri',0)),int(data.get('bpm',0)),int(data.get('hrv',0)),float(data.get('rmssd',0)),float(data.get('sdnn',0)),float(data.get('pnn50',0)),int(data.get('beats',0)),int(data.get('duration',90)),str(data.get('sensor','demo')),str(data.get('notes','')),str(data.get('timeseries','')),str(data.get('rr_intervals','')),int(data.get('kwaliteit',100)),str(data.get('meting_type','basismeting')),str(data.get('ctx_dimensie','')),float(data.get('ctx_vitaliteit',0)) if data.get('ctx_vitaliteit') else None,_subj_score,_ctx_ongemak,_ctx_vrije_tekst,_office)
-            db.execute('INSERT INTO client_metingen (client_id,pro_key,ts,ri,bpm,hrv_pct,rmssd,sdnn,pnn50,beats,duration,sensor_type,notes,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,office_label) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',_vals)
+            _vals=(int(client_id),get_user_key(),int(data.get('ts',__import__('datetime').datetime.now().timestamp()*1000)),float(data.get('ri',0)),int(data.get('bpm',0)),int(data.get('hrv',0)),float(data.get('rmssd',0)),float(data.get('sdnn',0)),float(data.get('pnn50',0)),int(data.get('beats',0)),int(data.get('duration',90)),str(data.get('sensor','demo')),str(data.get('notes','')),str(data.get('timeseries','')),str(data.get('rr_intervals','')),int(data.get('kwaliteit',100)),str(data.get('meting_type','basismeting')),str(data.get('ctx_dimensie','')),float(data.get('ctx_vitaliteit',0)) if data.get('ctx_vitaliteit') else None,_subj_score,_ctx_ongemak,_ctx_vrije_tekst,_office,_gate_metrics_json)
+            db.execute('INSERT INTO client_metingen (client_id,pro_key,ts,ri,bpm,hrv_pct,rmssd,sdnn,pnn50,beats,duration,sensor_type,notes,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,office_label,gate_metrics) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',_vals)
             db.commit()
             db.close()
             return jsonify({'ok': True, 'client_id': int(client_id)})
 
         db = get_meting_db()
         db.execute('''INSERT INTO metingen
-            (user_key,ts,ri,bpm,hrv_pct,rmssd,beats,duration,sensor_type,notes,sdnn,pnn50,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,pending)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)''', (
+            (user_key,ts,ri,bpm,hrv_pct,rmssd,beats,duration,sensor_type,notes,sdnn,pnn50,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,gate_metrics,pending)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)''', (
             get_user_key(),
             int(data.get('ts', datetime.now().timestamp()*1000)),
             float(data.get('ri',0)), int(data.get('bpm',0)), int(data.get('hrv',0)),
@@ -3299,7 +3305,7 @@ def api_save_meting():
             str(data.get('ctx_dimensie','')),
             float(data.get('ctx_vitaliteit',0)) if data.get('ctx_vitaliteit') else None,
             _subj_score,
-            _ctx_ongemak, _ctx_vrije_tekst
+            _ctx_ongemak, _ctx_vrije_tekst, _gate_metrics_json
         ))
         db.commit()
         session['after_meting'] = True
