@@ -10,9 +10,50 @@ DB-paden volgen app.py-conventie (env-overrides toegestaan).
 import os
 import sqlite3
 import datetime
+import json
+import math
 
 SAAS_DB = os.environ.get('SC_DB_PATH', '/opt/ic-license-server/data/saas_licenses.db')
 PRO_DB  = os.environ.get('SC_PRO_DB',  '/opt/stresschecker/data/sc_pro.db')
+
+
+# ============================================================================
+# RUWE GATE-MATEN-LOGGING (alleen opslag — GEEN gate-evaluatie/markering op prod).
+# gate_metrics() berekent op de VOLLEDIGE RR exact dezelfde maten als de staging-gate
+# (static/js/hrv.js::rrIrregularity / staging analytics.rr_irregular: sd1/sd2/rmssd) +
+# pNN50. Per nieuwe meting weggeschreven in kolom gate_metrics (JSON), zodat dagelijkse
+# prod-data de drempel-herijking kan voeden i.p.v. de bestaande slice-15-kolommen
+# (rmssd/pnn50), die op de afgekapte reeks staan en de full-RR-gate niet representeren.
+# ============================================================================
+def gate_metrics(rr):
+    """Full-RR gate-maten {sd1sd2, rmssd_full, pnn50_full} of None bij < 20 RR-intervallen.
+    rr: list van RR (ms) of JSON-string. Identieke full-RR-berekening als de onregelmatigheid-gate."""
+    if isinstance(rr, str):
+        try:
+            rr = json.loads(rr)
+        except (ValueError, TypeError):
+            return None
+    if not rr or len(rr) < 20:
+        return None
+    try:
+        rr = [float(x) for x in rr if x is not None]
+    except (ValueError, TypeError):
+        return None
+    n = len(rr)
+    if n < 20:
+        return None
+    mean = sum(rr) / n
+    sdnn = math.sqrt(sum((x - mean) ** 2 for x in rr) / n)
+    diffs = [rr[i + 1] - rr[i] for i in range(n - 1)]
+    nd = len(diffs)
+    rmssd = math.sqrt(sum(d * d for d in diffs) / nd)
+    md = sum(diffs) / nd
+    sdsd = math.sqrt(sum((d - md) ** 2 for d in diffs) / nd)
+    sd1 = math.sqrt(0.5) * sdsd
+    sd2 = math.sqrt(max(2 * sdnn * sdnn - 0.5 * sdsd * sdsd, 0))
+    ratio = sd1 / sd2 if sd2 > 0 else 99
+    pnn50 = 100.0 * sum(1 for d in diffs if abs(d) > 50) / nd
+    return {'sd1sd2': round(ratio, 4), 'rmssd_full': round(rmssd, 2), 'pnn50_full': round(pnn50, 2)}
 
 
 # ============================================================================
