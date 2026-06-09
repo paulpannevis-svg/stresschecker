@@ -1,5 +1,25 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-09 — PROD: conservatief plafond-VOORSCHOT — tabel-markering (GEEN definitieve gate)
+
+Beperkt voorschot op prod: een minimale tabel-markering die ALLEEN de evidente plafond-onzin vangt,
+in afwachting van de definitieve drempel uit de 30-06-herijking op de prod-`gate_metrics`.
+
+- **Conditie (benoemde constanten):** `PROV_SD1SD2 = 1.05` **ÉN** `PROV_HRV_PLAFOND = 200` (volledige RR).
+  Bewust streng — read-only over de echte prod-populatie: **6 metingen = 3.0%**, allemaal 220%-plafond
+  (hrv 218-220) + extreme vorm (SD1/SD2 ≥ 1.086). De matige vorm-gevallen (bv. RMSSD 47/SD1/SD2 1.21
+  zonder plafond, of net-over-1.05) worden **niet** gemarkeerd — die horen bij de herijking.
+- **Scope = ALLEEN tabel-markering** op `/resultaten` + `/pro/eigen_metingen`: gevlagde rij krijgt een
+  grijze stip + ⚠️ + een zichtbare neutrale regel ("te onregelmatig om betrouwbaar te scoren", NL/DE/EN).
+  Inline in de display-laag (geen route-/endpoint-wijziging). **GEEN** aggregaat-uitsluiting, **GEEN**
+  rode trendlijn, **GEEN** Kompas-aanpassing — die blijven voor de 30-06-herijking.
+- **Expliciet voorlopig:** in code-commentaar, design-doc én hier gemarkeerd als "voorlopig conservatief
+  voorschot, definitieve drempel volgt uit 30-06-herijking". De staging-gate (0.55/25) is en blijft de
+  te-herijken kandidaat (0.55 was op de echte prod-verdeling onbruikbaar: ~62%, geen natuurlijke kloof).
+- **Verificatie:** node --check beide inline-blokken (OK) + functioneel op de ijk-metingen — id523/524
+  (hrv 220, SD1/SD2 1.13/1.18) → gemarkeerd; id525/526/527 (gestructureerd, SD1/SD2 < 1.05) en
+  360/333/368 (geen plafond) → niet geraakt. Trend/Kompas/aggregaten ONVERANDERD.
+
 ## 2026-06-09 — PROD: ruwe gate-maten-logging (alleen opslag, geen gate-weergave)
 
 Vooruit op een mogelijke onregelmatigheid-gate-promotie: prod legt nu per nieuwe meting de
