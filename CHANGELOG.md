@@ -1,5 +1,21 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-09 — PROD: /kwadrant Details-tab — info-kaarten accordion + onderste tooltip omhoog
+
+Twee kleine UI-fixes op de Details-tab (`templates/kwadrant.html`), taal-onafhankelijk (NL/DE/EN),
+op staging in de browser geverifieerd vóór prod.
+
+- **Accordion:** de ⓘ-info-kaarten (Recovery capacity, Reference value, HRV%, Heart rate stability,
+  Large variations) hielden elk hun eigen losse toggle bij → meerdere tegelijk open (DE stapelend,
+  EN overlappend). Nu één gedeelde functie `kwInfo(id)`: bij openen van een kaart sluiten alle andere
+  (class `.kw-info`), nogmaals klikken = sluiten (toggle). Eén tegelijk open.
+- **Onderste tooltip-afkapping:** de info-tooltip opende altijd naar beneden (`margin-top`) en werd bij
+  het laatste item afgekapt door `.kw-right{overflow:hidden}` (de afgeronde kaart). Minimale fix: alleen
+  het laatste item (`ri === detRows.length-1`) opent omhoog (`bottom:100%;margin-bottom`) via een ternary
+  in dezelfde `.map`. Bovenste items ongewijzigd. `overflow:hidden` blijft staan.
+- **Niets anders gewijzigd:** lijn/aggregaten/tabel/Kompas ongemoeid. Isolated `node --check` (5 scripts ×
+  3 talen) groen.
+
 ## 2026-06-09 — PROD: grafiek-markering beter zichtbaar (alleen puntstyling)
 
 Het holle grijze punt viel te slecht weg tegen de gekleurde zonebanden (vooral het groen). Alleen de
