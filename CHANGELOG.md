@@ -1,5 +1,24 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-09 — PROD: ruwe gate-maten-logging (alleen opslag, geen gate-weergave)
+
+Vooruit op een mogelijke onregelmatigheid-gate-promotie: prod legt nu per nieuwe meting de
+full-RR gate-maten vast, zodat dagelijkse echte prod-data de drempel-herijking kan voeden.
+Read-only analyse toonde dat de bestaande kolommen `rmssd`/`pnn50` op de **slice-15**-reeks staan
+(client-berekend; id308: 19.7 opgeslagen vs 84.8 full-RR) en de full-RR-gate dus niet representeren.
+
+- **`analytics.gate_metrics(rr)`** (nieuw): `{sd1sd2, rmssd_full, pnn50_full}` op de **VOLLEDIGE RR**,
+  met exact dezelfde berekening als de staging-gate (`rr_irregular`/`hrv.js::rrIrregularity`) + pNN50.
+  Geverifieerd tegen de read-only-analyse: id308→84.8, id312→48.61, id310→42.71, id309→11.66 (match).
+- **Nieuwe kolom `gate_metrics TEXT` (JSON)** op `metingen` én `client_metingen`, via het bestaande
+  idempotente `ALTER`-patroon in `get_meting_db`/`get_pro_db` (additief, nullable).
+- **Opslag in `api_save_meting`**: server berekent `gate_metrics(rr_intervals)` één keer en schrijft het
+  in beide INSERTs (consument + Pro-cliënt). < 20 RR → NULL. De slice-15-kolommen `rmssd`/`pnn50`
+  blijven ongemoeid.
+- **ALLEEN opslag.** Geen gate-evaluatie, geen markering, geen score-effect, geen UI-verandering.
+  main bevat de gate-WEERGAVE niet (die staat op de staging-branch); main krijgt enkel `gate_metrics`
+  + de logging. Forward-only (bestaande ~344 metingen NIET gebackfilld — apart later).
+
 ## 2026-06-07 — getColor() gelijkgetrokken met getLabel()-grenzen (2/4/6/8) (STAGING)
 
 `hrv.js getColor()` gebruikte eigen kleur-grenzen (3/5/7/8.5), ~1 punt uit de pas met de
