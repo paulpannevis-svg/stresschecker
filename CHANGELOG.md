@@ -1,5 +1,19 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-09 — PROD: grafiek-markering beter zichtbaar (alleen puntstyling)
+
+Het holle grijze punt viel te slecht weg tegen de gekleurde zonebanden (vooral het groen). Alleen de
+styling van het gemarkeerde punt aangepast — verder niets (lijn, aggregaten, drempel, tabel ongemoeid).
+
+- **Gemarkeerd punt nu:** groter (straal 6 vs 4), witte vulling, **dikke donkere ring (#333, 2.5px)** —
+  steekt af tegen groen/geel/oranje. ⚠️ donker (#333) en vet (13px), **ónder** het punt met een **witte
+  halo** voor contrast op elke zoneband.
+- **Render-check legde een bug bloot:** plafond-punten staan op RI 10 (bovenrand grafiek), dus het ⚠️
+  *boven* het punt werd afgekapt. Daarom onder het punt geplaatst (geverifieerd via een getrouwe PIL-render
+  tegen de echte zonebanden + visuele bevestiging op staging).
+- **Beide pagina's identiek:** `/resultaten` (canvas) + `/pro/eigen_metingen` (Chart.js, per-punt
+  styling-arrays + afterDatasetsDraw-plugin). Geen rood, geen gat, geen herberekening — alleen het punt.
+
 ## 2026-06-09 — PROD: plafond-voorschot óók in de grafiek (tabel/grafiek consistent)
 
 Vervolg op de tabel-markering: een door het voorschot gemarkeerde meting krijgt nu ook in de
