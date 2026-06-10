@@ -1,5 +1,17 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-10 — PROD: /welkom — Pro NL-welkomvideo naar v2 + preload="none"
+
+De Pro NL-`<video>` op `/welkom` (`templates/welcome.html`) wijst nu naar `sc_video_pro_nl_v2.mp4`
+i.p.v. `sc_video_pro_nl.mp4`. De nieuwe bestandsnaam fungeert tegelijk als **cache-bust**, en
+`preload="none"` zorgt dat de ~65 MB pas bij `play` laadt (geen onnodige download bij paginabezoek).
+Chirurgische promotie van alleen de `welcome.html`-edit uit staging-commit `b3fbd39` (feature-commit
+`73f5597` op prod) — Consument-NL en DE/EN-embeds ongemoeid; geen aritmie-gate/ander staging-werk mee.
+
+- **v2-mp4 staat apart op de prod-server** (`/opt/stresschecker/static/img/`, gitignored, 644) — niet in
+  de repo. Promotie naar prod vereist dus dat het bestand vooraf op de server staat.
+- **Oude `sc_video_pro_nl.mp4` blijft staan** als ongebruikte terugval (nergens meer gerefereerd).
+
 ## 2026-06-09 — PROD: /kwadrant Details — neutrale regel bij lege mini-grafiekjes
 
 De drie mini-grafiekjes (RMSSD/HRV%/BPM) op de Details-tab blijven grijs bij < 2 timeseries-punten
