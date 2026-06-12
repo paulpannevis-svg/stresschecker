@@ -42,6 +42,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/1.4.0/chartjs-plugin-annotation.min.js"></script>
 <script>if(window.Chart&&window['chartjs-plugin-annotation']){Chart.register(window['chartjs-plugin-annotation']);}</script>
+<script src="/static/js/hrv.js?v=9"></script>
 <script>
 var dNL={lichamelijk:'Lichamelijk',mentaal:'Mentaal',emotioneel:'Emotioneel',spiritueel:'Spiritueel',weet_niet:'?'};
 var data = {{ metingen_chart | tojson }};
@@ -191,16 +192,16 @@ if(!data||!data.length){list.innerHTML='<p style="text-align:center;color:#888;"
 else{
   var html='<div class="table-responsive"><table class="meting-tabel" style="width:100%;border-collapse:collapse;table-layout:fixed;">';
   html+='<colgroup>'
-    +'<col style="width:11%">'   // Datum (DD-MM-YY) — breder voor volledige datum
+    +'<col style="width:9%">'    // Datum (DD-MM-YY) — datum past ruim op 9%
     +'<col style="width:5%">'    // Tijd (HH:MM)
-    +'<col style="width:5%">'    // RI
+    +'<col style="width:18%">'   // RI — breder zodat de markering "Te onregelmatig"/"Zu unregelmäßig" op één regel past (incl. stip+⚠)
     +'<col style="width:5%">'    // BPM
     +'<col style="width:5%">'    // HRV%
     +'<col style="width:6%">'    // RMSSD
     +'<col style="width:14%">'   // Meting
-    +'<col style="width:17%">'   // Label
-    +'<col style="width:20%">'   // Wat speelt er — breedst voor volle context
-    +'<col style="width:12%">'   // Kubios
+    +'<col style="width:11%">'   // Label
+    +'<col style="width:17%">'   // Wat speelt er — breed genoeg voor de DE-kop "Was beschäftigt Sie" op één regel
+    +'<col style="width:10%">'   // Kubios
     +'</colgroup>';
   html+='<tr style="background:#f8f8f6;"><th style="'+hTH+'">'+hDatum+'</th><th style="'+hTH+'">'+hTijd+'</th><th style="'+hTH+'">RI</th><th style="'+hTH+'">BPM</th><th style="'+hTH+'">HRV%</th><th style="'+hTH+'">RMSSD</th><th style="'+hTH+'">'+hMeting+'</th><th style="'+hTH+'">'+hLabel+'</th><th style="'+hTH+'">'+hDim+'</th><th style="'+hTH+'">Kubios</th></tr>';
   data.forEach(function(r){
@@ -210,15 +211,23 @@ else{
     var ri=r.ri||0;
     // Kwaliteits-gate (besluit 2a): grijze stip bij kwaliteit <85.
     var _kwlow=(r.kwaliteit!=null&&!isNaN(Number(r.kwaliteit))&&Number(r.kwaliteit)<85);
-    // VOORLOPIG conservatief plafond-voorschot — gedeelde helper (zelfde conditie/constanten als de grafiek).
-    var _provFlag=_provPlafond(r.rr_intervals, r.hrv_pct);
-    var _provN=(_L=='de'?'zu unregelmäßig für eine zuverlässige Bewertung':_L=='en'?'too irregular to score reliably':'te onregelmatig om betrouwbaar te scoren');
-    var _provWarn=_provFlag?'<span title="'+_provN+'" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
-    var _provLine=_provFlag?'<div style="font-size:.66rem;color:#c0392b;line-height:1.2;margin-top:1px;">'+_provN+'</div>':'';
-    var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+((_kwlow||_provFlag)?'#bfbfbf':(ri<2?'#c0392b':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#27ae60':'#1e8449'))+'"></span>';
+    // Meetkwaliteit: nieuwe tweelaags-gate (HRV.qualityClassify, variant B) — één bron i.p.v. de
+    // inline SD1/SD2-kopie. 'slecht' -> markeren. De oude HRV.rrIrregularity blijft in hrv.js als
+    // referentie (hier niet gebruikt). Getoonde RI blijft r.ri (niets herberekend uit de RR).
+    var _q; try{ _q=HRV.qualityClassify(r.rr_intervals); }catch(e){}
+    var _slecht=(_q&&_q.band==='slecht');
+    // 3-traps vertrouwbaarheid uit kwaliteit (legacy/ontbrekend = trusted): <70 untrusted / 70-84 limited / >=85 trusted.
+    var _kwv=(r.kwaliteit==null||r.kwaliteit==='')?100:Number(r.kwaliteit);
+    var _conf=isNaN(_kwv)?'trusted':(_kwv>=85?'trusted':_kwv>=70?'limited':'untrusted');
+    // Getal-onderdrukking: Slecht OF kwaliteit<70 -> markering i.p.v. getal; 70-84 -> getal + grijze stip; rest -> getal.
+    var _suppress=(_slecht||_conf==='untrusted');
+    var _irrLabel={de:'Zu unregelmäßig',en:'Too irregular',nl:'Te onregelmatig'}['{{lang}}']||'Te onregelmatig';
+    var _warn=_slecht?'<span title="Te onregelmatig om betrouwbaar te scoren (hart of sensor)" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
+    var dot=_warn+'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+((_kwlow||_slecht)?'#bfbfbf':(ri<2?'#c0392b':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#27ae60':'#1e8449'))+'"></span>';
+    var riCell=_suppress?'<span title="Te onregelmatig om betrouwbaar te scoren (hart of sensor)" style="color:#c0392b;font-weight:600;white-space:nowrap;">'+_irrLabel+'</span>':ri;
     var mt=r.meting_type||'-';var mtL=mTYPE[mt.toLowerCase()]||mt;
     var dimL=r.dimensie?(dDIM[r.dimensie]||r.dimensie):'-';
-    html+='<tr style="border-bottom:1px solid #eef0f3;"><td style="'+cTD+'white-space:nowrap;">'+date+'</td><td style="'+cTD+'white-space:nowrap;">'+tijd+'</td><td style="'+cTD+'white-space:nowrap;">'+_provWarn+dot+ri+_provLine+'</td><td style="'+cNUM+'">'+(r.bpm||'-')+'</td><td style="'+cNUM+'">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td style="'+cNUM+'">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td style="'+cTD+'">'+mtL+'</td><td style="'+cTD+'">'+(r.notes||'')+'</td><td style="'+cTD+'">'+dimL+'</td><td style="'+cTD+'white-space:nowrap;">'+(r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" style="font-size:.75rem;color:#0078ff;text-decoration:none;">&darr; Kubios</a>':'')+'</td></tr>';
+    html+='<tr style="border-bottom:1px solid #eef0f3;"><td style="'+cTD+'white-space:nowrap;">'+date+'</td><td style="'+cTD+'white-space:nowrap;">'+tijd+'</td><td style="'+cTD+'white-space:nowrap;">'+dot+riCell+'</td><td style="'+cNUM+'">'+(r.bpm||'-')+'</td><td style="'+cNUM+'">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td style="'+cNUM+'">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td style="'+cTD+'">'+mtL+'</td><td style="'+cTD+'">'+(r.notes||'')+'</td><td style="'+cTD+'">'+dimL+'</td><td style="'+cTD+'white-space:nowrap;">'+(r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" style="font-size:.75rem;color:#0078ff;text-decoration:none;">&darr; Kubios</a>':'')+'</td></tr>';
   });
   html+='</table></div>';
   list.innerHTML=html;

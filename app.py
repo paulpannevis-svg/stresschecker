@@ -3413,15 +3413,15 @@ def _generate_question(dim, lang, meting_type='basismeting'):
 
     if meting_type == 'biofeedback':
         q = {'nl': f'Wat ga jij de komende dagen doen om te ontdekken welke interventie jouw {target} het beste helpt?',
-             'de': f'Was wirst du in den nächsten Tagen tun, um herauszufinden, welche Intervention deinem {target} am besten hilft?',
+             'de': f'Was werden Sie in den nächsten Tagen tun, um herauszufinden, welche Intervention Ihrem {target} am besten hilft?',
              'en': f'What will you do in the coming days to discover which intervention helps your {target} most?'}
     elif meting_type == 'situatiemeting':
         q = {'nl': f'Wat ga jij vandaag doen om te ontdekken hoe jouw {target} reageert op verschillende situaties?',
-             'de': f'Was wirst du heute tun, um herauszufinden, wie dein {target} auf verschiedene Situationen reagiert?',
+             'de': f'Was werden Sie heute tun, um herauszufinden, wie Ihr {target} auf verschiedene Situationen reagiert?',
              'en': f'What will you do today to discover how your {target} responds to different situations?'}
     else:
         q = {'nl': f'Wat ga jij doen om te ontdekken wat jouw {target} nodig heeft?',
-             'de': f'Was wirst du tun, um herauszufinden, was dein {target} braucht?',
+             'de': f'Was werden Sie tun, um herauszufinden, was Ihr {target} braucht?',
              'en': f'What will you do to discover what your {target} needs?'}
     return q.get(lang, q['nl'])
 
@@ -3535,7 +3535,7 @@ TREND_VARIANTS = {
         'de': {
             'consumer': [
                 "Noch zu wenige Messungen für ein erstes Bild — das kommt mit den nächsten paar.",
-                "Ab Messung 5 wird hier sichtbar, wie dein Körper sich über die Zeit verhält.",
+                "Ab Messung 5 wird hier sichtbar, wie Ihr Körper sich über die Zeit verhält.",
                 "Nach ein paar Messungen mehr entsteht hier ein erstes Bild deines Musters.",
             ],
             'pro': [
@@ -3572,9 +3572,9 @@ TREND_VARIANTS = {
         },
         'de': {
             'consumer': [
-                "In den letzten Wochen kommt mehr Raum in deinen Atem — dein Körper holt sich Erholung zurück.",
-                "Dein Herz findet in den letzten Wochen Schritt für Schritt zu seiner Ruhe zurück.",
-                "Dein Körper erholt sich in den letzten Wochen zunehmend — das siehst du in deinen Messungen.",
+                "In den letzten Wochen kommt mehr Raum in Ihren Atem — Ihr Körper holt sich Erholung zurück.",
+                "Ihr Herz findet in den letzten Wochen Schritt für Schritt zu seiner Ruhe zurück.",
+                "Ihr Körper erholt sich in den letzten Wochen zunehmend — das sehen Sie in Ihren Messungen.",
             ],
             'pro': [
                 "Der Körper von {name} holt sich in den letzten Wochen Erholung zurück — mehr Raum, mehr Ruhe.",
@@ -3610,9 +3610,9 @@ TREND_VARIANTS = {
         },
         'de': {
             'consumer': [
-                "Dein Körper läuft in den letzten Wochen geschmeidiger — mehr Raum, mehr Erholung.",
-                "In den letzten Wochen findet dein Herz leichter einen ruhigen Rhythmus.",
-                "In der letzten Zeit kommt zunehmend Ruhe in deinen Körper.",
+                "Ihr Körper läuft in den letzten Wochen geschmeidiger — mehr Raum, mehr Erholung.",
+                "In den letzten Wochen findet Ihr Herz leichter einen ruhigen Rhythmus.",
+                "In der letzten Zeit kommt zunehmend Ruhe in Ihren Körper.",
             ],
             'pro': [
                 "Der Körper von {name} läuft in den letzten Wochen geschmeidiger mit.",
@@ -3648,9 +3648,9 @@ TREND_VARIANTS = {
         },
         'de': {
             'consumer': [
-                "In den letzten Wochen fand dein Herz weniger zur Ruhe.",
-                "Dein Körper hatte in letzter Zeit weniger Raum zum Erholen.",
-                "Deine Ruhelinie sackt in den letzten Wochen langsam ab — das verdient Aufmerksamkeit.",
+                "In den letzten Wochen fand Ihr Herz weniger zur Ruhe.",
+                "Ihr Körper hatte in letzter Zeit weniger Raum zum Erholen.",
+                "Ihre Ruhelinie sackt in den letzten Wochen langsam ab — das verdient Aufmerksamkeit.",
             ],
             'pro': [
                 "Das Herz von {name} fand in den letzten Wochen weniger zur Ruhe.",
@@ -3686,9 +3686,9 @@ TREND_VARIANTS = {
         },
         'de': {
             'consumer': [
-                "In den letzten Wochen kommt dein Körper etwas weniger zur Ruhe — es lohnt sich, darauf zu achten.",
-                "Dein Körper zeigt in den letzten Wochen etwas mehr Aktivierung als zuvor.",
-                "Dein Herz findet seinen ruhigen Rhythmus in den letzten Wochen etwas weniger leicht.",
+                "In den letzten Wochen kommt Ihr Körper etwas weniger zur Ruhe — es lohnt sich, darauf zu achten.",
+                "Ihr Körper zeigt in den letzten Wochen etwas mehr Aktivierung als zuvor.",
+                "Ihr Herz findet seinen ruhigen Rhythmus in den letzten Wochen etwas weniger leicht.",
             ],
             'pro': [
                 "Der Körper von {name} kommt in den letzten Wochen etwas weniger zur Ruhe.",
@@ -3724,9 +3724,9 @@ TREND_VARIANTS = {
         },
         'de': {
             'consumer': [
-                "Dein Körper zeigt in den letzten Wochen einen stabilen Rhythmus — so stehst du jetzt da.",
+                "Ihr Körper zeigt in den letzten Wochen einen stabilen Rhythmus — so stehen Sie jetzt da.",
                 "Der Rhythmus deines Herzens ist seit einiger Zeit gleich — das ist deine aktuelle Basislinie.",
-                "Dein Körper ist schon eine Weile in einem ruhigen, stabilen Muster.",
+                "Ihr Körper ist schon eine Weile in einem ruhigen, stabilen Muster.",
             ],
             'pro': [
                 "Der Körper von {name} zeigt in den letzten Wochen einen stabilen Rhythmus.",
@@ -3978,7 +3978,7 @@ BASISMETING_SYSTEM_PROMPT = (
     "Een basismeting is een momentopname van het autonome zenuwstelsel in rust.\n"
     "Je kijkt naar hoe deze meting zich verhoudt tot de recente basismetingen van dezelfde persoon.\n"
     "Je bent geen coach, geen therapeut, geen diagnosticus. "
-    "Je observeert wat je ziet, in de tweede persoon (je in NL, du in DE, you in EN), "
+    "Je observeert wat je ziet, in de tweede persoon (je in NL, Sie (formeel) in DE, you in EN), "
     "nuchter en zonder alarmisme of geruststelling die niet is onderbouwd.\n\n"
     "FEITEN-BLOK (cruciaal): het user_message begint met een blok 'FEITEN' dat het systeem "
     "deterministisch heeft berekend — de vergelijking met de vorige meting, het gemiddelde "
@@ -4003,6 +4003,7 @@ BASISMETING_SYSTEM_PROMPT = (
     "- recent_basis[] — laatste basismetingen, per item: ri, subjectief_score, datum, ctx_dimensie, ctx_vrije_tekst\n"
     "- baseline_ri_history — gemiddelde RI van basismetingen 8-14 terug, of null\n"
     "- phase — phase1 / phase2 / phase3\n"
+    "- (optioneel) een feit in het FEITEN-blok dat de score sterk is voor de leeftijd ('bovengemiddeld voor je leeftijdsgroep') — verwoord het positief en terloops; verzin geen leeftijdsgetallen die niet in FEITEN staan\n"
     "NULL-waarden negeer je: schrijf er niet over, gebruik ze niet als leeg signaal.\n\n"
     "TIJD/DATUM (belangrijk):\n"
     "Als je een datum noemt, gebruik dan UITSLUITEND de absolute datums zoals ze "
@@ -4451,7 +4452,7 @@ def _richting(diff, lang):
     return r[key], f"{sign}{abs(delta)}"
 
 
-def _basismeting_feiten(cur, recent_basis, phase, lang):
+def _basismeting_feiten(cur, recent_basis, phase, lang, age=None):
     """Bereken ALLE vergelijkings-, gemiddelde- en datum-feiten deterministisch en
     lever ze als kant-en-klaar FEITEN-blok (platte tekst). Het model verwoordt deze
     feiten uitsluitend — het rekent, vergelijkt en dateert niets meer zelf.
@@ -4467,7 +4468,7 @@ def _basismeting_feiten(cur, recent_basis, phase, lang):
         'nl': {
             'hdr': 'FEITEN (door het systeem berekend — neem letterlijk over, reken of dateer NIETS zelf):',
             'cur': '- Huidige meting: RI {ri} op {date}. Zone: "{zone}".',
-            'first': '- Dit is je eerste basismeting — er is nog geen eerdere meting om mee te vergelijken.',
+            'first': '- Dit is je eerste basismeting — een momentopname. Eén meting laat zien waar je nu zit; over meer metingen ontstaat je eigen beeld.',
             'prev': '- Vorige meting: RI {ri} op {date}. De huidige meting is {dir} de vorige ({delta}).',
             'avg': '- Gemiddelde van je laatste {n} basismetingen ({period}): RI {avg}. De huidige meting is {dir} dat gemiddelde ({delta}).',
             'one': '- Gebaseerd op 1 eerdere basismeting (op {date}): RI {avg}. (Nog te weinig metingen voor een trend.)',
@@ -4482,13 +4483,13 @@ def _basismeting_feiten(cur, recent_basis, phase, lang):
         'de': {
             'hdr': 'FAKTEN (vom System berechnet — wörtlich übernehmen, NICHTS selbst rechnen oder datieren):',
             'cur': '- Aktuelle Messung: RI {ri} am {date}. Zone: "{zone}".',
-            'first': '- Dies ist deine erste Basismessung — es gibt noch keine frühere Messung zum Vergleich.',
-            'prev': '- Vorige Messung: RI {ri} am {date}. Die aktuelle Messung ist {dir} die vorige ({delta}).',
-            'avg': '- Durchschnitt deiner letzten {n} Basismessungen ({period}): RI {avg}. Die aktuelle Messung ist {dir} dieser Durchschnitt ({delta}).',
+            'first': '- Dies ist Ihre erste Basismessung — eine Momentaufnahme. Eine einzelne Messung zeigt, wo Sie gerade stehen; über mehrere Messungen hinweg entsteht Ihr eigenes Bild.',
+            'prev': '- Vorherige Messung: RI {ri} am {date}. Die aktuelle Messung ist {dir} die vorherige ({delta}).',
+            'avg': '- Durchschnitt Ihrer letzten {n} Basismessungen ({period}): RI {avg}. Die aktuelle Messung ist {dir} dieser Durchschnitt ({delta}).',
             'one': '- Basierend auf 1 früheren Basismessung (am {date}): RI {avg}. (Noch zu wenige Messungen für einen Trend.)',
-            'body_sim': '- Körper versus Gefühl: deine Selbsteinschätzung ({subj}) und dein RI ({ri}) liegen nah beieinander.',
-            'body_mild': '- Körper versus Gefühl: deine Selbsteinschätzung ({subj}) und dein RI ({ri}) liegen etwas auseinander — ein milder Unterschied.',
-            'body_diff': '- Körper versus Gefühl: deine Selbsteinschätzung ist {subj}, dein RI ist {ri} — das unterscheidet sich merklich.',
+            'body_sim': '- Körper versus Gefühl: Ihre Selbsteinschätzung ({subj}) und Ihr RI ({ri}) liegen nah beieinander.',
+            'body_mild': '- Körper versus Gefühl: Ihre Selbsteinschätzung ({subj}) und Ihr RI ({ri}) liegen etwas auseinander — ein milder Unterschied.',
+            'body_diff': '- Körper versus Gefühl: Ihre Selbsteinschätzung ist {subj}, Ihr RI ist {ri} — das unterscheidet sich merklich.',
             'fase': {'phase1': '- Phase: noch wenige Messungen — noch kein verlässliches Muster.',
                      'phase2': '- Phase: ein erstes Muster wird sichtbar.',
                      'phase3': '- Phase: genug Messungen für ein Muster.'},
@@ -4497,7 +4498,7 @@ def _basismeting_feiten(cur, recent_basis, phase, lang):
         'en': {
             'hdr': 'FACTS (computed by the system — use verbatim, do NOT calculate or date anything yourself):',
             'cur': '- Current reading: RI {ri} on {date}. Zone: "{zone}".',
-            'first': '- This is your first baseline reading — there is no earlier reading to compare with yet.',
+            'first': '- This is your first baseline measurement — a snapshot. A single measurement shows where you are right now; your own picture emerges over several measurements.',
             'prev': '- Previous reading: RI {ri} on {date}. The current reading is {dir} the previous one ({delta}).',
             'avg': '- Average of your last {n} baseline readings ({period}): RI {avg}. The current reading is {dir} that average ({delta}).',
             'one': '- Based on 1 earlier baseline reading (on {date}): RI {avg}. (Still too few readings for a trend.)',
@@ -4523,6 +4524,22 @@ def _basismeting_feiten(cur, recent_basis, phase, lang):
         cur_date = '?'
     zone_label = _an.zone_label(_an.zone_for_ri(cur_ri), L) if cur_ri is not None else '?'
     lines.append(T['cur'].format(ri=cur_ri_s, date=cur_date, zone=zone_label))
+
+    # A1-FEIT (leeftijds-relatief sterk): hoge, schone score op leeftijd >= 65 — de AI verwoordt dit feit.
+    _a1_feit = {
+        'nl': '- Zeker sterk voor je leeftijd — bovengemiddeld voor je leeftijdsgroep.',
+        'de': '- Für Ihr Alter durchaus stark — überdurchschnittlich für Ihre Altersgruppe.',
+        'en': '- Notably strong for your age — above average for your age group.',
+    }
+    try:
+        _a1_ok = (cur_ri is not None and float(cur_ri) >= 8
+                  and (cur.get('hrv_pct') or 0) >= 130
+                  and age is not None and age >= 65
+                  and not _an.is_slecht_rr(cur.get('rr_intervals')))
+    except Exception:
+        _a1_ok = False
+    if _a1_ok:
+        lines.append(_a1_feit.get(L, _a1_feit['nl']))
 
     rb = [r for r in (recent_basis or []) if r.get('ri') is not None]
 
@@ -4696,7 +4713,7 @@ def _build_kompas_prompt(cur, lang, context, session_data=None, baseline_avg=Non
         # Alleen échte basismetingen: FEITEN-blok (vergelijkingen, gemiddelden, datums, zone,
         # lichaam-versus-gevoel, fase al deterministisch berekend — het model verwoordt enkel).
         # Fallback-randgevallen (bio-zonder-pre / situ-zonder-label) blijven bewust ongemoeid.
-        feiten_blok = _basismeting_feiten(cur, recent, phase, lang)
+        feiten_blok = _basismeting_feiten(cur, recent, phase, lang, age=context.get('age'))
         user = (
             f"{feiten_blok}\n\n"
             "RUWE DATA (uitsluitend als context voor je duiding/toon — NIET om mee te rekenen, "
@@ -4767,9 +4784,9 @@ def api_feedback():
                     'Toch komt je zelfinschatting redelijk overeen met wat je lichaam aangeeft — dat is waardevol, want het betekent dat je goed naar jezelf luistert.',
             },
             'de': {
-                'insight': 'Dein Körper zeigt Anspannung, besonders körperlich — aber du erkennst deine Signale gut.',
-                'reflection': 'Dein autonomes Nervensystem zeigt Anspannung, besonders auf körperlicher Ebene. '
-                    'Deine Selbsteinschätzung stimmt recht gut mit dem überein, was dein Körper meldet — das ist wertvoll, denn es bedeutet, dass du gut auf dich hörst.',
+                'insight': 'Ihr Körper zeigt Anspannung, besonders körperlich — aber Sie erkennen Ihre Signale gut.',
+                'reflection': 'Ihr autonomes Nervensystem zeigt Anspannung, besonders auf körperlicher Ebene. '
+                    'Ihre Selbsteinschätzung stimmt recht gut mit dem überein, was Ihr Körper meldet — das ist wertvoll, denn es bedeutet, dass Sie gut auf sich hören.',
             },
             'en': {
                 'insight': 'Your body is showing tension, especially physically — but you recognize your signals well.',
@@ -4898,12 +4915,41 @@ def api_feedback():
         elif diff < -0.5: trend = 'down'
         else: trend = 'stable'
 
+    # A2: 'eerste-basismeting'-signaal, IDENTIEK aan de FEITEN-trigger (not rb) via dezelfde recent_basis.
+    # Vroeg opgehaald zodat alle lokale-fallback-aanroepen (ook de geen-api-key-tak) hetzelfde vuren.
+    _uk = get_user_key() if not _is_client_query else None
+    try:
+        kompas_ctx = _gather_kompas_context(cur, _is_client_query, _uk, cid if _is_client_query else None)
+    except Exception:
+        kompas_ctx = {}
+    _rb_a2 = [r for r in (kompas_ctx.get('recent_basis') or []) if r.get('ri') is not None]
+    _first_basis = (meting_type == 'basismeting') and isinstance(kompas_ctx.get('recent_basis'), list) and len(_rb_a2) == 0
+
+    # A1: leeftijd ophalen (consumer: sessie-profiel; pro: clients-record via cid). Doorgegeven aan
+    # _basismeting_feiten (FEITEN) via kompas_ctx['age'] en aan _generate_local_feedback (vangnet) als param.
+    _age = None
+    try:
+        if _is_client_query and cid:
+            _adb = get_pro_db()
+            _byr = _adb.execute('SELECT birth_year FROM clients WHERE id=?', (cid,)).fetchone()
+            _adb.close()
+            _by = _byr[0] if _byr else None
+        else:
+            _by = session.get('profile_birth_year')
+        if _by:
+            from datetime import datetime as _dtA1
+            _age = _dtA1.now().year - int(_by)
+    except Exception:
+        _age = None
+    if isinstance(kompas_ctx, dict):
+        kompas_ctx['age'] = _age
+
     # Echte gebruiker: Anthropic API aanroepen
     question = _generate_question(dim, lang, meting_type)
 
     api_key = os.environ.get('ANTHROPIC_API_KEY', '')
     if not api_key:
-        result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline)
+        result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline, first_basis=_first_basis, leeftijd=_age)
         result['reflection'] = _hard_truncate(result['reflection'], 250)
         # Trend info gaat via trend_hint field; niet meer in reflection.
         _store_feedback_cache(meting_id, result['insight'], result['reflection'], is_client=_is_client_query, lang=lang)
@@ -4921,9 +4967,7 @@ def api_feedback():
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
 
-        # Gebruik nieuwe per-meting_type prompts (router op meting_type)
-        _uk = get_user_key() if not _is_client_query else None
-        kompas_ctx = _gather_kompas_context(cur, _is_client_query, _uk, cid if _is_client_query else None)
+        # Gebruik nieuwe per-meting_type prompts (router op meting_type); _uk + kompas_ctx zijn hierboven al opgehaald.
         # Biofeedback v3: intra-sessie data + baseline-gemiddelde
         _session_data = None
         _baseline_avg = None
@@ -5023,7 +5067,7 @@ def api_feedback():
                 else:
                     raise ValueError('retry bevat nog steeds een dag-anker')
             except Exception:
-                result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline)
+                result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline, first_basis=_first_basis, leeftijd=_age)
                 result['reflection'] = _hard_truncate(result['reflection'], 250)
                 _store_feedback_cache(meting_id, result['insight'], result['reflection'], is_client=_is_client_query, lang=lang)
                 result['question'] = question
@@ -5038,7 +5082,7 @@ def api_feedback():
 
         # Language mixing check — discard and use local fallback if wrong language detected
         if _check_language_mixing(insight, lang) or _check_language_mixing(reflection, lang):
-            result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline)
+            result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline, first_basis=_first_basis, leeftijd=_age)
             result['reflection'] = _hard_truncate(result['reflection'], 250)
             # Trend info gaat via trend_hint field; niet meer in reflection.
             _store_feedback_cache(meting_id, result['insight'], result['reflection'], is_client=_is_client_query, lang=lang)
@@ -5054,7 +5098,7 @@ def api_feedback():
 
         # Forbidden word check — vervang met lokale fallback als nodig
         if _check_forbidden(insight) or _check_forbidden(reflection):
-            result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline)
+            result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline, first_basis=_first_basis, leeftijd=_age)
             result['reflection'] = _hard_truncate(result['reflection'], 250)
             # Trend info gaat via trend_hint field; niet meer in reflection.
             _store_feedback_cache(meting_id, result['insight'], result['reflection'], is_client=_is_client_query, lang=lang)
@@ -5078,7 +5122,7 @@ def api_feedback():
         resp.headers['Expires'] = '0'
         return resp
     except Exception as e:
-        result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline)
+        result = _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=is_biofeedback, basis_ri=basis_ri, is_situatie=is_situatie, personal_baseline=personal_baseline, first_basis=_first_basis, leeftijd=_age)
         result['reflection'] = _hard_truncate(result['reflection'], 250)
         # Trend info gaat via trend_hint field; niet meer in reflection.
         _store_feedback_cache(meting_id, result['insight'], result['reflection'], is_client=_is_client_query, lang=lang)
@@ -5145,7 +5189,7 @@ def regenerate_kompas(mid):
     return redirect(url_for('api_feedback') + '?' + urlencode(qs), code=303)
 
 
-def _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=False, basis_ri=None, is_situatie=False, personal_baseline=None):
+def _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=False, basis_ri=None, is_situatie=False, personal_baseline=None, first_basis=False, leeftijd=None):
     """Lokale fallback: genereert coherent insight + reflection paar."""
     ri = cur.get('ri', 5)
     dim = cur.get('ctx_dimensie', '')
@@ -5168,56 +5212,56 @@ def _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=False, basis
     # Insight: één zin voor kwadrant
     insights = {
         'nl': {
-            'risk': 'Je autonoom zenuwstelsel is flink belast — geef jezelf rust en ruimte.',
-            'stress': 'Er zit duidelijke spanning in je lichaam — je zenuwstelsel vraagt om aandacht.',
-            'neutral': 'Je lichaam is redelijk in balans, met ruimte om dieper te ontspannen.',
-            'vital': 'Je autonoom zenuwstelsel herstelt goed — je lijf voelt veerkrachtig.',
-            'very_vital': 'Uitstekend — je lichaam is diep ontspannen en herstelt optimaal.',
+            'risk': 'Je autonome zenuwstelsel staat flink onder belasting en komt nu moeilijk tot rust — gun jezelf ruimte.',
+            'stress': 'Er zit spanning in je lichaam en het komt nog moeilijk op adem — je zenuwstelsel vraagt aandacht.',
+            'neutral': 'Je lichaam houdt belasting en ontspanning redelijk in evenwicht, met ruimte om dieper te zakken.',
+            'vital': 'Weinig belasting en ruimte om bij te tanken — je zenuwstelsel voelt veerkrachtig.',
+            'very_vital': 'Uitstekend — weinig belasting en volop herstelruimte; je zenuwstelsel is diep in balans.',
         },
         'de': {
-            'risk': 'Dein autonomes Nervensystem ist stark belastet — gönne dir Ruhe und Raum.',
-            'stress': 'Deutliche Anspannung in deinem Körper — dein Nervensystem braucht Aufmerksamkeit.',
-            'neutral': 'Dein Körper ist einigermaßen im Gleichgewicht, mit Raum für tiefere Entspannung.',
-            'vital': 'Dein autonomes Nervensystem erholt sich gut — dein Körper fühlt sich widerstandsfähig an.',
-            'very_vital': 'Ausgezeichnet — dein Körper ist tief entspannt und erholt sich optimal.',
+            'risk': 'Ihr autonomes Nervensystem steht stark unter Belastung und kommt jetzt schwer zur Ruhe — gönnen Sie sich Raum.',
+            'stress': 'In Ihrem Körper steckt Anspannung, und er kommt noch schwer zur Ruhe — Ihr Nervensystem braucht Aufmerksamkeit.',
+            'neutral': 'Ihr Körper hält Belastung und Entspannung recht gut im Gleichgewicht, mit Raum, um tiefer zu sinken.',
+            'vital': 'Wenig Belastung und Raum zum Auftanken — Ihr Nervensystem fühlt sich widerstandsfähig an.',
+            'very_vital': 'Ausgezeichnet — wenig Belastung und viel Raum zur Erholung; Ihr Nervensystem ist tief im Gleichgewicht.',
         },
         'en': {
-            'risk': 'Your autonomic nervous system is under significant strain — give yourself rest and space.',
-            'stress': 'Clear tension in your body — your nervous system needs attention.',
-            'neutral': 'Your body is reasonably balanced, with room to relax more deeply.',
-            'vital': 'Your autonomic nervous system is recovering well — your body feels resilient.',
-            'very_vital': 'Excellent — your body is deeply relaxed and recovering optimally.',
+            'risk': 'Your autonomic nervous system is under significant strain and is struggling to settle — give yourself some space.',
+            'stress': "There's tension in your body and it's not yet finding its breath — your nervous system needs attention.",
+            'neutral': 'Your body keeps strain and relaxation reasonably balanced, with room to settle deeper.',
+            'vital': 'Low strain and room to recharge — your nervous system feels resilient.',
+            'very_vital': 'Excellent — low strain and plenty of room to recover; your nervous system is deeply in balance.',
         }
     }
 
     # Reflection: 3-4 zinnen die het insight uitdiepen
     reflections = {
         'nl': {
-            'risk': 'Je autonoom zenuwstelsel laat zien dat het op dit moment flink belast is.',
-            'stress': 'Er zit spanning in je lichaam — je zenuwstelsel heeft moeite om tot rust te komen.',
-            'neutral': 'Je lichaam is redelijk in balans, maar er is ruimte om dieper te ontspannen.',
-            'vital': 'Mooi — je autonoom zenuwstelsel herstelt goed. Je lijf voelt veerkrachtig.',
-            'very_vital': 'Uitstekend! Je lichaam is diep ontspannen en je autonoom zenuwstelsel herstelt optimaal.',
+            'risk': 'Je autonome zenuwstelsel staat flink aan; de ruimte om bij te tanken is er nu nauwelijks.',
+            'stress': 'Er zit spanning in je lichaam; je zenuwstelsel staat nog aan en komt traag tot rust.',
+            'neutral': 'Belasting en ontspanning zijn redelijk in evenwicht; er is nog ruimte om dieper tot rust te komen.',
+            'vital': 'Fijn — de belasting is laag en je zenuwstelsel tankt goed bij. Je lichaam voelt veerkrachtig.',
+            'very_vital': 'Uitstekend! Je lichaam staat onder weinig belasting en is diep ontspannen — volop ruimte om bij te tanken, mooi in balans.',
         },
         'de': {
-            'risk': 'Dein autonomes Nervensystem zeigt, dass es gerade stark belastet ist.',
-            'stress': 'Es steckt Anspannung in deinem Körper — dein Nervensystem kommt schwer zur Ruhe.',
-            'neutral': 'Dein Körper ist einigermaßen im Gleichgewicht, aber es gibt Raum für tiefere Entspannung.',
-            'vital': 'Schön — dein autonomes Nervensystem erholt sich gut. Dein Körper fühlt sich widerstandsfähig an.',
-            'very_vital': 'Ausgezeichnet! Dein Körper ist tief entspannt und dein autonomes Nervensystem erholt sich optimal.',
+            'risk': 'Ihr autonomes Nervensystem ist stark aktiviert; der Raum zum Auftanken fehlt im Moment fast ganz.',
+            'stress': 'In Ihrem Körper steckt Anspannung; Ihr Nervensystem ist noch aktiviert und kommt langsam zur Ruhe.',
+            'neutral': 'Belastung und Entspannung sind recht gut im Gleichgewicht; es gibt noch Raum, um tiefer zur Ruhe zu kommen.',
+            'vital': 'Schön — die Belastung ist niedrig und Ihr Nervensystem tankt gut auf. Ihr Körper fühlt sich widerstandsfähig an.',
+            'very_vital': 'Ausgezeichnet! Ihr Körper steht unter wenig Belastung und ist tief entspannt — viel Raum zum Auftanken, schön im Gleichgewicht.',
         },
         'en': {
-            'risk': 'Your autonomic nervous system is showing signs of significant strain right now.',
-            'stress': 'There is tension in your body — your nervous system is struggling to settle.',
-            'neutral': 'Your body is reasonably balanced, but there\'s room to relax more deeply.',
-            'vital': 'Nice — your autonomic nervous system is recovering well. Your body feels resilient.',
-            'very_vital': 'Excellent! Your body is deeply relaxed and your autonomic nervous system is recovering optimally.',
+            'risk': 'Your autonomic nervous system is running high; there\'s little room to recharge right now.',
+            'stress': 'There\'s tension in your body; your nervous system is still switched on and is slow to settle.',
+            'neutral': 'Strain and relaxation are reasonably balanced; there\'s still room to come to deeper rest.',
+            'vital': 'Good to see — strain is low and your nervous system is recharging well. Your body feels resilient.',
+            'very_vital': 'Excellent! Your body is under little strain and deeply relaxed — plenty of room to recharge, nicely in balance.',
         }
     }
 
     trend_lines = {
         'nl': {'up': 'Ten opzichte van je vorige meting gaat het de goede kant op.', 'down': 'Je score is iets gezakt — luister naar wat je lichaam je vertelt.', 'stable': 'Je score is vergelijkbaar met de vorige keer.'},
-        'de': {'up': 'Im Vergleich zur letzten Messung geht es in die richtige Richtung.', 'down': 'Dein Wert ist etwas gesunken — höre auf das, was dein Körper dir sagt.', 'stable': 'Dein Wert ist ähnlich wie beim letzten Mal.'},
+        'de': {'up': 'Im Vergleich zur letzten Messung geht es in die richtige Richtung.', 'down': 'Ihr Wert ist etwas gesunken — hören Sie auf das, was Ihr Körper Ihnen sagt.', 'stable': 'Ihr Wert ist ähnlich wie beim letzten Mal.'},
         'en': {'up': 'Compared to your previous reading, things are moving in the right direction.', 'down': 'Your score has dipped — listen to what your body is telling you.', 'stable': 'Your score is similar to last time.'},
     }
 
@@ -5230,11 +5274,11 @@ def _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=False, basis
             '': 'Probeer 5 minuten rustig te ademen: 4 tellen in, 6 tellen uit. Geef je lijf een moment van herstel.',
         },
         'de': {
-            'lichamelijk': 'Versuche einen kurzen Spaziergang oder 5 Minuten Dehnung — dein Körper braucht Bewegung und Entlastung.',
-            'mentaal': 'Versuche 5 Minuten nichts zu tun — kein Bildschirm, keine To-do-Liste. Lass deine Gedanken ruhen.',
-            'emotioneel': 'Gönne dir einen Moment, um zu fühlen, was da ist, ohne es lösen zu müssen. Manchmal reicht Anerkennung.',
-            'spiritueel': 'Halte kurz inne bei dem, was dir wirklich wichtig ist. Eine bewusste Entscheidung aus deiner Mitte macht den Unterschied.',
-            '': 'Versuche 5 Minuten ruhig zu atmen: 4 Sekunden ein, 6 Sekunden aus. Gib deinem Körper einen Moment der Erholung.',
+            'lichamelijk': 'Versuchen Sie einen kurzen Spaziergang oder 5 Minuten Dehnung — Ihr Körper braucht Bewegung und Entlastung.',
+            'mentaal': 'Versuchen Sie 5 Minuten nichts zu tun — kein Bildschirm, keine To-do-Liste. Lassen Sie Ihre Gedanken ruhen.',
+            'emotioneel': 'Gönnen Sie sich einen Moment, um zu fühlen, was da ist, ohne es lösen zu müssen. Manchmal reicht Anerkennung.',
+            'spiritueel': 'Halten Sie kurz inne bei dem, was Ihnen wirklich wichtig ist. Eine bewusste Entscheidung aus Ihrer Mitte macht den Unterschied.',
+            '': 'Versuchen Sie 5 Minuten ruhig zu atmen: 4 Sekunden ein, 6 Sekunden aus. Geben Sie Ihrem Körper einen Moment der Erholung.',
         },
         'en': {
             'lichamelijk': 'Try taking a short walk or 5 minutes of stretching — your body is asking for movement and release.',
@@ -5247,11 +5291,34 @@ def _generate_local_feedback(cur, prev, trend, lang, is_biofeedback=False, basis
 
     insight = insights.get(lang, insights['nl'])[zone]
 
-    parts = [reflections.get(lang, reflections['nl'])[zone]]
+    # A2 (momentopname-framing) vooraan bij de eerste basismeting — zelfde trigger als FEITEN (not rb).
+    _a2 = {
+        'nl': 'Dit is je eerste basismeting — een momentopname. Eén meting laat zien waar je nu zit; over meer metingen ontstaat je eigen beeld.',
+        'de': 'Dies ist Ihre erste Basismessung — eine Momentaufnahme. Eine einzelne Messung zeigt, wo Sie gerade stehen; über mehrere Messungen hinweg entsteht Ihr eigenes Bild.',
+        'en': 'This is your first baseline measurement — a snapshot. A single measurement shows where you are right now; your own picture emerges over several measurements.',
+    }
+    parts = []
+    if first_basis:
+        parts.append(_a2.get(lang, _a2['nl']))
+    parts.append(reflections.get(lang, reflections['nl'])[zone])
+    # A1 (leeftijds-relatieve duiding) NÁ de zone-reflectie — alleen bij hoge, schone score op leeftijd >= 65.
+    _a1 = {
+        'nl': 'Zeker sterk voor je leeftijd — bovengemiddeld voor je leeftijdsgroep.',
+        'de': 'Für Ihr Alter durchaus stark — überdurchschnittlich für Ihre Altersgruppe.',
+        'en': 'Notably strong for your age — above average for your age group.',
+    }
+    try:
+        import analytics as _an_a1
+        _a1_slecht = _an_a1.is_slecht_rr(cur.get('rr_intervals'))
+    except Exception:
+        _a1_slecht = False
+    _hrv_a1 = cur.get('hrv_pct') or 0
+    if zone == 'very_vital' and _hrv_a1 >= 130 and leeftijd is not None and leeftijd >= 65 and not _a1_slecht:
+        parts.append(_a1.get(lang, _a1['nl']))
     if trend and trend in trend_lines.get(lang, {}):
         parts.append(trend_lines[lang][trend])
     if subj is not None and ri is not None and (ri - subj) < -1.5:
-        subj_line = {'nl': 'Opvallend: je lichaam ervaart meer spanning dan je zelf inschat.', 'de': 'Auffällig: dein Körper erlebt mehr Anspannung als du selbst einschätzt.', 'en': 'Notably, your body is experiencing more tension than you realize.'}
+        subj_line = {'nl': 'Opvallend: je lichaam ervaart meer spanning dan je zelf inschat.', 'de': 'Auffällig: Ihr Körper erlebt mehr Anspannung als Sie selbst einschätzen.', 'en': 'Notably, your body is experiencing more tension than you realize.'}
         parts.append(subj_line.get(lang, subj_line['nl']))
     tips = dim_tips.get(lang, dim_tips['nl'])
     parts.append(tips.get(dim, tips['']))
@@ -5282,12 +5349,12 @@ def _generate_biofeedback_feedback(ri, basis_ri, lang):
             'no_ref': f'Je biofeedback-meting toont een RI van {ri} — zonder basismeting is het effect lastig te duiden.',
         },
         'de': {
-            'strong_up': f'Dein autonomes Nervensystem reagiert deutlich — dein RI stieg um {delta} Punkte nach deiner Intervention.',
-            'up': f'Deine Intervention zeigt Wirkung: dein RI ging von {basis_ri} auf {ri}.',
-            'stable': 'Dein RI ist während des Biofeedbacks stabil geblieben — dein Körper hält an seinem aktuellen Zustand fest.',
-            'down': 'Dein RI ist während der Sitzung etwas gesunken — das kann bedeuten, dass dein Körper noch sucht.',
-            'strong_down': 'Dein RI ist auffällig gesunken — manchmal zeigt sich Vertiefung, bevor Erholung einsetzt.',
-            'no_ref': f'Deine Biofeedback-Messung zeigt einen RI von {ri} — ohne Basismessung ist die Wirkung schwer einzuordnen.',
+            'strong_up': f'Ihr autonomes Nervensystem reagiert deutlich — Ihr RI stieg um {delta} Punkte nach Ihrer Intervention.',
+            'up': f'Ihre Intervention zeigt Wirkung: Ihr RI ging von {basis_ri} auf {ri}.',
+            'stable': 'Ihr RI ist während des Biofeedbacks stabil geblieben — Ihr Körper hält an seinem aktuellen Zustand fest.',
+            'down': 'Ihr RI ist während der Sitzung etwas gesunken — das kann bedeuten, dass Ihr Körper noch sucht.',
+            'strong_down': 'Ihr RI ist auffällig gesunken — manchmal zeigt sich Vertiefung, bevor Erholung einsetzt.',
+            'no_ref': f'Ihre Biofeedback-Messung zeigt einen RI von {ri} — ohne Basismessung ist die Wirkung schwer einzuordnen.',
         },
         'en': {
             'strong_up': f'Your autonomic nervous system responded clearly — your RI rose by {delta} points after your intervention.',
@@ -5321,24 +5388,24 @@ def _generate_biofeedback_feedback(ri, basis_ri, lang):
                 'Doe voor de volgende biofeedback eerst een korte basismeting — dan kun je het verschil zien.',
         },
         'de': {
-            'strong_up': f'Dein autonomes Nervensystem zeigt eine deutliche Verschiebung: von {basis_ri} auf {ri}. '
-                'Das zeigt, dass dein Körper gut auf deine Intervention reagiert — die Erholungsfähigkeit ist sichtbar vorhanden. '
-                'Was hast du selbst während der Sitzung bemerkt — gab es einen Moment, in dem du eine Veränderung gespürt hast?',
-            'up': f'Dein RI ging von {basis_ri} auf {ri} — dein autonomes Nervensystem bewegt sich Richtung Entspannung. '
+            'strong_up': f'Ihr autonomes Nervensystem zeigt eine deutliche Verschiebung: von {basis_ri} auf {ri}. '
+                'Das zeigt, dass Ihr Körper gut auf Ihre Intervention reagiert — die Erholungsfähigkeit ist sichtbar vorhanden. '
+                'Was haben Sie selbst während der Sitzung bemerkt — gab es einen Moment, in dem Sie eine Veränderung gespürt haben?',
+            'up': f'Ihr RI ging von {basis_ri} auf {ri} — Ihr autonomes Nervensystem bewegt sich Richtung Entspannung. '
                 'Der Effekt ist subtil, aber messbar — genau so sieht Veränderung oft aus. '
                 'Welcher Moment in der Sitzung fühlte sich am entspanntesten an?',
-            'stable': f'Dein RI blieb bei etwa {ri}, vergleichbar mit deiner Basismessung von {basis_ri}. '
-                'Stabilität ist an sich eine Information — es könnte bedeuten, dass dein Nervensystem mehr Zeit braucht, oder dass die Intervention auf einer anderen Ebene wirkt. '
+            'stable': f'Ihr RI blieb bei etwa {ri}, vergleichbar mit Ihrer Basismessung von {basis_ri}. '
+                'Stabilität ist an sich eine Information — es könnte bedeuten, dass Ihr Nervensystem mehr Zeit braucht, oder dass die Intervention auf einer anderen Ebene wirkt. '
                 'Wie fühlte sich die Sitzung innerlich an — hat sich etwas verschoben, auch wenn die Messung das noch nicht zeigt?',
-            'down': f'Dein RI sank leicht von {basis_ri} auf {ri} während der Sitzung. '
-                'Das mag überraschen, aber manchmal ist ein vorübergehender Rückgang ein Zeichen dafür, dass dein Körper tiefer geht — Loslassen verläuft nicht immer linear. '
-                'Gab es einen Moment in der Sitzung, in dem du eine Verschiebung gespürt hast?',
-            'strong_down': f'Dein RI ging von {basis_ri} auf {ri} — ein auffälliger Rückgang während der Sitzung. '
-                'Das könnte bedeuten, dass dein Körper einen tieferen Prozess durchläuft, oder dass die Intervention etwas berührt hat, das noch Aufmerksamkeit braucht. '
-                'Wie hast du dich am Ende der Sitzung gefühlt — ruhiger, oder eher bewusster?',
-            'no_ref': f'Deine Biofeedback-Messung zeigt einen RI von {ri}. '
-                'Ohne Basismessung von heute ist die Wirkung deiner Intervention schwer einzuordnen. '
-                'Mache vor dem nächsten Biofeedback zuerst eine kurze Basismessung — dann kannst du den Unterschied sehen.',
+            'down': f'Ihr RI sank leicht von {basis_ri} auf {ri} während der Sitzung. '
+                'Das mag überraschen, aber manchmal ist ein vorübergehender Rückgang ein Zeichen dafür, dass Ihr Körper tiefer geht — Loslassen verläuft nicht immer linear. '
+                'Gab es einen Moment in der Sitzung, in dem Sie eine Verschiebung gespürt haben?',
+            'strong_down': f'Ihr RI ging von {basis_ri} auf {ri} — ein auffälliger Rückgang während der Sitzung. '
+                'Das könnte bedeuten, dass Ihr Körper einen tieferen Prozess durchläuft, oder dass die Intervention etwas berührt hat, das noch Aufmerksamkeit braucht. '
+                'Wie haben Sie sich am Ende der Sitzung gefühlt — ruhiger, oder eher bewusster?',
+            'no_ref': f'Ihre Biofeedback-Messung zeigt einen RI von {ri}. '
+                'Ohne Basismessung von heute ist die Wirkung Ihrer Intervention schwer einzuordnen. '
+                'Machen Sie vor dem nächsten Biofeedback zuerst eine kurze Basismessung — dann können Sie den Unterschied sehen.',
         },
         'en': {
             'strong_up': f'Your autonomic nervous system shows a clear shift: from {basis_ri} to {ri}. '

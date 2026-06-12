@@ -209,6 +209,145 @@ BASELINE_MIN_DAYS = 7
 _BASELINE_TZ = 'Europe/Amsterdam'
 
 
+# ---------------------------------------------------------------------------
+# Tweelaags-meetkwaliteit (variant B) — Python-twin van static/js/hrv.js ::
+# HRV.qualityClassify. MOET bit-voor-bit hetzelfde oordeel geven als de JS
+# (bewaakt door tests/test_irrgate_parity.py). De oude rr_irregular/
+# row_is_irregular hierboven blijven als REFERENTIE staan. NB: deze twin is
+# (nog) NIET in de aggregaten bedraad — dat is een aparte stap die op echte
+# productie-meetreeksen wacht (zie project_quality_aggregation_gate_parity).
+# ---------------------------------------------------------------------------
+QUAL_W = 21
+QUAL_ART_REL = 0.25
+QUAL_BAND_GOED = 5
+QUAL_BAND_SLECHT = 15
+QUAL_L2_SD1SD2 = 0.70
+QUAL_L2_RMSSD_MIN = 25
+
+
+def _jsround(x):
+    """Repliceert JS Math.round (half naar +inf); alle inputs hier zijn >= 0."""
+    return math.floor(x + 0.5)
+
+
+def _quality_poincare(rr):
+    n = len(rr)
+    mean = sum(rr) / n
+    ss = sum((x - mean) ** 2 for x in rr)
+    sdnn = math.sqrt(ss / n)
+    s = 0.0
+    md = 0.0
+    for i in range(1, n):
+        d = rr[i] - rr[i - 1]
+        s += d * d
+        md += d
+    nd = n - 1
+    rmssd = math.sqrt(s / nd)
+    md /= nd
+    sx = 0.0
+    for i in range(1, n):
+        d2 = (rr[i] - rr[i - 1]) - md
+        sx += d2 * d2
+    sdsd = math.sqrt(sx / nd)
+    sd1 = math.sqrt(0.5) * sdsd
+    sd2 = math.sqrt(max(2 * sdnn * sdnn - 0.5 * sdsd * sdsd, 0))
+    ratio = (sd1 / sd2) if sd2 > 0 else 99
+    return ratio, rmssd
+
+
+def quality_classify(rr):
+    """Variant-B-meetkwaliteit, 1-op-1 met HRV.qualityClassify (hrv.js)."""
+    if isinstance(rr, str):
+        try:
+            rr = json.loads(rr)
+        except (ValueError, TypeError):
+            return {'band': 'onbepaald', 'reason': 'parse'}
+    if not rr or len(rr) < 20:
+        return {'band': 'onbepaald', 'reason': 'te kort (<20 RR)'}
+    rr = [float(x) for x in rr]
+    n = len(rr)
+    half = QUAL_W // 2
+    # LAAG 1 — puntartefact-detectie
+    flag = [False] * n
+    for i in range(n):
+        lo = max(0, i - half)
+        hi = min(n - 1, i + half)
+        s = 0.0
+        cnt = 0
+        for j in range(lo, hi + 1):
+            if j != i:
+                s += rr[j]
+                cnt += 1
+        lm = (s / cnt) if cnt > 0 else rr[i]
+        flag[i] = abs(rr[i] - lm) > QUAL_ART_REL * lm
+    art_count = sum(1 for f in flag if f)
+    run_len = [0] * n
+    max_run = 0
+    k = 0
+    while k < n:
+        if flag[k]:
+            st = k
+            while k < n and flag[k]:
+                k += 1
+            length = k - st
+            for p in range(st, k):
+                run_len[p] = length
+            if length > max_run:
+                max_run = length
+        else:
+            k += 1
+    art_pct = 100.0 * art_count / n
+    consecutive = max_run >= 3
+    # CORRECTIE — run-lengte 1 en 2 lineair interpoleren tussen geldige buren; run>=3 niet
+    corr = list(rr)
+    for i in range(n):
+        if not flag[i] or run_len[i] > 2:
+            continue
+        left = i - 1
+        right = i + 1
+        while left >= 0 and flag[left]:
+            left -= 1
+        while right < n and flag[right]:
+            right += 1
+        if left >= 0 and right < n:
+            corr[i] = rr[left] + (rr[right] - rr[left]) * ((i - left) / (right - left))
+        elif left >= 0:
+            corr[i] = rr[left]
+        elif right < n:
+            corr[i] = rr[right]
+    # LAAG 2 — Poincaré-vorm op de GECORRIGEERDE RR
+    ratio, rmssd = _quality_poincare(corr)
+    laag2 = (ratio >= QUAL_L2_SD1SD2 and rmssd >= QUAL_L2_RMSSD_MIN)
+    # LABEL
+    if art_pct > QUAL_BAND_SLECHT:
+        band, reason = 'slecht', 'Laag1 artefact %s%% > 15%%' % (_jsround(art_pct * 10) / 10)
+    elif consecutive:
+        band, reason = 'slecht', 'aaneengesloten artefacten (run=%d), niet interpoleerbaar' % max_run
+    elif laag2:
+        band, reason = 'slecht', 'Laag2 SD1/SD2 %s >= 0.70' % (_jsround(ratio * 100) / 100)
+    elif art_pct > QUAL_BAND_GOED:
+        band, reason = 'redelijk', 'Laag1 artefact %s%% (5-15%%)' % (_jsround(art_pct * 10) / 10)
+    else:
+        band, reason = 'goed', 'schoon'
+    return {
+        'band': band, 'reason': reason,
+        'artefactPct': _jsround(art_pct * 10) / 10, 'artefactCount': art_count, 'maxRun': max_run,
+        'sd1sd2': _jsround(ratio * 1000) / 1000, 'rmssd': _jsround(rmssd * 10) / 10,
+        'laag1Slecht': (art_pct > QUAL_BAND_SLECHT or consecutive), 'laag2': laag2,
+        'corrected': corr, 'scoreOK': (band in ('goed', 'redelijk')),
+    }
+
+
+def is_slecht_rr(rr):
+    """True als variant-B de reeks 'slecht' noemt (raw RR of JSON-string)."""
+    return quality_classify(rr).get('band') == 'slecht'
+
+
+def is_slecht(row):
+    """is_slecht op een meting-row (leest 'rr_intervals')."""
+    return is_slecht_rr(_g(row, 'rr_intervals'))
+
+
 def _g(row, key):
     """Veilige veld-toegang voor dict én sqlite3.Row (mist → None)."""
     try:

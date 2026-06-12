@@ -303,8 +303,8 @@ function _scProfileBlockReason(){
 }
 function _scBlockMsg(r){
   var L=window.SC_LANG||'nl';
-  if(r==='age') return L==='de'?'Bitte zuerst dein Geburtsjahr eingeben. Das ist für eine zuverlässige Bewertung nötig.':L==='en'?'Please enter your year of birth first. It is needed for a reliable assessment.':'Vul eerst je geboortejaar in. Dat is nodig voor een betrouwbaar oordeel.';
-  if(r==='gender') return L==='de'?'Bitte zuerst dein Geschlecht wählen. Das ist für den richtigen Referenzwert nötig.':L==='en'?'Please select your gender first. It is needed for the correct reference value.':'Kies eerst je geslacht. Dat is nodig voor de juiste referentiewaarde.';
+  if(r==='age') return L==='de'?'Bitte zuerst Ihr Geburtsjahr eingeben. Das ist für eine zuverlässige Bewertung nötig.':L==='en'?'Please enter your year of birth first. It is needed for a reliable assessment.':'Vul eerst je geboortejaar in. Dat is nodig voor een betrouwbaar oordeel.';
+  if(r==='gender') return L==='de'?'Bitte zuerst Ihr Geschlecht wählen. Das ist für den richtigen Referenzwert nötig.':L==='en'?'Please select your gender first. It is needed for the correct reference value.':'Kies eerst je geslacht. Dat is nodig voor de juiste referentiewaarde.';
   return L==='de'?'StressChecker ist für Nutzer ab 18 Jahren gedacht. Für Jüngere zeigen wir keine Belastbarkeitsbewertung — die verwendeten HRV-Normen basieren auf Erwachsenen.':L==='en'?'StressChecker is intended for users aged 18 and over. For younger users we do not show a strain assessment — the HRV reference values are based on adults.':'StressChecker is bedoeld voor gebruikers vanaf 18 jaar. Voor jongeren tonen we geen belastbaarheidsoordeel — de gebruikte HRV-normen zijn op volwassenen gebaseerd.';
 }
 function _scShowBlock(r){

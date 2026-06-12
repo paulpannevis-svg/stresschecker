@@ -134,6 +134,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/hrv.js?v=9"></script>
 <script>
 function toggleCtx2(id){var el=document.getElementById("ctx2-"+id);if(el)el.style.display=el.style.display==="none"?"table-row":"none";}
 
@@ -261,13 +262,21 @@ function renderResults(results) {
     var z=r.ri!=null?zone(r.ri):0;
     // Kwaliteits-gate (besluit 2a): stip grijs bij kwaliteit <85 — geen stellige zonekleur op een onbetrouwbare meting.
     var _kwlow=(r.kwaliteit!=null&&!isNaN(Number(r.kwaliteit))&&Number(r.kwaliteit)<85);
-    // VOORLOPIG conservatief plafond-voorschot — gedeelde helper (zelfde conditie/constanten als de grafiek).
-    var _provFlag=_provPlafond(r.rr_intervals, r.hrv_pct);
-    var _provN=(LANG=='de'?'zu unregelmäßig für eine zuverlässige Bewertung':LANG=='en'?'too irregular to score reliably':'te onregelmatig om betrouwbaar te scoren');
-    var _provWarn=_provFlag?'<span title="'+_provN+'" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
-    var _provLine=_provFlag?'<div style="font-size:.66rem;color:#c0392b;line-height:1.2;margin-top:1px;">'+_provN+'</div>':'';
-    var col=(_kwlow||_provFlag)?'#bfbfbf':(COLORS[z]||'#999');
-    var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+col+';margin-right:4px;"></span>';
+    // Meetkwaliteit: nieuwe tweelaags-gate (HRV.qualityClassify, variant B) — één bron i.p.v. de
+    // inline SD1/SD2-kopie. 'slecht' -> markeren. De oude HRV.rrIrregularity blijft in hrv.js als
+    // referentie (hier niet gebruikt). Getoonde RI blijft r.ri (niets herberekend uit de RR).
+    var _q; try{ _q=HRV.qualityClassify(r.rr_intervals); }catch(e){}
+    var _slecht=(_q&&_q.band==='slecht');
+    // 3-traps vertrouwbaarheid uit kwaliteit (legacy/ontbrekend = trusted): <70 untrusted / 70-84 limited / >=85 trusted.
+    var _kwv=(r.kwaliteit==null||r.kwaliteit==='')?100:Number(r.kwaliteit);
+    var _conf=isNaN(_kwv)?'trusted':(_kwv>=85?'trusted':_kwv>=70?'limited':'untrusted');
+    // Getal-onderdrukking: Slecht OF kwaliteit<70 -> markering i.p.v. getal; 70-84 -> getal + grijze stip; rest -> getal.
+    var _suppress=(_slecht||_conf==='untrusted');
+    var _irrLabel={de:'Zu unregelmäßig',en:'Too irregular',nl:'Te onregelmatig'}[LANG]||'Te onregelmatig';
+    var col=(_kwlow||_slecht)?'#bfbfbf':(COLORS[z]||'#999');
+    var _warn=_slecht?'<span title="Te onregelmatig om betrouwbaar te scoren (hart of sensor)" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
+    var dot=_warn+'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+col+';margin-right:4px;"></span>';
+    var riCell=_suppress?'<span title="Te onregelmatig om betrouwbaar te scoren (hart of sensor)" style="color:#c0392b;font-weight:600;white-space:nowrap;">'+_irrLabel+'</span>':ri;
         var ctx_html2='';
         if(r.subjectief_score!=null||r.ctx_vitaliteit!=null||r.ctx_dimensie){
           var dDIM=LANG=='de'?{lichamelijk:'Körperlich',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spirituell',weet_niet:'?'}:LANG=='en'?{lichamelijk:'Physical',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spiritual',weet_niet:'?'}:{lichamelijk:'Lichamelijk',mentaal:'Mentaal',emotioneel:'Emotioneel',spiritueel:'Spiritueel',weet_niet:'?'};
@@ -283,7 +292,7 @@ function renderResults(results) {
         var mTYPE=LANG=='de'?{basismeting:'Basismessung',biofeedback:'Biofeedback',situatiemeting:'Situationsmessung'}:LANG=='en'?{basismeting:'Baseline measurement',biofeedback:'Biofeedback',situatiemeting:'Situation measurement'}:{};
         var mTypeL=mTYPE[mType.toLowerCase()]||mType;
         var dimL=r.ctx_dimensie?(dDIM[r.ctx_dimensie]||r.ctx_dimensie):'-';
-        html+='<tr style="'+(hC?'cursor:pointer;':'')+'" '+(hC?'onclick="toggleCtx2('+r.id+')"':'')+'>'+'<td>'+date+'</td><td>'+tijd+'</td><td>'+_provWarn+dot+ri+_provLine+'</td><td>'+(r.bpm||'-')+'</td><td class="hide-on-tablet">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td class="hide-on-tablet">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td>'+mTypeL+'</td><td>'+dimL+'</td><td>'+(r.notes||'')+'</td></tr>'+ctx_html2;
+        html+='<tr style="'+(hC?'cursor:pointer;':'')+'" '+(hC?'onclick="toggleCtx2('+r.id+')"':'')+'>'+'<td>'+date+'</td><td>'+tijd+'</td><td>'+dot+riCell+'</td><td>'+(r.bpm||'-')+'</td><td class="hide-on-tablet">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td class="hide-on-tablet">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td>'+mTypeL+'</td><td>'+dimL+'</td><td>'+(r.notes||'')+'</td></tr>'+ctx_html2;
   });
   html+='</table></div>';
   list.innerHTML=html;

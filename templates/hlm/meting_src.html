@@ -6483,8 +6483,8 @@ function startRelaxCountdown() {
   if (_ageMissing || _genderMissing || (_age !== null && _age < 18)) {
     const _L = currentLang;
     let _msg;
-    if (_ageMissing) _msg = (_L==='de'?'Bitte zuerst dein Geburtsjahr eingeben. Das ist für eine zuverlässige Bewertung nötig.':_L==='en'?'Please enter your year of birth first. It is needed for a reliable assessment.':'Vul eerst je geboortejaar in. Dat is nodig voor een betrouwbaar oordeel.');
-    else if (_genderMissing) _msg = (_L==='de'?'Bitte zuerst dein Geschlecht wählen. Das ist für den richtigen Referenzwert nötig.':_L==='en'?'Please select your gender first. It is needed for the correct reference value.':'Kies eerst je geslacht. Dat is nodig voor de juiste referentiewaarde.');
+    if (_ageMissing) _msg = (_L==='de'?'Bitte zuerst Ihr Geburtsjahr eingeben. Das ist für eine zuverlässige Bewertung nötig.':_L==='en'?'Please enter your year of birth first. It is needed for a reliable assessment.':'Vul eerst je geboortejaar in. Dat is nodig voor een betrouwbaar oordeel.');
+    else if (_genderMissing) _msg = (_L==='de'?'Bitte zuerst Ihr Geschlecht wählen. Das ist für den richtigen Referenzwert nötig.':_L==='en'?'Please select your gender first. It is needed for the correct reference value.':'Kies eerst je geslacht. Dat is nodig voor de juiste referentiewaarde.');
     else _msg = (_L==='de'?'StressChecker ist für Nutzer ab 18 Jahren gedacht. Für Jüngere zeigen wir keine Belastbarkeitsbewertung — die verwendeten HRV-Normen basieren auf Erwachsenen.':_L==='en'?'StressChecker is intended for users aged 18 and over. For younger users we do not show a strain assessment — the HRV reference values are based on adults.':'StressChecker is bedoeld voor gebruikers vanaf 18 jaar. Voor jongeren tonen we geen belastbaarheidsoordeel — de gebruikte HRV-normen zijn op volwassenen gebaseerd.');
     const _e = document.getElementById('relax-profile-error');
     if (_e) { _e.textContent = _msg; _e.style.display = 'block'; }

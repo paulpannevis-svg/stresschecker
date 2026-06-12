@@ -91,8 +91,90 @@ function getMeetKwaliteit(r){if(r&&r.length>30)r=r.slice(15);if(!r||r.length<3)r
 // >=85 'trusted' · 70-84 'limited' (toon met voorbehoud, blokkeer positieve "Veerkrachtig")
 // · <70 'untrusted' (RI/zone onderdrukken). Ontbrekende kwaliteit = vertrouwd (besluit 5: legacy).
 function riConfidence(kw){kw=(kw===null||kw===undefined||kw==='')?100:Number(kw);if(isNaN(kw))return 'trusted';return kw>=85?'trusted':kw>=70?'limited':'untrusted';}
+// ===========================================================================
+// NIEUWE tweelaags-meetkwaliteit (qualityClassify) — APART van rrIrregularity.
+// Gebouwd op read-only PI-Zwolle-analyse (juni 2026). De oude SD1/SD2-gate
+// hierboven (rrIrregularity) blijft als REFERENTIE staan tijdens A/B-testen;
+// deze functie vervangt 'm (nog) NIET.
+//  LAAG 1 — puntartefacten: Kubios per-interval, venster W=21 (gecentreerd,
+//    asymmetrisch/trailing aan de randen, testinterval uitgesloten). Markeer als
+//    |RR_i - lokaalgemiddelde| > 25% van dat lokaalgemiddelde (intrinsiek
+//    hartslag-geschaald). Tel artefact-%.
+//  CORRECTIE (variant B) — lineaire interpolatie van losse artefacten EN gaten van 2
+//    (run-lengte 1 of 2) tussen geldige buren. Bij >=3 OPEENVOLGENDE gemarkeerde
+//    intervallen NIET interpoleren (zou verzonnen data zijn): die meting wordt Slecht
+//    via de aaneengesloten-regel.
+//  LAAG 2 — Poincaré-vorm SD1/SD2 >= 0.70 EN RMSSD >= 25 ms.
+//    ONTWERPKEUZE: Laag 2 rekent op de GECORRIGEERDE RR. Een puntartefact blaast
+//    SD1/RMSSD op en maakt de wolk kunstmatig rond; op ruwe RR zou Laag 2 dus
+//    her-vlaggen wat Laag 1 al ving (puntruis != echte ritme-onregelmatigheid).
+//    Laag 2 oordeelt over het RESTERENDE ritme na puntcorrectie. De RMSSD-vloer
+//    (25) weert het vlak-kalme lage-HRV-artefact waar SD1/SD2 spurieus -> 1 loopt.
+//  LABEL: Slecht = artefact-% >15% OF aaneengesloten OF Laag2 -> GEEN RI.
+//         Redelijk = artefact-% 5-15% (en niet Slecht) -> RI met voorbehoud.
+//         Goed = artefact-% <=5% (en niet Slecht) -> normale RI.
+//  RI hoort (door de caller) op de GECORRIGEERDE RR berekend te worden.
+var QUAL_W=21, QUAL_ART_REL=0.25, QUAL_BAND_GOED=5, QUAL_BAND_SLECHT=15;
+var QUAL_L2_SD1SD2=0.70, QUAL_L2_RMSSD_MIN=25;
+function _poincare(rr){
+  var n=rr.length, mean=0, i; for(i=0;i<n;i++)mean+=rr[i]; mean/=n;
+  var ss=0; for(i=0;i<n;i++){var dv=rr[i]-mean; ss+=dv*dv;} var sdnn=Math.sqrt(ss/n);
+  var s=0,md=0; for(i=1;i<n;i++){var d=rr[i]-rr[i-1]; s+=d*d; md+=d;} var nd=n-1; md/=nd;
+  var rmssd=Math.sqrt(s/nd);
+  var sx=0; for(i=1;i<n;i++){var d2=(rr[i]-rr[i-1])-md; sx+=d2*d2;} var sdsd=Math.sqrt(sx/nd);
+  var sd1=Math.sqrt(0.5)*sdsd, sd2=Math.sqrt(Math.max(2*sdnn*sdnn-0.5*sdsd*sdsd,0));
+  return {ratio: sd2>0?sd1/sd2:99, rmssd:rmssd};
+}
+function qualityClassify(rr){
+  if(typeof rr==='string'){try{rr=JSON.parse(rr);}catch(e){return {band:'onbepaald',reason:'parse'};}}
+  if(!rr||rr.length<20) return {band:'onbepaald',reason:'te kort (<20 RR)'};
+  var n=rr.length, half=Math.floor(QUAL_W/2), i, j;
+  // LAAG 1 — detectie van puntartefacten
+  var flag=new Array(n);
+  for(i=0;i<n;i++){
+    var lo=Math.max(0,i-half), hi=Math.min(n-1,i+half), sum=0, cnt=0;
+    for(j=lo;j<=hi;j++){ if(j!==i){ sum+=rr[j]; cnt++; } }
+    var lm=cnt>0?sum/cnt:rr[i];
+    flag[i]=Math.abs(rr[i]-lm) > QUAL_ART_REL*lm;
+  }
+  // run-lengtes per index bepalen (voor de interpolatie-grens en de aaneengesloten-regel)
+  var artCount=0, maxRun=0, runLen=new Array(n), k;
+  for(i=0;i<n;i++) runLen[i]=0;
+  for(i=0;i<n;i++) if(flag[i]) artCount++;
+  k=0; while(k<n){ if(flag[k]){ var st=k; while(k<n && flag[k]) k++; var L=k-st; for(var p=st;p<k;p++) runLen[p]=L; if(L>maxRun)maxRun=L; } else k++; }
+  var artPct=100*artCount/n, consecutive=(maxRun>=3);
+  // CORRECTIE — losse artefacten EN gaten van 2 (run-lengte 1 of 2) lineair interpoleren
+  // tussen geldige buren. Runs van >=3 worden NIET geinterpoleerd (Slecht via consecutive).
+  var corr=rr.slice();
+  for(i=0;i<n;i++){
+    if(!flag[i] || runLen[i]>2) continue;
+    var left=i-1, right=i+1;
+    while(left>=0 && flag[left]) left--;
+    while(right<n && flag[right]) right++;
+    if(left>=0 && right<n) corr[i]=rr[left]+(rr[right]-rr[left])*((i-left)/(right-left));
+    else if(left>=0) corr[i]=rr[left];
+    else if(right<n) corr[i]=rr[right];
+  }
+  // LAAG 2 — Poincaré-vorm op de GECORRIGEERDE RR (zie ontwerpkeuze hierboven)
+  var pc=_poincare(corr);
+  var laag2=(pc.ratio>=QUAL_L2_SD1SD2 && pc.rmssd>=QUAL_L2_RMSSD_MIN);
+  // LABEL
+  var band, reason;
+  if(artPct>QUAL_BAND_SLECHT){ band='slecht'; reason='Laag1 artefact '+(Math.round(artPct*10)/10)+'% > 15%'; }
+  else if(consecutive){ band='slecht'; reason='aaneengesloten artefacten (run='+maxRun+'), niet interpoleerbaar'; }
+  else if(laag2){ band='slecht'; reason='Laag2 SD1/SD2 '+(Math.round(pc.ratio*100)/100)+' >= 0.70'; }
+  else if(artPct>QUAL_BAND_GOED){ band='redelijk'; reason='Laag1 artefact '+(Math.round(artPct*10)/10)+'% (5-15%)'; }
+  else { band='goed'; reason='schoon'; }
+  return {
+    band:band, reason:reason,
+    artefactPct:Math.round(artPct*10)/10, artefactCount:artCount, maxRun:maxRun,
+    sd1sd2:Math.round(pc.ratio*1000)/1000, rmssd:Math.round(pc.rmssd*10)/10,
+    laag1Slecht:(artPct>QUAL_BAND_SLECHT||consecutive), laag2:laag2,
+    corrected:corr, scoreOK:(band==='goed'||band==='redelijk')
+  };
+}
 function calculateSDNN(r){var res=filterRR(r);var f=res.filtered;if(!f||f.length<2)return 0;var m=f.reduce(function(a,b){return a+b;},0)/f.length;return Math.round(Math.sqrt(f.reduce(function(a,b){return a+Math.pow(b-m,2);},0)/f.length)*10)/10;}
 function calculatePNN50(r){var res=filterRR(r);var f=res.filtered;if(!f||f.length<2)return 0;var n=0;for(var i=1;i<f.length;i++)if(Math.abs(f[i]-f[i-1])>50)n++;return Math.round((n/(f.length-1))*1000)/10;}
-var HRV={filterRR:filterRR,calculateRMSSD:calculateRMSSD,calculateSDNN:calculateSDNN,calculatePNN50:calculatePNN50,calculateHRVPercent:calculateHRVPercent,getMeetKwaliteit:getMeetKwaliteit,riConfidence:riConfidence,lookupRelaxIndex:lookupRelaxIndex,getLabel:getLabel,getColor:getColor,RMSSD_NORMS:N};
+var HRV={filterRR:filterRR,calculateRMSSD:calculateRMSSD,calculateSDNN:calculateSDNN,calculatePNN50:calculatePNN50,calculateHRVPercent:calculateHRVPercent,getMeetKwaliteit:getMeetKwaliteit,riConfidence:riConfidence,qualityClassify:qualityClassify,QUAL_L2_SD1SD2:QUAL_L2_SD1SD2,QUAL_L2_RMSSD_MIN:QUAL_L2_RMSSD_MIN,lookupRelaxIndex:lookupRelaxIndex,getLabel:getLabel,getColor:getColor,RMSSD_NORMS:N};
 if(typeof module!=="undefined"&&module.exports){module.exports=HRV;}else{g.HRV=HRV;}
 })(typeof window!=="undefined"?window:this);

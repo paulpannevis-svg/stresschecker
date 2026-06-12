@@ -107,6 +107,7 @@ body{background:#f5f5f5;margin:0;}
 </div>
 <div style="display:flex;justify-content:space-between;align-items:center;max-width:820px;margin:.75rem auto 0;padding:0 1rem;"><a href="{% if request.args.get("from") == "hlm" %}/hlm/consumer{% elif client_id and client_id > 0 and is_pro %}/pro/clienten{% else %}/menu{% endif %}" style="display:inline-flex;align-items:center;gap:.4rem;background:#eee;color:#555;padding:.5rem 1.2rem;border-radius:8px;text-decoration:none;font-size:.85rem;font-weight:600;">&#8592; {% if client_id and client_id > 0 and is_pro %}CLIËNTEN{% else %}{%if lang=="de"%}MENÜ{%elif lang=="en"%}MENU{%else%}MENU{%endif%}{% endif %}</a><button onclick="discardAndGo('{% if client_id and client_id > 0 and is_pro %}/pro/meting?cid={{ client_id }}{% else %}/meetkeuze{% endif %}')" style="background:#E8344E;color:#fff;padding:.5rem 1.4rem;border-radius:8px;border:none;cursor:pointer;font-size:.85rem;font-weight:700;">{%if lang=="de"%}NEUE MESSUNG{%elif lang=="en"%}NEW MEASUREMENT{%else%}NIEUWE METING{%endif%}</button><button onclick="kwOpslaan()"" style="background:#E8344E;color:#fff;padding:.5rem 1.4rem;border-radius:8px;border:none;cursor:pointer;font-size:.85rem;font-weight:700;"><span id="kwOpslaanTekst">Opslaan</span></button></div>
 
+<script src="/static/js/hrv.js?v=9"></script>
 <script>
 // Accordion voor de Details-info-kaarten: bij openen van een kaart sluiten alle andere; nogmaals klikken = sluiten (toggle). Eén tegelijk open.
 function kwInfo(id){var el=document.getElementById(id),wasOpen=el.style.display==='block';document.querySelectorAll('.kw-info').forEach(function(e){e.style.display='none';});if(!wasOpen)el.style.display='block';}
@@ -265,6 +266,13 @@ var vit=5;
   // Kwaliteits-gate: bij beperkte/onbetrouwbare kwaliteit stip + gauge-naald grijzen (één verhaal, geen schijn-positief in het groen).
   var _kwv=(cur.kwaliteit===null||cur.kwaliteit===undefined||cur.kwaliteit==='')?100:Number(cur.kwaliteit);
   var _gated=!isNaN(_kwv)&&_kwv<85;
+  // Onregelmatigheid: nieuwe tweelaags-meetkwaliteit (HRV.qualityClassify, variant B) — één bron
+  // i.p.v. de inline SD1/SD2-kopie. 'slecht' -> markeren ('flag'); rest -> 'clean'. De oude
+  // HRV.rrIrregularity blijft in hrv.js als referentie (hier niet gebruikt). Getoonde RI = cur.ri
+  // (niets herberekend uit RR). try/catch-terugval op 'clean' als hrv.js/RR ontbreekt.
+  var _irr='clean';
+  try{ var _q=HRV.qualityClassify(cur.rr_intervals); _irr=(_q&&_q.band==='slecht')?'flag':'clean'; }catch(e){}
+  if(_irr==='flag') _gated=true;  // te onregelmatig: ook stip + gauge-naald grijzen
   // Eén systeem-van-record (cur.ri) voor label/stip-ring/gauge/getal — zelfde zone overal.
   // Biofeedback: getRaw-eindwaarde (bewuste uitzondering; window-mean-vs-eindwaarde = losse open kwestie, RMSSD_HERBEREKENING_OVERZICHT).
   var displayRi=(cur.meting_type==='biofeedback'&&typeof window.getRaw==='function')?Math.min(10,Math.round((window.getRaw(bpm,hrv)/12)*10)/10):ri;
