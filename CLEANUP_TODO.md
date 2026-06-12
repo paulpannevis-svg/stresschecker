@@ -103,13 +103,14 @@ Niet in oorspronkelijk plan, tijdens recursieve scan vóór Fase 2-E ontdekt en 
 
 ### Toegevoegd 22-05-2026 na RI birth_year/gender uitvraag-sessie
 
-- [x] **2FA-codes plaintext in journalctl** *(HIGH PRIORITY)* — UITGEVOERD 06-06-2026 (Fase 2D). Bij hercontrole bleken het **4** logsites te zijn (niet 2; de oude regelnummers 671/692 waren verschoven): `app.py:971`, `:994`, `:1304`, `:6082`. Alle vier `logging.getLogger().warning("2FA CODE…{code}")` vervangen door `logging.getLogger().info(f"2FA-code verzonden aan {email}")` — event blijft, code-inhoud weg. 2FA-flow ongewijzigd. **Live-deploy (kill -HUP) gebeurt bij de afrondende Fase 2C/2E-commit ná Paul's 2B**; tot dan draait de oude code nog in geheugen.
+- [x] **2FA-codes plaintext in journalctl** *(HIGH PRIORITY)* — UITGEVOERD 06-06-2026 (Fase 2D). Bij hercontrole bleken het **4** logsites te zijn (niet 2; de oude regelnummers 671/692 waren verschoven): `app.py:971`, `:994`, `:1304`, `:6082`. Alle vier `logging.getLogger().warning("2FA CODE…{code}")` vervangen door `logging.getLogger().info(f"2FA-code verzonden aan {email}")` — event blijft, code-inhoud weg. 2FA-flow ongewijzigd. **Live-deploy (kill -HUP) gebeurt bij de afrondende Fase 2C/2E-commit ná Paul's 2B**; tot dan draait de oude code nog in geheugen. → **GEVERIFIEERD LIVE 2026-06-12**: fix zit in HEAD `a7c4f8e`, sites verschoven naar `app.py:1015/1038/1342/6234` en loggen alleen `{email}`; prod-gunicorn herstart 11-06 + 12-06, draait de gefixte code. Item DICHT — niet heropenen.
 
-- [ ] **Licentiecodes plaintext in logs (06-06-2026)** *(MEDIUM PRIORITY)*: tijdens Fase 2D-2FA-onderzoek aangetroffen, **bewust buiten die commit gehouden** — eigen afweging (debug-nut vs. risico). Licentiecodes zijn ook secrets. Drie debug-`print`-statements loggen de code:
-    - `app.py:370` — `print(f"VALIDATE START: code={code}", flush=True)`
-    - `app.py:788` — `print(f"[ACTIVEER DEBUG] code='{code}' legacy='{legacy}' email='{email}'", flush=True)`
-    - `app.py:6143` — `print(f"LICENSE GENERATED: {new_code} type=… email=… order=…", flush=True)`
-    Aparte sessie: per regel beslissen redacten/verwijderen (versus tijdelijk debug-nut). Anders dan 2FA-codes (eenmalig, 10 min geldig) zijn licentiecodes langlevend.
+- [ ] **Licentiecodes plaintext in logs** *(HIGH PRIORITY — verhoogd van MEDIUM op 2026-06-12)*: tijdens Fase 2D-2FA-onderzoek (06-06) aangetroffen, **bewust buiten die commit gehouden**. Licentiecodes zijn secrets én — anders dan 2FA-codes (eenmalig, 10 min) — **langlevend**. Drie debug-`print`-statements loggen de code **onvoorwaardelijk op prod** (geen SC_ENV-gate) → prod-journalctl, risico op activatie-overname. Regelnummers herijkt 2026-06-12:
+    - `app.py:414` — `print(f"VALIDATE START: code={code}", flush=True)` (was :370)
+    - `app.py:832` — `print(f"[ACTIVEER DEBUG] code='{code}' legacy='{legacy}' email='{email}'", flush=True)` (was :788)
+    - `app.py:6295` — `print(f"LICENSE GENERATED: {new_code} type=… email=… order=…", flush=True)` (was :6143)
+    Actie: per regel de code-waarde maskeren (bv. laatste 4 tekens) of de debug-print verwijderen; event mag blijven. Daarna verifiëren dat geen code-waarde meer in journalctl verschijnt. Memory: `project_license_code_plaintext_logging`.
+    - **LOW-sibling (niet prioriteren)**: `app.py:29/:53` — `print(f"[STAGING-MAIL] … code={code}")` logt 2FA-/wachtwoord-reset-code plaintext, maar **alleen onder `SC_ENV=='staging'`** → staging-journalctl, niet prod. Bewuste staging-dev-affordance; opruimen kan, lage prioriteit.
 
 - [ ] **Kompas-tekst basismeting — baseline expliciet benoemen (06-06-2026, GEPARKEERD)**:
   overwegen om in de Innerlijk-Kompas-tekst bij basismetingen de baseline expliciet te noemen
