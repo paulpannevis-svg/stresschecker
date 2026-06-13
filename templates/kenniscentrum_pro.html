@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from 'macros.html' import youtube_embed %}
 {% block title %}{% if lang=="de" %}Wissenszentrum Pro{% elif lang=="en" %}Knowledge Centre Pro{% else %}Kenniscentrum Pro{% endif %}{% endblock %}
 
 {% block content %}
@@ -55,13 +56,24 @@
 .kc-begrip:last-child{border-bottom:none}
 .kc-begrip dt{font-size:.85rem;font-weight:700;color:#333;margin-bottom:.15rem}
 .kc-begrip dd{font-size:.81rem;color:#555;line-height:1.6;margin:0}
-
+.video-wrapper{position:relative;width:100%;max-width:560px;aspect-ratio:16/9;margin:0 auto;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.1);}
+.video-wrapper iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
 </style>
 
 <div class="kc-wrap">
   <div class="kc-header">
     <h1>{% if lang=="de" %}Wissenszentrum{% elif lang=="en" %}Knowledge Centre{% else %}Kenniscentrum{% endif %} <span class="kc-pro-badge">PRO</span></h1>
     <p>{% if lang=="de" %}Fachkenntnisse für Coaches, Therapeuten und Trainer{% elif lang=="en" %}Professional knowledge for coaches, therapists and trainers{% else %}Vakkennis voor coaches, therapeuten en trainers{% endif %}</p>
+  </div>
+
+  <div class="kc-landing-video">
+    {% if lang == 'de' %}
+      {{ youtube_embed('ikpLOkaN-Kw', 'Wissenszentrum Pro') }}
+    {% elif lang == 'en' %}
+      {{ youtube_embed('UV3p9ko1BAU', 'Knowledge Center Pro') }}
+    {% else %}
+      {{ youtube_embed('cCeay2JOPxA', 'Kenniscentrum Pro') }}
+    {% endif %}
   </div>
 
   <div class="kc-nav">
