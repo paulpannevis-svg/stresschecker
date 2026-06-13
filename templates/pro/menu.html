@@ -1,36 +1,5 @@
 {% extends "base.html" %}
-{% block title %}StressChecker® Pro — Dashboard
-    <!-- Kenniscentrum Pro knop -->
-    <div style="text-align:center;margin-top:1rem;padding-bottom:1rem">
-      {%if is_pro and not session.get('free_trial') and not session.get('is_demo')%}
-      <a href="/kenniscentrum-pro" onclick="{% if session.get('is_demo') %}event.preventDefault();alert('Alleen voor abonnementhouders');{% endif %}" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.2rem;background:#e8f5f3;color:#2a9d8f;border:1px solid #b2dbd5;border-radius:20px;text-decoration:none;font-size:.82rem;font-weight:600">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        {%if lang=='de'%}Wissenszentrum Pro{%elif lang=='en'%}Knowledge Centre Pro{%else%}Kenniscentrum Pro{%endif%}
-      </a>
-      {%else%}
-      <span onclick="alert('{%if lang=="de"%}Nur für Pro-Abonnenten{%elif lang=="en"%}Pro subscribers only{%else%}Alleen voor Pro-abonnees{%endif%}')" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.2rem;background:#f5f5f5;color:#aaa;border:1px solid #ddd;border-radius:20px;font-size:.82rem;cursor:pointer">
-        🔒 {%if lang=='de'%}Wissenszentrum Pro{%elif lang=='en'%}Knowledge Centre Pro{%else%}Kenniscentrum Pro{%endif%}
-      </span>
-      {%endif%}
-    </div>
-
-    
-    <!-- Kenniscentrum Pro knop -->
-    <div style="text-align:center;margin-top:1rem;padding-bottom:1rem">
-      {%if is_pro and not session.get('free_trial') and not session.get('is_demo')%}
-      <a href="/kenniscentrum-pro" onclick="{% if session.get('is_demo') %}event.preventDefault();alert('Alleen voor abonnementhouders');{% endif %}" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.2rem;background:#e8f5f3;color:#2a9d8f;border:1px solid #b2dbd5;border-radius:20px;text-decoration:none;font-size:.82rem;font-weight:600">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        {%if lang=='de'%}Wissenszentrum Pro{%elif lang=='en'%}Knowledge Centre Pro{%else%}Kenniscentrum Pro{%endif%}
-      </a>
-      {%else%}
-        <span onclick="this.nextElementSibling.style.display='block';this.style.color='#E8344E';" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.2rem;background:#f5f5f5;color:#aaa;border:1px solid #ddd;border-radius:20px;font-size:.82rem;cursor:pointer;flex-direction:column;">
-        🔒 {%if lang=='de'%}Wissenszentrum Pro{%elif lang=='en'%}Knowledge Centre Pro{%else%}Kenniscentrum Pro{%endif%}
-        </span>
-        {%endif%}
-        <div id="demo-msg-pro" style="display:none;font-size:.78rem;color:#E8344E;margin-top:6px;text-align:center;">Alleen voor Pro-abonnees</div>
-        <span onclick="this.nextElementSibling.style.display='block';this.style.color='#E8344E';" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1.2rem;background:#f5f5f5;color:#aaa;border:1px solid #ddd;border-radius:20px;font-size:.82rem;cursor:pointer;flex-direction:column;">
-
-{% endblock %}
+{% block title %}StressChecker® Pro — Dashboard{% endblock %}
 {% block content %}
 <style>
 .pro-wrap{max-width:1080px;margin:0 auto;padding:1.5rem 1rem 2rem;}
