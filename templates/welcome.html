@@ -28,7 +28,7 @@
   margin-right: auto;
   padding-left: 1rem;
 }
-.video-wrapper{position:relative;width:100%;max-width:284px;aspect-ratio:16/9;margin:0 auto;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.1);}
+.video-wrapper{position:relative;width:100%;max-width:340px;aspect-ratio:16/9;margin:0 auto;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.1);}
 .video-wrapper iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
 </style>
 {% if meting_count == 0 and (session.get('license_valid') or session.get('demo_mode')) %}
@@ -134,19 +134,17 @@
     <div style="text-align:center;margin:.2rem 0 .4rem;">
       <a href="#" id="show-videos-link" onclick="document.getElementById('sc-videos').style.display='block';localStorage.removeItem('sc_videos_seen');this.style.display='none';return false;" style="font-size:.78rem;color:#bbb;text-decoration:none;">&#9654; Bekijk de video's</a>
     </div>
-    <div id="sc-videos" style="width:100%;max-width:900px;margin:0 auto .6rem;padding:0 16px;">
+    <div id="sc-videos" style="width:100%;max-width:760px;margin:0 auto .6rem;padding:0 16px;">
       <div style="text-align:right;margin-bottom:.3rem;">
         <button onclick="document.getElementById('sc-videos').style.display='none';localStorage.setItem('sc_videos_seen','1');document.getElementById('show-videos-link').style.display='inline';" style="background:none;border:none;font-size:.78rem;color:#aaa;cursor:pointer;">&#10005; video's sluiten</button>
       </div>
-      <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
         <div style="flex:1;min-width:260px;">
           <div style="font-size:.82rem;font-weight:700;color:#E8344E;margin-bottom:.3rem;text-align:center;">StressChecker</div>
           {% if lang == 'de' %}
             {{ youtube_embed('AhOIRJ8GeAo', title='StressChecker — Konsument') }}
           {% else %}
-          <video controls playsinline style="width:100%;max-height:160px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);">
-            <source src="{{ url_for('static', filename='img/sc_video_consument_nl.mp4') }}" type="video/mp4">
-          </video>
+            {{ youtube_embed('4FI-kSaFOeM', title='StressChecker – Consument') }}
           {% endif %}
         </div>
         <div style="flex:1;min-width:260px;">
@@ -154,9 +152,7 @@
           {% if lang == 'de' %}
             {{ youtube_embed('8na6R5JB_eY', title='StressChecker Pro') }}
           {% else %}
-          <video controls playsinline preload="metadata" style="width:100%;max-height:160px;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.1);">
-            <source src="{{ url_for('static', filename='img/sc_video_pro_nl_v2.mp4') }}" type="video/mp4">
-          </video>
+            {{ youtube_embed('_pPS3qOSdXY', title='StressChecker Pro') }}
           {% endif %}
         </div>
       </div>
