@@ -1,5 +1,41 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-13 — PROD: /kenniscentrum-pro — video losser van tabbladenrij
+
+`.kc-landing-video` had geen `margin-bottom`, waardoor de zojuist toegevoegde video tegen de
+tabbladenrij (Methodik/HRV/Protokoll…) plakte. Eén CSS-regel toegevoegd: `.kc-landing-video{margin:0 0 1rem;}`
+— 1rem ruimte eronder, consistent met de consumentenpagina `kenniscentrum.html`. Verder niets aangeraakt.
+Cherry-pick van staging-commit `62b251c` (prod `a50864a`).
+
+## 2026-06-13 — PROD: /kenniscentrum-pro — per-taal welkomstvideo's toegevoegd
+
+De Kenniscentrum Pro-pagina (`templates/kenniscentrum_pro.html`) had nog géén video. Toegevoegd: een
+`kc-landing-video`-blok met `{% if/elif/else %}`-taalstructuur via de bestaande `youtube_embed`-macro
+(youtube-nocookie), plus de onmisbare macro-import (regel 2) en de `.video-wrapper`-CSS (`max-width:560px`),
+gespiegeld aan `kenniscentrum.html`. Per taal een eigen video: DE `ikpLOkaN-Kw` · EN `UV3p9ko1BAU` ·
+NL `cCeay2JOPxA`. Cherry-pick van staging-commit `3cb09e3` (prod `a232fd5`).
+
+- **Lang-routing:** zelfde sessie-`lang` als `/welkom` — route negeert `?lang=`. Verificatie van taalvarianten
+  via `Accept-Language` in verse sessie. De pagina is Pro-gated (anoniem → 302), dus render-check gebeurde
+  via Jinja-parse + standalone macro-render (geen 2FA-mail getriggerd).
+
+## 2026-06-13 — PROD: /welkom — EN-tak met Engelse welkomstvideo's
+
+Het videoblok op `/welkom` gebruikte een binaire `{% if lang == 'de' %}/{% else %}` — EN viel daardoor in
+de NL-`else`-tak en toonde de NL-video's. Eigen `{% elif lang == 'en' %}`-tak toegevoegd voor beide video's:
+consument `npSk9bERrCY` · Pro `ANhM3u1U7MQ`. DE-takken (`AhOIRJ8GeAo`, `8na6R5JB_eY`) en NL-`else`-takken
+ongemoeid. Cherry-pick van staging-commit `a81874a` (prod `da32aee`).
+
+## 2026-06-13 — PROD: /welkom — NL-video's naar YouTube-embeds + strakker videopaar
+
+De twee NL-`<video>`-mp4-elementen op `/welkom` vervangen door `youtube_embed`-embeds (youtube-nocookie),
+gelijk aan de DE-tak: consument `4FI-kSaFOeM` · Pro `_pPS3qOSdXY`. Tegelijk de layout van het videopaar
+strakker gezet: `#sc-videos max-width 900→760px`, flex-`gap 1rem→.5rem`, `.video-wrapper max-width 284→340px`.
+Squash-promotie van staging-commits `1daf081`+`10e179d`+`038fb83` (prod `9d29e60`).
+
+- **Oude mp4's blijven staan** (`sc_video_consument_nl.mp4`, `sc_video_pro_nl_v2.mp4`) maar zijn nu
+  functioneel ongebruikt — verwijderkandidaat bij een volgende opruimsessie.
+
 ## 2026-06-10 — PROD: /welkom — Pro NL-welkomvideo naar v2 + preload="none"
 
 De Pro NL-`<video>` op `/welkom` (`templates/welcome.html`) wijst nu naar `sc_video_pro_nl_v2.mp4`
