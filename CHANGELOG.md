@@ -1,5 +1,19 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-13 — PROD: /pro dashboard — gelekte knop-HTML uit `<title>` verwijderd
+
+De `<title>` van het Pro-dashboard (`/pro`, `templates/pro/menu.html`) lekte HTML: in Google Analytics
+verscheen de titel als `StressChecker® Pro — Dashboard <!-- Kenniscentrum Pro knop --> <div style="…">…`
+gevolgd door de volledige knop-HTML. Oorzaak: het `{% block title %}` (regel 2) sloot pas op regel 33 —
+ná twee dubbele, verkeerd geplaatste Kenniscentrum-Pro pill-knoppen — en `base.html` wikkelt de
+blok-inhoud in `<title>…</title>`, dus al die HTML belandde in de titel.
+
+- **Fix:** title-blok direct gesloten → `{% block title %}StressChecker® Pro — Dashboard{% endblock %}`;
+  de stray dubbele knop-HTML (regels 3-33) verwijderd. De **correcte** `.pro-card`-knop naar
+  `/kenniscentrum-pro` in de body blijft ongemoeid (was al de juiste variant). Niets verplaatst.
+- Geverifieerd door het title-blok standalone te renderen: `<title>` = `StressChecker® Pro — Dashboard`,
+  geen HTML meer. Cherry-pick van staging-commit `1349125` (prod `990bc10`).
+
 ## 2026-06-13 — PROD: /kenniscentrum-pro — video losser van tabbladenrij
 
 `.kc-landing-video` had geen `margin-bottom`, waardoor de zojuist toegevoegde video tegen de
