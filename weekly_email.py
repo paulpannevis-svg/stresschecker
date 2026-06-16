@@ -27,6 +27,13 @@ MAIL_ALLOW = {e.strip().lower() for e in os.environ.get('STAGING_MAIL_ALLOW', ''
 # Onbestelbare / test-domeinen (RFC 6761 reserved + interne placeholders).
 INVALID_DOMAINS = ('.invalid', '.test', '.example')
 
+# Expliciet uitgesloten test-/intern-accounts die niet door de heuristiek worden
+# gevangen (geen 'test'/+alias/ongeldig-domein). Alleen uitsluiten van de mail;
+# het account blijft in de DB (aparte opruimtaak).
+EXCLUDE_EMAILS = {
+    'partnerships@lifestylemonitors.com',  # testaccount Paul (geen echte klant)
+}
+
 
 def user_key(email):
     return hashlib.sha256(email.encode()).hexdigest()[:32]
@@ -35,6 +42,8 @@ def user_key(email):
 def test_account_reden(email, display_name='', origins=''):
     """None als het adres een gewone klant lijkt; anders de reden waarom het een
     test-/eval-/onbestelbaar adres is. Conservatief: alleen harde fixture-signalen."""
+    if email.strip().lower() in EXCLUDE_EMAILS:
+        return 'testaccount (handmatig uitgesloten)'
     local = email.split('@')[0]
     dom = email.split('@')[1] if '@' in email else ''
     if any(dom.endswith(s) for s in INVALID_DOMAINS):
