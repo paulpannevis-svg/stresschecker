@@ -24,8 +24,28 @@ IS_STAGING = os.environ.get('SC_ENV') == 'staging'
 MAIL_ALLOW = {e.strip().lower() for e in os.environ.get('STAGING_MAIL_ALLOW', '').split(',') if e.strip()}
 
 
+# Onbestelbare / test-domeinen (RFC 6761 reserved + interne placeholders).
+INVALID_DOMAINS = ('.invalid', '.test', '.example')
+
+
 def user_key(email):
     return hashlib.sha256(email.encode()).hexdigest()[:32]
+
+
+def test_account_reden(email, display_name='', origins=''):
+    """None als het adres een gewone klant lijkt; anders de reden waarom het een
+    test-/eval-/onbestelbaar adres is. Conservatief: alleen harde fixture-signalen."""
+    local = email.split('@')[0]
+    dom = email.split('@')[1] if '@' in email else ''
+    if any(dom.endswith(s) for s in INVALID_DOMAINS):
+        return 'ongeldig adres'
+    if 'test' in local or 'test' in (display_name or '').lower():
+        return 'testaccount'
+    if '+' in local:
+        return 'testaccount (+alias-fixture)'
+    if origins and 'evaluation' in origins:
+        return 'evaluatie-account'
+    return None
 
 
 def unsub_token(email):
@@ -117,7 +137,10 @@ def load_recipients():
     db = sqlite3.connect(LICENSE_DB)
     db.row_factory = sqlite3.Row
     rows = db.execute(
-        """SELECT lower(u.email) AS email, COALESCE(u.language,'nl') AS lang
+        """SELECT lower(u.email) AS email, COALESCE(u.language,'nl') AS lang,
+                  COALESCE(u.display_name,'') AS display_name,
+                  group_concat(DISTINCT l.type) AS types,
+                  group_concat(DISTINCT l.origin) AS origins
              FROM users u
              JOIN licenses l ON lower(l.email) = lower(u.email)
             WHERE l.product LIKE 'sc%'
@@ -129,12 +152,22 @@ def load_recipients():
         optout = {r[0] for r in db.execute("SELECT lower(email) FROM email_optout WHERE list='weekly'")}
     except sqlite3.OperationalError:
         optout = set()
+    # Route B: gekoppelde cliënten categorisch uitsluiten (veilige default tot de
+    # per-Pro toestemmingsschakelaar er is). Een cliënt is herkenbaar doordat zijn
+    # user_key voorkomt als gekoppelde-sleutel in een van de twee koppeltabellen.
+    paired = set()
+    for q in ("SELECT consumer_user_key FROM pairing_codes WHERE consumer_user_key IS NOT NULL",
+              "SELECT paired_device_id FROM client_pairings WHERE paired_device_id IS NOT NULL"):
+        try:
+            paired |= {r[0] for r in db.execute(q) if r[0]}
+        except sqlite3.OperationalError:
+            pass
     db.close()
-    return rows, optout
+    return rows, optout, paired
 
 
 def send_weekly():
-    recipients, optout = load_recipients()
+    recipients, optout, paired = load_recipients()
     sg = sendgrid.SendGridAPIClient(SG_KEY)
     sent = 0
     for u in recipients:
@@ -146,6 +179,15 @@ def send_weekly():
         # AVG: afgemelde adressen overslaan.
         if email in optout:
             print(f"Overgeslagen (afgemeld): {email}")
+            continue
+        # Route B: gekoppelde cliënten niet mailen (default uit).
+        if user_key(email) in paired:
+            print(f"Overgeslagen (gekoppelde cliënt): {email}")
+            continue
+        # Test-/eval-/onbestelbare adressen overslaan.
+        reden = test_account_reden(email, u["display_name"], u["origins"])
+        if reden:
+            print(f"Overgeslagen ({reden}): {email}")
             continue
         # Staging-vangnet: alleen allow-listed adressen krijgen ECHT mail.
         if IS_STAGING and email not in MAIL_ALLOW:
