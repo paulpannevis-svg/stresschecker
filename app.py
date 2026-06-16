@@ -723,6 +723,71 @@ def welcome():
     return render_template('welcome.html', lang=session.get('lang', 'nl'))
 
 
+# --- Wekelijkse-mail afmelding (AVG) ---------------------------------------
+# Onvervalsbaar token = HMAC-SHA256(email, SC_SECRET_KEY); identiek berekend in
+# weekly_email.py. GET toont bevestiging (voorkomt per-ongeluk afmelden door
+# link-prefetch van mailclients); POST schrijft de opt-out naar email_optout.
+def _afmeld_token(email):
+    import hmac
+    return hmac.new(app.secret_key.encode(), (email or '').strip().lower().encode(), hashlib.sha256).hexdigest()
+
+
+def _afmeld_token_ok(email, token):
+    import hmac
+    return bool(token) and hmac.compare_digest(_afmeld_token(email), token)
+
+
+_AFMELD_T = {
+    'titel':   {'nl': 'Afmelden wekelijkse mail', 'de': 'Woechentliche Mail abbestellen', 'en': 'Unsubscribe weekly email'},
+    'vraag':   {'nl': 'Weet je zeker dat je geen wekelijkse StressChecker-mail meer wilt ontvangen?', 'de': 'Moechtest du wirklich keine woechentliche StressChecker-Mail mehr erhalten?', 'en': 'Are you sure you no longer want to receive the weekly StressChecker email?'},
+    'knop':    {'nl': 'Ja, afmelden', 'de': 'Ja, abmelden', 'en': 'Yes, unsubscribe'},
+    'klaar':   {'nl': 'Je bent afgemeld. Je ontvangt geen wekelijkse mail meer.', 'de': 'Du bist abgemeldet. Du erhaeltst keine woechentliche Mail mehr.', 'en': 'You have been unsubscribed. You will no longer receive the weekly email.'},
+    'fout':    {'nl': 'Deze afmeldlink is ongeldig of verlopen.', 'de': 'Dieser Abmeldelink ist ungueltig oder abgelaufen.', 'en': 'This unsubscribe link is invalid or expired.'},
+}
+_AFMELD_PAGE = """<!doctype html><html lang="{{ lang }}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ titel }}</title>
+<style>body{font-family:system-ui,Arial,sans-serif;max-width:34rem;margin:4rem auto;padding:0 1.2rem;color:#222;line-height:1.5}
+.b{background:#0b7;color:#fff;border:0;padding:.7rem 1.3rem;border-radius:.4rem;font-size:1rem;cursor:pointer}</style></head>
+<body><h2>{{ titel }}</h2>
+{% if klaar %}<p>{{ klaar }}</p>
+{% elif fout %}<p>{{ fout }}</p>
+{% else %}<p>{{ vraag }}</p>
+<form method="post" action="/afmelden"><input type="hidden" name="e" value="{{ email }}">
+<input type="hidden" name="t" value="{{ token }}"><button class="b" type="submit">{{ knop }}</button></form>
+{% endif %}</body></html>"""
+
+
+@app.route('/afmelden', methods=['GET', 'POST'])
+def afmelden():
+    from flask import render_template_string
+    email = (request.values.get('e', '') or '').strip().lower()
+    token = request.values.get('t', '')
+    # Taal: voorkeur uit users-tabel, anders sessie, anders nl.
+    lang = session.get('lang', 'nl')
+    try:
+        cn = sqlite3.connect(DB_PATH)
+        row = cn.execute("SELECT language FROM users WHERE lower(email)=?", (email,)).fetchone()
+        cn.close()
+        if row and row[0]:
+            lang = row[0]
+    except Exception:
+        pass
+    tr = lambda k: _AFMELD_T[k].get(lang, _AFMELD_T[k]['nl'])
+    if not _afmeld_token_ok(email, token):
+        return render_template_string(_AFMELD_PAGE, lang=lang, titel=tr('titel'), fout=tr('fout')), 400
+    if request.method == 'POST':
+        try:
+            cn = sqlite3.connect(DB_PATH)
+            cn.execute("CREATE TABLE IF NOT EXISTS email_optout (email TEXT PRIMARY KEY, list TEXT DEFAULT 'weekly', opted_out_at TEXT DEFAULT (datetime('now')), source TEXT)")
+            cn.execute("INSERT OR IGNORE INTO email_optout(email, list, source) VALUES(?, 'weekly', 'unsubscribe-link')", (email,))
+            cn.commit()
+            cn.close()
+        except Exception as e:
+            print('Afmeld-fout:', e, flush=True)
+        return render_template_string(_AFMELD_PAGE, lang=lang, titel=tr('titel'), klaar=tr('klaar'))
+    return render_template_string(_AFMELD_PAGE, lang=lang, titel=tr('titel'), vraag=tr('vraag'), knop=tr('knop'), email=email, token=token)
+
+
 @app.route('/start')
 def start():
     if not session.get('lang'):
