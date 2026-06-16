@@ -75,7 +75,12 @@ def afmeld_regel(email, lang):
     return "\n\n---\n" + t
 
 
-def get_naam(email):
+def get_naam(email, display_name=''):
+    # Voorkeur: voornaam uit display_name (eerste woord). Anders nette terugval op
+    # het e-mailadres (oude gedrag) zodat er altijd een aanhef is.
+    dn = (display_name or '').strip()
+    if dn:
+        return dn.split()[0]
     return email.split("@")[0].split(".")[0].split("+")[0].capitalize()
 
 
@@ -104,8 +109,8 @@ def get_patroon(email):
     return {"avg_recent": ar, "avg_older": ao, "top_dim": td, "top_dim_count": dc.get(td, 0) if td else 0, "top_dim_total": len(dims), "count": len(rows)}
 
 
-def build_nudge(email, lang, status="nieuw", count=0):
-    naam = get_naam(email)
+def build_nudge(email, lang, status="nieuw", count=0, display_name=''):
+    naam = get_naam(email, display_name)
     aanhef = {"nl": f"Beste {naam},", "de": f"Liebe/r {naam},", "en": f"Dear {naam},"}.get(lang, f"Beste {naam},")
     subj = {"nl": "Hoe gaat het met je?", "de": "Wie geht es dir?", "en": "How are you doing?"}.get(lang, "Hoe gaat het met je?")
     tekst = {"nl": "Je hebt deze week nog niet gemeten. Neem 90 seconden voor jezelf en ontdek hoe je lichaam er echt voor staat.", "de": "Diese Woche hast du noch keine Messung durchgefuehrt. Nimm dir 90 Sekunden fuer dich und entdecke, wie es deinem Koerper wirklich geht.", "en": "You have not measured this week yet. Take 90 seconds for yourself and find out how your body is really doing."}.get(lang, "")
@@ -113,8 +118,8 @@ def build_nudge(email, lang, status="nieuw", count=0):
     return subj, aanhef + "\n\n" + tekst + "\n\n" + groet + afmeld_regel(email, lang)
 
 
-def build_email(email, lang, p):
-    naam = get_naam(email)
+def build_email(email, lang, p, display_name=''):
+    naam = get_naam(email, display_name)
     aanhef = {"nl": f"Beste {naam},", "de": f"Liebe/r {naam},", "en": f"Dear {naam},"}.get(lang, f"Beste {naam},")
     subj = {"nl": "Je weekoverzicht van StressChecker", "de": "Deine Wochenzusammenfassung von StressChecker", "en": "Your weekly StressChecker summary"}.get(lang, "Je weekoverzicht")
     delen = []
@@ -202,14 +207,15 @@ def send_weekly():
         if IS_STAGING and email not in MAIL_ALLOW:
             print(f"[STAGING-MAIL] zou versturen aan {email} (niet op allow-list) -> niet verzonden")
             continue
+        dn = u["display_name"]
         p = get_patroon(email)
         if not p or "status" in p:
             status = p["status"] if p else "nieuw"
             count = p.get("count", 0) if p else 0
-            subj, body = build_nudge(email, lang, status, count)
+            subj, body = build_nudge(email, lang, status, count, display_name=dn)
             label = f"Nudge({status})"
         else:
-            subj, body = build_email(email, lang, p)
+            subj, body = build_email(email, lang, p, display_name=dn)
             label = "Patroon"
         msg = Mail(from_email="noreply@lifestylemonitors.com", to_emails=email, subject=subj, plain_text_content=body)
         try:
