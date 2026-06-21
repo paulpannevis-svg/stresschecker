@@ -19,17 +19,32 @@ KK_OPERATOR_ENABLED = False
 # SMTP configuratie voor 2FA verificatiecodes
 MAIL_SERVER   = 'mailout.hostnet.nl'
 MAIL_PORT     = 587
-MAIL_USERNAME = 'noreply@lifestylemonitors.com'
+MAIL_USERNAME = 'info@lifestylemonitors.com'
 MAIL_PASSWORD = '55Bumper@#'
 
 import random, os
 
+def _reply_to_for_lang(lang):
+    """B-light reply-to-policy: afzender blijft altijd info@lifestylemonitors.com,
+    reply-to volgt de locale — DE naar de Duitse mailbox, NL/EN naar de .com-mailbox."""
+    return 'info@lifestylemonitors.de' if lang == 'de' else 'info@lifestylemonitors.com'
+
+
+def _staging_mail_allowed(email):
+    """STAGING-ONLY allow-list (env STAGING_MAIL_ALLOW, komma-gescheiden). Adressen op de
+    lijst krijgen op staging ECHTE mail (testers/Paul); al het andere blijft in het log.
+    Op prod (SC_ENV != 'staging') irrelevant: daar verstuurt send_* altijd echt."""
+    allow = {e.strip().lower() for e in os.environ.get('STAGING_MAIL_ALLOW', '').split(',') if e.strip()}
+    return (email or '').strip().lower() in allow
+
+
 def send_verification_code(email, code, lang='nl'):
-    if os.environ.get('SC_ENV') == 'staging':
+    # Op staging: alleen adressen op de allow-list krijgen echte mail; de rest naar het log.
+    if os.environ.get('SC_ENV') == 'staging' and not _staging_mail_allowed(email):
         print(f'[STAGING-MAIL] verification to={email} code={code}', flush=True); return True
     try:
         import sendgrid
-        from sendgrid.helpers.mail import Mail
+        from sendgrid.helpers.mail import Mail, ReplyTo
         sg = sendgrid.SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
         if lang == 'de':
             subject = 'Ihr Verifizierungscode – StressChecker'
@@ -40,11 +55,16 @@ def send_verification_code(email, code, lang='nl'):
         else:
             subject = 'Uw verificatiecode – StressChecker'
             body = f'Uw verificatiecode is: {code}\n\nDeze code is 10 minuten geldig.'
-        msg = Mail(from_email='noreply@lifestylemonitors.com', to_emails=email, subject=subject, plain_text_content=body)
+        msg = Mail(from_email='info@lifestylemonitors.com', to_emails=email, subject=subject, plain_text_content=body)
+        msg.reply_to = ReplyTo(_reply_to_for_lang(lang))
         sg.send(msg)
         return True
     except Exception as e:
         print('Mail fout:', e)
+        # Vangnet op staging: bij een verzendfout de code alsnog naar het log, zodat een
+        # allow-listed tester niet buitengesloten raakt door een tijdelijke SendGrid-fout.
+        if os.environ.get('SC_ENV') == 'staging':
+            print(f'[STAGING-MAIL-FALLBACK] verification to={email} code={code}', flush=True)
         return False
 
 
@@ -73,7 +93,7 @@ def send_password_reset_email(email, code, lang='nl'):
                     f'Je resetcode is: {code}\n\n'
                     f'Deze code is 10 minuten geldig en kan slechts één keer gebruikt worden.\n\n'
                     f'Heb je dit niet aangevraagd? Negeer dan deze e-mail.')
-        msg = Mail(from_email='noreply@lifestylemonitors.com', to_emails=email, subject=subject, plain_text_content=body)
+        msg = Mail(from_email='info@lifestylemonitors.com', to_emails=email, subject=subject, plain_text_content=body)
         sg.send(msg)
         return True
     except Exception as e:
@@ -174,7 +194,7 @@ def send_activation_confirmation_email(email, lang, consent_ts):
         import sendgrid
         from sendgrid.helpers.mail import Mail
         sg = sendgrid.SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
-        msg = Mail(from_email='noreply@lifestylemonitors.com', to_emails=email,
+        msg = Mail(from_email='info@lifestylemonitors.com', to_emails=email,
                    subject=subject, plain_text_content=body)
         sg.send(msg)
         return True
@@ -205,7 +225,7 @@ def verify_password(password, stored_hash):
     return (False, False)
 
 
-MAIL_FROM     = 'StressChecker <noreply@lifestylemonitors.com>'
+MAIL_FROM     = 'StressChecker <info@lifestylemonitors.com>'
 
 # HLM-blueprint is optioneel: de hlm/-module is bewust untracked/geparkeerd in git, dus
 # afwezig in de staging-worktree. Op live (hlm/ aanwezig) laadt dit normaal; op staging
@@ -247,6 +267,9 @@ def _full_name_filter(obj, surname=None):
 DB_PATH        = os.environ.get('SC_DB_PATH', '/opt/ic-license-server/data/saas_licenses.db')
 METING_DB_PATH = os.environ.get('SC_METING_DB', '/opt/stresschecker/data/sc_measurements.db')
 PRO_DB_PATH    = os.environ.get('SC_PRO_DB', '/opt/stresschecker/data/sc_pro.db')
+# Event-modus (apart datamodel, eigen DB-bestand). Default = prod-locatie; staging
+# overschrijft via SC_EVENT_DB (.env.staging) — zelfde patroon als de paden hierboven.
+EVENT_DB_PATH  = os.environ.get('SC_EVENT_DB', '/opt/stresschecker/data/sc_event.db')
 
 # ─── STAGING-startup-guards ──────────────────────────────────────────────────
 # No-op in productie (SC_ENV is daar niet 'staging'). Twee harde asserties die
@@ -254,13 +277,14 @@ PRO_DB_PATH    = os.environ.get('SC_PRO_DB', '/opt/stresschecker/data/sc_pro.db'
 if os.environ.get('SC_ENV') == 'staging':
     # (a) Geen enkel DB-pad mag naar de LIVE-data wijzen (val-terug-op-default-val §2d).
     _LIVE_PREFIXES = ('/opt/stresschecker/data/', '/opt/ic-license-server/data/')
-    for _p in (DB_PATH, METING_DB_PATH, PRO_DB_PATH):
+    for _p in (DB_PATH, METING_DB_PATH, PRO_DB_PATH, EVENT_DB_PATH):
         assert not any(_p.startswith(_x) for _x in _LIVE_PREFIXES), \
             f'STAGING WEIGERT live-DB-pad: {_p}'
     # (b) De license-DB moet gescrubd zijn: een verse, ONGESCRUBDE kopie mag niet serveren.
     #     Elk niet-whitelist, niet-*.invalid e-mailadres in users/licenses = ongescrubde PII.
     _SCRUB_WL = {'paulpannevis@gmail.com', 'paulpannevis@lifestylemonitors.com',
-                 'test-rifix@lifestylemonitors.com', 'test-rifix-divers@lifestylemonitors.com'}
+                 'test-rifix@lifestylemonitors.com', 'test-rifix-divers@lifestylemonitors.com',
+                 'stevenpannevis@lifestylemonitors.com', 'malutenhoope@gmail.com'}
     try:
         import sqlite3 as _sq3
         _cn = _sq3.connect(f'file:{DB_PATH}?mode=ro', uri=True)
@@ -307,9 +331,27 @@ def get_meting_db():
         ctx_vitaliteit REAL,
         created_at  TEXT DEFAULT CURRENT_TIMESTAMP
     )''')
-    for col, coltype in [('ctx_dimensie', 'TEXT'), ('ctx_vitaliteit', 'REAL'), ('feedback_cache', 'TEXT'), ('gate_metrics', 'TEXT')]:
+    # Additieve kolommen (nieuwe vragenset basismeting). prediction: voorspelling van de
+    # gebruiker (1=boven/hoger, 2=rond/gelijk, 3=onder/lager, NULL=overgeslagen/oude flow);
+    # prediction_hit: 0/1 server-berekend tegen de baseline-band, NULL bij geen voorspelling.
+    # Additieve kolommen vragenset basismeting. Fase 1: prediction/prediction_hit (zie boven).
+    # Fase 2 voorvragen: sleep_quality(1-3), load_prev_day(1-3), meaning_score(REAL, NULL tot
+    # aanraking — onderscheid 'bewust' vs 'default'). Bestaande ctx_*-kolommen blijven (oude data),
+    # worden voor nieuwe basismetingen NULL (ongemak/dimensie/zinvolheid vervallen in de voor-flow).
+    for col, coltype in [('ctx_dimensie', 'TEXT'), ('ctx_vitaliteit', 'REAL'), ('feedback_cache', 'TEXT'),
+                         ('prediction', 'INTEGER'), ('prediction_hit', 'INTEGER'),
+                         ('sleep_quality', 'INTEGER'), ('load_prev_day', 'INTEGER'), ('meaning_score', 'REAL'),
+                         ('recovery_feel', 'INTEGER')]:
         try: conn.execute(f'ALTER TABLE metingen ADD COLUMN {col} {coltype}')
         except: pass
+    # Fase 3 adaptieve trigger-chips (koppeltabel). meting_id → metingen.id (eigen/consument).
+    conn.execute('''CREATE TABLE IF NOT EXISTS meting_triggers (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        meting_id   INTEGER NOT NULL,
+        chip        TEXT NOT NULL,
+        is_recovery INTEGER DEFAULT 0,
+        created_at  TEXT DEFAULT CURRENT_TIMESTAMP
+    )''')
     conn.commit()
     return conn
 
@@ -352,9 +394,85 @@ def get_pro_db():
         created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (client_id) REFERENCES clients(id)
     )''')
-    for col, coltype in [('ctx_dimensie', 'TEXT'), ('ctx_vitaliteit', 'REAL'), ('feedback_cache', 'TEXT'), ('gate_metrics', 'TEXT')]:
+    # Additieve kolommen (nieuwe vragenset basismeting); zie get_meting_db voor de betekenis.
+    for col, coltype in [('ctx_dimensie', 'TEXT'), ('ctx_vitaliteit', 'REAL'), ('feedback_cache', 'TEXT'),
+                         ('prediction', 'INTEGER'), ('prediction_hit', 'INTEGER'),
+                         ('sleep_quality', 'INTEGER'), ('load_prev_day', 'INTEGER'), ('meaning_score', 'REAL'),
+                         ('recovery_feel', 'INTEGER')]:
         try: conn.execute(f'ALTER TABLE client_metingen ADD COLUMN {col} {coltype}')
         except: pass
+    conn.commit()
+    return conn
+
+def _event_enabled():
+    """Event-modus is in Fase 2 UITSLUITEND op staging actief (inert op prod).
+    Fase 5 vervangt dit door een echte rol-/entitlement-check; Fase 6 ontgrendelt prod."""
+    return os.environ.get('SC_ENV') == 'staging'
+
+def get_event_db():
+    """Connectie naar het APARTE event-datamodel (sc_event.db). Idempotent schema —
+    spiegelt get_pro_db. Raakt sc_pro/saas_licenses NIET aan."""
+    os.makedirs(os.path.dirname(EVENT_DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(EVENT_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA foreign_keys = ON')
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS events (
+            event_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_code        TEXT UNIQUE NOT NULL,
+            opdrachtgever     TEXT NOT NULL,
+            naam              TEXT,
+            datum             TEXT,
+            facilitator_label TEXT,
+            status            TEXT NOT NULL DEFAULT 'open',
+            created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS event_participants (
+            participant_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id          INTEGER NOT NULL REFERENCES events(event_id),
+            meting_code       TEXT UNIQUE NOT NULL,
+            birth_year        INTEGER,
+            gender            TEXT,
+            created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_ep_event ON event_participants(event_id);
+        CREATE TABLE IF NOT EXISTS event_metingen (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id       INTEGER NOT NULL REFERENCES events(event_id),
+            participant_id INTEGER NOT NULL REFERENCES event_participants(participant_id),
+            meting_code    TEXT NOT NULL,
+            ts             INTEGER NOT NULL,
+            ri             REAL,
+            bpm            INTEGER,
+            hrv_pct        INTEGER,
+            rmssd          REAL,
+            sdnn           REAL,
+            pnn50          REAL,
+            beats          INTEGER,
+            duration       INTEGER DEFAULT 90,
+            sensor_type    TEXT DEFAULT 'unknown',
+            kwaliteit      INTEGER,
+            rr_intervals   TEXT,
+            timeseries     TEXT,
+            quality_band   TEXT,
+            created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_em_event ON event_metingen(event_id);
+        CREATE INDEX IF NOT EXISTS idx_em_participant ON event_metingen(participant_id);
+    ''')
+    # Additieve kolom (idempotent): deelnemernaam. BEWUSTE privacymodel-wijziging — naam staat
+    # UITSLUITEND hier in sc_event.db (event_participants), nooit in sc_pro/sc_measurements/gedeelde
+    # tabellen. Bureau koppelt code↔persoon; verwijderfunctie volgt als aparte fase.
+    try: conn.execute('ALTER TABLE event_participants ADD COLUMN name TEXT')
+    except Exception: pass
+    # Ontspanningscijfer (zelfde semantiek als basismeting subjectief_score, 0-10; onaangeraakt
+    # = bewuste 5). Additief, alleen sc_event.db; basismeting/gedeelde tabellen onaangeraakt.
+    try: conn.execute('ALTER TABLE event_metingen ADD COLUMN subjectief_score INTEGER')
+    except Exception: pass
+    # Koppeling event -> VB-event-licentie (saas_licenses.licenses.license_key, origin='event').
+    # Additief/idempotent. NULL = CLI/legacy-event zonder licentie (geen credit-handhaving).
+    try: conn.execute('ALTER TABLE events ADD COLUMN license_key TEXT')
+    except Exception: pass
     conn.commit()
     return conn
 
@@ -551,6 +669,13 @@ def require_kk_office_if_krankenkasse(view):
 def _inject_kk_flags():
     """Maakt `is_krankenkasse` in elke template beschikbaar zonder per-view-doorgift."""
     return {'is_krankenkasse': is_krankenkasse_session()}
+
+
+@app.context_processor
+def _inject_staging_flag():
+    """Maakt `is_staging` in elke template beschikbaar voor de TEST-banner.
+    Op productie is SC_ENV afwezig → False → banner rendert nooit."""
+    return {'is_staging': os.environ.get('SC_ENV') == 'staging'}
 
 
 # ----------------------------------------------------------------------------
@@ -1166,7 +1291,7 @@ def send_kk_activation_email(to_email, contact_name, license_code, tier_label, l
             f'Mit freundlichen Gruessen,\n'
             f'Lifestyle Monitors'
         )
-        msg = Mail(from_email='noreply@lifestylemonitors.com', to_emails=to_email,
+        msg = Mail(from_email='info@lifestylemonitors.com', to_emails=to_email,
                    subject=subject, plain_text_content=body)
         msg.reply_to = ReplyTo('info@lifestylemonitors.de')
         sg.send(msg)
@@ -1410,7 +1535,7 @@ def sc_login():
 
 
 
-@app.route('/verify', methods=['GET','POST'])
+@app.route('/vb/verify', methods=['GET','POST'])
 def verify_2fa():
     lang = session.get('2fa_lang','nl')
     error = None
@@ -1691,7 +1816,8 @@ def password_reset_form():
         _cn.commit()
         _cn.close()
         return redirect(url_for('sc_login', success='password_reset', lang=lang))
-    return render_template('wachtwoord_reset.html', lang=lang, email=email_qs)
+    return render_template('wachtwoord_reset.html', lang=lang, email=email_qs,
+                           code=request.args.get('code', ''))
 
 
 @app.route('/profiel')
@@ -1934,6 +2060,23 @@ def sensor_en_meten():
                    "gender": _own_gen or session.get("profile_gender", "male")}
     _dur_arg = request.args.get("duration", type=int)
     _biofeed_dur = _dur_arg if (_dur_arg is not None and 180 <= _dur_arg <= 1800) else 600
+    # Voorspelvraag-variant (alleen eigen/consument-basismeting, _cid==0): tel de eerdere
+    # basismetingen → meting 1 = vraag overslaan; ≥7 meetdagen → niveau-variant, anders
+    # vorige-keer-variant. prediction_hit zelf wordt server-side bij opslaan berekend.
+    _pred_count, _pred_has_baseline = 0, False
+    if not _cid:
+        try:
+            _mdb = get_meting_db()
+            _prows = _mdb.execute(
+                "SELECT ts, ri, meting_type, rr_intervals FROM metingen WHERE user_key=? "
+                "AND lower(coalesce(meting_type,''))='basismeting' AND ri IS NOT NULL "
+                "ORDER BY ts DESC LIMIT 200", (get_user_key(),)).fetchall()
+            _mdb.close()
+            _pred_count = len(_prows)
+            import analytics as _an_pred
+            _pred_has_baseline = _an_pred.compute_baseline([dict(r) for r in _prows]) is not None
+        except Exception:
+            pass
     return render_template("sensor_en_meten.html",
         lang=session.get("lang", "nl"), profile=profile, profile_ok=_profile_ok,
         duration=_biofeed_dur if request.args.get("type")=="biofeedback" else 90,
@@ -1941,6 +2084,7 @@ def sensor_en_meten():
         meting_type=request.args.get("type","basismeting"),
         is_demo=session.get("is_demo") or session.get("demo_mode", False),
         client_id=_cid,
+        pred_meting_count=_pred_count, pred_has_baseline=_pred_has_baseline,
         show_edu=show_educational_blocks(),
     )
 
@@ -2184,7 +2328,10 @@ def pro_eigen_metingen():
         "SELECT * FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 100",
         (pro_key,)).fetchall()
     db.close()
-    metingen_chart = [{'id': r['id'], 'ts': r['ts'], 'ri': r['ri'], 'bpm': r['bpm'], 'hrv_pct': r['hrv_pct'], 'rmssd': r['rmssd'], 'notes': r['notes'] if 'notes' in r.keys() else '', 'meting_type': r['meting_type'] if 'meting_type' in r.keys() else '', 'rr_intervals': r['rr_intervals'] if 'rr_intervals' in r.keys() else '', 'dimensie': r['ctx_dimensie'] if 'ctx_dimensie' in r.keys() else '', 'subjectief_score': r['subjectief_score'] if 'subjectief_score' in r.keys() else None, 'kwaliteit': r['kwaliteit'] if 'kwaliteit' in r.keys() else None} for r in metingen]
+    import analytics as _an_eig
+    # irrflag (onregelmatigheid-gate v2) per meting → de Chart.js-trend kan gevlagde metingen uit de
+    # betrouwbare lijn weren (rood segment), identiek aan /resultaten. rr_intervals blijft mee (tabel-gate).
+    metingen_chart = [{'id': r['id'], 'ts': r['ts'], 'ri': r['ri'], 'bpm': r['bpm'], 'hrv_pct': r['hrv_pct'], 'rmssd': r['rmssd'], 'notes': r['notes'] if 'notes' in r.keys() else '', 'meting_type': r['meting_type'] if 'meting_type' in r.keys() else '', 'rr_intervals': r['rr_intervals'] if 'rr_intervals' in r.keys() else '', 'dimensie': r['ctx_dimensie'] if 'ctx_dimensie' in r.keys() else '', 'subjectief_score': r['subjectief_score'] if 'subjectief_score' in r.keys() else None, 'kwaliteit': r['kwaliteit'] if 'kwaliteit' in r.keys() else None, 'irrflag': _an_eig.row_is_irregular(r)} for r in metingen]
     from datetime import datetime
     metingen_list = []
     for r in metingen:
@@ -2891,7 +3038,7 @@ def send_report_ready_email(to_email, uuid_str, lang='nl'):
                     f'Download het hier:\n{link}\n\n'
                     f'De link werkt zolang u ingelogd bent.\n\n'
                     f'Met vriendelijke groet,\nLifestyle Monitors')
-        msg = Mail(from_email='noreply@lifestylemonitors.com', to_emails=to_email,
+        msg = Mail(from_email='info@lifestylemonitors.com', to_emails=to_email,
                    subject=subject, plain_text_content=body)
         sg.send(msg)
         return True
@@ -2922,7 +3069,7 @@ def send_report_failed_email(to_email, lang, err_summary):
             body = (f'Helaas kon uw rapport niet worden gegenereerd.\n\n'
                     f'Fout: {err_summary}\n\n'
                     f'Probeer opnieuw of neem contact op met support@lifestylemonitors.com.')
-        msg = Mail(from_email='noreply@lifestylemonitors.com', to_emails=to_email,
+        msg = Mail(from_email='info@lifestylemonitors.com', to_emails=to_email,
                    subject=subject, plain_text_content=body)
         sg.send(msg)
     except Exception as e:
@@ -3338,26 +3485,69 @@ def api_save_meting():
                 return None
         _ctx_ongemak = _ctx_int(data.get('ctx_ongemak'))
         _ctx_vrije_tekst = (str(data.get('ctx_vrije_tekst') or '')).strip()[:100] or None
-        # Ruwe gate-maten-logging (ALLEEN opslag — geen gate-evaluatie, geen markering, geen UI-effect):
-        # full-RR sd1sd2/rmssd/pnn50 via analytics.gate_metrics (zelfde math als de staging-gate).
-        # < 20 RR → None → kolom blijft NULL. Slice-15-kolommen rmssd/pnn50 blijven ongemoeid.
-        import analytics as _an_gm, json as _json_gm
-        _gmd = _an_gm.gate_metrics(str(data.get('rr_intervals', '')))
-        _gate_metrics_json = _json_gm.dumps(_gmd) if _gmd else None
+        # Voorspelvraag: 1/2/3 of None (overgeslagen bij meting 1 / oude flow). NULL-veilig.
+        def _pred_int(v):
+            try:
+                n = int(float(str(v))) if v not in (None, '') else None
+                return n if n in (1, 2, 3) else None
+            except Exception:
+                return None
+        _prediction = _pred_int(data.get('prediction'))
+        # Fase 2 voorvragen (basismeting): V1 slaap + V2 zwaarte = chips 1-3; V3 zinvolheid =
+        # slider 0-10 maar NULL tot aanraking (onderscheid 'bewust' vs 'default').
+        def _chip13(v):
+            try:
+                n = int(float(str(v))) if v not in (None, '') else None
+                return n if n in (1, 2, 3) else None
+            except Exception:
+                return None
+        _sleep_q = _chip13(data.get('sleep_quality'))
+        _load_pd = _chip13(data.get('load_prev_day'))
+        try:
+            _meaning = float(data.get('meaning_score')) if data.get('meaning_score') not in (None, '') else None
+            if _meaning is not None and not (0 <= _meaning <= 10): _meaning = None
+        except Exception:
+            _meaning = None
+        # ctx_dimensie schoon: None (niet de string 'None') bij JSON-null/leeg.
+        _ctx_dim = (str(data.get('ctx_dimensie')).strip() or None) if data.get('ctx_dimensie') else None
+        # ctx_vitaliteit: REAL of None (vervalt voor basismeting → NULL i.p.v. nepwaarde).
+        _ctx_vital = float(data.get('ctx_vitaliteit')) if data.get('ctx_vitaliteit') not in (None, '') else None
+        # Voorspelling + voorvragen horen alleen bij de basismeting; negeer (evt. blijven
+        # hangende) waarden bij andere meettypes.
+        if str(data.get('meting_type', 'basismeting')).lower() != 'basismeting':
+            _prediction = _sleep_q = _load_pd = _meaning = None
         if client_id > 0 and _is_pro_or_demo_pro():
             db = get_pro_db()
             # office_label vult alleen bij Krankenkasse-sessie; voor reguliere Pro blijft de kolom NULL
             _office = session.get('kk_office') if is_krankenkasse_session() else None
-            _vals=(int(client_id),get_user_key(),int(data.get('ts',__import__('datetime').datetime.now().timestamp()*1000)),float(data.get('ri',0)),int(data.get('bpm',0)),int(data.get('hrv',0)),float(data.get('rmssd',0)),float(data.get('sdnn',0)),float(data.get('pnn50',0)),int(data.get('beats',0)),int(data.get('duration',90)),str(data.get('sensor','demo')),str(data.get('notes','')),str(data.get('timeseries','')),str(data.get('rr_intervals','')),int(data.get('kwaliteit',100)),str(data.get('meting_type','basismeting')),str(data.get('ctx_dimensie','')),float(data.get('ctx_vitaliteit',0)) if data.get('ctx_vitaliteit') else None,_subj_score,_ctx_ongemak,_ctx_vrije_tekst,_office,_gate_metrics_json)
-            db.execute('INSERT INTO client_metingen (client_id,pro_key,ts,ri,bpm,hrv_pct,rmssd,sdnn,pnn50,beats,duration,sensor_type,notes,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,office_label,gate_metrics) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',_vals)
+            _vals=(int(client_id),get_user_key(),int(data.get('ts',__import__('datetime').datetime.now().timestamp()*1000)),float(data.get('ri',0)),int(data.get('bpm',0)),int(data.get('hrv',0)),float(data.get('rmssd',0)),float(data.get('sdnn',0)),float(data.get('pnn50',0)),int(data.get('beats',0)),int(data.get('duration',90)),str(data.get('sensor','demo')),str(data.get('notes','')),str(data.get('timeseries','')),str(data.get('rr_intervals','')),int(data.get('kwaliteit',100)),str(data.get('meting_type','basismeting')),str(data.get('ctx_dimensie','')),float(data.get('ctx_vitaliteit',0)) if data.get('ctx_vitaliteit') else None,_subj_score,_ctx_ongemak,_ctx_vrije_tekst,_office)
+            db.execute('INSERT INTO client_metingen (client_id,pro_key,ts,ri,bpm,hrv_pct,rmssd,sdnn,pnn50,beats,duration,sensor_type,notes,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,office_label) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',_vals)
             db.commit()
             db.close()
             return jsonify({'ok': True, 'client_id': int(client_id)})
 
         db = get_meting_db()
+        # prediction_hit deterministisch berekenen tegen de eigen historie (vóór deze INSERT,
+        # dus uitsluitend op eerdere metingen). Alleen voor basismetingen; NULL bij geen
+        # voorspelling of geen referentie (meting 1). compute_baseline/baseline_day_values =
+        # zelfde bron als grafiek/Kompas (band = min/max van de per-dag-waarden).
+        _pred_hit = None
+        if _prediction is not None and str(data.get('meting_type','basismeting')).lower() == 'basismeting':
+            try:
+                _brows = db.execute(
+                    "SELECT ts, ri, meting_type, rr_intervals FROM metingen WHERE user_key=? "
+                    "AND lower(coalesce(meting_type,''))='basismeting' AND ri IS NOT NULL "
+                    "ORDER BY ts DESC LIMIT 200", (get_user_key(),)).fetchall()
+                _prev_ri = _brows[0]['ri'] if _brows else None
+                import analytics as _an_save
+                _, _pred_hit = _an_save.prediction_outcome(
+                    _prediction, float(data.get('ri', 0)),
+                    [dict(r) for r in _brows], prev_ri=_prev_ri)
+            except Exception:
+                _pred_hit = None
         db.execute('''INSERT INTO metingen
-            (user_key,ts,ri,bpm,hrv_pct,rmssd,beats,duration,sensor_type,notes,sdnn,pnn50,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,gate_metrics,pending)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)''', (
+            (user_key,ts,ri,bpm,hrv_pct,rmssd,beats,duration,sensor_type,notes,sdnn,pnn50,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,sleep_quality,load_prev_day,meaning_score,prediction,prediction_hit,pending)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)''', (
             get_user_key(),
             int(data.get('ts', datetime.now().timestamp()*1000)),
             float(data.get('ri',0)), int(data.get('bpm',0)), int(data.get('hrv',0)),
@@ -3367,10 +3557,12 @@ def api_save_meting():
             str(data.get('timeseries','')), str(data.get('rr_intervals','')),
                 int(data.get('kwaliteit',100)),
             str(data.get('meting_type','basismeting')),
-            str(data.get('ctx_dimensie','')),
-            float(data.get('ctx_vitaliteit',0)) if data.get('ctx_vitaliteit') else None,
+            _ctx_dim,
+            _ctx_vital,
             _subj_score,
-            _ctx_ongemak, _ctx_vrije_tekst, _gate_metrics_json
+            _ctx_ongemak, _ctx_vrije_tekst,
+            _sleep_q, _load_pd, _meaning,
+            _prediction, _pred_hit
         ))
         db.commit()
         session['after_meting'] = True
@@ -3379,6 +3571,418 @@ def api_save_meting():
         return jsonify({'ok': True})
     except Exception as e:
         import traceback; return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
+@app.route('/api/event/meting/opslaan', methods=['POST'])
+def api_event_save_meting():
+    """Event-modus opslag (Fase 2). Schrijft UITSLUITEND naar het aparte sc_event.db
+    (event_metingen). Raakt /api/meting/opslaan, metingen of client_metingen NIET aan.
+    Gegate via _event_enabled() (staging-only tot Fase 5/6)."""
+    if not _event_enabled():
+        return jsonify({'error': 'Event-modus niet beschikbaar'}), 404
+    data = request.get_json(silent=True) or {}
+    code = (str(data.get('meting_code') or '')).strip().upper()
+    if not code:
+        return jsonify({'error': 'meting_code is vereist'}), 400
+    try:
+        db = get_event_db()
+        part = db.execute(
+            'SELECT participant_id, event_id FROM event_participants WHERE meting_code=?',
+            (code,)
+        ).fetchone()
+        if not part:
+            db.close()
+            return jsonify({'error': 'Onbekende meting_code'}), 404
+
+        # Max-2-cap (harde server-grendel, niet alleen cosmetisch): een deelnemer mag
+        # MAXIMAAL 2 metingen doen. Een 3e (of latere) wordt geweigerd — ongeacht of de
+        # eerdere geslaagd of afgekeurd waren (een afgekeurde telt gewoon mee). De kiosk
+        # verbergt de "Nieuwe meting"-knop al bij >=2; dit borgt het ook tegen een directe
+        # /event/kiosk/meten/<code>-link of herhaalde terugkeer.
+        _n_already = db.execute(
+            'SELECT COUNT(*) FROM event_metingen WHERE participant_id=?',
+            (part['participant_id'],)
+        ).fetchone()[0]
+        if _n_already >= 2:
+            db.close()
+            return jsonify({'error': 'max_metingen', 'n_metingen': _n_already}), 409
+
+        # Credit-handhaving (event-licentie): blokkeer bij 0 credits VÓÓR de INSERT.
+        # Alleen voor aan een licentie gekoppelde events; CLI/legacy-events (license_key
+        # NULL) blijven ongemoeid.
+        _ev = db.execute('SELECT license_key FROM events WHERE event_id=?',
+                         (part['event_id'],)).fetchone()
+        _lickey = _ev['license_key'] if _ev else None
+        if _lickey:
+            _ldb = get_db()
+            _lrow = _ldb.execute(
+                "SELECT credits_available FROM licenses "
+                "WHERE license_key=? AND origin='event'", (_lickey,)).fetchone()
+            _ldb.close()
+            if (not _lrow) or (_lrow['credits_available'] or 0) <= 0:
+                db.close()
+                return jsonify({'error': 'geen_credits',
+                                'message': 'Geen credits meer beschikbaar'}), 403
+
+        def _f(v):
+            try: return float(v) if v not in (None, '') else None
+            except Exception: return None
+        def _i(v):
+            try: return int(float(v)) if v not in (None, '') else None
+            except Exception: return None
+
+        _rr = str(data.get('rr_intervals', '') or '')
+        # quality_band defensief: alleen als analytics.quality_classify aanwezig is (variant-B,
+        # staging). Op een branch zonder die functie blijft het NULL — geen harde afhankelijkheid.
+        _qband = None
+        try:
+            _qc = getattr(__import__('analytics'), 'quality_classify', None)
+            if _qc and _rr:
+                import json as _json
+                _rrlist = _json.loads(_rr) if _rr.strip().startswith('[') else []
+                if _rrlist:
+                    _res = _qc(_rrlist)
+                    _qband = (_res or {}).get('band') if isinstance(_res, dict) else None
+        except Exception:
+            _qband = None
+
+        # Ontspanningscijfer (event-kiosk): ALLEEN een bewust gekozen waarde opslaan — geen
+        # stille default-5. Ontbrekend/leeg/ongeldig → NULL (de Start-gate in de kiosk borgt
+        # dat er altijd een bewuste waarde is bij een echte meting).
+        def _subj(v):
+            try:
+                n = int(float(str(v))) if v not in (None, '') else None
+                return n if (n is not None and 0 <= n <= 10) else None
+            except Exception:
+                return None
+        _subjectief = _subj(data.get('subjectief'))
+
+        db.execute(
+            'INSERT INTO event_metingen '
+            '(event_id, participant_id, meting_code, ts, ri, bpm, hrv_pct, rmssd, sdnn, '
+            ' pnn50, beats, duration, sensor_type, kwaliteit, rr_intervals, timeseries, quality_band, '
+            ' subjectief_score) '
+            'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            (part['event_id'], part['participant_id'], code,
+             _i(data.get('ts')) or int(datetime.now().timestamp() * 1000),
+             _f(data.get('ri')), _i(data.get('bpm')), _i(data.get('hrv')),
+             _f(data.get('rmssd')), _f(data.get('sdnn')), _f(data.get('pnn50')),
+             _i(data.get('beats')), _i(data.get('duration')) or 90,
+             str(data.get('sensor', 'demo')), _i(data.get('kwaliteit')),
+             _rr, str(data.get('timeseries', '') or ''), _qband, _subjectief)
+        )
+        db.commit()
+        _mid = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+        # Credit-decrement: 1 credit per opgeslagen meting (alleen gekoppelde events).
+        # `> 0`-guard borgt dat credits nooit negatief worden bij een race.
+        if _lickey:
+            _ldb = get_db()
+            _ldb.execute(
+                "UPDATE licenses SET credits_available = credits_available - 1 "
+                "WHERE license_key=? AND origin='event' AND credits_available > 0",
+                (_lickey,))
+            _ldb.commit()
+            _rem = _ldb.execute(
+                "SELECT credits_available FROM licenses WHERE license_key=?",
+                (_lickey,)).fetchone()
+            _ldb.close()
+            app.logger.info('Credit used: %s (%s remaining)', _lickey,
+                            _rem['credits_available'] if _rem else '?')
+        # Totaal-na-insert: voedt de kiosk-knop ("Nieuwe meting" alleen tonen bij < 2).
+        _n_total = _n_already + 1
+        # Geslaagde-meting aanwezig? (kwaliteit >= 85 EN niet 'slecht'-geclassificeerd; gelijke
+        # gate als de laatste-geslaagde-wint-selectie in event_report). Een te onregelmatige
+        # meting (quality_band 'slecht') telt NIET als geslaagd, ook niet bij hoog signaal-%.
+        # NULL/'onbepaald' telt wél mee. Voedt de slotboodschap: >=1 geslaagd -> "dit is je
+        # resultaat"; 0 geslaagd -> "meting lukte niet".
+        _n_reliable = db.execute(
+            'SELECT COUNT(*) FROM event_metingen WHERE participant_id=? '
+            "AND kwaliteit IS NOT NULL AND kwaliteit >= 85 "
+            "AND (quality_band IS NULL OR quality_band <> 'slecht')",
+            (part['participant_id'],)
+        ).fetchone()[0]
+        db.close()
+        return jsonify({'ok': True, 'meting_id': _mid, 'meting_code': code,
+                        'ri': _f(data.get('ri')), 'quality_band': _qband,
+                        'subjectief': _subjectief, 'n_metingen': _n_total,
+                        'has_reliable': bool(_n_reliable)})
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+
+
+def _event_gen_code(db, table, col, prefix):
+    import secrets as _sec
+    for _ in range(100):
+        c = prefix + _sec.token_hex(3).upper()
+        if not db.execute(f'SELECT 1 FROM {table} WHERE {col}=?', (c,)).fetchone():
+            return c
+    raise RuntimeError('geen unieke code')
+
+
+@app.route('/event/kiosk')
+def event_kiosk_home():
+    """Kiosk-landing (Fase 2b): toon open events. Staging-only via _event_enabled()."""
+    if not _event_enabled():
+        return ('Event-modus niet beschikbaar', 404)
+    db = get_event_db()
+    events = db.execute(
+        "SELECT e.event_code, e.opdrachtgever, e.naam, e.datum, e.status, "
+        "(SELECT COUNT(*) FROM event_participants p WHERE p.event_id=e.event_id) AS n "
+        "FROM events e WHERE e.status='open' ORDER BY e.event_id DESC"
+    ).fetchall()
+    db.close()
+    return render_template('event/kiosk.html', events=events)
+
+
+# Terugkeer-melding (ingetypte code onbekend/typefout): vriendelijke val-terug naar de
+# normale nieuwe-deelnemer-flow. Alleen DEZE melding is meertalig; de rest van de kiosk-UI
+# is (nog) NL — bredere i18n is een apart traject.
+_EVENT_RETURN_NOTFOUND = {
+    'nl': 'Deze code kennen we niet — je meet als nieuwe deelnemer.',
+    'de': 'Diesen Code kennen wir nicht — Sie messen als neue Person.',
+    'en': "We don't recognize this code — you'll measure as a new participant.",
+}
+
+
+@app.route('/event/kiosk/<event_code>')
+def event_kiosk_event(event_code):
+    if not _event_enabled():
+        return ('Event-modus niet beschikbaar', 404)
+    db = get_event_db()
+    ev = db.execute("SELECT * FROM events WHERE event_code=?", (event_code,)).fetchone()
+    db.close()
+    if not ev:
+        return ('Onbekend event', 404)
+    lang = request.args.get('lang', 'nl')
+    if lang not in ('nl', 'de', 'en'):
+        lang = 'nl'
+    notfound = request.args.get('notfound') == '1'
+    return render_template('event/kiosk_event.html', ev=ev, lang=lang,
+                           notfound_msg=(_EVENT_RETURN_NOTFOUND[lang] if notfound else None))
+
+
+@app.route('/event/kiosk/<event_code>/terugkeer', methods=['POST'])
+def event_kiosk_return_participant(event_code):
+    """Terugkerende deelnemer: koppelt een 2e meting aan een BESTAANDE participant via diens
+    meting-code (alleen code-lookup; GEEN naam-/fuzzy-matching). Bij een onbekende code/typefout
+    wordt NIET gekoppeld en NIET gecrasht — vriendelijke val-terug naar de nieuwe-deelnemer-pagina.
+    Slaat GEEN extra PII op (geen naam/geboortejaar opnieuw). Staging-only via _event_enabled()."""
+    if not _event_enabled():
+        return ('Event-modus niet beschikbaar', 404)
+    lang = request.form.get('lang', 'nl')
+    if lang not in ('nl', 'de', 'en'):
+        lang = 'nl'
+    db = get_event_db()
+    ev = db.execute("SELECT event_id FROM events WHERE event_code=?", (event_code,)).fetchone()
+    if not ev:
+        db.close()
+        return ('Onbekend event', 404)
+    code = (request.form.get('return_code') or '').strip().upper()
+    part = None
+    if code:
+        # Binnen DEZE meetdag (event_id) zoeken: voorkomt cross-event-koppeling op een
+        # globaal-unieke code; niet-gevonden valt sowieso netjes terug op nieuw.
+        part = db.execute(
+            "SELECT meting_code FROM event_participants WHERE event_id=? AND meting_code=?",
+            (ev['event_id'], code)
+        ).fetchone()
+    db.close()
+    if part:
+        # Bekende deelnemer: hergebruik de bestaande code → /api/event/meting/opslaan hangt
+        # de nieuwe meting onder dezelfde participant_id (append, 1:N). Naam komt uit het
+        # bestaande record (meten.html toont p.name) — wordt niet opnieuw getypt.
+        return redirect(url_for('event_kiosk_meten', meting_code=part['meting_code'], terug=1))
+    # Onbekende code: geen koppeling, vriendelijke melding, gewoon door als nieuwe deelnemer.
+    return redirect(url_for('event_kiosk_event', event_code=event_code, lang=lang, notfound=1))
+
+
+@app.route('/event/kiosk/<event_code>/deelnemer', methods=['POST'])
+def event_kiosk_new_participant(event_code):
+    if not _event_enabled():
+        return ('Event-modus niet beschikbaar', 404)
+    db = get_event_db()
+    ev = db.execute("SELECT event_id FROM events WHERE event_code=?", (event_code,)).fetchone()
+    if not ev:
+        db.close()
+        return ('Onbekend event', 404)
+    try:
+        by = int(request.form.get('birth_year', '') or 0) or None
+    except ValueError:
+        by = None
+    g = (request.form.get('gender') or '').strip().lower()
+    if g not in ('male', 'female', 'other'):
+        g = None
+    # Deelnemernaam (bewuste privacymodel-wijziging): alleen in sc_event.db.
+    nm = (request.form.get('name') or '').strip()[:120] or None
+    code = _event_gen_code(db, 'event_participants', 'meting_code', 'M-')
+    db.execute(
+        "INSERT INTO event_participants (event_id, meting_code, birth_year, gender, name) VALUES (?,?,?,?,?)",
+        (ev['event_id'], code, by, g, nm)
+    )
+    db.commit()
+    db.close()
+    return redirect(url_for('event_kiosk_meten', meting_code=code))
+
+
+@app.route('/event/kiosk/meten/<meting_code>')
+def event_kiosk_meten(meting_code):
+    if not _event_enabled():
+        return ('Event-modus niet beschikbaar', 404)
+    db = get_event_db()
+    row = db.execute(
+        "SELECT p.participant_id, p.meting_code, p.birth_year, p.gender, p.name, e.event_code, e.opdrachtgever "
+        "FROM event_participants p JOIN events e ON e.event_id=p.event_id "
+        "WHERE p.meting_code=?", (meting_code,)
+    ).fetchone()
+    if not row:
+        db.close()
+        return ('Onbekende meting-code', 404)
+    # Reeds gedane metingen — voedt de max-2-cap-UI: bij >=2 toont de uitslag de
+    # slotboodschap (geen meetscherm meer). has_reliable = is er een geslaagde meting
+    # (kwaliteit >= 85 EN niet 'slecht'-geclassificeerd; gelijk aan de laatste-geslaagde-wint-
+    # selectie van het rapport). Te onregelmatig (quality_band 'slecht') telt niet als geslaagd.
+    _n = db.execute("SELECT COUNT(*) FROM event_metingen WHERE participant_id=?",
+                    (row['participant_id'],)).fetchone()[0]
+    _nrel = db.execute("SELECT COUNT(*) FROM event_metingen WHERE participant_id=? "
+                       "AND kwaliteit IS NOT NULL AND kwaliteit >= 85 "
+                       "AND (quality_band IS NULL OR quality_band <> 'slecht')",
+                       (row['participant_id'],)).fetchone()[0]
+    db.close()
+    return render_template('event/meten.html', p=row, n_metingen=_n,
+                           capped=(_n >= 2), has_reliable=bool(_nrel))
+
+
+@app.route('/event/kiosk/<event_code>/wissen', methods=['GET'])
+def event_kiosk_wipe_confirm(event_code):
+    """Bevestigingsscherm: toont tellingen + vraagt om de event-code exact te typen.
+    Wist niets. Staging-only via _event_enabled()."""
+    if not _event_enabled():
+        return ('Event-modus niet beschikbaar', 404)
+    db = get_event_db()
+    ev = db.execute("SELECT * FROM events WHERE event_code=?", (event_code,)).fetchone()
+    if not ev:
+        db.close()
+        return ('Onbekend event', 404)
+    n_part = db.execute("SELECT COUNT(*) c FROM event_participants WHERE event_id=?",
+                        (ev['event_id'],)).fetchone()['c']
+    n_met = db.execute("SELECT COUNT(*) c FROM event_metingen WHERE event_id=?",
+                       (ev['event_id'],)).fetchone()['c']
+    db.close()
+    return render_template('event/wissen.html', ev=ev, n_part=n_part, n_met=n_met,
+                           error=request.args.get('error'))
+
+
+@app.route('/event/kiosk/<event_code>/wissen', methods=['POST'])
+def event_kiosk_wipe_do(event_code):
+    """Voert de wis uit ALLEEN als het getypte confirm_code exact de event_code is.
+    Verwijdert deelnemers + metingen van deze meetdag uit sc_event.db; event-hull blijft."""
+    if not _event_enabled():
+        return ('Event-modus niet beschikbaar', 404)
+    db = get_event_db()
+    ev = db.execute("SELECT * FROM events WHERE event_code=?", (event_code,)).fetchone()
+    if not ev:
+        db.close()
+        return ('Onbekend event', 404)
+    typed = (request.form.get('confirm_code') or '').strip().upper()
+    if typed != str(ev['event_code']).upper():
+        db.close()
+        return redirect(url_for('event_kiosk_wipe_confirm', event_code=event_code, error='1'))
+    n_part = db.execute("SELECT COUNT(*) c FROM event_participants WHERE event_id=?",
+                        (ev['event_id'],)).fetchone()['c']
+    n_met = db.execute("SELECT COUNT(*) c FROM event_metingen WHERE event_id=?",
+                       (ev['event_id'],)).fetchone()['c']
+    db.execute("DELETE FROM event_metingen WHERE event_id=?", (ev['event_id'],))
+    db.execute("DELETE FROM event_participants WHERE event_id=?", (ev['event_id'],))
+    db.commit()
+    db.close()
+    return render_template('event/wissen_klaar.html', ev=ev, n_part=n_part, n_met=n_met)
+
+
+@app.route('/event/rapport/<meting_code>')
+def event_report_pdf(meting_code):
+    """TIJDELIJKE staging-route: toont het individuele momentopname-rapport als PDF in de
+    browser. Gegate op SC_ENV (inert op prod). Genereert on-the-fly uit sc_event.db (read-only)
+    via event_report.render_report; ?lang=nl|de|en."""
+    if not _event_enabled():
+        return ('Event-modus niet beschikbaar', 404)
+    lang = request.args.get('lang', 'nl')
+    if lang not in ('nl', 'de', 'en'):
+        lang = 'nl'
+    import event_report as _evr
+    try:
+        pdf_bytes, info = _evr.render_report(meting_code, lang)
+    except ValueError as e:
+        return (str(e), 404)
+    from flask import Response
+    return Response(pdf_bytes, mimetype='application/pdf',
+                    headers={'Content-Disposition': 'inline; filename="%s.pdf"' % info['code']})
+
+
+@app.route('/event/rapport/<meting_code>/print')
+def event_report_print_shell(meting_code):
+    """Dunne print-omhulsel-pagina (variant A, staging-only). Bedt het BESTAANDE PDF-rapport
+    in een same-origin iframe in en toont een Print-knop die de INGEBEDDE PDF print
+    (iframe.contentWindow.print()), niet het omhulsel. GEEN tweede renderbron: de iframe wijst
+    naar event_report_pdf — de WeasyPrint-PDF blijft de enige bron. Lichte bestaanscheck op de
+    deelnemer (geen dubbele PDF-render); de iframe toont zelf de echte 404 bij dieper falen."""
+    if not _event_enabled():
+        return ('Event-modus niet beschikbaar', 404)
+    lang = request.args.get('lang', 'nl')
+    if lang not in ('nl', 'de', 'en'):
+        lang = 'nl'
+    code = (meting_code or '').strip().upper()
+    db = get_event_db()
+    row = db.execute("SELECT 1 FROM event_participants WHERE meting_code=?", (code,)).fetchone()
+    db.close()
+    if not row:
+        return ('Onbekende meting-code', 404)
+    pdf_url = url_for('event_report_pdf', meting_code=code, lang=lang)
+    return render_template('event/rapport_print.html', code=code, lang=lang, pdf_url=pdf_url)
+
+
+# Adaptieve na-vragen (Fase 3): chips (V6/V8) + vrije tekst + herstel-gevoel (V7). Auto-save per
+# interactie (zoals /api/set_subjectief). Partiële payloads toegestaan (alleen de gewijzigde velden).
+_ADAPTIEF_CHIPS = {'werkdruk', 'spanning', 'lichamelijk', 'alcohol', 'sport', 'anders'}
+@app.route('/api/meting/adaptief', methods=['POST'])
+def api_meting_adaptief():
+    if not session.get('license_valid') and not session.get('demo_mode') and not session.get('hlm_user_id'):
+        return jsonify({'error': 'Niet ingelogd'}), 401
+    data = request.get_json() or {}
+    try:
+        mid = int(data.get('meting_id') or 0)
+    except Exception:
+        mid = 0
+    if not mid:
+        return jsonify({'error': 'geen id'}), 400
+    try:
+        db = get_meting_db()
+        # Eigendomscheck: de meting moet van de huidige gebruiker zijn.
+        row = db.execute("SELECT user_key FROM metingen WHERE id=?", (mid,)).fetchone()
+        if row is None or row['user_key'] != get_user_key():
+            db.close()
+            return jsonify({'error': 'niet gevonden'}), 404
+        if 'chips' in data:
+            chips = [c for c in (data.get('chips') or []) if c in _ADAPTIEF_CHIPS]
+            is_recovery = 1 if data.get('is_recovery') else 0
+            # Idempotent: herschrijf de chips voor deze meting (zelfde is_recovery-laag).
+            db.execute("DELETE FROM meting_triggers WHERE meting_id=?", (mid,))
+            for c in chips:
+                db.execute("INSERT INTO meting_triggers (meting_id, chip, is_recovery) VALUES (?,?,?)", (mid, c, is_recovery))
+        if 'vrije_tekst' in data:
+            _vt = (str(data.get('vrije_tekst') or '')).strip()[:100] or None
+            db.execute("UPDATE metingen SET ctx_vrije_tekst=? WHERE id=?", (_vt, mid))
+        if data.get('recovery_feel') is not None:
+            try:
+                _rf = int(float(str(data.get('recovery_feel'))))
+                if _rf in (1, 2, 3):
+                    db.execute("UPDATE metingen SET recovery_feel=? WHERE id=?", (_rf, mid))
+            except Exception:
+                pass
+        db.commit(); db.close()
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/meting/label', methods=['POST'])
@@ -3426,19 +4030,47 @@ def api_get_metingen():
         # laatste basismeting, alleen meting_type='basismeting'. Vervangt de oude berekening
         # (oudste 7 metingen, geen type-/per-dag-filter) die /resultaten-stat + /kwadrant voedde.
         baseline_rows = db.execute(
-            "SELECT ts, ri, meting_type, kwaliteit FROM metingen WHERE user_key=? "
+            "SELECT ts, ri, meting_type, kwaliteit, rr_intervals FROM metingen WHERE user_key=? "
             "AND lower(coalesce(meting_type,''))='basismeting' AND ri IS NOT NULL "
             "ORDER BY ts DESC LIMIT 200",
             (get_user_key(),)).fetchall()
+        # Bestaande adaptieve trigger-chips van de meest recente meting (voor prefill op kwadrant).
+        _latest_triggers = []
+        if rows:
+            try:
+                _latest_triggers = [{'chip': t['chip'], 'is_recovery': t['is_recovery']}
+                                    for t in db.execute(
+                                        "SELECT chip, is_recovery FROM meting_triggers WHERE meting_id=?",
+                                        (rows[0]['id'],)).fetchall()]
+            except Exception:
+                _latest_triggers = []
         db.close()
         import analytics as _an
-        baseline = _an.compute_baseline([dict(r) for r in baseline_rows])
+        _bl_dicts = [dict(r) for r in baseline_rows]
+        baseline = _an.compute_baseline(_bl_dicts)
         result = []
         for r in rows:
             d = dict(r)
             d['baseline'] = baseline
             d['delta'] = round(d['ri']-baseline,1) if (baseline is not None and d.get('ri') is not None) else None
+            # Onregelmatigheid-gate (v2): markeer gevlagde metingen zodat de trendgrafiek ze
+            # uit de betrouwbare lijn weert (rood segment) en de tabel ze als ⚠ kan tonen.
+            # rr_intervals blijft in de payload (tabel-gate gebruikt het al); irrflag is additief.
+            d['irrflag'] = _an.row_is_irregular(d)
             result.append(d)
+        # Meest recente basismeting: server-side de voorspelvraag-terugkoppeling (Fase 1) én de
+        # adaptieve trigger-status (Fase 3), zodat kwadrant.html geen logica dupliceert. NULL-veilig.
+        # _bl_dicts is ts-DESC → [0] = huidige basismeting; referentie = HISTORIE _bl_dicts[1:].
+        if result and str(result[0].get('meting_type','')).lower() == 'basismeting':
+            _prior = _bl_dicts[1:]
+            _prev_ri = _prior[0]['ri'] if _prior else None
+            if result[0].get('prediction') is not None:
+                _actual, _ = _an.prediction_outcome(result[0]['prediction'], result[0].get('ri'),
+                                                    _prior, prev_ri=_prev_ri)
+                result[0]['pred_actual'] = _actual
+                result[0]['pred_variant'] = 'baseline' if len(_an.baseline_day_values(_prior)) >= _an.BASELINE_MIN_DAYS else 'prev'
+            result[0]['adaptive'] = _an.adaptive_state(_bl_dicts)
+            result[0]['triggers'] = _latest_triggers
         from datetime import datetime, timezone
         resp = jsonify(result)
         resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
@@ -3453,12 +4085,30 @@ def api_meting_stats():
     if not session.get('license_valid') and not session.get('demo_mode') and not session.get('hlm_user_id'):
         return jsonify({'error': 'Niet ingelogd'}), 401
     try:
+        import analytics as _an
         db = get_meting_db()
-        row = db.execute('''SELECT COUNT(*) as total, AVG(ri) as avg_ri,
-            MAX(ri) as max_ri, MIN(ri) as min_ri, AVG(bpm) as avg_bpm
-            FROM metingen WHERE user_key=?''', (get_user_key(),)).fetchone()
+        rows = db.execute('SELECT ri, bpm, rr_intervals FROM metingen WHERE user_key=?',
+                          (get_user_key(),)).fetchall()
         db.close()
-        return jsonify(dict(row))
+        # Onregelmatigheid-gate (v2): gevlagde metingen UITSLUITEN vóór gem./max/min — niet
+        # corrigeren, alleen niet meetellen. AVG(ri)/max waren anders vertekend door valse RI-10's.
+        ri_vals, bpm_vals = [], []
+        for r in rows:
+            if _an.row_is_irregular(r):
+                continue
+            if r['ri'] is not None:
+                ri_vals.append(float(r['ri']))
+            if r['bpm'] is not None:
+                bpm_vals.append(float(r['bpm']))
+        stats = {
+            'total': len(rows),                 # alle metingen
+            'reliable': len(ri_vals),           # niet-gevlagd met RI (transparantie)
+            'avg_ri': round(sum(ri_vals)/len(ri_vals), 2) if ri_vals else None,
+            'max_ri': max(ri_vals) if ri_vals else None,
+            'min_ri': min(ri_vals) if ri_vals else None,
+            'avg_bpm': round(sum(bpm_vals)/len(bpm_vals), 2) if bpm_vals else None,
+        }
+        return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -3823,12 +4473,12 @@ def _generate_trend_data(user_key=None, client_id=None, lang='nl', client_name=N
         if client_id:
             db = get_pro_db()
             count_row = db.execute("SELECT COUNT(*) FROM client_metingen WHERE client_id=? AND meting_type='basismeting'", (client_id,)).fetchone()
-            ri_rows = db.execute("SELECT ri FROM client_metingen WHERE client_id=? AND ri IS NOT NULL AND meting_type='basismeting' ORDER BY ts DESC LIMIT 10", (client_id,)).fetchall()
+            ri_rows = db.execute("SELECT ri, rr_intervals FROM client_metingen WHERE client_id=? AND ri IS NOT NULL AND meting_type='basismeting' ORDER BY ts DESC LIMIT 40", (client_id,)).fetchall()
             db.close()
         else:
             db = get_meting_db()
             count_row = db.execute("SELECT COUNT(*) FROM metingen WHERE user_key=? AND meting_type='basismeting'", (user_key,)).fetchone()
-            ri_rows = db.execute("SELECT ri FROM metingen WHERE user_key=? AND ri IS NOT NULL AND meting_type='basismeting' ORDER BY ts DESC LIMIT 10", (user_key,)).fetchall()
+            ri_rows = db.execute("SELECT ri, rr_intervals FROM metingen WHERE user_key=? AND ri IS NOT NULL AND meting_type='basismeting' ORDER BY ts DESC LIMIT 40", (user_key,)).fetchall()
             db.close()
     except:
         return {'trend_hint': '', 'trend_sentence': ''}
@@ -3851,7 +4501,19 @@ def _generate_trend_data(user_key=None, client_id=None, lang='nl', client_name=N
     if count < 5:
         return {'trend_hint': _pick('phase1'), 'trend_sentence': ''}
 
-    ri_values = [float(r[0]) for r in ri_rows]
+    # Onregelmatigheid-gate (v2): gevlagde basismetingen uit de trend-/patroonberekening; we
+    # bouwen het venster uit de laatste 10 BETROUWBARE metingen. Te weinig betrouwbaar (<3) →
+    # geen verzonnen patroon maar een neutrale regel (randgeval, geen lege/0-aggregaten).
+    import analytics as _an_tr
+    _rel = [float(r[0]) for r in ri_rows if r[0] is not None and not _an_tr.rr_irregular(r[1])]
+    ri_values = _rel[:10]
+    if len(ri_values) < 3:
+        _neutral = {
+            'nl': 'Te weinig betrouwbare metingen om een patroon te tonen.',
+            'de': 'Zu wenige zuverlässige Messungen, um ein Muster zu zeigen.',
+            'en': 'Too few reliable readings to show a pattern.',
+        }.get(lang_key, 'Te weinig betrouwbare metingen om een patroon te tonen.')
+        return {'trend_hint': _neutral, 'trend_sentence': ''}
     current_ri = ri_values[0] if ri_values else 0
 
     # Calculate delta: most recent RI vs average of the rest of the window
@@ -3927,7 +4589,7 @@ INTERPRETATIE-LEIDRAAD VOOR DE TERUGKOPPELING
 Je genereert twee zinnen. Zin 1 is een observatie met lichte duiding. Zin 2 is een reflectie over het samenspel tussen wat het lichaam toont en wat de persoon zelf aangeeft (Innerlijk Kompas).
 
 ALGEMENE HOUDING
-- Je spreekt de persoon die de meting deed direct aan in de tweede persoon: "je" in NL, "Sie/Ihr" (formeel) in DE, "you" in EN. In het DUITS ALTIJD Sie/Ihr, NOOIT du/dein/dich — de Nederlandse voorbeeldzinnen hieronder zijn enkel toon-/stijlvoorbeeld, GEEN voorschrift voor de Duitse aanspreekvorm. Ook bij Pro-cliëntmetingen spreek je de cliënt aan, niet de Pro.
+- Je spreekt de persoon die de meting deed direct aan met "je". Ook bij Pro-cliëntmetingen spreek je de cliënt aan, niet de Pro.
 - Je stelt niets vast, je biedt iets aan. Vermijd categorische taal. Gebruik: "kan wijzen op", "past bij", "lijkt", "dit patroon zien we vaak bij".
 - Je bent GEEN medische autoriteit. Nooit diagnostische termen voor specifieke aandoeningen.
 - De context-invoer is een geschenk van de persoon. Verwerk het als weefsel, niet als citaat. NIET: "je zei dat je moe was". WEL: duiding die de context meeweegt zonder letterlijk citeren.
@@ -4146,7 +4808,7 @@ BIOFEEDBACK_SYSTEM_PROMPT_V3 = (
 
 Je bent geen coach, geen therapeut, geen diagnosticus. Je geeft geen advies, geen aanbevelingen voor volgende sessies, geen oordeel of de oefening "gelukt" is. Je beschrijft hoe de meting verliep.
 
-Spreek de cliënt aan in de tweede persoon: "je" in NL, "Sie/Ihr" (formeel) in DE — in het DUITS ALTIJD Sie/Ihr, NOOIT du/dein —, "you" in EN. Maximaal 200 tekens totaal, verdeeld over twee zinnen.
+Spreek de cliënt aan in de tweede persoon enkelvoud (je). Maximaal 200 tekens totaal, verdeeld over twee zinnen.
 
 KERN VAN DE OBSERVATIE
 Vergelijk de eerste minuut van de sessie met de laatste minuut. Benoem delta_ri (afgerond op 0.1). Voeg het kwalitatieve verloop toe via slope_ri_per_min + variabiliteit_rmssd:
@@ -4367,6 +5029,7 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
     Bij biofeedback zonder pre_ref binnen 30min-venster: pre_ref ontbreekt → router valt terug op basismeting-template.
     """
     from datetime import datetime as _dt
+    import analytics as _an
     ctx = {}
     ts_cur = cur.get('ts') or 0
     ctx['datetime_iso'] = _dt.fromtimestamp(ts_cur/1000).strftime('%Y-%m-%d %H:%M') if ts_cur else ''
@@ -4390,17 +5053,21 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
                 ctx['pre_ref'] = dict(pre_row)
             # Altijd recent_basis + phase ophalen als rust-referentie (ook als pre_ref gevuld is)
             recent_rows = db.execute(
-                f"SELECT ri, subjectief_score, ts, ctx_dimensie, ctx_vrije_tekst FROM {tbl} "
+                f"SELECT ri, subjectief_score, ts, ctx_dimensie, ctx_vrije_tekst, rr_intervals FROM {tbl} "
                 f"WHERE {where_key} AND meting_type='basismeting' AND ts < ? "
-                f"ORDER BY ts DESC LIMIT 7",
+                f"ORDER BY ts DESC LIMIT 50",
                 (key_val, ts_cur)
             ).fetchall()
+            # Onregelmatigheid-gate (v2): gevlagde metingen niet als rust-referentie aan de
+            # Kompas-prompt voeren (anders becommentarieert het Kompas valse RI-10's). Ruim ophalen,
+            # eerste 7 BETROUWBARE houden. Niet corrigeren, alleen uitsluiten.
+            _rb_clean = [r for r in recent_rows if not _an.rr_irregular(r[5])][:7]
             ctx['recent_basis'] = [
                 {'ri': r[0], 'subjectief_score': r[1],
                  'datum': _dt.fromtimestamp((r[2] or 0)/1000).strftime('%Y-%m-%d'),
                  'ctx_dimensie': r[3] or None,
                  'ctx_vrije_tekst': (r[4][:100] if r[4] else None)}
-                for r in recent_rows
+                for r in _rb_clean
             ]
             count_row = db.execute(
                 f"SELECT COUNT(*) FROM {tbl} WHERE {where_key} AND meting_type='basismeting'",
@@ -4416,12 +5083,12 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
             # zonder per-dag-filter.) baseline_ri/range pas vanaf 7 meetdagen, anders ongezet.
             import analytics as _an
             bl_rows = db.execute(
-                f"SELECT ts, ri, meting_type FROM {tbl} WHERE {where_key} "
+                f"SELECT ts, ri, meting_type, rr_intervals FROM {tbl} WHERE {where_key} "
                 f"AND lower(coalesce(meting_type,''))='basismeting' AND ri IS NOT NULL "
                 f"ORDER BY ts DESC LIMIT 200",
                 (key_val,)
             ).fetchall()
-            _bl_dicts = [dict(r) for r in bl_rows]
+            _bl_dicts = [dict(r) for r in bl_rows]  # bevat rr_intervals → baseline_day_values gate't gevlagde eruit
             _bl = _an.compute_baseline(_bl_dicts)
             if _bl is not None:
                 _vals = _an.baseline_day_values(_bl_dicts)
@@ -4431,17 +5098,21 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
         else:
             # basismeting (default) + fallbacks voor bio-zonder-pre / situ-zonder-label
             recent_rows = db.execute(
-                f"SELECT ri, subjectief_score, ts, ctx_dimensie, ctx_vrije_tekst FROM {tbl} "
+                f"SELECT ri, subjectief_score, ts, ctx_dimensie, ctx_vrije_tekst, rr_intervals FROM {tbl} "
                 f"WHERE {where_key} AND meting_type='basismeting' AND ts < ? "
-                f"ORDER BY ts DESC LIMIT 7",
+                f"ORDER BY ts DESC LIMIT 50",
                 (key_val, ts_cur)
             ).fetchall()
+            # Onregelmatigheid-gate (v2): gevlagde metingen niet als rust-referentie aan de
+            # Kompas-prompt voeren (anders becommentarieert het Kompas valse RI-10's). Ruim ophalen,
+            # eerste 7 BETROUWBARE houden. Niet corrigeren, alleen uitsluiten.
+            _rb_clean = [r for r in recent_rows if not _an.rr_irregular(r[5])][:7]
             ctx['recent_basis'] = [
                 {'ri': r[0], 'subjectief_score': r[1],
                  'datum': _dt.fromtimestamp((r[2] or 0)/1000).strftime('%Y-%m-%d'),
                  'ctx_dimensie': r[3] or None,
                  'ctx_vrije_tekst': (r[4][:100] if r[4] else None)}
-                for r in recent_rows
+                for r in _rb_clean
             ]
             count_row = db.execute(
                 f"SELECT COUNT(*) FROM {tbl} WHERE {where_key} AND meting_type='basismeting'",
@@ -4449,12 +5120,16 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
             ).fetchone()
             count = count_row[0] if count_row else 0
             ctx['phase'] = 'phase3' if count >= 15 else ('phase2' if count >= 5 else 'phase1')
+            # baseline_ri_history = gem. RI van basismetingen 8-14 terug. Onregelmatigheid-gate (v2):
+            # eerst gevlagde uitsluiten, dán de 8e-14e BETROUWBARE nemen (offset over betrouwbare,
+            # niet over de ruwe reeks — anders schuift de ruis het venster in).
             sec_rows = db.execute(
-                f"SELECT ri FROM {tbl} WHERE {where_key} AND meting_type='basismeting' "
-                f"AND ri IS NOT NULL AND ts < ? ORDER BY ts DESC LIMIT 7 OFFSET 7",
+                f"SELECT ri, rr_intervals FROM {tbl} WHERE {where_key} AND meting_type='basismeting' "
+                f"AND ri IS NOT NULL AND ts < ? ORDER BY ts DESC LIMIT 100",
                 (key_val, ts_cur)
             ).fetchall()
-            sec_vals = [float(r[0]) for r in sec_rows if r[0] is not None]
+            _clean_hist = [float(r[0]) for r in sec_rows if r[0] is not None and not _an.rr_irregular(r[1])]
+            sec_vals = _clean_hist[7:14]
             if len(sec_vals) >= 3:
                 ctx['baseline_ri_history'] = round(sum(sec_vals) / len(sec_vals), 1)
         db.close()
@@ -4809,26 +5484,26 @@ def api_feedback():
         if _is_client_query:
             db = get_pro_db()
             if mid_param:
-                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries FROM client_metingen WHERE id=? AND client_id=?', (mid_param, cid)).fetchone()
+                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals FROM client_metingen WHERE id=? AND client_id=?', (mid_param, cid)).fetchone()
                 rows = []
                 if cur_r:
                     rows.append(cur_r)
-                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries FROM client_metingen WHERE client_id=? AND ts < ? ORDER BY ts DESC LIMIT 1', (cid, cur_r['ts'])).fetchone()
+                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals FROM client_metingen WHERE client_id=? AND ts < ? ORDER BY ts DESC LIMIT 1', (cid, cur_r['ts'])).fetchone()
                     if prev_r: rows.append(prev_r)
             else:
-                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 2', (cid,)).fetchall()
+                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 2', (cid,)).fetchall()
             db.close()
         else:
             db = get_meting_db()
             if mid_param:
-                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries FROM metingen WHERE id=? AND user_key=?', (mid_param, get_user_key())).fetchone()
+                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals FROM metingen WHERE id=? AND user_key=?', (mid_param, get_user_key())).fetchone()
                 rows = []
                 if cur_r:
                     rows.append(cur_r)
-                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries FROM metingen WHERE user_key=? AND ts < ? ORDER BY ts DESC LIMIT 1', (get_user_key(), cur_r['ts'])).fetchone()
+                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals FROM metingen WHERE user_key=? AND ts < ? ORDER BY ts DESC LIMIT 1', (get_user_key(), cur_r['ts'])).fetchone()
                     if prev_r: rows.append(prev_r)
             else:
-                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 2', (get_user_key(),)).fetchall()
+                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 2', (get_user_key(),)).fetchall()
             db.close()
     except Exception as e:
         import traceback; traceback.print_exc()
@@ -4876,6 +5551,71 @@ def api_feedback():
     is_biofeedback = meting_type == 'biofeedback'
     is_situatie = meting_type == 'situatiemeting'
     dim = cur.get('ctx_dimensie') or ''
+
+    # ── Onregelmatigheid-gate (v2): HUIDIGE basismeting zelf te onregelmatig? ──────────────
+    # Geen AI-commentaar over een valse RI (geen LLM-call). Toon een neutrale kopregel +
+    # het OPGESLAGEN commentaar van de laatste betrouwbare (niet-gevlagde) basismeting (niet
+    # live hergenereren — dan komt de ruis terug). Geen betrouwbare eerdere meting → neutrale regel.
+    import analytics as _an_irr
+    if meting_type == 'basismeting' and _an_irr.row_is_irregular(cur):
+        from datetime import datetime as _dt_irr
+        _head = {
+            'nl': 'Je meting van vandaag was te onregelmatig om betrouwbaar te scoren — dat kan aan de meting liggen of aan je hartslag. Hieronder je laatste betrouwbare spiegeling.',
+            'de': 'Ihre Messung von heute war zu unregelmäßig, um zuverlässig bewertet zu werden — das kann an der Messung oder an Ihrem Herzschlag liegen. Unten sehen Sie Ihre letzte zuverlässige Auswertung.',
+            'en': 'Today’s measurement was too irregular to score reliably — this may be due to the measurement or to your heart rate. Below is your last reliable reading.',
+        }.get(lang, 'Je meting van vandaag was te onregelmatig om betrouwbaar te scoren — dat kan aan de meting liggen of aan je hartslag. Hieronder je laatste betrouwbare spiegeling.')
+        _lbl = {
+            'nl': 'Je laatste betrouwbare spiegeling, van %s: ',
+            'de': 'Ihre letzte zuverlässige Spiegelung, vom %s: ',
+            'en': 'Your last reliable reflection, from %s: ',
+        }.get(lang, 'Je laatste betrouwbare spiegeling, van %s: ')
+        _none = {
+            'nl': 'Te weinig betrouwbare metingen om een patroon te tonen.',
+            'de': 'Zu wenige zuverlässige Messungen, um ein Muster zu zeigen.',
+            'en': 'Too few reliable readings to show a pattern.',
+        }.get(lang, 'Te weinig betrouwbare metingen om een patroon te tonen.')
+        try:
+            _idb = get_pro_db() if _is_client_query else get_meting_db()
+            if _is_client_query:
+                _cands = _idb.execute("SELECT ts, rr_intervals, feedback_cache FROM client_metingen "
+                    "WHERE client_id=? AND lower(coalesce(meting_type,''))='basismeting' AND ts < ? "
+                    "ORDER BY ts DESC LIMIT 100", (cid, cur.get('ts') or 0)).fetchall()
+            else:
+                _cands = _idb.execute("SELECT ts, rr_intervals, feedback_cache FROM metingen "
+                    "WHERE user_key=? AND lower(coalesce(meting_type,''))='basismeting' AND ts < ? "
+                    "ORDER BY ts DESC LIMIT 100", (get_user_key(), cur.get('ts') or 0)).fetchall()
+            _idb.close()
+        except Exception:
+            _cands = []
+        _ref_text, _ref_date = '', ''
+        for _c in _cands:
+            if _an_irr.rr_irregular(_c['rr_intervals']):
+                continue  # ook deze meting is gevlagd → verder terug
+            _fc = _c['feedback_cache']
+            if not _fc:
+                continue  # niet-gevlagd maar nooit becommentarieerd (lazy cache) → verder terug
+            try:
+                _fcd = json.loads(_fc)
+            except (ValueError, TypeError):
+                continue
+            _ld = _fcd.get(lang) if isinstance(_fcd, dict) else None
+            if _ld and isinstance(_ld, dict) and (_ld.get('reflection') or _ld.get('insight')):
+                _ref_text = _ld.get('reflection') or _ld.get('insight')
+                _ref_date = _dt_irr.fromtimestamp((_c['ts'] or 0) / 1000).strftime('%d-%m-%Y')
+                break
+        if _ref_text:
+            _refl = _hard_truncate((_lbl % _ref_date) + _ref_text, 250)
+            _payload = {'insight': _head, 'reflection': _refl, 'question': '',
+                        'source': 'irregular_last_reliable', 'irregular': True}
+        else:
+            _payload = {'insight': _head, 'reflection': _none, 'question': '',
+                        'source': 'irregular_no_reliable', 'irregular': True}
+        resp = jsonify(_payload)
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
+    # ──────────────────────────────────────────────────────────────────────────────────────
 
     # Trend data berekenen (phase 1/2/3)
     _client_name_for_trend = None
@@ -4926,25 +5666,31 @@ def api_feedback():
     basis_ri = None
     if is_biofeedback:
         try:
+            import analytics as _an_bf
             if cid and _is_pro_or_demo_pro():
                 db2 = get_pro_db()
-                basis_row = db2.execute(
-                    "SELECT ri FROM client_metingen WHERE client_id=? AND meting_type='basismeting' "
+                _bf_cand = db2.execute(
+                    "SELECT ri, rr_intervals FROM client_metingen WHERE client_id=? AND meting_type='basismeting' "
                     "AND ts >= (SELECT ts FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 1) - 86400000 "
                     "AND ts < (SELECT ts FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 1) "
-                    "ORDER BY ts DESC LIMIT 1",
-                    (cid, cid, cid)).fetchone()
+                    "AND ri IS NOT NULL ORDER BY ts DESC",
+                    (cid, cid, cid)).fetchall()
             else:
                 db2 = get_meting_db()
-                basis_row = db2.execute(
-                    "SELECT ri FROM metingen WHERE user_key=? AND meting_type='basismeting' "
+                _bf_cand = db2.execute(
+                    "SELECT ri, rr_intervals FROM metingen WHERE user_key=? AND meting_type='basismeting' "
                     "AND ts >= (SELECT ts FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 1) - 86400000 "
                     "AND ts < (SELECT ts FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 1) "
-                    "ORDER BY ts DESC LIMIT 1",
-                    (get_user_key(), get_user_key(), get_user_key())).fetchone()
-            if basis_row:
-                basis_ri = float(basis_row[0])
+                    "AND ri IS NOT NULL ORDER BY ts DESC",
+                    (get_user_key(), get_user_key(), get_user_key())).fetchall()
             db2.close()
+            # Onregelmatigheid-gate (v2), BEIDE takken: meest recente NIET-gevlagde basismeting in
+            # het 24u-venster als ijkpunt. Alle gevlagd → basis_ri blijft None → _generate_biofeedback_
+            # feedback toont de 'no_ref'-tekst (geen vergelijking) i.p.v. tegen een ruis-RI te ijken.
+            for _bc in _bf_cand:
+                if not _an_bf.rr_irregular(_bc['rr_intervals']):
+                    basis_ri = float(_bc['ri'])
+                    break
         except:
             pass
 
@@ -4958,13 +5704,13 @@ def api_feedback():
             if cid and _is_pro_or_demo_pro():
                 db2 = get_pro_db()
                 _bl_rows = db2.execute(
-                    "SELECT ts, ri, meting_type FROM client_metingen WHERE client_id=? "
+                    "SELECT ts, ri, meting_type, rr_intervals FROM client_metingen WHERE client_id=? "
                     "AND lower(coalesce(meting_type,''))='basismeting' AND ri IS NOT NULL "
                     "ORDER BY ts DESC LIMIT 200", (cid,)).fetchall()
             else:
                 db2 = get_meting_db()
                 _bl_rows = db2.execute(
-                    "SELECT ts, ri, meting_type FROM metingen WHERE user_key=? "
+                    "SELECT ts, ri, meting_type, rr_intervals FROM metingen WHERE user_key=? "
                     "AND lower(coalesce(meting_type,''))='basismeting' AND ri IS NOT NULL "
                     "ORDER BY ts DESC LIMIT 200", (get_user_key(),)).fetchall()
             db2.close()
@@ -6834,3 +7580,242 @@ def lab():
         (user_key,)).fetchone()
     db.close()
     return render_template('lab.html', lang=lang, meting=dict(meting) if meting else None)
+
+
+# ===== VB — StressChecker Pro Event (vitaliteitsbureau credit-packs) =====
+@app.route('/vb/order-success', methods=['GET'])
+def vb_order_success():
+    """Bedankpagina na Stripe Payment Link-betaling. Read-only: kent GEEN
+    credits toe (bron van waarheid = webhook in de license-server)."""
+    tier = request.args.get('tier', '')
+    if tier not in ['s', 'm', 'l']:
+        return "Invalid tier", 400
+    tier_map = {'s': 100, 'm': 250, 'l': 500}
+    credits = tier_map[tier]
+    tier_name = "Pro Event " + tier.upper()
+    return render_template('vb/order_success.html',
+                           tier=tier,
+                           tier_name=tier_name,
+                           credits=credits)
+
+
+def _vb_event_license(db, email):
+    """Geef de actieve event-licentie (origin='event') voor dit e-mailadres, of None.
+    Event-licenties zijn type='pro' maar bewust géén gewone Pro-sessie: VB-auth
+    leeft in een eigen vb_*-session-namespace (geen is_pro()-toegang tot de hoofdapp)."""
+    return db.execute(
+        "SELECT license_key, email, credits_available, credits_purchased, vb_tier, "
+        "       product_name "
+        "FROM licenses WHERE email=? COLLATE NOCASE AND origin='event' "
+        "  AND status IN ('activated', 'available') "
+        "ORDER BY created_at DESC LIMIT 1",
+        (email,)).fetchone()
+
+
+@app.route('/vb/login', methods=['GET', 'POST'])
+def vb_login():
+    """Login voor vitaliteitsbureaus met een event-licentie. E-mail + wachtwoord
+    (wachtwoord gezet via de reset-link uit de account-gereed-mail)."""
+    error = None
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        if not email or not password:
+            error = 'Vul e-mail en wachtwoord in.'
+        else:
+            db = get_db()
+            user = db.execute(
+                "SELECT id, email, display_name, password_hash FROM users "
+                "WHERE email=? COLLATE NOCASE", (email,)).fetchone()
+            lic = None
+            if user and user['password_hash']:
+                ok, _legacy = verify_password(password, user['password_hash'])
+                if ok:
+                    lic = _vb_event_license(db, email)
+            db.close()
+            if user and lic:
+                session['vb_user_id'] = user['id']
+                session['vb_email'] = user['email']
+                session['vb_verified'] = True
+                session['vb_name'] = user['display_name'] or user['email']
+                session['vb_license_key'] = lic['license_key']
+                return render_template('vb_verify.html')
+            # Generieke fout (geen enumeratie van bestaan/licentie-status)
+            error = 'Onjuiste inloggegevens of geen event-licentie gevonden.'
+    return render_template('vb/login.html', error=error)
+
+
+@app.route('/vb/logout')
+def vb_logout():
+    for k in ('vb_user_id', 'vb_email', 'vb_name', 'vb_license_key'):
+        session.pop(k, None)
+    return redirect(url_for('vb_login'))
+
+
+@app.route('/vb/create-event', methods=['POST'])
+def vb_create_event():
+    """VB maakt een meetdag (event) aan, gekoppeld aan de eigen event-licentie.
+    Genereert een uniek EV-XXXXXX-code (zelfde formaat als event_admin)."""
+    if not session.get('vb_user_id'):
+        return redirect(url_for('vb_login'))
+    license_key = session.get('vb_license_key')
+    ldb = get_db()
+    lic = ldb.execute(
+        "SELECT license_key, email FROM licenses "
+        "WHERE license_key=? AND origin='event'", (license_key,)).fetchone()
+    ldb.close()
+    if not lic:
+        return redirect(url_for('vb_logout'))
+    import secrets as _sec
+    edb = get_event_db()
+    code = None
+    for _ in range(50):
+        cand = 'EV-' + _sec.token_hex(3).upper()
+        if not edb.execute('SELECT 1 FROM events WHERE event_code=?', (cand,)).fetchone():
+            code = cand
+            break
+    if code is None:
+        edb.close()
+        return redirect(url_for('vb_dashboard', err='code'))
+    opdracht = session.get('vb_name') or lic['email']
+    edb.execute(
+        "INSERT INTO events (event_code, opdrachtgever, status, license_key) "
+        "VALUES (?, ?, 'open', ?)", (code, opdracht, license_key))
+    edb.commit()
+    edb.close()
+    app.logger.info('VB event aangemaakt: %s door %s', code, license_key)
+    return redirect(url_for('vb_dashboard', new_event=code))
+
+
+def _vb_fmt_ts(ts):
+    if not ts:
+        return ''
+    try:
+        return datetime.fromtimestamp(int(ts) / 1000).strftime('%Y-%m-%d %H:%M')
+    except Exception:
+        return ''
+
+
+def _vb_group_data(edb, event_id):
+    """Aggregeer een meetdag voor het groepsrapport. Per deelnemer de MEEST RECENTE
+    GESLAAGDE meting (kwaliteit>=85 EN band!='slecht'; anders laatste) — zelfde
+    reliable-wins-selectie als event_report.render_report. Zones via canonieke
+    analytics.zone_for_ri/zone_label (geen eigen rekenlogica). Zone-eerst."""
+    import analytics
+    rows = edb.execute(
+        "SELECT p.name, p.meting_code, m.ri, m.kwaliteit, m.quality_band, m.ts "
+        "FROM event_participants p "
+        "JOIN event_metingen m ON m.id = ("
+        "  SELECT m2.id FROM event_metingen m2 WHERE m2.participant_id=p.participant_id "
+        "  ORDER BY CASE WHEN m2.kwaliteit IS NOT NULL AND m2.kwaliteit>=85 "
+        "    AND (m2.quality_band IS NULL OR m2.quality_band<>'slecht') THEN 1 ELSE 0 END DESC, "
+        "    m2.ts DESC, m2.id DESC LIMIT 1) "
+        "WHERE p.event_id=? ORDER BY p.created_at", (event_id,)).fetchall()
+    parts, ts_list = [], []
+    zone_counts = {k: 0 for k in analytics.ZONE_KEYS}
+    ri_sum, ri_n, unreliable = 0.0, 0, 0
+    for r in rows:
+        reliable = (r['ri'] is not None and r['kwaliteit'] is not None
+                    and r['kwaliteit'] >= 85 and (r['quality_band'] or '') != 'slecht')
+        zk = analytics.zone_for_ri(r['ri']) if reliable else None
+        if reliable:
+            zone_counts[zk] = zone_counts.get(zk, 0) + 1
+            ri_sum += float(r['ri']); ri_n += 1
+        else:
+            unreliable += 1
+        if r['ts']:
+            ts_list.append(int(r['ts']))
+        parts.append({'name': r['name'] or '—',
+                      'ri': (f"{float(r['ri']):.1f}" if reliable else None),
+                      'zone': analytics.zone_label(zk, 'nl') if zk else None,
+                      'reliable': reliable, 'tijd': _vb_fmt_ts(r['ts'])})
+    n = len(parts)
+    zdist = [{'label': analytics.zone_label(k, 'nl'), 'n': zone_counts[k],
+              'pct': round(100 * zone_counts[k] / n) if n else 0}
+             for k in analytics.ZONE_KEYS]
+    tr = (_vb_fmt_ts(min(ts_list)) + ' – ' + _vb_fmt_ts(max(ts_list))) if ts_list else ''
+    return {'parts': parts, 'n': n, 'reliable_n': ri_n, 'unreliable_n': unreliable,
+            'unreliable_pct': round(100 * unreliable / n) if n else 0,
+            'avg_ri': (f"{ri_sum / ri_n:.1f}" if ri_n else '—'),
+            'zdist': zdist, 'time_range': tr, 'enough': n >= 5}
+
+
+@app.route('/vb/rapport')
+def vb_group_report():
+    """Geanonimiseerd-deelbaar groepsrapport per meetdag. Alleen de VB die de
+    meetdag bezit (events.license_key == sessie-licentie). ?pdf=1 → WeasyPrint-PDF."""
+    if not session.get('vb_user_id'):
+        return redirect(url_for('vb_login'))
+    event_code = (request.args.get('event_code') or '').strip().upper()
+    if not event_code:
+        return "event_code vereist", 400
+    edb = get_event_db()
+    ev = edb.execute(
+        "SELECT event_id, event_code, opdrachtgever, naam, datum, created_at, license_key "
+        "FROM events WHERE event_code=?", (event_code,)).fetchone()
+    if not ev:
+        edb.close(); return "Onbekend event", 404
+    if ev['license_key'] != session.get('vb_license_key'):
+        edb.close(); abort(403)
+    data = _vb_group_data(edb, ev['event_id'])
+    edb.close()
+    want_pdf = request.args.get('pdf') == '1'
+    html = render_template('vb/group_report.html', ev=ev, d=data, pdf=want_pdf)
+    if want_pdf:
+        from weasyprint import HTML
+        pdf_bytes = HTML(string=html, base_url=app.root_path).write_pdf()
+        fname = 'event_rapport_%s.pdf' % ((ev['datum'] or ev['created_at'] or '')[:10] or 'meetdag')
+        return Response(pdf_bytes, mimetype='application/pdf',
+                        headers={'Content-Disposition': 'attachment; filename="%s"' % fname})
+    return html
+
+
+@app.route('/vb/dashboard', methods=['GET'])
+def vb_dashboard():
+    """VB dashboard: credits + (stub) events. Vereist VB-login met event-licentie."""
+    if not session.get('vb_user_id'):
+        return redirect(url_for('vb_login'))
+    db = get_db()
+    lic = db.execute(
+        "SELECT license_key, email, credits_available, credits_purchased, "
+        "       vb_tier, product_name "
+        "FROM licenses WHERE license_key=? AND origin='event'",
+        (session.get('vb_license_key'),)).fetchone()
+    db.close()
+    if not lic:
+        # Licentie verdwenen/gewijzigd -> sessie ongeldig maken
+        return redirect(url_for('vb_logout'))
+    credits_available = lic['credits_available'] or 0
+    # Events van deze VB uit het aparte sc_event.db, met deelnemers-/metingen-tellingen.
+    events = []
+    total_metingen = 0
+    edb = get_event_db()
+    rows = edb.execute(
+        "SELECT event_id, event_code, naam, datum, status, created_at "
+        "FROM events WHERE license_key=? ORDER BY created_at DESC",
+        (lic['license_key'],)).fetchall()
+    for ev in rows:
+        n_part = edb.execute(
+            "SELECT COUNT(*) FROM event_participants WHERE event_id=?",
+            (ev['event_id'],)).fetchone()[0]
+        n_met = edb.execute(
+            "SELECT COUNT(*) FROM event_metingen WHERE event_id=?",
+            (ev['event_id'],)).fetchone()[0]
+        total_metingen += n_met
+        events.append({'code': ev['event_code'],
+                       'naam': ev['naam'] or '—',
+                       'datum': (ev['datum'] or ev['created_at'] or '')[:10],
+                       'deelnemers': n_part, 'credits': n_met,
+                       'status': ev['status']})
+    edb.close()
+    # credits_used = werkelijk aantal opgeslagen metingen (autoritatief, reconcilieerbaar
+    # met de credits_available-kolom die per meting wordt afgeteld).
+    credits_used = total_metingen
+    return render_template('vb/dashboard.html',
+                           vb_name=session.get('vb_name'),
+                           vb_email=lic['email'],
+                           tier=(lic['vb_tier'] or '').upper(),
+                           credits_available=credits_available,
+                           credits_used=credits_used,
+                           events=events,
+                           new_event=request.args.get('new_event', ''))
