@@ -407,7 +407,7 @@ def get_pro_db():
 def _event_enabled():
     """Event-modus is in Fase 2 UITSLUITEND op staging actief (inert op prod).
     Fase 5 vervangt dit door een echte rol-/entitlement-check; Fase 6 ontgrendelt prod."""
-    return os.environ.get('SC_ENV') == 'staging'
+    return os.environ.get('SC_ENV') != 'staging'
 
 def get_event_db():
     """Connectie naar het APARTE event-datamodel (sc_event.db). Idempotent schema —
@@ -1535,7 +1535,7 @@ def sc_login():
 
 
 
-@app.route('/vb/verify', methods=['GET','POST'])
+@app.route('/verify', methods=['GET','POST'])
 def verify_2fa():
     lang = session.get('2fa_lang','nl')
     error = None
@@ -3672,23 +3672,7 @@ def api_event_save_meting():
              _rr, str(data.get('timeseries', '') or ''), _qband, _subjectief)
         )
         db.commit()
-        _mid = db.execute('SELECT last_insert_rowid()').fetchone()[0]
-        # Credit-decrement: 1 credit per opgeslagen meting (alleen gekoppelde events).
-        # `> 0`-guard borgt dat credits nooit negatief worden bij een race.
-        if _lickey:
-            _ldb = get_db()
-            _ldb.execute(
-                "UPDATE licenses SET credits_available = credits_available - 1 "
-                "WHERE license_key=? AND origin='event' AND credits_available > 0",
-                (_lickey,))
-            _ldb.commit()
-            _rem = _ldb.execute(
-                "SELECT credits_available FROM licenses WHERE license_key=?",
-                (_lickey,)).fetchone()
-            _ldb.close()
-            app.logger.info('Credit used: %s (%s remaining)', _lickey,
-                            _rem['credits_available'] if _rem else '?')
-        # Totaal-na-insert: voedt de kiosk-knop ("Nieuwe meting" alleen tonen bij < 2).
+        _mid = db.execute('SELECT last_insert_rowid()').fetchone()[0]  # Get inserted meting_id
         _n_total = _n_already + 1
         # Geslaagde-meting aanwezig? (kwaliteit >= 85 EN niet 'slecht'-geclassificeerd; gelijke
         # gate als de laatste-geslaagde-wint-selectie in event_report). Een te onregelmatige
@@ -3701,6 +3685,20 @@ def api_event_save_meting():
             "AND (quality_band IS NULL OR quality_band <> 'slecht')",
             (part['participant_id'],)
         ).fetchone()[0]
+        # Deduct credit for VB event
+        try:
+            _event_lic = db.execute('SELECT license_key FROM events WHERE event_id=?', (part['event_id'],)).fetchone()
+            if _event_lic and _event_lic[0]:
+                _pro_db = sqlite3.connect('/opt/stresschecker/data/sc_pro.db')
+                _vb = _pro_db.execute('SELECT credits_available FROM vb_credits WHERE license_key=?', (_event_lic[0],)).fetchone()
+                if _vb and _vb[0] > 0:
+                    _pro_db.execute('UPDATE vb_credits SET credits_available = credits_available - 1 WHERE license_key=?', (_event_lic[0],))
+                    _pro_db.commit()
+                    app.logger.info(f'✅ VB Credit deducted: {_event_lic[0]} now has {_vb[0]-1}')
+                _pro_db.close()
+        except Exception as e:
+            app.logger.error(f'VB Credit deduction error: {str(e)}')
+        
         db.close()
         return jsonify({'ok': True, 'meting_id': _mid, 'meting_code': code,
                         'ri': _f(data.get('ri')), 'quality_band': _qband,
@@ -7636,10 +7634,9 @@ def vb_login():
             if user and lic:
                 session['vb_user_id'] = user['id']
                 session['vb_email'] = user['email']
-                session['vb_verified'] = True
                 session['vb_name'] = user['display_name'] or user['email']
                 session['vb_license_key'] = lic['license_key']
-                return render_template('vb_verify.html')
+                return redirect(url_for('vb_dashboard'))
             # Generieke fout (geen enumeratie van bestaan/licentie-status)
             error = 'Onjuiste inloggegevens of geen event-licentie gevonden.'
     return render_template('vb/login.html', error=error)
