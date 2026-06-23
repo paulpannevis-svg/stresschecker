@@ -1003,9 +1003,10 @@ def event_code_entry():
             error = 'Voer een event-code in' if _lang == 'nl' else 'Enter event code'
             return render_template('event_code_entry.html', lang=_lang, error=error)
         
-        _db = get_db()
-        _event = _db.execute('SELECT event_id, license_key FROM events WHERE code=?', (_code,)).fetchone()
-        
+        _db = get_event_db()
+        _event = _db.execute('SELECT event_id, license_key FROM events WHERE event_code=?', (_code,)).fetchone()
+        _db.close()
+
         if not _event:
             error = 'Event niet gevonden' if _lang == 'nl' else 'Event not found'
             return render_template('event_code_entry.html', lang=_lang, error=error)
@@ -1018,7 +1019,7 @@ def event_code_entry():
             error = 'Geen credits beschikbaar' if _lang == 'nl' else 'No credits available'
             return render_template('event_code_entry.html', lang=_lang, error=error)
         
-        return redirect(url_for('event_kiosk', code=_code))
+        return redirect(url_for('event_kiosk_event', event_code=_code))
     
     return render_template('event_code_entry.html', lang=_lang)
 
