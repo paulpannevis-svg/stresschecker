@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gewist — {{ ev.opdrachtgever }}</title>
+  <style>
+    body{font-family:system-ui,-apple-system,sans-serif;background:#f4f5f7;margin:0;padding:1.5rem;color:#222}
+    .wrap{max-width:480px;margin:0 auto;text-align:center}
+    .card{background:#fff;border-radius:14px;padding:1.6rem;box-shadow:0 2px 10px rgba(0,0,0,.07)}
+    .ok{font-size:1.2rem;font-weight:700;color:#1f9d55;margin-bottom:.6rem}
+    .next{display:block;margin-top:1.3rem;padding:.9rem;border-radius:12px;background:#333;color:#fff;
+          text-decoration:none;font-weight:700}
+    .banner{background:#fffae6;border:1px solid #f0d000;border-radius:10px;padding:.5rem .8rem;
+            font-size:.85rem;color:#7a6500;margin-bottom:1rem;text-align:left}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="banner">STAGING · Event-modus. Alleen voor test.</div>
+    <div class="card">
+      <div class="ok">Gewist</div>
+      <div>{{ n_part }} deelnemer(s) en {{ n_met }} meting(en) van
+        <b>{{ ev.opdrachtgever }}</b> ({{ ev.event_code }}) zijn definitief verwijderd.</div>
+      <div style="color:#777;margin-top:.6rem;font-size:.9rem">De meetdag zelf blijft bestaan.</div>
+      <a class="next" href="/event/kiosk">← Terug naar meetdagen</a>
+    </div>
+  </div>
+</body>
+</html>

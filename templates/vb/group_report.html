@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Groepsrapport — {{ ev.event_code }}</title>
+  <style>
+    body{font-family:system-ui,Arial,sans-serif;color:#222;margin:0;background:{{ '#fff' if pdf else '#f6f4f0' }}}
+    .wrap{max-width:760px;margin:{{ '0' if pdf else '4vh auto' }};padding:{{ '0' if pdf else '0 16px' }}}
+    .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+    h1{font-size:20px;margin:0}
+    .meta{color:#888;font-size:13px;margin-bottom:18px}
+    .warn{background:#fdf3e7;border:1px solid #f3d6a8;color:#8a5a12;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px}
+    .cards{display:flex;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+    .stat{flex:1;min-width:130px;background:#fff;border:1px solid #ece7df;border-radius:12px;padding:16px}
+    .stat .n{font-size:26px;font-weight:700;color:#E84C5C}
+    .stat .l{font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-top:4px}
+    .zones{margin:0 0 22px}
+    .zrow{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:13px}
+    .zrow .lab{width:120px;color:#555}
+    .bar{flex:1;background:#f0ece6;border-radius:6px;height:16px;overflow:hidden}
+    .bar > span{display:block;height:100%;background:#E84C5C}
+    .zrow .val{width:64px;text-align:right;color:#777}
+    table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #ece7df;border-radius:10px;overflow:hidden}
+    th,td{padding:9px 13px;text-align:left;font-size:13px;border-bottom:1px solid #f0ece6}
+    th{background:#faf8f4;color:#888;text-transform:uppercase;font-size:10px;letter-spacing:.05em}
+    .un{color:#b06a1f}
+    .btns{margin:18px 0;display:flex;gap:10px}
+    .btns a{padding:10px 16px;border-radius:8px;background:#E84C5C;color:#fff;text-decoration:none;font-size:13px;font-weight:600}
+    .btns a.sec{background:#fff;color:#555;border:1px solid #d8d2c7}
+    .foot{margin-top:18px;color:#aaa;font-size:11px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top"><h1>Groepsrapport meetdag</h1><div class="meta">{{ ev.event_code }}</div></div>
+    <div class="meta">
+      {{ ev.opdrachtgever }}{% if ev.naam %} — {{ ev.naam }}{% endif %}
+      {% if d.time_range %} &middot; {{ d.time_range }}{% endif %}
+    </div>
+
+    {% if not d.enough %}
+    <div class="warn">Let op: {{ d.n }} deelnemer(s). Een geanonimiseerd groepsrapport is pas
+      betrouwbaar/deelbaar vanaf <strong>5 deelnemers</strong> (kleine-aantallen-privacy).</div>
+    {% endif %}
+
+    <div class="cards">
+      <div class="stat"><div class="n">{{ d.n }}</div><div class="l">Deelnemers</div></div>
+      <div class="stat"><div class="n">{{ d.avg_ri }}</div><div class="l">Gem. Relax Index (1-10)</div></div>
+      <div class="stat"><div class="n">{{ d.unreliable_pct }}%</div><div class="l">Onbetrouwbaar</div></div>
+    </div>
+
+    <h2 style="font-size:14px;color:#555;">Zoneverdeling</h2>
+    <div class="zones">
+      {% for z in d.zdist %}
+      <div class="zrow"><div class="lab">{{ z.label }}</div>
+        <div class="bar"><span style="width:{{ z.pct }}%"></span></div>
+        <div class="val">{{ z.n }} &middot; {{ z.pct }}%</div></div>
+      {% endfor %}
+      {% if d.unreliable_n %}
+      <div class="zrow"><div class="lab un">Onbetrouwbaar</div>
+        <div class="bar"><span style="width:{{ d.unreliable_pct }}%;background:#c98b3a"></span></div>
+        <div class="val">{{ d.unreliable_n }} &middot; {{ d.unreliable_pct }}%</div></div>
+      {% endif %}
+    </div>
+
+    {% if not pdf %}
+    <div class="btns">
+      <a href="/vb/rapport?event_code={{ ev.event_code }}&amp;pdf=1">Download PDF</a>
+      <a class="sec" href="/vb/dashboard">Terug</a>
+    </div>
+    {% endif %}
+
+    <h2 style="font-size:14px;color:#555;">Deelnemers</h2>
+    <table>
+      <thead><tr><th>Deelnemer</th><th>Relax Index</th><th>Zone</th><th>Tijdstip</th></tr></thead>
+      <tbody>
+        {% for p in d.parts %}
+        <tr>
+          <td>{{ p.name }}</td>
+          {% if p.reliable %}<td>{{ p.ri }}</td><td>{{ p.zone }}</td>
+          {% else %}<td class="un" colspan="2">Onbetrouwbaar (te lage kwaliteit)</td>{% endif %}
+          <td>{{ p.tijd }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="text-align:center;color:#999;padding:18px;">Nog geen metingen.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="foot">Gegenereerd op basis van momentopnames; Relax Index 1-10, zone-indeling
+      volgens de StressChecker-norm. Onbetrouwbare metingen tellen niet mee in het gemiddelde of de zoneverdeling.</div>
+  </div>
+</body>
+</html>

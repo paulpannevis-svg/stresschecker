@@ -405,9 +405,8 @@ def get_pro_db():
     return conn
 
 def _event_enabled():
-    """Event-modus is in Fase 2 UITSLUITEND op staging actief (inert op prod).
-    Fase 5 vervangt dit door een echte rol-/entitlement-check; Fase 6 ontgrendelt prod."""
-    return os.environ.get('SC_ENV') != 'staging'
+    """Event-modus actief op production en staging."""
+    return True
 
 def get_event_db():
     """Connectie naar het APARTE event-datamodel (sc_event.db). Idempotent schema —
@@ -990,6 +989,38 @@ SPOOR3_ERROR_MESSAGES = {
               "info@lifestylemonitors.com.",
     },
 }
+
+
+@app.route('/event-code-entry', methods=['GET', 'POST'])
+def event_code_entry():
+    """VB Event kiosk - enter event code"""
+    _lang = session.get('lang', 'nl')
+    
+    if request.method == 'POST':
+        _code = request.form.get('event_code', '').strip().upper()
+        
+        if not _code:
+            error = 'Voer een event-code in' if _lang == 'nl' else 'Enter event code'
+            return render_template('event_code_entry.html', lang=_lang, error=error)
+        
+        _db = get_db()
+        _event = _db.execute('SELECT event_id, license_key FROM events WHERE code=?', (_code,)).fetchone()
+        
+        if not _event:
+            error = 'Event niet gevonden' if _lang == 'nl' else 'Event not found'
+            return render_template('event_code_entry.html', lang=_lang, error=error)
+        
+        _pro_db = sqlite3.connect('/opt/stresschecker/data/sc_pro.db')
+        _vb = _pro_db.execute('SELECT credits_available FROM vb_credits WHERE license_key=?', (_event[1],)).fetchone()
+        _pro_db.close()
+        
+        if not _vb or _vb[0] <= 0:
+            error = 'Geen credits beschikbaar' if _lang == 'nl' else 'No credits available'
+            return render_template('event_code_entry.html', lang=_lang, error=error)
+        
+        return redirect(url_for('event_kiosk', code=_code))
+    
+    return render_template('event_code_entry.html', lang=_lang)
 
 
 @app.route('/licentie')
@@ -3577,7 +3608,7 @@ def api_save_meting():
 def api_event_save_meting():
     """Event-modus opslag (Fase 2). Schrijft UITSLUITEND naar het aparte sc_event.db
     (event_metingen). Raakt /api/meting/opslaan, metingen of client_metingen NIET aan.
-    Gegate via _event_enabled() (staging-only tot Fase 5/6)."""
+    Gegate via _event_enabled()."""
     if not _event_enabled():
         return jsonify({'error': 'Event-modus niet beschikbaar'}), 404
     data = request.get_json(silent=True) or {}
@@ -3720,7 +3751,7 @@ def _event_gen_code(db, table, col, prefix):
 
 @app.route('/event/kiosk')
 def event_kiosk_home():
-    """Kiosk-landing (Fase 2b): toon open events. Staging-only via _event_enabled()."""
+    """Kiosk-landing (Fase 2b): toon open events. Gegate via _event_enabled()."""
     if not _event_enabled():
         return ('Event-modus niet beschikbaar', 404)
     db = get_event_db()
@@ -3765,7 +3796,7 @@ def event_kiosk_return_participant(event_code):
     """Terugkerende deelnemer: koppelt een 2e meting aan een BESTAANDE participant via diens
     meting-code (alleen code-lookup; GEEN naam-/fuzzy-matching). Bij een onbekende code/typefout
     wordt NIET gekoppeld en NIET gecrasht — vriendelijke val-terug naar de nieuwe-deelnemer-pagina.
-    Slaat GEEN extra PII op (geen naam/geboortejaar opnieuw). Staging-only via _event_enabled()."""
+    Slaat GEEN extra PII op (geen naam/geboortejaar opnieuw). Gegate via _event_enabled()."""
     if not _event_enabled():
         return ('Event-modus niet beschikbaar', 404)
     lang = request.form.get('lang', 'nl')
@@ -3854,7 +3885,7 @@ def event_kiosk_meten(meting_code):
 @app.route('/event/kiosk/<event_code>/wissen', methods=['GET'])
 def event_kiosk_wipe_confirm(event_code):
     """Bevestigingsscherm: toont tellingen + vraagt om de event-code exact te typen.
-    Wist niets. Staging-only via _event_enabled()."""
+    Wist niets. Gegate via _event_enabled()."""
     if not _event_enabled():
         return ('Event-modus niet beschikbaar', 404)
     db = get_event_db()
@@ -3899,8 +3930,8 @@ def event_kiosk_wipe_do(event_code):
 
 @app.route('/event/rapport/<meting_code>')
 def event_report_pdf(meting_code):
-    """TIJDELIJKE staging-route: toont het individuele momentopname-rapport als PDF in de
-    browser. Gegate op SC_ENV (inert op prod). Genereert on-the-fly uit sc_event.db (read-only)
+    """Toont het individuele momentopname-rapport als PDF in de
+    browser. Gegate via _event_enabled(). Genereert on-the-fly uit sc_event.db (read-only)
     via event_report.render_report; ?lang=nl|de|en."""
     if not _event_enabled():
         return ('Event-modus niet beschikbaar', 404)
@@ -3919,7 +3950,7 @@ def event_report_pdf(meting_code):
 
 @app.route('/event/rapport/<meting_code>/print')
 def event_report_print_shell(meting_code):
-    """Dunne print-omhulsel-pagina (variant A, staging-only). Bedt het BESTAANDE PDF-rapport
+    """Dunne print-omhulsel-pagina (variant A). Bedt het BESTAANDE PDF-rapport
     in een same-origin iframe in en toont een Print-knop die de INGEBEDDE PDF print
     (iframe.contentWindow.print()), niet het omhulsel. GEEN tweede renderbron: de iframe wijst
     naar event_report_pdf — de WeasyPrint-PDF blijft de enige bron. Lichte bestaanscheck op de
@@ -7598,22 +7629,20 @@ def vb_order_success():
 
 
 def _vb_event_license(db, email):
-    """Geef de actieve event-licentie (origin='event') voor dit e-mailadres, of None.
-    Event-licenties zijn type='pro' maar bewust géén gewone Pro-sessie: VB-auth
-    leeft in een eigen vb_*-session-namespace (geen is_pro()-toegang tot de hoofdapp)."""
+    """Geef de actieve event-licentie (origin='event') voor dit e-mailadres, of None."""
     return db.execute(
-        "SELECT license_key, email, credits_available, credits_purchased, vb_tier, "
-        "       product_name "
-        "FROM licenses WHERE email=? COLLATE NOCASE AND origin='event' "
-        "  AND status IN ('activated', 'available') "
-        "ORDER BY created_at DESC LIMIT 1",
+        "SELECT license_key, vb_email, credits_available, tier "
+        "FROM vb_credits WHERE vb_email=? COLLATE NOCASE "
+        "AND credits_available > 0 "
+        "ORDER BY id DESC LIMIT 1",
         (email,)).fetchone()
+
 
 
 @app.route('/vb/login', methods=['GET', 'POST'])
 def vb_login():
     """Login voor vitaliteitsbureaus met een event-licentie. E-mail + wachtwoord
-    (wachtwoord gezet via de reset-link uit de account-gereed-mail)."""
+    (wachtwoord gezet via de reset-link uit de account-gereed-email)."""
     error = None
     if request.method == 'POST':
         email = request.form.get('email', '').strip().lower()
@@ -7621,7 +7650,8 @@ def vb_login():
         if not email or not password:
             error = 'Vul e-mail en wachtwoord in.'
         else:
-            db = get_db()
+            db = sqlite3.connect(PRO_DB_PATH)
+            db.row_factory = sqlite3.Row
             user = db.execute(
                 "SELECT id, email, display_name, password_hash FROM users "
                 "WHERE email=? COLLATE NOCASE", (email,)).fetchone()
@@ -7637,51 +7667,14 @@ def vb_login():
                 session['vb_name'] = user['display_name'] or user['email']
                 session['vb_license_key'] = lic['license_key']
                 return redirect(url_for('vb_dashboard'))
-            # Generieke fout (geen enumeratie van bestaan/licentie-status)
-            error = 'Onjuiste inloggegevens of geen event-licentie gevonden.'
+            error = 'Onzuiste inloggegevens of geen event-licentie gevonden.'
     return render_template('vb/login.html', error=error)
-
 
 @app.route('/vb/logout')
 def vb_logout():
     for k in ('vb_user_id', 'vb_email', 'vb_name', 'vb_license_key'):
         session.pop(k, None)
     return redirect(url_for('vb_login'))
-
-
-@app.route('/vb/create-event', methods=['POST'])
-def vb_create_event():
-    """VB maakt een meetdag (event) aan, gekoppeld aan de eigen event-licentie.
-    Genereert een uniek EV-XXXXXX-code (zelfde formaat als event_admin)."""
-    if not session.get('vb_user_id'):
-        return redirect(url_for('vb_login'))
-    license_key = session.get('vb_license_key')
-    ldb = get_db()
-    lic = ldb.execute(
-        "SELECT license_key, email FROM licenses "
-        "WHERE license_key=? AND origin='event'", (license_key,)).fetchone()
-    ldb.close()
-    if not lic:
-        return redirect(url_for('vb_logout'))
-    import secrets as _sec
-    edb = get_event_db()
-    code = None
-    for _ in range(50):
-        cand = 'EV-' + _sec.token_hex(3).upper()
-        if not edb.execute('SELECT 1 FROM events WHERE event_code=?', (cand,)).fetchone():
-            code = cand
-            break
-    if code is None:
-        edb.close()
-        return redirect(url_for('vb_dashboard', err='code'))
-    opdracht = session.get('vb_name') or lic['email']
-    edb.execute(
-        "INSERT INTO events (event_code, opdrachtgever, status, license_key) "
-        "VALUES (?, ?, 'open', ?)", (code, opdracht, license_key))
-    edb.commit()
-    edb.close()
-    app.logger.info('VB event aangemaakt: %s door %s', code, license_key)
-    return redirect(url_for('vb_dashboard', new_event=code))
 
 
 def _vb_fmt_ts(ts):
@@ -7772,11 +7765,11 @@ def vb_dashboard():
     """VB dashboard: credits + (stub) events. Vereist VB-login met event-licentie."""
     if not session.get('vb_user_id'):
         return redirect(url_for('vb_login'))
-    db = get_db()
+    db = sqlite3.connect(PRO_DB_PATH)
+    db.row_factory = sqlite3.Row
     lic = db.execute(
-        "SELECT license_key, email, credits_available, credits_purchased, "
-        "       vb_tier, product_name "
-        "FROM licenses WHERE license_key=? AND origin='event'",
+        "SELECT license_key, vb_email, credits_available, tier "
+        "FROM vb_credits WHERE license_key=?",
         (session.get('vb_license_key'),)).fetchone()
     db.close()
     if not lic:
@@ -7810,9 +7803,49 @@ def vb_dashboard():
     credits_used = total_metingen
     return render_template('vb/dashboard.html',
                            vb_name=session.get('vb_name'),
-                           vb_email=lic['email'],
-                           tier=(lic['vb_tier'] or '').upper(),
+                           vb_email=lic['vb_email'],
+                           tier=(lic['tier'] or '').upper(),
                            credits_available=credits_available,
                            credits_used=credits_used,
                            events=events,
                            new_event=request.args.get('new_event', ''))
+
+
+@app.route('/vb/create-event', methods=['POST'])
+def vb_create_event():
+    """VB maakt een meetdag (event) aan, gekoppeld aan de eigen event-licentie.
+    Genereert een uniek EV-XXXXXX code (zelfde formaat als event_admin)."""
+    if not session.get('vb_user_id'):
+        return redirect(url_for('vb_login'))
+    license_key = session.get('vb_license_key')
+    db = sqlite3.connect(PRO_DB_PATH)
+    db.row_factory = sqlite3.Row
+    lic = db.execute(
+        "SELECT license_key, vb_email FROM vb_credits "
+        "WHERE license_key=?", (license_key,)).fetchone()
+    db.close()
+    if not lic:
+        return redirect(url_for('vb_logout'))
+    import secrets as _sec
+    edb = sqlite3.connect(EVENT_DB_PATH)
+    edb.row_factory = sqlite3.Row
+    code = None
+    for _ in range(50):
+        cand = 'EV-' + _sec.token_hex(3).upper()
+        if not edb.execute('SELECT 1 FROM events WHERE event_code=?', (cand,)).fetchone():
+            code = cand
+            break
+    if code is None:
+        edb.close()
+        return redirect(url_for('vb_dashboard', err='code'))
+    naam = request.form.get('event_naam', '')
+    datum = request.form.get('event_datum', '')
+    facilitator = request.form.get('facilitator_label', '')
+    edb.execute(
+        "INSERT INTO events (event_code, opdrachtgever, naam, datum, facilitator_label, status, license_key) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)", (code, naam, naam, datum, facilitator, 'open', license_key))
+    edb.commit()
+    edb.close()
+    app.logger.info('VB event aangemaakt: %s door %s', code, license_key)
+    return redirect(url_for('vb_dashboard', new_event=code))
+

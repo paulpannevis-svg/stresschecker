@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deelnemergegevens wissen — {{ ev.opdrachtgever }}</title>
+  <style>
+    body{font-family:system-ui,-apple-system,sans-serif;background:#f4f5f7;margin:0;padding:1.5rem;color:#222}
+    .wrap{max-width:480px;margin:0 auto}
+    h1{font-size:1.3rem;margin-bottom:.2rem}
+    .sub{color:#777;margin-bottom:1.2rem}
+    .card{background:#fff;border-radius:14px;padding:1.4rem;box-shadow:0 2px 10px rgba(0,0,0,.07)}
+    .warn{background:#fdecea;border:1px solid #f5c6c2;border-radius:12px;padding:1rem;margin-bottom:1rem;color:#8a1c12}
+    .warn b{font-size:1.05rem}
+    label{display:block;font-weight:600;margin:.9rem 0 .3rem}
+    input{width:100%;padding:.7rem;border:1px solid #ccc;border-radius:10px;font-size:1rem;box-sizing:border-box;letter-spacing:.05em}
+    .hint{color:#888;font-size:.82rem;margin-top:.25rem}
+    button{margin-top:1.3rem;width:100%;padding:.9rem;border:none;border-radius:12px;background:#c0392b;
+           color:#fff;font-size:1.05rem;font-weight:700;cursor:pointer}
+    a.back{display:inline-block;margin-top:1rem;color:#777;text-decoration:none;font-size:.9rem}
+    .err{background:#fff3cd;border:1px solid #f0d000;border-radius:10px;padding:.6rem .8rem;color:#7a6500;margin-bottom:1rem}
+    .banner{background:#fffae6;border:1px solid #f0d000;border-radius:10px;padding:.5rem .8rem;
+            font-size:.85rem;color:#7a6500;margin-bottom:1rem}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="banner">STAGING · Event-modus. Alleen voor test.</div>
+    <h1>Deelnemergegevens wissen</h1>
+    <div class="sub">{{ ev.opdrachtgever }}{% if ev.naam %} · {{ ev.naam }}{% endif %} · {{ ev.event_code }}</div>
+    <div class="card">
+      {% if error %}<div class="err">De ingevoerde code kwam niet overeen. Er is niets gewist.</div>{% endif %}
+      <div class="warn">
+        <b>Let op — dit kan niet ongedaan worden gemaakt.</b><br>
+        Je staat op het punt <b>{{ n_part }}</b> deelnemer(s) (inclusief namen) en
+        <b>{{ n_met }}</b> meting(en) van deze meetdag definitief te wissen.
+        De meetdag zelf ({{ ev.event_code }}) blijft bestaan.
+      </div>
+      <form method="POST" action="/event/kiosk/{{ ev.event_code }}/wissen">
+        <label for="confirm_code">Typ ter bevestiging de event-code <code>{{ ev.event_code }}</code></label>
+        <input type="text" id="confirm_code" name="confirm_code" autocomplete="off"
+               placeholder="{{ ev.event_code }}" required>
+        <div class="hint">De wis gebeurt alleen als je de code exact overtypt.</div>
+        <button type="submit">Definitief wissen</button>
+      </form>
+    </div>
+    <a class="back" href="/event/kiosk">← Annuleren, terug naar meetdagen</a>
+  </div>
+</body>
+</html>

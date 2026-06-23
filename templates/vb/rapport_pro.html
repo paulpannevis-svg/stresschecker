@@ -1,0 +1,60 @@
+{% extends "reports/base.html" %}
+{% import "reports/_macros.html" as rmacros %}
+{% block title %}Cliëntrapport — {{ client.name }}{% endblock %}
+{% block content %}
+
+<h1>{% if lang=='de' %}Klientenbericht{% elif lang=='en' %}Client report{% else %}Cliëntrapport{% endif %} — {{ client.name }}{% if client.surname %} {{ client.surname }}{% endif %}</h1>
+<div class="meta">
+  {% if lang=='de' %}Geburtsjahr{% elif lang=='en' %}Birth year{% else %}Geboortejaar{% endif %}: {{ client.birth_year or '–' }}
+  · {% if lang=='de' %}Geschlecht{% elif lang=='en' %}Gender{% else %}Geslacht{% endif %}:
+  {% if client.gender == 'male' %}{% if lang=='de' %}Mann{% elif lang=='en' %}Male{% else %}Man{% endif %}
+  {% elif client.gender == 'female' %}{% if lang=='de' %}Frau{% elif lang=='en' %}Female{% else %}Vrouw{% endif %}
+  {% else %}{{ client.gender or '–' }}{% endif %}
+  · {{ period_start_date }} → {{ period_end_date }}
+</div>
+
+<div class="stats-row">
+  <div class="stat-block">
+    <span class="value">{{ overall.total_metingen }}</span>
+    <span class="label">{% if lang=='de' %}Messungen{% elif lang=='en' %}Readings{% else %}Metingen{% endif %}</span>
+  </div>
+  <div class="stat-block">
+    <span class="value">{{ overall.ri_average if overall.ri_average is not none else '–' }}</span>
+    <span class="label">{% if lang=='de' %}Durchschn. RI{% elif lang=='en' %}Avg. RI{% else %}Gem. RI{% endif %}</span>
+  </div>
+</div>
+
+<h2>{% if lang=='de' %}Zonenverteilung{% elif lang=='en' %}Zone distribution{% else %}Zoneverdeling{% endif %}</h2>
+<table class="data">
+  <tr><th style="width:35%;">{% if lang=='de' %}Zone{% elif lang=='en' %}Zone{% else %}Zone{% endif %}</th><th>{% if lang=='de' %}Anzahl{% elif lang=='en' %}Count{% else %}Aantal{% endif %}</th><th>%</th></tr>
+  {% for z in zone_order %}
+  <tr class="zone-row">
+    <td class="label zone-{{ z }}">{{ zone_label(z, lang) }}</td>
+    <td>{{ overall.zone_distribution[z] }}</td>
+    <td>{{ pct(overall.zone_distribution[z], overall.reliable_metingen) }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{{ rmacros.quality_note(overall, lang) }}
+
+<h2>{% if lang=='de' %}Verlauf{% elif lang=='en' %}Time series{% else %}Tijdreeks{% endif %}</h2>
+{% if series %}
+<table class="data">
+  <tr>
+    <th style="width:35%;">{% if lang=='de' %}Datum{% elif lang=='en' %}Date{% else %}Datum{% endif %}</th>
+    <th style="text-align:right;width:15%;">RI</th>
+    <th>{% if lang=='de' %}Zone{% elif lang=='en' %}Zone{% else %}Zone{% endif %}</th>
+  </tr>
+  {% for m in series %}
+  <tr>
+    <td>{{ m.date }}</td>
+    <td style="text-align:right;font-weight:600;">{{ m.ri if m.ri is not none else '–' }}</td>
+    <td class="zone-{{ m.zone }}">{{ zone_label(m.zone, lang) }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p style="color:#888;font-style:italic;">{% if lang=='de' %}Keine Messungen im gewählten Zeitraum.{% elif lang=='en' %}No readings in the selected period.{% else %}Geen metingen in de gekozen periode.{% endif %}</p>
+{% endif %}
+
+{% endblock %}

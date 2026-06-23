@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="{{ lang or 'nl' }}">
+<head>
+  <meta charset="utf-8">
+  <title>{{ t.title }} — {{ p.name or p.meting_code }}</title>
+  <style>
+    @page { size: A4; margin: 13mm 14mm; }
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #222; font-size: 10.5pt; line-height: 1.28; }
+    .head { display: flex; justify-content: space-between; align-items: flex-start;
+            border-bottom: 2px solid #E8344E; padding-bottom: 8px; margin-bottom: 14px; }
+    .brand-logo { height: 32px; }
+    .report-tag { color: #E8344E; font-weight: 700; font-size: 10pt; text-transform: uppercase; letter-spacing: .04em; }
+    .client { margin: 0 0 12px; }
+    .client .name { font-size: 19pt; font-weight: 800; line-height: 1.1; }
+    .client .codebox { display: inline-block; margin-top: 5px; padding: 5px 11px;
+                       border: 1.5px solid #2c3e63; border-radius: 8px; }
+    .client .codebox .code-label { font-size: 10pt; color: #2c3e63; font-weight: 600; }
+    .client .codebox .code-val { font-size: 16pt; font-weight: 800; color: #15233f; letter-spacing: .5px; }
+    .client .codebox .code-keep { font-size: 8.5pt; color: #555; font-weight: 400; margin-top: 1px; }
+    .meta-row { color: #555; font-size: 9.5pt; margin-top: 3px; }
+    .zone-banner { border-radius: 11px; padding: 12px 18px; margin: 4px 0 11px; }
+    .zone-banner .zlabel { font-size: 20pt; font-weight: 800; line-height: 1; }
+    .zone-banner .zdesc { font-size: 10.5pt; margin-top: 4px; }
+    .ri-line { font-size: 9.5pt; margin-top: 7px; opacity: .92; }
+    .ri-num { font-weight: 700; }
+    .grid { display: flex; gap: 10px; margin: 4px 0 12px; }
+    .cell { flex: 1; border: 1px solid #e3e3e3; border-radius: 9px; padding: 9px 12px; }
+    .cell .k { color: #777; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .03em; }
+    .cell .v { font-size: 15pt; font-weight: 700; margin-top: 2px; }
+    .cell .stars { font-size: 14pt; line-height: 1; margin-top: 2px; letter-spacing: 1px; }
+    .cell .stars .on { color: #f1a517; }
+    .cell .stars .off { color: #d9d4cf; }
+    .cell .stars .na { color: #c4bdb6; font-size: 11pt; }
+    .cell .v.q { font-size: 11pt; font-weight: 600; color: #777; margin-top: 1px; }
+    /* gauge + kwadrant NAAST elkaar — echte tabel-kolommen (betrouwbaar in WeasyPrint),
+       verticaal gecentreerd zodat de kleine gauge naast het grote kwadrant in balans staat. */
+    .viz-row { display: table; width: 100%; table-layout: fixed; margin: 5px 0 10px;
+               border-spacing: 0; }
+    .viz-col { display: table-cell; vertical-align: top; text-align: center; }
+    .viz-col h3 { font-size: 8.5pt; color: #777; text-transform: uppercase; letter-spacing: .03em;
+                  font-weight: 700; margin: 0 0 6px; line-height: 1.2; }
+    .viz-gauge { width: 33%; }
+    .viz-quad { width: 67%; }
+    .gauge-svg { width: 230px; height: auto; }
+    .gauge-cap { font-size: 9pt; color: #555; margin-top: 5px; }
+    .viz-quad svg { width: 100%; max-width: 340px; height: auto; display: block; margin: 0 auto; }
+    .quad-legend { font-size: 9pt; color: #555; margin-top: 7px; }
+    .quad-legend span { margin: 0 9px; }
+    .quad-legend .ld { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+                       margin-right: 4px; vertical-align: middle; border: 1.5px solid #fff;
+                       box-shadow: 0 0 0 1px #ccc; }
+    .quad-legend .ld.huidig { background: #1a1a1a; }
+    .quad-legend .ld.zelf { background: #0078ff; }
+    .quad-note { font-size: 8.5pt; color: #888; font-style: italic; text-align: center; margin-top: 3px; }
+    .gm { margin: 5px 0 9px; }
+    .gm h3 { font-size: 8.5pt; color: #777; text-transform: uppercase; letter-spacing: .03em;
+             font-weight: 700; margin: 0 0 5px; }
+    .gm .intro { font-size: 9.5pt; color: #555; margin: 0 0 7px; }
+    .gm .nums { display: flex; gap: 18px; margin: 0 0 7px; font-size: 10.5pt; }
+    .gm .nums b { color: #222; }
+    .gm .text { font-size: 10.5pt; color: #333; margin: 0; }
+    .gm .neutral { font-size: 10pt; color: #777; font-style: italic; margin: 0; }
+    .note { background: #f7f7f9; border-radius: 9px; padding: 9px 13px; font-size: 9.5pt; color: #444; margin: 0 0 6px; }
+    .unreliable { background: #fdecea; border: 1px solid #f5c6c2; color: #8a1c12; border-radius: 9px;
+                  padding: 10px 14px; font-size: 10pt; margin: 4px 0 12px; }
+    .foot { color: #999; font-size: 8.5pt; margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px; }
+    /* zone-achtergrondpalet, identiek aan reports/base.html */
+    .zone-bg-zwaar_belast { background: #c0392b; color: #fff; }
+    .zone-bg-belast       { background: #e67e22; color: #fff; }
+    .zone-bg-licht_belast { background: #f1c40f; color: #333; }
+    .zone-bg-in_balans    { background: #6fcf7a; color: #fff; }
+    .zone-bg-veerkrachtig { background: #27ae60; color: #fff; }
+    /* afgekeurde meting (kwaliteit < 85): geen stellige zone-kleur, neutraal grijs */
+    .zone-bg-unreliable   { background: #8a9099; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <img src="static/img/sc_logo_full.png" alt="StressChecker — Lifestyle Monitors" class="brand-logo">
+    <span class="report-tag">{{ t.tag }}</span>
+  </div>
+
+  <div class="client">
+    <div class="name">{{ p.name or t.no_name }}</div>
+    <div class="codebox">
+      <span class="code-label">{{ t.code_label }}:</span> <span class="code-val">{{ p.meting_code }}</span>
+      <div class="code-keep">{{ t.code_keep }}</div>
+    </div>
+    <div class="meta-row">
+      {{ p.opdrachtgever }}{% if p.event_naam %} · {{ p.event_naam }}{% endif %}
+      {% if p.event_datum %} · {{ p.event_datum }}{% endif %}
+      · {{ t.measured_at }}: {{ measured_at_str }}
+      {% if age is not none %} · {{ t.age }}: {{ age }}{% endif %}
+      {% if gender_label %} · {{ gender_label }}{% endif %}
+    </div>
+  </div>
+
+  {# Zone-eerst: de zone is het hoofdresultaat; het RI-getal staat ondergeschikt. Bij een
+     afgekeurde meting (kwaliteit < 85) NIET de zone stellig noemen — neutraal grijs + voorbehoud. #}
+  <div class="zone-banner {{ 'zone-bg-' + zone_key if reliable else 'zone-bg-unreliable' }}">
+    {% if reliable %}
+    <div class="zlabel">{{ zone_label }}</div>
+    <div class="zdesc">{{ zone_desc }}</div>
+    {% else %}
+    <div class="zlabel">{{ t.unreliable_zone_heading }}</div>
+    <div class="zdesc">{{ t.unreliable_zone_desc_completed if completed else t.unreliable_zone_desc }}</div>
+    {% endif %}
+    <div class="ri-line">
+      {% if reliable %}
+        {{ t.ri_label }}: <span class="ri-num">{{ ri_str }}</span> / 10
+      {% else %}
+        {{ t.ri_label }}: <span class="ri-num">—</span>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if not reliable %}
+  <div class="unreliable">{{ t.unreliable_completed if completed else t.unreliable }}</div>
+  {% endif %}
+
+  <div class="grid">
+    <div class="cell"><div class="k">{{ t.bpm }}</div><div class="v">{{ p.bpm if p.bpm is not none else '–' }}</div></div>
+    <div class="cell"><div class="k">HRV%</div><div class="v">{{ p.hrv_pct if p.hrv_pct is not none else '–' }}</div></div>
+    <div class="cell"><div class="k">{{ t.quality }}</div>
+      <div class="stars">
+        {# 'slecht' (te onregelmatig) -> geen waarderende sterren; '—' net als bij ontbrekende rating.
+           De waarderende ster-rating mag niet botsen met de 'Onzeker'-zone hierboven. #}
+        {% if p.quality_band == 'slecht' %}<span class="na">—</span>{% elif stars.rated %}{% for i in range(stars.total) %}<span class="{{ 'on' if i < stars.filled else 'off' }}">★</span>{% endfor %}{% else %}<span class="na">—</span>{% endif %}
+      </div>
+      <div class="v q">{{ p.kwaliteit if p.kwaliteit is not none else '–' }}%</div></div>
+  </div>
+
+  {# Gauge (RI-schaal) + tweeassig kwadrant NAAST elkaar — bespaart hoogte zodat alles op
+     één A4 past. Beide statische SVG-reproducties van /kwadrant; geen JS, geen nieuwe berekening. #}
+  <div class="viz-row">
+    <div class="viz-col viz-gauge" style="width: {{ '33%' if quad.show else '100%' }}">
+      <h3>{{ gauge_heading }}</h3>
+      <svg class="gauge-svg" viewBox="0 0 200 118" xmlns="http://www.w3.org/2000/svg">
+        {% for a in gauge.arcs %}
+        <path d="{{ a.d }}" stroke="{{ a.color }}" stroke-width="{{ gauge.sw }}" fill="none"/>
+        {% endfor %}
+        <line x1="{{ gauge.needle.x1 }}" y1="{{ gauge.needle.y1 }}"
+              x2="{{ gauge.needle.x2 }}" y2="{{ gauge.needle.y2 }}"
+              stroke="{{ gauge.needle.color }}" stroke-width="3"/>
+        <circle cx="{{ gauge.cx }}" cy="{{ gauge.cy }}" r="5" fill="#fff" stroke="#ccc" stroke-width="1"/>
+      </svg>
+      <div class="gauge-cap">{{ zone_label if reliable else t.gauge_cap_unreliable }}</div>
+    </div>
+    {% if quad.show %}
+    <div class="viz-col viz-quad">
+      <h3>{{ quad.heading }}</h3>
+      {{ quad.svg|safe }}
+      <div class="quad-legend">
+        <span><span class="ld huidig"></span>{{ quad.l_huidig }}</span>
+        {% if quad.l_zelf %}<span><span class="ld zelf"></span>{{ quad.l_zelf }}</span>{% endif %}
+      </div>
+      {% if quad.note %}<div class="quad-note">{{ quad.note }}</div>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {# Gevoel vs. meting — beschrijvend, niet-oordelend. Onbetrouwbaar → neutrale regel;
+     geen gevoel → blok weg. Drempel |gevoel-RI| <= 2 → 'ongeveer gelijk'. #}
+  {% if gm.show %}
+  <div class="gm">
+    <h3>{{ gm.heading }}</h3>
+    {% if gm.reliable %}
+      <p class="intro">{{ gm.intro }}</p>
+      <div class="nums"><span>{{ gm.feeling_label }}: <b>{{ gm.feeling }}</b> / 10</span><span>{{ gm.meas_label }}: <b>{{ gm.measurement }}</b> / 10</span></div>
+      <p class="text">{{ gm.text }}</p>
+    {% else %}
+      <p class="neutral">{{ gm.text }}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="note">{{ t.method }}</div>
+
+  <div class="foot">{{ t.generated }}: {{ generated_at }} · {{ t.snapshot_note }}</div>
+</body>
+</html>

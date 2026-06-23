@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Print — {{ code }}</title>
+  <style>
+    html,body{margin:0;height:100%;font-family:system-ui,-apple-system,sans-serif;background:#525659}
+    .bar{position:fixed;top:0;left:0;right:0;height:56px;background:#2c3e63;display:flex;align-items:center;
+         justify-content:space-between;padding:0 14px;box-sizing:border-box;z-index:2}
+    .bar .ttl{color:#fff;font-weight:700;font-size:.95rem;letter-spacing:.3px}
+    .bar .actions{display:flex;gap:8px}
+    .btn{padding:.6rem 1.1rem;border:none;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;
+         text-decoration:none;display:inline-block;box-sizing:border-box}
+    .btn-print{background:#fff;color:#2c3e63}
+    .btn-print:disabled{opacity:.5;cursor:default}
+    .btn-back{background:transparent;color:#fff;border:1.5px solid #fff}
+    iframe{position:fixed;top:56px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 56px);border:0;background:#fff}
+    /* Mocht iemand Ctrl+P op het OMHULSEL doen: verberg de balk zodat alleen het rapport print.
+       De Print-knop zelf gebruikt contentWindow.print() en print sowieso enkel de PDF. */
+    @media print { .bar{display:none} iframe{top:0;height:100%} }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <span class="ttl">{{ code }}</span>
+    <div class="actions">
+      <!-- Expliciete navigatie naar de kiosk-uitslag van DEZELFDE deelnemer (code uit de
+           print-URL). NIET history.back(): de wrapper opent in een nieuw tabblad, dus de
+           geschiedenis is leeg bij direct openen → dat landde op een lege startpagina. -->
+      <a class="btn btn-back" href="/event/kiosk/meten/{{ code }}">Terug</a>
+      <button class="btn btn-print" id="printBtn" onclick="printReport()" disabled>Print 🖨</button>
+    </div>
+  </div>
+
+  <!-- ENIGE renderbron: de bestaande PDF-route. Geen rapport-inhoud in dit omhulsel. -->
+  <iframe id="pdf" src="{{ pdf_url }}" title="rapport {{ code }}"></iframe>
+
+  <script>
+    var f = document.getElementById('pdf');
+    var btn = document.getElementById('printBtn');
+    // Knop pas vrijgeven als de ingebedde PDF geladen is (load-timing is de bekende valkuil).
+    // De PDF-plugin vuurt 'load' niet altijd betrouwbaar → ook een korte fallback-timer.
+    f.addEventListener('load', function () { btn.disabled = false; });
+    setTimeout(function () { btn.disabled = false; }, 1500);
+
+    function printReport() {
+      try {
+        // Print de INGEBEDDE PDF, niet het omhulsel.
+        f.contentWindow.focus();
+        f.contentWindow.print();
+      } catch (e) {
+        // Laatste redmiddel als de browser het frame-printen blokkeert: open de kale PDF,
+        // dan is de viewer-printknop (Ctrl+P) beschikbaar.
+        window.open(f.src, '_blank', 'noopener');
+      }
+    }
+  </script>
+</body>
+</html>

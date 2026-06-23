@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Event-meting — {{ p.meting_code }}</title>
+  <style>
+    body{font-family:system-ui,-apple-system,sans-serif;background:#f4f5f7;margin:0;padding:1.5rem;color:#222}
+    .wrap{max-width:480px;margin:0 auto;text-align:center}
+    .code{color:#777;font-size:.9rem;margin-bottom:1rem}
+    .card{background:#fff;border-radius:16px;padding:1.6rem;box-shadow:0 2px 10px rgba(0,0,0,.07)}
+    .big{font-size:2.6rem;font-weight:800;line-height:1}
+    .lbl{color:#777;font-size:.85rem;margin-top:.2rem}
+    .stats{display:flex;justify-content:space-around;margin:1.2rem 0}
+    button{width:100%;padding:.95rem;border:none;border-radius:12px;font-size:1.05rem;font-weight:700;cursor:pointer;margin-top:.6rem}
+    .start{background:#E8344E;color:#fff}
+    .stop{background:#555;color:#fff}
+    button:disabled{opacity:.45;cursor:default}
+    .report{display:block;margin-top:1.1rem;padding:.95rem;border-radius:12px;background:#2c3e63;color:#fff;
+            text-decoration:none;font-weight:700}
+    .rep-hint{font-size:.78rem;color:#999;margin-top:.45rem}
+    .again{display:block;margin-top:1rem;padding:.95rem;border-radius:12px;background:#E8344E;color:#fff;
+           text-decoration:none;font-weight:700}
+    .next{display:block;margin-top:1rem;padding:.95rem;border-radius:12px;background:#1f9d55;color:#fff;
+          text-decoration:none;font-weight:700}
+    .ri{font-size:3.2rem;font-weight:800}
+    .band{font-size:1.2rem;font-weight:700;margin-top:.3rem}
+    .banner{background:#fffae6;border:1px solid #f0d000;border-radius:10px;padding:.5rem .8rem;
+            font-size:.85rem;color:#7a6500;margin-bottom:1rem;text-align:left}
+    .slotmsg{margin-top:1rem;padding:.85rem 1rem;border-radius:12px;font-size:.92rem;line-height:1.45;text-align:left}
+    .slot-done{background:#eef6ee;color:#2c5d3a;border:1px solid #cfe5cf}
+    .slot-failed{background:#f4f5f7;color:#555;border:1px solid #ddd}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="banner">STAGING · Event-modus (kiosk). Alleen voor test.</div>
+    <div class="code">{% if p.name %}<b>{{ p.name }}</b> · {% endif %}code {{ p.meting_code }} · {{ p.opdrachtgever }}</div>
+
+    <!-- Ontspanningsvraag VÓÓR de meting — exact dezelfde verwoording/schaal als de
+         basismeting (voorbereiden.html V4). Opslag = event_metingen.subjectief_score (0-10). -->
+    <div id="phase-subj" class="card" style="text-align:left">
+      <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.6rem;">Hoe ontspannen voel je je op dit moment?</div>
+      <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-bottom:.3rem;">
+        <span>Zeer gespannen</span><span>Volledig ontspannen</span>
+      </div>
+      <input type="range" id="evSubjSlider" min="0" max="10" value="5"
+        style="width:100%;accent-color:#E8344E;cursor:pointer;"
+        oninput="evSubjTouch()" onpointerdown="evSubjTouch()">
+      <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-top:.2rem;"><span>Uitgeput / hoofd vol</span><span>Gaat wel</span><span>Lekker in mijn vel</span></div>
+      <div style="text-align:center;font-size:1.4rem;font-weight:700;color:#E8344E;margin-top:.4rem;"><span id="evSubjVal">—</span><span style="font-size:.85rem;font-weight:400;color:#aaa"> / 10</span></div>
+      <div id="evSubjHint" style="text-align:center;font-size:.72rem;font-style:italic;color:#b0a8a0;margin-top:.3rem;">Beweeg de schuif om je eerste, eerlijke gevoel te kiezen.</div>
+    </div>
+
+    <div id="phase-measure" class="card">
+      <div class="stats">
+        <div><div class="big" id="bpm">--</div><div class="lbl">bpm</div></div>
+        <div><div class="big" id="beats">0</div><div class="lbl">slagen</div></div>
+        <div><div class="big" id="time">0</div><div class="lbl">sec</div></div>
+      </div>
+      <button class="start" id="startBtn" onclick="startMeasure()" disabled>Start meting</button>
+      <!-- Annuleer: breekt de lopende meting volledig af ZONDER op te slaan (geen API-call,
+           geen spoor, telt niet tegen max-2). Alleen zichtbaar tijdens het meten; idle = verborgen. -->
+      <button class="stop" id="cancelBtn" onclick="cancelMeasure()" style="display:none">Annuleer</button>
+    </div>
+
+    <div id="phase-result" class="card" style="display:none">
+      <div class="ri" id="riOut">--</div>
+      <div class="lbl">Relax Index</div>
+      <div class="band" id="bandOut"></div>
+      <div class="lbl" id="qualOut" style="margin-top:.6rem"></div>
+      <!-- Eén rapport-knop: opent de print-wrapper (PDF in iframe + Terug + Print). Bekijken
+           én printen gebeurt daar; daarom geen aparte "Print"-knop meer op de uitslag. -->
+      <a class="report" href="/event/rapport/{{ p.meting_code }}/print" target="_blank" rel="noopener">Bekijk / print rapport →</a>
+      <div class="rep-hint">Gauge, kwadrant en gevoel-vs-meting — om samen te bespreken. Toont je meest betrouwbare meting.</div>
+      <!-- "Nieuwe meting": 2e meting onder DEZELFDE participant_id via de bestaande code
+           (code-terugkeer-mechanisme). Standaard verborgen; JS toont 'm alleen bij < 2
+           metingen (max-2-cap). Bij >= 2 blijft hij weg. -->
+      <a class="again" id="againBtn" href="/event/kiosk/meten/{{ p.meting_code }}" style="display:none">Nieuwe meting →</a>
+      <!-- Slotboodschap bij 2 voltooide metingen (knop weg): JS vult done/failed o.b.v.
+           has_reliable. -->
+      <div class="slotmsg" id="slotMsg" style="display:none"></div>
+      <a class="next" href="/event/kiosk/{{ p.event_code }}">Volgende deelnemer →</a>
+    </div>
+
+    <!-- Reeds-voltooid (deelnemer keert terug terwijl n_metingen >= 2): geen meetscherm,
+         alleen de slotboodschap + rapportlink. -->
+    <div id="phase-capped" class="card" style="display:none">
+      <div class="slotmsg" id="cappedMsg"></div>
+      <a class="report" href="/event/rapport/{{ p.meting_code }}/print" target="_blank" rel="noopener">Bekijk / print rapport →</a>
+      <a class="next" href="/event/kiosk/{{ p.event_code }}">Volgende deelnemer →</a>
+    </div>
+  </div>
+
+  <script src="/static/js/hrv.js?v=8"></script>
+  <script src="/static/js/sensor.js"></script>
+  <script>
+    var MC = {{ p.meting_code|tojson }};
+    var BIRTH_YEAR = {{ p.birth_year or 0 }};
+    var GENDER = {{ (p.gender or 'male')|tojson }};
+    var AGE = BIRTH_YEAR ? (new Date().getFullYear() - BIRTH_YEAR) : 40;
+    var GEN = (GENDER === 'other') ? 'divers' : GENDER;
+    var _durParam = parseInt(new URLSearchParams(window.location.search).get('dur') || '0', 10);
+    var DURATION = (_durParam > 0 && _durParam <= 120) ? _durParam : 90;
+
+    var LANG = (function () {
+      var l = new URLSearchParams(window.location.search).get('lang');
+      return (l === 'de' || l === 'en') ? l : 'nl';
+    })();
+    var CAPPED = {{ 'true' if capped else 'false' }};
+    var HAS_RELIABLE = {{ 'true' if has_reliable else 'false' }};
+
+    // Slotboodschap bij 2 voltooide metingen (max-2-cap; knop is dan weg).
+    //  done   = minstens één geslaagde meting -> definitief resultaat van vandaag.
+    //  failed = beide afgekeurd -> GEEN gezondheidsconclusie; alleen de signaalkwaliteit
+    //           was te laag (koude handen/beweging/sensor). Verwijst naar de begeleider.
+    // NL informeel (je), DE formeel (Sie) — consistent met de bestaande kiosk-strings.
+    var SLOT_MSG = {
+      done: {
+        nl: 'Dit is je resultaat van vandaag. Hiermee is de meetronde afgerond — bedankt voor je deelname.',
+        de: 'Das ist Ihr Ergebnis von heute. Damit ist die Messrunde abgeschlossen — vielen Dank für Ihre Teilnahme.',
+        en: 'This is your result for today. Your measurement round is now complete — thank you for taking part.'
+      },
+      failed: {
+        nl: 'Vandaag lukte het niet om een betrouwbare meting te krijgen. Dat ligt meestal aan koude handen, beweging of de sensor — het zegt niets over jou. Vraag je begeleider om hulp, of probeer het op een rustiger moment opnieuw.',
+        de: 'Heute ließ sich keine zuverlässige Messung erstellen. Das liegt meist an kalten Händen, Bewegung oder dem Sensor — es sagt nichts über Sie aus. Bitte wenden Sie sich an Ihre Begleitung, oder versuchen Sie es in einem ruhigeren Moment noch einmal.',
+        en: "We couldn't get a reliable measurement today. That's usually due to cold hands, movement or the sensor — it doesn't say anything about you. Please ask your facilitator for help, or try again at a calmer moment."
+      }
+    };
+    function slotText(key) {
+      return (SLOT_MSG[key] && (SLOT_MSG[key][LANG] || SLOT_MSG[key].nl)) || '';
+    }
+    function renderSlot(el, hasReliable) {
+      var key = hasReliable ? 'done' : 'failed';
+      el.textContent = slotText(key);
+      el.className = 'slotmsg ' + (hasReliable ? 'slot-done' : 'slot-failed');
+    }
+
+    // Reeds-voltooid bij paginalaad (>=2 metingen): toon alleen de slotboodschap.
+    if (CAPPED) {
+      document.getElementById('phase-subj').style.display = 'none';
+      document.getElementById('phase-measure').style.display = 'none';
+      renderSlot(document.getElementById('cappedMsg'), HAS_RELIABLE);
+      document.getElementById('phase-capped').style.display = 'block';
+    }
+
+    var rrIntervals = [], beatCount = 0, elapsed = 0, timer = null, active = false;
+    var _subjTouched = false;
+
+    // Touched-tracking: de ontspanningsvraag moet BEWUST beantwoord worden. Tot dan toont
+    // het cijfer '—' en blijft 'Start meting' uitgeschakeld. Geen stille default-5.
+    function evSubjTouch() {
+      _subjTouched = true;
+      document.getElementById('evSubjVal').textContent = document.getElementById('evSubjSlider').value;
+      var h = document.getElementById('evSubjHint'); if (h) h.style.display = 'none';
+      document.getElementById('startBtn').disabled = false;
+    }
+
+    function onBeat(rr) {
+      beatCount++;
+      rrIntervals.push(rr);
+      document.getElementById('bpm').textContent = Math.round(60000 / rr);
+      document.getElementById('beats').textContent = beatCount;
+    }
+
+    function startMeasure() {
+      if (active || !_subjTouched) return;
+      active = true;
+      document.getElementById('startBtn').disabled = true;
+      // Annuleer is alleen tijdens het meten beschikbaar (idle = verborgen).
+      document.getElementById('cancelBtn').style.display = 'block';
+      Sensor.startDemo(onBeat, function () {});
+      timer = setInterval(function () {
+        elapsed++;
+        document.getElementById('time').textContent = elapsed;
+        if (elapsed >= DURATION) finishMeasure();
+      }, 1000);
+    }
+
+    // Annuleer: breekt de lopende meting volledig af ZONDER op te slaan. Roept de server NOOIT
+    // aan (geen /api/event/meting/opslaan) -> geen rij in event_metingen, geen spoor, telt niet
+    // tegen de max-2-cap. Reset daarna het meet-scherm naar de begintoestand zodat de deelnemer
+    // direct opnieuw kan meten; het ontspanningscijfer wordt gewist en moet bewust opnieuw worden
+    // gekozen (vers cijfer afgedwongen, net als de allereerste keer).
+    function cancelMeasure() {
+      if (!active) return;
+      active = false;
+      clearInterval(timer);
+      Sensor.stop();
+      // Tellers terug naar nul.
+      rrIntervals = []; beatCount = 0; elapsed = 0;
+      document.getElementById('bpm').textContent = '--';
+      document.getElementById('beats').textContent = '0';
+      document.getElementById('time').textContent = '0';
+      // Annuleer-knop weer verbergen (idle-toestand).
+      document.getElementById('cancelBtn').style.display = 'none';
+      // Ontspanningscijfer wissen: slider terug naar neutrale beginstand, cijfer leeg, hint terug.
+      _subjTouched = false;
+      document.getElementById('evSubjSlider').value = 5;
+      document.getElementById('evSubjVal').textContent = '—';
+      var _h = document.getElementById('evSubjHint'); if (_h) _h.style.display = '';
+      // Start blokkeren tot er opnieuw een vers cijfer is gekozen.
+      document.getElementById('startBtn').disabled = true;
+    }
+
+    function finishMeasure() {
+      if (!active) return;
+      active = false;
+      clearInterval(timer);
+      Sensor.stop();
+      document.getElementById('cancelBtn').style.display = 'none';
+      var rrF = (HRV.filterRR(rrIntervals).filtered) || rrIntervals;
+      var hrv = HRV.calculateHRVPercent(rrF, AGE, GEN);
+      var avgRR = rrIntervals.reduce(function (a, b) { return a + b; }, 0) / (rrIntervals.length || 1);
+      var bpm = Math.round(60000 / avgRR);
+      var rmssd = HRV.calculateRMSSD(rrIntervals);
+      var ri = HRV.lookupRelaxIndex(bpm, hrv);
+      // Event-variant van de kwaliteit-bepaling (minimum-data-gate, blinde-vlek-bescherming):
+      // te weinig RAUWE RR-intervallen (<80, HRV.hasEnoughRR) -> kwaliteit 0 = untrusted, exact
+      // dezelfde behandeling als een slechte sensor (riOut '--' + "— onbetrouwbaar"). NIET universeel:
+      // alleen hier in de event-kiosk; baseline HRV.getMeetKwaliteit blijft ongewijzigd.
+      var kwaliteit = (function () {
+        try {
+          if (!HRV.hasEnoughRR(rrIntervals)) return 0;
+          return HRV.getMeetKwaliteit(rrIntervals);
+        } catch (e) { return 0; }
+      })();
+
+      fetch('/api/event/meting/opslaan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          meting_code: MC, ri: ri, bpm: bpm, hrv: hrv, rmssd: rmssd,
+          beats: beatCount, duration: elapsed, sensor: 'demo',
+          kwaliteit: kwaliteit, rr_intervals: JSON.stringify(rrIntervals),
+          subjectief: _subjTouched ? parseInt(document.getElementById('evSubjSlider').value, 10) : null
+        })
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        if (!j.ok) {
+          if (j.error === 'max_metingen') {
+            alert('Deze deelnemer heeft al 2 metingen — een 3e is niet mogelijk.');
+          } else {
+            alert('Opslaan mislukt: ' + (j.error || 'onbekend'));
+          }
+          return;
+        }
+        document.getElementById('phase-subj').style.display = 'none';
+        document.getElementById('phase-measure').style.display = 'none';
+        document.getElementById('phase-result').style.display = 'block';
+        // Gate-vlaggen (zelfde verhaal als kwadrant.html + de event-PDF): te onregelmatig
+        // (quality_band 'slecht') OF slecht signaal (kwaliteit < 85) -> geen stellige zone/RI tonen.
+        var _slecht = (j.quality_band === 'slecht');
+        var _gated = _slecht || (kwaliteit < 85);
+        // Zone-eerst (robuust tegen de RI-herrekening): label prominent, getal secundair.
+        // Bij 'slecht' geen positief zone-label maar 'Te onregelmatig' (markeren, niet corrigeren).
+        if (_slecht) {
+          document.getElementById('bandOut').textContent = 'Te onregelmatig';
+          document.getElementById('bandOut').style.color = '#c0392b';
+        } else {
+          document.getElementById('bandOut').textContent = HRV.getLabel(ri);
+          document.getElementById('bandOut').style.color = HRV.getColor(ri);
+        }
+        document.getElementById('riOut').textContent = _gated ? '--' : ri.toFixed(1);
+        document.getElementById('riOut').style.color = _gated ? '#999' : HRV.getColor(ri);
+        var q = 'Kwaliteit ' + kwaliteit + '%';
+        if (j.quality_band) q += ' · ' + j.quality_band;
+        if (_gated) q += ' — onbetrouwbaar';
+        document.getElementById('qualOut').textContent = q;
+        // Max-2-cap: "Nieuwe meting" alleen tonen zolang < 2 metingen. Bij >= 2 verdwijnt
+        // de knop en verschijnt de slotboodschap (done/failed o.b.v. has_reliable).
+        var again = document.getElementById('againBtn');
+        var slot = document.getElementById('slotMsg');
+        if (j.n_metingen != null && j.n_metingen >= 2) {
+          if (again) again.style.display = 'none';
+          renderSlot(slot, !!j.has_reliable);
+          slot.style.display = 'block';
+        } else {
+          if (again) again.style.display = 'block';
+          if (slot) slot.style.display = 'none';
+        }
+      }).catch(function (e) { alert('Opslaan mislukt: ' + e); });
+    }
+  </script>
+</body>
+</html>

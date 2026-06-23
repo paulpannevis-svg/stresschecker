@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if lang == 'nl' %}Event Code{% else %}Event Code{% endif %}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 30px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-cancel {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-cancel:hover {
+            background: #e0e0e0;
+        }
+        
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #c33;
+            font-size: 14px;
+        }
+        
+        .info-box {
+            background: #f0f7ff;
+            border: 1px solid #cce7ff;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 13px;
+            color: #0066cc;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{% if lang == 'nl' %}Event Code{% else %}Event Code{% endif %}</h1>
+            <p class="subtitle">
+                {% if lang == 'nl' %}
+                    Voer je event-code in om te starten
+                {% else %}
+                    Enter your event code to begin
+                {% endif %}
+            </p>
+        </div>
+        
+        {% if error %}
+            <div class="error-message">{{ error }}</div>
+        {% endif %}
+        
+        <form method="POST">
+            <div class="form-group">
+                <label for="event_code">
+                    {% if lang == 'nl' %}Event Code{% else %}Event Code{% endif %}
+                </label>
+                <input 
+                    type="text" 
+                    id="event_code" 
+                    name="event_code" 
+                    placeholder="{% if lang == 'nl' %}Bijv. ABC123{% else %}E.g. ABC123{% endif %}"
+                    autofocus
+                    required
+                >
+            </div>
+            
+            <div class="button-group">
+                <button type="submit" class="btn-submit">
+                    {% if lang == 'nl' %}Starten{% else %}Start{% endif %}
+                </button>
+                <button type="button" class="btn-cancel" onclick="window.location.href='{{ url_for(\"welcome\") }}'">
+                    {% if lang == 'nl' %}Annuleren{% else %}Cancel{% endif %}
+                </button>
+            </div>
+        </form>
+        
+        <div class="info-box">
+            {% if lang == 'nl' %}
+                <strong>Geen code?</strong> Vraag deze aan de organisator van het event.
+            {% else %}
+                <strong>No code?</strong> Ask the event organizer for your code.
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
