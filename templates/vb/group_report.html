@@ -82,7 +82,7 @@
           {% if p.reliable %}<td>{{ p.ri }}</td><td>{{ p.zone }}</td>
           {% else %}<td class="un" colspan="2">Onbetrouwbaar (te lage kwaliteit)</td>{% endif %}
           <td>{{ p.tijd }}</td>
-          {% if not pdf %}<td>{% if p.meting_code %}<a class="ipl" href="{{ url_for('event_report_pdf', event_code=ev.event_code, meting_code=p.meting_code) }}" target="_blank" rel="noopener">📄 Bekijk</a>{% endif %}</td>{% endif %}
+          {% if not pdf %}<td>{% if p.meting_code %}<a class="ipl" href="{{ url_for('event_rapport_fullscreen', event_code=ev.event_code, meting_code=p.meting_code) }}" target="_blank" rel="noopener">📄 Bekijk</a>{% endif %}</td>{% endif %}
         </tr>
         {% else %}
         <tr><td colspan="{{ 5 if not pdf else 4 }}" style="text-align:center;color:#999;padding:18px;">Nog geen metingen.</td></tr>

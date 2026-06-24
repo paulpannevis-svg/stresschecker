@@ -4076,6 +4076,13 @@ def event_report_print_shell(event_code, meting_code):
     return render_template('event/rapport_print.html', code=code, event_code=event_code, lang=lang, pdf_url=pdf_url)
 
 
+@app.route('/event/kiosk/<event_code>/rapport/<meting_code>/fullscreen')
+def event_rapport_fullscreen(event_code, meting_code):
+    """Alias: /fullscreen -> de kale PDF-route (event_report_pdf). Geen eigen
+    render/verificatie — de PDF-route doet zelf de gate + 404 bij onbekende code."""
+    return redirect(url_for('event_report_pdf', event_code=event_code, meting_code=meting_code))
+
+
 # Adaptieve na-vragen (Fase 3): chips (V6/V8) + vrije tekst + herstel-gevoel (V7). Auto-save per
 # interactie (zoals /api/set_subjectief). Partiële payloads toegestaan (alleen de gewijzigde velden).
 _ADAPTIEF_CHIPS = {'werkdruk', 'spanning', 'lichamelijk', 'alcohol', 'sport', 'anders'}
