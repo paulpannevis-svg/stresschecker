@@ -28,7 +28,7 @@
       <!-- Expliciete navigatie naar de kiosk-uitslag van DEZELFDE deelnemer (code uit de
            print-URL). NIET history.back(): de wrapper opent in een nieuw tabblad, dus de
            geschiedenis is leeg bij direct openen → dat landde op een lege startpagina. -->
-      <a class="btn btn-back" href="/event/kiosk/meten/{{ code }}">Terug</a>
+      <a class="btn btn-back" href="/event/kiosk/{{ event_code }}/meten/{{ code }}">Terug</a>
       <button class="btn btn-print" id="printBtn" onclick="printReport()" disabled>Print 🖨</button>
     </div>
   </div>

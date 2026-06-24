@@ -991,9 +991,26 @@ SPOOR3_ERROR_MESSAGES = {
 }
 
 
+def _event_org_email(license_key):
+    """Organiser-e-mail bij een event: events.license_key -> licenses.email (saas_licenses.db).
+    None wanneer er geen gekoppelde licentie/mail is (CLI/legacy-event)."""
+    if not license_key:
+        return None
+    _l = get_db()
+    r = _l.execute("SELECT email FROM licenses WHERE license_key=?", (license_key,)).fetchone()
+    _l.close()
+    return r['email'] if r and r['email'] else None
+
+
+def _event_unlocked(event_code):
+    """True zodra de organiser 2FA voltooide voor dit event_code (per-event sessievlag)."""
+    return session.get(f'event_2fa_verified_{event_code}') == True
+
+
 @app.route('/event-code-entry', methods=['GET', 'POST'])
-def event_code_entry():
-    """VB Event kiosk - enter event code"""
+def event_code_request_otp():
+    """Organiser-2FA stap 1: event-code in -> OTP naar de gekoppelde organiser-mail.
+    Behoudt de bestaande bestaan/credits-checks; vervangt de directe kiosk-redirect."""
     _lang = session.get('lang', 'nl')
     
     if request.method == 'POST':
@@ -1011,17 +1028,84 @@ def event_code_entry():
             error = 'Event niet gevonden' if _lang == 'nl' else 'Event not found'
             return render_template('event_code_entry.html', lang=_lang, error=error)
         
-        _pro_db = sqlite3.connect('/opt/stresschecker/data/sc_pro.db')
-        _vb = _pro_db.execute('SELECT credits_available FROM vb_credits WHERE license_key=?', (_event[1],)).fetchone()
-        _pro_db.close()
+        _ldb = get_db()
+        _vb = _ldb.execute("SELECT credits_available FROM licenses WHERE license_key=? AND origin='event'", (_event['license_key'],)).fetchone()
+        _ldb.close()
         
-        if not _vb or _vb[0] <= 0:
+        if not _vb or (_vb['credits_available'] or 0) <= 0:
             error = 'Geen credits beschikbaar' if _lang == 'nl' else 'No credits available'
             return render_template('event_code_entry.html', lang=_lang, error=error)
         
-        return redirect(url_for('event_kiosk_event', event_code=_code))
-    
+        # --- Organiser-2FA: i.p.v. direct de kiosk in, eerst een OTP naar de organiser ---
+        _org = _event_org_email(_event['license_key'])
+        if not _org:
+            error = ('Dit event heeft geen gekoppeld e-mailadres' if _lang == 'nl'
+                     else ('Diesem Event ist keine E-Mail zugeordnet' if _lang == 'de'
+                           else 'No email linked to this event'))
+            return render_template('event_code_entry.html', lang=_lang, error=error)
+        import secrets as _sec, datetime as _dt
+        _otpdb = get_event_db()
+        # Opschonen + rate-limit: max 3 OTP per event per uur. UTC + ISO-'T' (parity password_reset_codes).
+        _otpdb.execute("DELETE FROM event_otp_sessions WHERE expires_at < strftime('%Y-%m-%dT%H:%M:%S','now')")
+        _recent = _otpdb.execute(
+            "SELECT COUNT(*) FROM event_otp_sessions "
+            "WHERE event_code=? AND created_at > strftime('%Y-%m-%dT%H:%M:%S','now','-1 hour')",
+            (_code,)).fetchone()[0]
+        if _recent < 3:
+            _otp = str(_sec.randbelow(1000000)).zfill(6)
+            _now = _dt.datetime.utcnow().isoformat()
+            _exp = (_dt.datetime.utcnow() + _dt.timedelta(minutes=10)).isoformat()
+            _otpdb.execute(
+                "INSERT INTO event_otp_sessions (event_code, organizer_email, otp_code, created_at, expires_at) "
+                "VALUES (?,?,?,?,?)", (_code, _org, _otp, _now, _exp))
+            _otpdb.commit()
+            send_verification_code(_org, _otp, _lang)
+        _otpdb.close()
+        # OTP staat in de DB, niet in de sessie; sessie draagt enkel welk event + naar welk adres.
+        session['event_2fa_code']  = _code
+        session['event_2fa_email'] = _org
+        return redirect(url_for('event_code_verify_otp'))
+
     return render_template('event_code_entry.html', lang=_lang)
+
+
+@app.route('/event-code-verify', methods=['GET', 'POST'])
+def event_code_verify_otp():
+    """Organiser-2FA stap 2: OTP bevestigen -> per-event sessievlag -> kiosk.
+    Max 5 pogingen per OTP (lockout); 10-min geldigheid; eenmalig (verified=1)."""
+    _lang = session.get('lang', 'nl')
+    _code = session.get('event_2fa_code')
+    if not _code:
+        return redirect(url_for('event_code_request_otp'))
+    error = None
+    if request.method == 'POST':
+        _in = request.form.get('code', '').strip()
+        _db = get_event_db()
+        row = _db.execute(
+            "SELECT id, otp_code, attempts FROM event_otp_sessions "
+            "WHERE event_code=? AND verified=0 AND expires_at > strftime('%Y-%m-%dT%H:%M:%S','now') "
+            "ORDER BY id DESC LIMIT 1", (_code,)).fetchone()
+        if not row:
+            _db.close()
+            session.pop('event_2fa_code', None)
+            return redirect(url_for('event_code_request_otp'))
+        _id, _otp, _att = row['id'], row['otp_code'], row['attempts']
+        if _att >= 5:
+            _db.execute("UPDATE event_otp_sessions SET verified=-1 WHERE id=?", (_id,))
+            _db.commit(); _db.close()
+            session.pop('event_2fa_code', None)
+            return redirect(url_for('event_code_request_otp'))
+        if _in == _otp:
+            _db.execute("UPDATE event_otp_sessions SET verified=1 WHERE id=?", (_id,))
+            _db.commit(); _db.close()
+            session[f'event_2fa_verified_{_code}'] = True
+            session.pop('event_2fa_code', None)
+            return redirect(url_for('event_kiosk_event', event_code=_code))
+        _db.execute("UPDATE event_otp_sessions SET attempts=attempts+1 WHERE id=?", (_id,))
+        _db.commit(); _db.close()
+        error = 'Onjuiste code.' if _lang == 'nl' else ('Falscher Code.' if _lang == 'de' else 'Incorrect.')
+    return render_template('event/verify_2fa_event.html', lang=_lang, error=error,
+                           email=session.get('event_2fa_email', ''))
 
 
 @app.route('/licentie')
@@ -3605,13 +3689,16 @@ def api_save_meting():
         import traceback; return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
 
 
-@app.route('/api/event/meting/opslaan', methods=['POST'])
-def api_event_save_meting():
+@app.route('/api/event/<event_code>/meting/opslaan', methods=['POST'])
+def api_event_save_meting(event_code):
     """Event-modus opslag (Fase 2). Schrijft UITSLUITEND naar het aparte sc_event.db
     (event_metingen). Raakt /api/meting/opslaan, metingen of client_metingen NIET aan.
-    Gegate via _event_enabled()."""
+    Gegate via _event_enabled() + organiser-2FA. 403-JSON bij locked (GEEN redirect:
+    dit is een fetch-endpoint, een 302 zou de opslag-JS breken)."""
     if not _event_enabled():
         return jsonify({'error': 'Event-modus niet beschikbaar'}), 404
+    if not _event_unlocked(event_code):
+        return jsonify({'error': 'event_locked'}), 403
     data = request.get_json(silent=True) or {}
     code = (str(data.get('meting_code') or '')).strip().upper()
     if not code:
@@ -3721,13 +3808,13 @@ def api_event_save_meting():
         try:
             _event_lic = db.execute('SELECT license_key FROM events WHERE event_id=?', (part['event_id'],)).fetchone()
             if _event_lic and _event_lic[0]:
-                _pro_db = sqlite3.connect('/opt/stresschecker/data/sc_pro.db')
-                _vb = _pro_db.execute('SELECT credits_available FROM vb_credits WHERE license_key=?', (_event_lic[0],)).fetchone()
-                if _vb and _vb[0] > 0:
-                    _pro_db.execute('UPDATE vb_credits SET credits_available = credits_available - 1 WHERE license_key=?', (_event_lic[0],))
-                    _pro_db.commit()
-                    app.logger.info(f'✅ VB Credit deducted: {_event_lic[0]} now has {_vb[0]-1}')
-                _pro_db.close()
+                _ldb = get_db()
+                _vb = _ldb.execute("SELECT credits_available FROM licenses WHERE license_key=? AND origin='event'", (_event_lic[0],)).fetchone()
+                if _vb and (_vb['credits_available'] or 0) > 0:
+                    _ldb.execute("UPDATE licenses SET credits_available = credits_available - 1 WHERE license_key=? AND origin='event'", (_event_lic[0],))
+                    _ldb.commit()
+                    app.logger.info(f'VB Credit deducted (Model B): {_event_lic[0]} now has {_vb["credits_available"]-1}')
+                _ldb.close()
         except Exception as e:
             app.logger.error(f'VB Credit deduction error: {str(e)}')
         
@@ -3784,6 +3871,8 @@ def event_kiosk_event(event_code):
     db.close()
     if not ev:
         return ('Onbekend event', 404)
+    if not _event_unlocked(event_code):
+        return redirect(url_for('event_code_request_otp'))
     lang = request.args.get('lang', 'nl')
     if lang not in ('nl', 'de', 'en'):
         lang = 'nl'
@@ -3808,6 +3897,9 @@ def event_kiosk_return_participant(event_code):
     if not ev:
         db.close()
         return ('Onbekend event', 404)
+    if not _event_unlocked(event_code):
+        db.close()
+        return redirect(url_for('event_code_request_otp'))
     code = (request.form.get('return_code') or '').strip().upper()
     part = None
     if code:
@@ -3822,7 +3914,7 @@ def event_kiosk_return_participant(event_code):
         # Bekende deelnemer: hergebruik de bestaande code → /api/event/meting/opslaan hangt
         # de nieuwe meting onder dezelfde participant_id (append, 1:N). Naam komt uit het
         # bestaande record (meten.html toont p.name) — wordt niet opnieuw getypt.
-        return redirect(url_for('event_kiosk_meten', meting_code=part['meting_code'], terug=1))
+        return redirect(url_for('event_kiosk_meten', event_code=event_code, meting_code=part['meting_code'], terug=1))
     # Onbekende code: geen koppeling, vriendelijke melding, gewoon door als nieuwe deelnemer.
     return redirect(url_for('event_kiosk_event', event_code=event_code, lang=lang, notfound=1))
 
@@ -3836,6 +3928,9 @@ def event_kiosk_new_participant(event_code):
     if not ev:
         db.close()
         return ('Onbekend event', 404)
+    if not _event_unlocked(event_code):
+        db.close()
+        return redirect(url_for('event_code_request_otp'))
     try:
         by = int(request.form.get('birth_year', '') or 0) or None
     except ValueError:
@@ -3852,13 +3947,15 @@ def event_kiosk_new_participant(event_code):
     )
     db.commit()
     db.close()
-    return redirect(url_for('event_kiosk_meten', meting_code=code))
+    return redirect(url_for('event_kiosk_meten', event_code=event_code, meting_code=code))
 
 
-@app.route('/event/kiosk/meten/<meting_code>')
-def event_kiosk_meten(meting_code):
+@app.route('/event/kiosk/<event_code>/meten/<meting_code>')
+def event_kiosk_meten(event_code, meting_code):
     if not _event_enabled():
         return ('Event-modus niet beschikbaar', 404)
+    if not _event_unlocked(event_code):
+        return redirect(url_for('event_code_request_otp'))
     db = get_event_db()
     row = db.execute(
         "SELECT p.participant_id, p.meting_code, p.birth_year, p.gender, p.name, e.event_code, e.opdrachtgever "
@@ -3868,6 +3965,10 @@ def event_kiosk_meten(meting_code):
     if not row:
         db.close()
         return ('Onbekende meting-code', 404)
+    # Defense-in-depth: de meting_code moet bij het event_code in de URL horen.
+    if str(row['event_code']).upper() != str(event_code).upper():
+        db.close()
+        return redirect(url_for('event_code_request_otp'))
     # Reeds gedane metingen — voedt de max-2-cap-UI: bij >=2 toont de uitslag de
     # slotboodschap (geen meetscherm meer). has_reliable = is er een geslaagde meting
     # (kwaliteit >= 85 EN niet 'slecht'-geclassificeerd; gelijk aan de laatste-geslaagde-wint-
@@ -3889,6 +3990,8 @@ def event_kiosk_wipe_confirm(event_code):
     Wist niets. Gegate via _event_enabled()."""
     if not _event_enabled():
         return ('Event-modus niet beschikbaar', 404)
+    if not _event_unlocked(event_code):
+        return redirect(url_for('event_code_request_otp'))
     db = get_event_db()
     ev = db.execute("SELECT * FROM events WHERE event_code=?", (event_code,)).fetchone()
     if not ev:
@@ -3903,12 +4006,14 @@ def event_kiosk_wipe_confirm(event_code):
                            error=request.args.get('error'))
 
 
-@app.route('/event/kiosk/<event_code>/wissen', methods=['POST'])
+@app.route('/event/kiosk/<event_code>/wissen-uitvoeren', methods=['POST'])
 def event_kiosk_wipe_do(event_code):
     """Voert de wis uit ALLEEN als het getypte confirm_code exact de event_code is.
     Verwijdert deelnemers + metingen van deze meetdag uit sc_event.db; event-hull blijft."""
     if not _event_enabled():
         return ('Event-modus niet beschikbaar', 404)
+    if not _event_unlocked(event_code):
+        return redirect(url_for('event_code_request_otp'))
     db = get_event_db()
     ev = db.execute("SELECT * FROM events WHERE event_code=?", (event_code,)).fetchone()
     if not ev:
@@ -3929,8 +4034,8 @@ def event_kiosk_wipe_do(event_code):
     return render_template('event/wissen_klaar.html', ev=ev, n_part=n_part, n_met=n_met)
 
 
-@app.route('/event/rapport/<meting_code>')
-def event_report_pdf(meting_code):
+@app.route('/event/kiosk/<event_code>/rapport/<meting_code>')
+def event_report_pdf(event_code, meting_code):
     """Toont het individuele momentopname-rapport als PDF in de
     browser. Gegate via _event_enabled(). Genereert on-the-fly uit sc_event.db (read-only)
     via event_report.render_report; ?lang=nl|de|en."""
@@ -3949,8 +4054,8 @@ def event_report_pdf(meting_code):
                     headers={'Content-Disposition': 'inline; filename="%s.pdf"' % info['code']})
 
 
-@app.route('/event/rapport/<meting_code>/print')
-def event_report_print_shell(meting_code):
+@app.route('/event/kiosk/<event_code>/rapport/<meting_code>/print')
+def event_report_print_shell(event_code, meting_code):
     """Dunne print-omhulsel-pagina (variant A). Bedt het BESTAANDE PDF-rapport
     in een same-origin iframe in en toont een Print-knop die de INGEBEDDE PDF print
     (iframe.contentWindow.print()), niet het omhulsel. GEEN tweede renderbron: de iframe wijst
@@ -3967,8 +4072,8 @@ def event_report_print_shell(meting_code):
     db.close()
     if not row:
         return ('Onbekende meting-code', 404)
-    pdf_url = url_for('event_report_pdf', meting_code=code, lang=lang)
-    return render_template('event/rapport_print.html', code=code, lang=lang, pdf_url=pdf_url)
+    pdf_url = url_for('event_report_pdf', event_code=event_code, meting_code=code, lang=lang)
+    return render_template('event/rapport_print.html', code=code, event_code=event_code, lang=lang, pdf_url=pdf_url)
 
 
 # Adaptieve na-vragen (Fase 3): chips (V6/V8) + vrije tekst + herstel-gevoel (V7). Auto-save per
@@ -7632,10 +7737,10 @@ def vb_order_success():
 def _vb_event_license(db, email):
     """Geef de actieve event-licentie (origin='event') voor dit e-mailadres, of None."""
     return db.execute(
-        "SELECT license_key, vb_email, credits_available, tier "
-        "FROM vb_credits WHERE vb_email=? COLLATE NOCASE "
-        "AND credits_available > 0 "
-        "ORDER BY id DESC LIMIT 1",
+        "SELECT license_key, email, credits_available, credits_purchased, vb_tier, product_name "
+        "FROM licenses WHERE email=? COLLATE NOCASE AND origin='event' "
+        "AND status IN ('activated', 'available') "
+        "ORDER BY created_at DESC LIMIT 1",
         (email,)).fetchone()
 
 
@@ -7651,8 +7756,7 @@ def vb_login():
         if not email or not password:
             error = 'Vul e-mail en wachtwoord in.'
         else:
-            db = sqlite3.connect(PRO_DB_PATH)
-            db.row_factory = sqlite3.Row
+            db = get_db()
             user = db.execute(
                 "SELECT id, email, display_name, password_hash FROM users "
                 "WHERE email=? COLLATE NOCASE", (email,)).fetchone()
@@ -7766,11 +7870,10 @@ def vb_dashboard():
     """VB dashboard: credits + (stub) events. Vereist VB-login met event-licentie."""
     if not session.get('vb_user_id'):
         return redirect(url_for('vb_login'))
-    db = sqlite3.connect(PRO_DB_PATH)
-    db.row_factory = sqlite3.Row
+    db = get_db()
     lic = db.execute(
-        "SELECT license_key, vb_email, credits_available, tier "
-        "FROM vb_credits WHERE license_key=?",
+        "SELECT license_key, email, credits_available, vb_tier "
+        "FROM licenses WHERE license_key=? AND origin='event'",
         (session.get('vb_license_key'),)).fetchone()
     db.close()
     if not lic:
@@ -7804,8 +7907,8 @@ def vb_dashboard():
     credits_used = total_metingen
     return render_template('vb/dashboard.html',
                            vb_name=session.get('vb_name'),
-                           vb_email=lic['vb_email'],
-                           tier=(lic['tier'] or '').upper(),
+                           vb_email=lic['email'],
+                           tier=(lic['vb_tier'] or '').upper(),
                            credits_available=credits_available,
                            credits_used=credits_used,
                            events=events,
@@ -7819,11 +7922,10 @@ def vb_create_event():
     if not session.get('vb_user_id'):
         return redirect(url_for('vb_login'))
     license_key = session.get('vb_license_key')
-    db = sqlite3.connect(PRO_DB_PATH)
-    db.row_factory = sqlite3.Row
+    db = get_db()
     lic = db.execute(
-        "SELECT license_key, vb_email FROM vb_credits "
-        "WHERE license_key=?", (license_key,)).fetchone()
+        "SELECT license_key, email FROM licenses "
+        "WHERE license_key=? AND origin='event'", (license_key,)).fetchone()
     db.close()
     if not lic:
         return redirect(url_for('vb_logout'))

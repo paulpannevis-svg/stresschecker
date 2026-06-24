@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{% if lang=="de" %}Verifizierung{% elif lang=="en" %}Verification{% else %}Verificatie{% endif %}{% endblock %}
+{% block content %}
+<div style="max-width:420px;margin:40px auto;padding:0 16px;">
+<div style="background:white;border-radius:14px;padding:28px 24px;box-shadow:0 2px 12px rgba(0,0,0,.08);text-align:center;">
+<div style="font-size:2.5rem;margin-bottom:8px;">&#128231;</div>
+<h2 style="font-size:1.2rem;font-weight:800;color:var(--red);margin:0 0 8px;">
+{% if lang=="de" %}Verifizierung{% elif lang=="en" %}Verification{% else %}Verificatie{% endif %}
+</h2>
+<p style="font-size:.85rem;color:#666;margin:0 0 20px;">
+{% if lang=="de" %}Code gesendet an <strong>{{ email }}</strong>.
+      <span style="display:block;font-size:.78rem;color:#999;margin-top:6px;">Keine E-Mail? Bitte auch den <strong>Spam-Ordner</strong> pr&uuml;fen.</span>
+{% elif lang=="en" %}Code sent to <strong>{{ email }}</strong>.
+      <span style="display:block;font-size:.78rem;color:#999;margin-top:6px;">No email? Please check your <strong>spam folder</strong> too.</span>
+{% else %}Code gestuurd naar <strong>{{ email }}</strong>.
+      <span style="display:block;font-size:.78rem;color:#999;margin-top:6px;">Geen e-mail? Kijk ook even in je <strong>spam</strong>.</span>{% endif %}
+</p>
+{% if error %}<p style="color:var(--red);font-size:.85rem;">{{ error }}</p>{% endif %}
+<form method="POST">
+<input type="text" name="code" inputmode="numeric" maxlength="6" autofocus placeholder="000000" style="width:100%;text-align:center;font-size:2rem;letter-spacing:.5rem;padding:12px;border:2px solid #eee;border-radius:10px;outline:none;font-family:inherit;box-sizing:border-box;">
+<button type="submit" style="width:100%;margin-top:16px;padding:14px;background:var(--red);color:white;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">{% if lang=="de" %}Best&auml;tigen{% elif lang=="en" %}Confirm{% else %}Bevestigen{% endif %}</button>
+</form>
+<a href="{{ url_for('event_code_request_otp') }}" style="display:block;margin-top:16px;font-size:.8rem;color:#aaa;text-decoration:none;">{% if lang=="de" %}Zur&uuml;ck{% elif lang=="en" %}Back{% else %}Terug{% endif %}</a>
+</div>
+</div>
+{% endblock %}
