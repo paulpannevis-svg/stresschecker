@@ -7859,7 +7859,7 @@ def _vb_group_data(edb, event_id):
             unreliable += 1
         if r['ts']:
             ts_list.append(int(r['ts']))
-        parts.append({'name': r['name'] or '—',
+        parts.append({'name': r['name'] or '—', 'meting_code': r['meting_code'],
                       'ri': (f"{float(r['ri']):.1f}" if reliable else None),
                       'zone': analytics.zone_label(zk, 'nl') if zk else None,
                       'reliable': reliable, 'tijd': _vb_fmt_ts(r['ts'])})

@@ -25,6 +25,7 @@
     th,td{padding:9px 13px;text-align:left;font-size:13px;border-bottom:1px solid #f0ece6}
     th{background:#faf8f4;color:#888;text-transform:uppercase;font-size:10px;letter-spacing:.05em}
     .un{color:#b06a1f}
+    a.ipl{display:inline-block;padding:5px 10px;border-radius:6px;background:#E84C5C;color:#fff;text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap}
     .btns{margin:18px 0;display:flex;gap:10px}
     .btns a{padding:10px 16px;border-radius:8px;background:#E84C5C;color:#fff;text-decoration:none;font-size:13px;font-weight:600}
     .btns a.sec{background:#fff;color:#555;border:1px solid #d8d2c7}
@@ -73,7 +74,7 @@
 
     <h2 style="font-size:14px;color:#555;">Deelnemers</h2>
     <table>
-      <thead><tr><th>Deelnemer</th><th>Relax Index</th><th>Zone</th><th>Tijdstip</th></tr></thead>
+      <thead><tr><th>Deelnemer</th><th>Relax Index</th><th>Zone</th><th>Tijdstip</th>{% if not pdf %}<th>Infopagina</th>{% endif %}</tr></thead>
       <tbody>
         {% for p in d.parts %}
         <tr>
@@ -81,9 +82,10 @@
           {% if p.reliable %}<td>{{ p.ri }}</td><td>{{ p.zone }}</td>
           {% else %}<td class="un" colspan="2">Onbetrouwbaar (te lage kwaliteit)</td>{% endif %}
           <td>{{ p.tijd }}</td>
+          {% if not pdf %}<td>{% if p.meting_code %}<a class="ipl" href="{{ url_for('event_report_pdf', event_code=ev.event_code, meting_code=p.meting_code) }}" target="_blank" rel="noopener">📄 Bekijk</a>{% endif %}</td>{% endif %}
         </tr>
         {% else %}
-        <tr><td colspan="4" style="text-align:center;color:#999;padding:18px;">Nog geen metingen.</td></tr>
+        <tr><td colspan="{{ 5 if not pdf else 4 }}" style="text-align:center;color:#999;padding:18px;">Nog geen metingen.</td></tr>
         {% endfor %}
       </tbody>
     </table>
