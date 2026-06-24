@@ -36,7 +36,7 @@
         <b>{{ n_met }}</b> meting(en) van deze meetdag definitief te wissen.
         De meetdag zelf ({{ ev.event_code }}) blijft bestaan.
       </div>
-      <form method="POST" action="/event/kiosk/{{ ev.event_code }}/wissen">
+      <form method="POST" action="/event/kiosk/{{ ev.event_code }}/wissen-uitvoeren">
         <label for="confirm_code">Typ ter bevestiging de event-code <code>{{ ev.event_code }}</code></label>
         <input type="text" id="confirm_code" name="confirm_code" autocomplete="off"
                placeholder="{{ ev.event_code }}" required>
