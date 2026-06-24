@@ -63,6 +63,8 @@
     .note { background: #f7f7f9; border-radius: 9px; padding: 9px 13px; font-size: 9.5pt; color: #444; margin: 0 0 6px; }
     .unreliable { background: #fdecea; border: 1px solid #f5c6c2; color: #8a1c12; border-radius: 9px;
                   padding: 10px 14px; font-size: 10pt; margin: 4px 0 12px; }
+    .hrv-warning { background: #fff4e5; border: 1px solid #f5d9a8; color: #8a5a12; border-radius: 9px;
+                  padding: 10px 14px; font-size: 10pt; margin: 8px 0 12px; }
     .foot { color: #999; font-size: 8.5pt; margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px; }
     /* zone-achtergrondpalet, identiek aan reports/base.html */
     .zone-bg-zwaar_belast { background: #c0392b; color: #fff; }
@@ -129,6 +131,11 @@
       </div>
       <div class="v q">{{ p.kwaliteit if p.kwaliteit is not none else '–' }}%</div></div>
   </div>
+
+  {# Waarschuwing bij verdacht hoge HRV% (> HRV_PCT_MAX_TRUSTED): meetkwaliteit afgetopt op ★★. #}
+  {% if stars.hrv_warning %}
+  <div class="hrv-warning">⚠ {{ t.hrv_warning }}</div>
+  {% endif %}
 
   {# Gauge (RI-schaal) + tweeassig kwadrant NAAST elkaar — bespaart hoogte zodat alles op
      één A4 past. Beide statische SVG-reproducties van /kwadrant; geen JS, geen nieuwe berekening. #}

@@ -27,6 +27,10 @@ from datetime import datetime
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DB = '/opt/stresschecker/data/sc_event.db'
 RELIABLE_MIN = 85  # zelfde drempel als de bestaande meetweergave
+# Boven deze HRV% is het signaal vrijwel altijd vertekend: ectopische slagen of
+# bewegingsartefacten blazen RMSSD (en daarmee de HRV%) kunstmatig op. Zo'n meting mag
+# nooit als volledig betrouwbaar (★★★) gepresenteerd worden → aftoppen op ★★ + waarschuwing.
+HRV_PCT_MAX_TRUSTED = 180
 
 sys.path.insert(0, PROJECT_ROOT)
 import analytics  # noqa: E402  (pure module — geen side-effects)
@@ -50,6 +54,9 @@ T = {
                                 'Dat zegt niets over jou — vaak komt het door koude handen, beweging of de sensor.',
         'unreliable_completed': 'Vandaag lukte geen betrouwbare meting. Vraag je begeleider om hulp.',
         'gauge_cap_unreliable': 'Richtwaarde',
+        'hrv_warning': 'De gemeten HRV% is uitzonderlijk hoog. Dit duidt meestal op een vertekend '
+                       'signaal (bv. onregelmatige slagen of beweging). De meetkwaliteit is daarom '
+                       'afgetopt op ★★; beschouw dit resultaat met voorbehoud.',
         'method': 'De Relax Index (RI, 0–10) is berekend uit één meting van hartslag en '
                   'hartritmevariabiliteit (HRV/RMSSD) van het autonome zenuwstelsel, '
                   'genormaliseerd naar leeftijd en geslacht. Dit is een momentopname, geen verloop.',
@@ -73,6 +80,9 @@ T = {
                                 'Das sagt nichts über Sie aus — oft liegt es an kalten Händen, Bewegung oder dem Sensor.',
         'unreliable_completed': 'Heute war keine zuverlässige Messung möglich. Bitte wenden Sie sich an Ihre Begleitung.',
         'gauge_cap_unreliable': 'Richtwert',
+        'hrv_warning': 'Die gemessene HRV% ist außergewöhnlich hoch. Das deutet meist auf ein '
+                       'verzerrtes Signal hin (z. B. unregelmäßige Schläge oder Bewegung). Die '
+                       'Messqualität wurde daher auf ★★ begrenzt; bitte mit Vorbehalt betrachten.',
         'method': 'Der Relax Index (RI, 0–10) wird aus einer Messung von Herzfrequenz und '
                   'Herzratenvariabilität (HRV/RMSSD) des autonomen Nervensystems berechnet, '
                   'normiert nach Alter und Geschlecht. Dies ist eine Momentaufnahme, kein Verlauf.',
@@ -96,6 +106,9 @@ T = {
                                 "That doesn't say anything about you — it's often due to cold hands, movement or the sensor.",
         'unreliable_completed': 'No reliable measurement was possible today. Please ask your facilitator for help.',
         'gauge_cap_unreliable': 'Estimate',
+        'hrv_warning': 'The measured HRV% is exceptionally high. This usually indicates a distorted '
+                       'signal (e.g. irregular beats or movement). Measurement quality has therefore '
+                       'been capped at ★★; please treat this result with caution.',
         'method': 'The Relax Index (RI, 0–10) is calculated from a single measurement of heart rate '
                   'and heart rate variability (HRV/RMSSD) of the autonomic nervous system, '
                   'normalized by age and gender. This is a snapshot, not a trend.',
@@ -202,21 +215,36 @@ def gevoel_meting(subjectief, ri, reliable, lang, irregular=False):
     }
 
 
-def quality_stars(kwaliteit):
+def quality_stars(kwaliteit, hrv_pct=None):
     """Meetkwaliteit → sterren (max 3). Grenzen = riConfidence (85/70), consistent met de
     afkeurlijn (<85). Presentatie-only, GEEN nieuwe berekening:
-      >=85 → ★★★ (trusted) · 70-84 → ★★ (limited) · <70 → ★ (untrusted) · ontbrekend → geen rating."""
+      >=85 → ★★★ (trusted) · 70-84 → ★★ (limited) · <70 → ★ (untrusted) · ontbrekend → geen rating.
+    Extra borg: een extreem hoge HRV% (> HRV_PCT_MAX_TRUSTED) duidt vrijwel altijd op een
+    vertekend signaal; dan nooit ★★★ toekennen → aftoppen op ★★ + 'hrv_warning' zetten zodat
+    het rapport een waarschuwing kan tonen. Verandert de RI/HRV-berekening niet."""
     try:
         kw = float(kwaliteit) if kwaliteit not in (None, '') else None
     except (TypeError, ValueError):
         kw = None
+    try:
+        hrv = float(hrv_pct) if hrv_pct not in (None, '') else None
+    except (TypeError, ValueError):
+        hrv = None
     if kw is None:
-        return {'filled': 0, 'total': 3, 'tier': 'onbepaald', 'rated': False}
+        return {'filled': 0, 'total': 3, 'tier': 'onbepaald', 'rated': False, 'hrv_warning': False}
     if kw >= 85:
-        return {'filled': 3, 'total': 3, 'tier': 'trusted', 'rated': True}
-    if kw >= 70:
-        return {'filled': 2, 'total': 3, 'tier': 'limited', 'rated': True}
-    return {'filled': 1, 'total': 3, 'tier': 'untrusted', 'rated': True}
+        res = {'filled': 3, 'total': 3, 'tier': 'trusted', 'rated': True, 'hrv_warning': False}
+    elif kw >= 70:
+        res = {'filled': 2, 'total': 3, 'tier': 'limited', 'rated': True, 'hrv_warning': False}
+    else:
+        res = {'filled': 1, 'total': 3, 'tier': 'untrusted', 'rated': True, 'hrv_warning': False}
+    # Aftoppen op ★★ (downgrade) bij verdacht hoge HRV% — nooit opwaarderen.
+    if hrv is not None and hrv > HRV_PCT_MAX_TRUSTED:
+        res['filled'] = min(res['filled'], 2)
+        if res['filled'] == 2:
+            res['tier'] = 'limited'
+        res['hrv_warning'] = True
+    return res
 
 
 def build_gauge(ri, reliable):
@@ -343,7 +371,7 @@ def render_report(meting_code, lang='nl'):
         reliable=reliable, completed=completed, ri_str=ri_str, age=age, gender_label=gender_label,
         measured_at_str=measured_at_str,
         gauge=build_gauge(p['ri'], reliable), gauge_heading=GAUGE_HEADING[lang],
-        stars=quality_stars(p['kwaliteit']),
+        stars=quality_stars(p['kwaliteit'], p['hrv_pct']),
         gm=gevoel_meting(p['subjectief_score'], p['ri'], reliable, lang,
                          irregular=((p['quality_band'] or '') == 'slecht')),
         quad=__import__('event_quadrant').build_quadrant(
