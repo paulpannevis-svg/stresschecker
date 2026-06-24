@@ -10,7 +10,8 @@ Hergebruikt de bestaande, bewezen logica:
 Leest UITSLUITEND sc_event.db (read-only). Importeert app.py NIET (geen schema-side-effect).
 Raakt de bestaande consument-/Pro-rapportage niet aan (eigen template + eigen CLI).
 
-Veiligheid: SC_EVENT_DB default = staging; weigert een live-DB-pad.
+DB-pad: SC_EVENT_DB (env) of anders de prod-default — identiek aan app.py's EVENT_DB_PATH.
+Event-modus draait sinds 2026-06-23 live op prod; de eerdere staging-only-grendel is vervallen.
 
 Gebruik:
     python3 event_report.py --meting-code M-50B004
@@ -24,8 +25,7 @@ import sys
 from datetime import datetime
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_DB = '/opt/stresschecker-staging/data/sc_event.db'
-_LIVE_PREFIXES = ('/opt/stresschecker/data/', '/opt/ic-license-server/data/')
+DEFAULT_DB = '/opt/stresschecker/data/sc_event.db'
 RELIABLE_MIN = 85  # zelfde drempel als de bestaande meetweergave
 
 sys.path.insert(0, PROJECT_ROOT)
@@ -250,10 +250,10 @@ def build_gauge(ri, reliable):
 
 
 def _db_path():
-    path = os.environ.get('SC_EVENT_DB', DEFAULT_DB)
-    if any(path.startswith(p) for p in _LIVE_PREFIXES):
-        sys.exit(f'WEIGERT live-pad voor event-DB: {path!r} (Fase 3 = staging-only).')
-    return path
+    # SC_EVENT_DB (staging zet dit in .env.staging) of anders de prod-default —
+    # zelfde resolutie als app.py's EVENT_DB_PATH. Event-modus is live op prod, dus
+    # het live-DB-pad is hier nu juist gewenst (geen staging-only-grendel meer).
+    return os.environ.get('SC_EVENT_DB', DEFAULT_DB)
 
 
 def render_report(meting_code, lang='nl'):

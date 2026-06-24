@@ -263,7 +263,10 @@
         document.getElementById('riOut').textContent = _gated ? '--' : ri.toFixed(1);
         document.getElementById('riOut').style.color = _gated ? '#999' : HRV.getColor(ri);
         var q = 'Kwaliteit ' + kwaliteit + '%';
-        if (j.quality_band) q += ' · ' + j.quality_band;
+        // quality_band (ritme-regelmaat: goed/matig/slecht) ALLEEN tonen bij een betrouwbaar
+        // signaal. Bij _gated (kwaliteit < 85 of 'slecht') is een positief "· goed" naast
+        // "Kwaliteit 0%" tegenstrijdig — dan alleen het onbetrouwbaar-voorbehoud.
+        if (j.quality_band && !_gated) q += ' · ' + j.quality_band;
         if (_gated) q += ' — onbetrouwbaar';
         document.getElementById('qualOut').textContent = q;
         // Max-2-cap: "Nieuwe meting" alleen tonen zolang < 2 metingen. Bij >= 2 verdwijnt
