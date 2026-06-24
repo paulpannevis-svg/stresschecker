@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid mt-5 mb-5">
+
+  <!-- Back button -->
+  <div class="mb-4">
+    <a href="{{ url_for('vb_group_report', event_code=event_code) }}" class="btn btn-outline-secondary">
+      ← Terug naar groepsrapport
+    </a>
+  </div>
+
+  <!-- Report header -->
+  <div style="border-bottom: 2px solid #333; padding-bottom: 1.5rem; margin-bottom: 2rem;">
+    <h1 style="margin: 0; color: #333;">Persoonlijk meetrapport</h1>
+    <p style="margin: 0.5rem 0 0 0; color: #d32f2f; font-size: 1.1rem; font-weight: bold;">{{ meting_code }}</p>
+    <p style="margin: 0.5rem 0 0 0; color: #666; font-size: 0.9rem;">{{ participant_name }} • {{ event_name }}</p>
+  </div>
+
+  {% if not reliable %}
+  <!-- Lage signaalkwaliteit: uitslag indicatief, geen stellige conclusie -->
+  <div style="background: #fdecea; border: 1px solid #f5c6c2; color: #8a1c12; padding: 1rem 1.25rem; border-radius: 6px; margin-bottom: 2rem;">
+    <strong>Let op — meting onbetrouwbaar.</strong> De signaalkwaliteit was te laag ({{ quality_percentage }}%)
+    voor een betrouwbaar resultaat. De zone hieronder is slechts indicatief; overweeg een nieuwe, rustige meting.
+  </div>
+  {% endif %}
+
+  <!-- Main layout: Gauge + Kwadrant side-by-side -->
+  <div class="row mb-4">
+
+    <!-- LEFT: Gauge -->
+    <div class="col-lg-6 mb-4">
+      <div style="text-align: center; padding: 2rem; background: #f9f9f9; border-radius: 8px;">
+        <h3 style="margin-bottom: 1.5rem; color: #333;">Relax Index</h3>
+
+        <svg width="280" height="180" viewBox="0 0 280 180" xmlns="http://www.w3.org/2000/svg" style="margin: 0 auto; display: block;">
+          <circle cx="140" cy="140" r="100" fill="none" stroke="#e0e0e0" stroke-width="20" stroke-dasharray="314.159" stroke-dashoffset="157.08"/>
+          <circle cx="140" cy="140" r="100" fill="none" stroke="{{ zone_color }}" stroke-width="20"
+                  stroke-dasharray="{% if relax_index == 1 %}31.416{% elif relax_index == 2 %}62.832{% elif relax_index == 3 %}94.248{% elif relax_index == 4 %}125.664{% else %}157.08{% endif %}"
+                  stroke-dashoffset="0" stroke-linecap="round"/>
+          <text x="50" y="160" font-size="12" fill="#666">1</text>
+          <text x="230" y="160" font-size="12" fill="#666">5</text>
+          <text x="140" y="80" font-size="48" font-weight="bold" fill="{{ zone_color }}" text-anchor="middle">{{ relax_index }}</text>
+          <text x="140" y="110" font-size="14" fill="#333" text-anchor="middle" font-weight="600">{{ zone }}</text>
+        </svg>
+
+        <p style="margin-top: 1.5rem; color: #666; font-size: 0.95rem;">
+          <strong>Score: {{ relax_index }}/5</strong>
+        </p>
+      </div>
+    </div>
+
+    <!-- RIGHT: Kwadrant + Stats -->
+    <div class="col-lg-6 mb-4">
+      <div style="padding: 2rem; background: #f9f9f9; border-radius: 8px;">
+        <h3 style="margin-bottom: 1.5rem; color: #333;">Biofeedback Gegevens</h3>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;">
+          <div style="text-align: center; padding: 1rem; background: white; border-radius: 6px; border: 1px solid #ddd;">
+            <h6 style="margin: 0; color: #999; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">BPM</h6>
+            <p style="margin: 0.5rem 0 0 0; font-size: 1.8rem; font-weight: bold; color: #d32f2f;">{{ bpm }}</p>
+            <p style="margin: 0; color: #999; font-size: 0.8rem;">slagen/minuut</p>
+          </div>
+
+          <div style="text-align: center; padding: 1rem; background: white; border-radius: 6px; border: 1px solid #ddd;">
+            <h6 style="margin: 0; color: #999; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">RMSSD</h6>
+            <p style="margin: 0.5rem 0 0 0; font-size: 1.8rem; font-weight: bold; color: #4caf50;">{{ rmssd }}</p>
+            <p style="margin: 0; color: #999; font-size: 0.8rem;">hartritme-variabiliteit</p>
+          </div>
+        </div>
+
+        <div style="text-align: center; padding: 1rem; background: white; border-radius: 6px; border: 1px solid #ddd;">
+          <h6 style="margin: 0; color: #999; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">KWALITEIT</h6>
+          <p style="margin: 0.5rem 0 0 0; font-size: 1.8rem; font-weight: bold; color: #d32f2f;">{{ quality_percentage }}%</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interpretation section -->
+  <div style="background: #f0f7ff; padding: 2rem; border-left: 4px solid #1976d2; border-radius: 6px; margin-bottom: 2rem;">
+    <h3 style="margin-top: 0; color: #1976d2;">Interpretatie</h3>
+
+    {% if relax_index == 1 %}
+      <p>Je ervaart momenteel <strong>zware belasting</strong>. Je lichaam en geest hebben behoefte aan rust en herstel. Zorg voor voldoende slaap, rustmomenten en activiteiten die je ontspannen.</p>
+    {% elif relax_index == 2 %}
+      <p>Je bent <strong>belast</strong>. Hoewel je nog functioneert, zou je jezelf meer ontspanning en beweging kunnen gunnen. Probeer diep in te ademen en activiteiten in te plannen die je opvrolijken.</p>
+    {% elif relax_index == 3 %}
+      <p>Je ervaart <strong>lichte belasting</strong>. Alles staat onder controle, maar blijf alert op signalen van je lichaam. Doe regelmatig iets wat je plezier geeft.</p>
+    {% elif relax_index == 4 %}
+      <p>Je bent in <strong>balans</strong>. Je lichaam en geest werken goed samen. Behoud deze balans door gezond gedrag vol te houden.</p>
+    {% elif relax_index == 5 %}
+      <p>Je bent <strong>veerkrachtig</strong>. Je vertoont uitstekende signalen van weerbaarheid. Dit is de staat waarin je optimaal kunt presteren en jezelf verder kunt ontwikkelen.</p>
+    {% endif %}
+  </div>
+
+  <!-- Print/Download button -->
+  <div style="text-align: center; margin-bottom: 3rem;">
+    <button onclick="window.print()" class="btn btn-primary btn-lg">
+      📄 Download / Print als PDF
+    </button>
+  </div>
+
+</div>
+
+<!-- Print styles -->
+<style media="print">
+  header, .app-header { display: none !important; }
+  body { margin: 0; padding: 10mm; background: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .btn, a.btn { display: none !important; }
+  .container-fluid { padding: 0; max-width: 100%; }
+  @page { margin: 10mm; size: A4; }
+</style>
+
+{% endblock %}

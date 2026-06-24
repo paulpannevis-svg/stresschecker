@@ -4083,6 +4083,52 @@ def event_rapport_fullscreen(event_code, meting_code):
     return redirect(url_for('event_report_pdf', event_code=event_code, meting_code=meting_code))
 
 
+@app.route('/event/kiosk/<event_code>/deelnemer/<meting_code>')
+def event_deelnemer_infopagina(event_code, meting_code):
+    """On-screen deelnemer-infopagina (kaart-layout: gauge + biofeedback + duiding).
+    Gegate via _event_enabled(). Data uit sc_event.db; zone STRIKT via de canonieke
+    analytics.zone_for_ri op de echte RI (0-10), niet uit een 1-5-kolom. De 1-5 gauge-index
+    is afgeleid van die zone (zone-eerst), zodat duiding en kleur kloppen. Reliable-wins-
+    selectie identiek aan de PDF en het groepsrapport."""
+    if not _event_enabled():
+        return ('Event-modus niet beschikbaar', 404)
+    import analytics
+    code = (meting_code or '').strip().upper()
+    db = get_event_db()
+    row = db.execute(
+        "SELECT p.name, p.meting_code, e.event_code, e.naam AS event_naam, "
+        "       m.ri, m.bpm, m.rmssd, m.kwaliteit, m.quality_band "
+        "FROM event_participants p "
+        "JOIN events e ON e.event_id = p.event_id "
+        "LEFT JOIN event_metingen m ON m.id = ("
+        "  SELECT m2.id FROM event_metingen m2 WHERE m2.participant_id = p.participant_id "
+        "  ORDER BY CASE WHEN m2.kwaliteit IS NOT NULL AND m2.kwaliteit >= 85 "
+        "    AND (m2.quality_band IS NULL OR m2.quality_band <> 'slecht') THEN 1 ELSE 0 END DESC, "
+        "    m2.ts DESC, m2.id DESC LIMIT 1) "
+        "WHERE p.meting_code = ?", (code,)).fetchone()
+    db.close()
+    if not row or row['ri'] is None:
+        return ('Onbekende meting-code', 404)
+    zone_key = analytics.zone_for_ri(row['ri'])
+    zone_label = analytics.zone_label(zone_key, 'nl')
+    # zone_key -> 1-5 index (zone-eerst) + canoniek zonekleurpalet (gelijk aan het PDF-rapport).
+    _ZIDX = {'zwaar_belast': 1, 'belast': 2, 'licht_belast': 3, 'in_balans': 4, 'veerkrachtig': 5}
+    _ZCOL = {'zwaar_belast': '#c0392b', 'belast': '#e67e22', 'licht_belast': '#f1c40f',
+             'in_balans': '#6fcf7a', 'veerkrachtig': '#27ae60'}
+    reliable = (row['kwaliteit'] is not None and row['kwaliteit'] >= 85
+                and (row['quality_band'] or '') != 'slecht')
+    return render_template(
+        'event/deelnemer_infopagina.html',
+        event_code=event_code, meting_code=code,
+        participant_name=row['name'] or '—', event_name=row['event_naam'] or '',
+        relax_index=_ZIDX.get(zone_key, 3), zone=zone_label,
+        zone_color=_ZCOL.get(zone_key, '#999'),
+        quality_percentage=int(row['kwaliteit'] or 0),
+        bpm=(row['bpm'] if row['bpm'] is not None else '–'),
+        rmssd=(round(row['rmssd'], 1) if row['rmssd'] is not None else '–'),
+        reliable=reliable, lang='nl')
+
+
 # Adaptieve na-vragen (Fase 3): chips (V6/V8) + vrije tekst + herstel-gevoel (V7). Auto-save per
 # interactie (zoals /api/set_subjectief). Partiële payloads toegestaan (alleen de gewijzigde velden).
 _ADAPTIEF_CHIPS = {'werkdruk', 'spanning', 'lichamelijk', 'alcohol', 'sport', 'anders'}
