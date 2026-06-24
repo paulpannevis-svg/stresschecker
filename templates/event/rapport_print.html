@@ -6,16 +6,16 @@
   <title>Print — {{ code }}</title>
   <style>
     html,body{margin:0;height:100%;font-family:system-ui,-apple-system,sans-serif;background:#525659}
-    .bar{position:fixed;top:0;left:0;right:0;height:56px;background:#2c3e63;display:flex;align-items:center;
-         justify-content:space-between;padding:0 14px;box-sizing:border-box;z-index:2}
-    .bar .ttl{color:#fff;font-weight:700;font-size:.95rem;letter-spacing:.3px}
+    .bar{position:fixed;top:0;left:0;right:0;height:40px;background:#2c3e63;display:flex;align-items:center;
+         justify-content:space-between;padding:0 12px;box-sizing:border-box;z-index:2}
+    .bar .ttl{color:#fff;font-weight:700;font-size:.85rem;letter-spacing:.3px}
     .bar .actions{display:flex;gap:8px}
-    .btn{padding:.6rem 1.1rem;border:none;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;
+    .btn{padding:.3rem .85rem;border:none;border-radius:8px;font-size:.85rem;font-weight:700;cursor:pointer;
          text-decoration:none;display:inline-block;box-sizing:border-box}
     .btn-print{background:#fff;color:#2c3e63}
     .btn-print:disabled{opacity:.5;cursor:default}
     .btn-back{background:transparent;color:#fff;border:1.5px solid #fff}
-    iframe{position:fixed;top:56px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 56px);border:0;background:#fff}
+    iframe{position:fixed;top:40px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 40px);border:0;background:#fff}
     /* Mocht iemand Ctrl+P op het OMHULSEL doen: verberg de balk zodat alleen het rapport print.
        De Print-knop zelf gebruikt contentWindow.print() en print sowieso enkel de PDF. */
     @media print { .bar{display:none} iframe{top:0;height:100%} }
