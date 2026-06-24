@@ -7767,12 +7767,19 @@ def vb_login():
                     lic = _vb_event_license(db, email)
             db.close()
             if user and lic:
-                session['vb_user_id'] = user['id']
-                session['vb_email'] = user['email']
-                session['vb_name'] = user['display_name'] or user['email']
-                session['vb_license_key'] = lic['license_key']
-                return redirect(url_for('vb_dashboard'))
-            error = 'Onzuiste inloggegevens of geen event-licentie gevonden.'
+                # Wachtwoord OK + geldige event-licentie -> 2FA-stap (e-mail-OTP), nog GEEN vb-sessie.
+                import time as _t, random as _r
+                _code = str(_r.SystemRandom().randrange(100000, 1000000))
+                session['vb_2fa_code']        = _code
+                session['vb_2fa_expires']     = _t.time() + 600        # 10 min
+                session['vb_2fa_attempts']    = 0
+                session['vb_2fa_uid']         = user['id']
+                session['vb_2fa_email']       = user['email']
+                session['vb_2fa_name']        = user['display_name'] or user['email']
+                session['vb_2fa_license_key'] = lic['license_key']
+                send_verification_code(user['email'], _code, 'nl')
+                return redirect(url_for('vb_verify_2fa'))
+            error = 'Onjuiste inloggegevens of geen event-licentie gevonden.'
     return render_template('vb/login.html', error=error)
 
 @app.route('/vb/logout')
@@ -7780,6 +7787,38 @@ def vb_logout():
     for k in ('vb_user_id', 'vb_email', 'vb_name', 'vb_license_key'):
         session.pop(k, None)
     return redirect(url_for('vb_login'))
+
+
+@app.route('/vb/verify_2fa', methods=['GET', 'POST'])
+def vb_verify_2fa():
+    """VB-organiser 2FA: e-mail-OTP bevestigen -> vb-sessie -> /vb/dashboard.
+    OTP leeft in de sessie (zoals consumer /verify_2fa); 10 min, max-5-pogingen-lockout.
+    Bij succes worden de echte vb_*-keys gezet (die dashboard/logout/create-event lezen)."""
+    import time as _t
+    if 'vb_2fa_code' not in session:
+        return redirect(url_for('vb_login'))
+    error = None
+    if request.method == 'POST':
+        if _t.time() > session.get('vb_2fa_expires', 0):
+            for _k in ('vb_2fa_code', 'vb_2fa_expires', 'vb_2fa_attempts',
+                       'vb_2fa_uid', 'vb_2fa_email', 'vb_2fa_name', 'vb_2fa_license_key'):
+                session.pop(_k, None)
+            return redirect(url_for('vb_login'))
+        session['vb_2fa_attempts'] = session.get('vb_2fa_attempts', 0) + 1
+        if session['vb_2fa_attempts'] > 5:
+            session.pop('vb_2fa_code', None)
+            return redirect(url_for('vb_login'))
+        if request.form.get('code', '').strip() == session['vb_2fa_code']:
+            session['vb_user_id']     = session.pop('vb_2fa_uid')
+            session['vb_email']       = session.pop('vb_2fa_email')
+            session['vb_name']        = session.pop('vb_2fa_name')
+            session['vb_license_key'] = session.pop('vb_2fa_license_key')
+            for _k in ('vb_2fa_code', 'vb_2fa_expires', 'vb_2fa_attempts'):
+                session.pop(_k, None)
+            return redirect(url_for('vb_dashboard'))
+        error = 'Onjuiste code.'
+    return render_template('vb/verify_2fa.html', lang='nl', error=error,
+                           email=session.get('vb_2fa_email', ''))
 
 
 def _vb_fmt_ts(ts):
