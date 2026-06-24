@@ -30,7 +30,7 @@ RELIABLE_MIN = 85  # zelfde drempel als de bestaande meetweergave
 # Boven deze HRV% is het signaal vrijwel altijd vertekend: ectopische slagen of
 # bewegingsartefacten blazen RMSSD (en daarmee de HRV%) kunstmatig op. Zo'n meting mag
 # nooit als volledig betrouwbaar (★★★) gepresenteerd worden → aftoppen op ★★ + waarschuwing.
-HRV_PCT_MAX_TRUSTED = 180
+HRV_PCT_MAX_TRUSTED = 160
 
 sys.path.insert(0, PROJECT_ROOT)
 import analytics  # noqa: E402  (pure module — geen side-effects)
