@@ -2340,6 +2340,49 @@ def verloop():
     return render_template('verloop.html', lang=session.get('lang','nl'))
 
 
+def _row_irregular(row):
+    """irrflag-helper: de aritmie-/onregelmatigheidsgate (analytics.row_is_irregular)
+    is op prod BEWUST afwezig (embargo, alleen staging). Val dan veilig terug op False
+    i.p.v. een AttributeError. Zelfde defensieve getattr-idioom als quality_classify."""
+    fn = getattr(__import__('analytics'), 'row_is_irregular', None)
+    try:
+        return bool(fn(row)) if fn else False
+    except Exception:
+        return False
+
+
+def _rr_irregular(rr):
+    """Zelfde embargo als [[_row_irregular]] voor de zuster-gate analytics.rr_irregular
+    (6 call-sites, telkens als boolean filter). Afwezig op prod → niets als onregelmatig
+    markeren (False), zodat de schone-RR-filters gewoon álle metingen meenemen."""
+    fn = getattr(__import__('analytics'), 'rr_irregular', None)
+    try:
+        return bool(fn(rr)) if fn else False
+    except Exception:
+        return False
+
+
+def _prediction_outcome(*args, **kwargs):
+    """Fase-1 voorspelvraag-terugkoppeling (analytics.prediction_outcome) is op prod
+    afwezig → lever het verwachte 2-tuple (None, None) zodat de uitpak-call niet breekt
+    en er simpelweg geen voorspel-feedback verschijnt."""
+    fn = getattr(__import__('analytics'), 'prediction_outcome', None)
+    try:
+        return fn(*args, **kwargs) if fn else (None, None)
+    except Exception:
+        return (None, None)
+
+
+def _adaptive_state(*args, **kwargs):
+    """Fase-3 adaptieve-status (analytics.adaptive_state) is op prod afwezig → None
+    (geen adaptieve na-vraagstatus); zelfde dormant-gedrag als de andere staging-features."""
+    fn = getattr(__import__('analytics'), 'adaptive_state', None)
+    try:
+        return fn(*args, **kwargs) if fn else None
+    except Exception:
+        return None
+
+
 @app.route('/mijn-metingen')
 def mijn_metingen():
     user_key = session.get('user_key','')
@@ -2447,7 +2490,7 @@ def pro_eigen_metingen():
     import analytics as _an_eig
     # irrflag (onregelmatigheid-gate v2) per meting → de Chart.js-trend kan gevlagde metingen uit de
     # betrouwbare lijn weren (rood segment), identiek aan /resultaten. rr_intervals blijft mee (tabel-gate).
-    metingen_chart = [{'id': r['id'], 'ts': r['ts'], 'ri': r['ri'], 'bpm': r['bpm'], 'hrv_pct': r['hrv_pct'], 'rmssd': r['rmssd'], 'notes': r['notes'] if 'notes' in r.keys() else '', 'meting_type': r['meting_type'] if 'meting_type' in r.keys() else '', 'rr_intervals': r['rr_intervals'] if 'rr_intervals' in r.keys() else '', 'dimensie': r['ctx_dimensie'] if 'ctx_dimensie' in r.keys() else '', 'subjectief_score': r['subjectief_score'] if 'subjectief_score' in r.keys() else None, 'kwaliteit': r['kwaliteit'] if 'kwaliteit' in r.keys() else None, 'irrflag': _an_eig.row_is_irregular(r)} for r in metingen]
+    metingen_chart = [{'id': r['id'], 'ts': r['ts'], 'ri': r['ri'], 'bpm': r['bpm'], 'hrv_pct': r['hrv_pct'], 'rmssd': r['rmssd'], 'notes': r['notes'] if 'notes' in r.keys() else '', 'meting_type': r['meting_type'] if 'meting_type' in r.keys() else '', 'rr_intervals': r['rr_intervals'] if 'rr_intervals' in r.keys() else '', 'dimensie': r['ctx_dimensie'] if 'ctx_dimensie' in r.keys() else '', 'subjectief_score': r['subjectief_score'] if 'subjectief_score' in r.keys() else None, 'kwaliteit': r['kwaliteit'] if 'kwaliteit' in r.keys() else None, 'irrflag': _row_irregular(r)} for r in metingen]
     from datetime import datetime
     metingen_list = []
     for r in metingen:
@@ -3656,7 +3699,7 @@ def api_save_meting():
                     "ORDER BY ts DESC LIMIT 200", (get_user_key(),)).fetchall()
                 _prev_ri = _brows[0]['ri'] if _brows else None
                 import analytics as _an_save
-                _, _pred_hit = _an_save.prediction_outcome(
+                _, _pred_hit = _prediction_outcome(
                     _prediction, float(data.get('ri', 0)),
                     [dict(r) for r in _brows], prev_ri=_prev_ri)
             except Exception:
@@ -4244,7 +4287,7 @@ def api_get_metingen():
             # Onregelmatigheid-gate (v2): markeer gevlagde metingen zodat de trendgrafiek ze
             # uit de betrouwbare lijn weert (rood segment) en de tabel ze als ⚠ kan tonen.
             # rr_intervals blijft in de payload (tabel-gate gebruikt het al); irrflag is additief.
-            d['irrflag'] = _an.row_is_irregular(d)
+            d['irrflag'] = _row_irregular(d)
             result.append(d)
         # Meest recente basismeting: server-side de voorspelvraag-terugkoppeling (Fase 1) én de
         # adaptieve trigger-status (Fase 3), zodat kwadrant.html geen logica dupliceert. NULL-veilig.
@@ -4253,11 +4296,11 @@ def api_get_metingen():
             _prior = _bl_dicts[1:]
             _prev_ri = _prior[0]['ri'] if _prior else None
             if result[0].get('prediction') is not None:
-                _actual, _ = _an.prediction_outcome(result[0]['prediction'], result[0].get('ri'),
+                _actual, _ = _prediction_outcome(result[0]['prediction'], result[0].get('ri'),
                                                     _prior, prev_ri=_prev_ri)
                 result[0]['pred_actual'] = _actual
                 result[0]['pred_variant'] = 'baseline' if len(_an.baseline_day_values(_prior)) >= _an.BASELINE_MIN_DAYS else 'prev'
-            result[0]['adaptive'] = _an.adaptive_state(_bl_dicts)
+            result[0]['adaptive'] = _adaptive_state(_bl_dicts)
             result[0]['triggers'] = _latest_triggers
         from datetime import datetime, timezone
         resp = jsonify(result)
@@ -4282,7 +4325,7 @@ def api_meting_stats():
         # corrigeren, alleen niet meetellen. AVG(ri)/max waren anders vertekend door valse RI-10's.
         ri_vals, bpm_vals = [], []
         for r in rows:
-            if _an.row_is_irregular(r):
+            if _row_irregular(r):
                 continue
             if r['ri'] is not None:
                 ri_vals.append(float(r['ri']))
@@ -4693,7 +4736,7 @@ def _generate_trend_data(user_key=None, client_id=None, lang='nl', client_name=N
     # bouwen het venster uit de laatste 10 BETROUWBARE metingen. Te weinig betrouwbaar (<3) →
     # geen verzonnen patroon maar een neutrale regel (randgeval, geen lege/0-aggregaten).
     import analytics as _an_tr
-    _rel = [float(r[0]) for r in ri_rows if r[0] is not None and not _an_tr.rr_irregular(r[1])]
+    _rel = [float(r[0]) for r in ri_rows if r[0] is not None and not _rr_irregular(r[1])]
     ri_values = _rel[:10]
     if len(ri_values) < 3:
         _neutral = {
@@ -5249,7 +5292,7 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
             # Onregelmatigheid-gate (v2): gevlagde metingen niet als rust-referentie aan de
             # Kompas-prompt voeren (anders becommentarieert het Kompas valse RI-10's). Ruim ophalen,
             # eerste 7 BETROUWBARE houden. Niet corrigeren, alleen uitsluiten.
-            _rb_clean = [r for r in recent_rows if not _an.rr_irregular(r[5])][:7]
+            _rb_clean = [r for r in recent_rows if not _rr_irregular(r[5])][:7]
             ctx['recent_basis'] = [
                 {'ri': r[0], 'subjectief_score': r[1],
                  'datum': _dt.fromtimestamp((r[2] or 0)/1000).strftime('%Y-%m-%d'),
@@ -5294,7 +5337,7 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
             # Onregelmatigheid-gate (v2): gevlagde metingen niet als rust-referentie aan de
             # Kompas-prompt voeren (anders becommentarieert het Kompas valse RI-10's). Ruim ophalen,
             # eerste 7 BETROUWBARE houden. Niet corrigeren, alleen uitsluiten.
-            _rb_clean = [r for r in recent_rows if not _an.rr_irregular(r[5])][:7]
+            _rb_clean = [r for r in recent_rows if not _rr_irregular(r[5])][:7]
             ctx['recent_basis'] = [
                 {'ri': r[0], 'subjectief_score': r[1],
                  'datum': _dt.fromtimestamp((r[2] or 0)/1000).strftime('%Y-%m-%d'),
@@ -5316,7 +5359,7 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
                 f"AND ri IS NOT NULL AND ts < ? ORDER BY ts DESC LIMIT 100",
                 (key_val, ts_cur)
             ).fetchall()
-            _clean_hist = [float(r[0]) for r in sec_rows if r[0] is not None and not _an.rr_irregular(r[1])]
+            _clean_hist = [float(r[0]) for r in sec_rows if r[0] is not None and not _rr_irregular(r[1])]
             sec_vals = _clean_hist[7:14]
             if len(sec_vals) >= 3:
                 ctx['baseline_ri_history'] = round(sum(sec_vals) / len(sec_vals), 1)
@@ -5745,7 +5788,7 @@ def api_feedback():
     # het OPGESLAGEN commentaar van de laatste betrouwbare (niet-gevlagde) basismeting (niet
     # live hergenereren — dan komt de ruis terug). Geen betrouwbare eerdere meting → neutrale regel.
     import analytics as _an_irr
-    if meting_type == 'basismeting' and _an_irr.row_is_irregular(cur):
+    if meting_type == 'basismeting' and _row_irregular(cur):
         from datetime import datetime as _dt_irr
         _head = {
             'nl': 'Je meting van vandaag was te onregelmatig om betrouwbaar te scoren — dat kan aan de meting liggen of aan je hartslag. Hieronder je laatste betrouwbare spiegeling.',
@@ -5777,7 +5820,7 @@ def api_feedback():
             _cands = []
         _ref_text, _ref_date = '', ''
         for _c in _cands:
-            if _an_irr.rr_irregular(_c['rr_intervals']):
+            if _rr_irregular(_c['rr_intervals']):
                 continue  # ook deze meting is gevlagd → verder terug
             _fc = _c['feedback_cache']
             if not _fc:
@@ -5876,7 +5919,7 @@ def api_feedback():
             # het 24u-venster als ijkpunt. Alle gevlagd → basis_ri blijft None → _generate_biofeedback_
             # feedback toont de 'no_ref'-tekst (geen vergelijking) i.p.v. tegen een ruis-RI te ijken.
             for _bc in _bf_cand:
-                if not _an_bf.rr_irregular(_bc['rr_intervals']):
+                if not _rr_irregular(_bc['rr_intervals']):
                     basis_ri = float(_bc['ri'])
                     break
         except:
