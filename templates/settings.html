@@ -117,9 +117,13 @@
     </div>
     {% endif %}
 
+    {# Stripe Customer Portal-knop verwijderd 2026-06-25 op verzoek — alleen de native
+       "Abonnement opzeggen"-knop hieronder. NB: portal-only acties (betaalmethode
+       wijzigen, plan wijzigen, heractiveren na opzegging) hebben hierdoor géén UI meer.
     <a href="{{ url_for('manage_subscription') }}" class="btn btn-secondary" style="width:100%;">
       {% if lang == 'de' %}Abonnement verwalten →{% elif lang == 'en' %}Manage subscription →{% else %}Abonnement beheren →{% endif %}
     </a>
+    #}
 
     {% if pro_active and subscription_info.status in ['active', 'past_due', 'trialing'] and not cancel_pending %}
     {% set _confirm_msg = 'Sind Sie sicher? Ihr Abonnement läuft bis zum Ende der Abrechnungsperiode weiter und wird danach nicht verlängert.' if lang == 'de' else ('Are you sure? Your subscription stays active until the end of the billing period and will not renew after that.' if lang == 'en' else 'Bent u zeker? Uw abonnement stopt aan het einde van de factureringsperiode.') %}
