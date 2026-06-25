@@ -73,14 +73,14 @@
   </div>
 
   <!-- Mijn abonnement (Fase 2) -->
-  {% if subscription_info %}
+  {% if pro_active %}
   <div class="pro-full">
     <h3>
       {%if lang=='de'%}Mein Abonnement{%elif lang=='en'%}My subscription{%else%}Mijn abonnement{%endif%}
     </h3>
     <p>
-      <strong>{% if tier_summary %}{{ tier_summary.tier_short }} — {{ tier_summary.period_label }}{% else %}{{ subscription_info.plan_name }}{% endif %}</strong><br>
-      {%if lang=='de'%}Nächste Rechnung: {{ subscription_info.current_period_end_display }}{%elif lang=='en'%}Next billing: {{ subscription_info.current_period_end_display }}{%else%}Volgende factuur: {{ subscription_info.current_period_end_display }}{%endif%}
+      <strong>{% if tier_summary %}{{ tier_summary.tier_short }} — {{ tier_summary.period_label }}{% elif subscription_info %}{{ subscription_info.plan_name }}{% endif %}</strong><br>
+      {% if subscription_info %}{%if lang=='de'%}Nächste Rechnung: {{ subscription_info.current_period_end_display }}{%elif lang=='en'%}Next billing: {{ subscription_info.current_period_end_display }}{%else%}Volgende factuur: {{ subscription_info.current_period_end_display }}{%endif%}{% endif %}
     </p>
     {# Stripe Customer Portal-knop verwijderd 2026-06-25 op verzoek (zelfde als /instellingen).
        NB: portal-only acties (betaalmethode/plan wijzigen, heractiveren na opzegging) hebben geen UI meer.

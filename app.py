@@ -2487,6 +2487,7 @@ def pro_menu():
                            demo_msg=("Nur fur Pro-Abonnenten" if lang=="de" else "Pro subscribers only" if lang=="en" else "Alleen voor Pro-abonnees"),
                            subscription_info=get_subscription_info(_email, lang),
                            tier_summary=get_pro_tier_summary(_email, lang),
+                           pro_active=has_active_pro_subscription(_email),
                            kk_tier=kk_tier_label(),
                            active_pairings=get_active_pairings_count(pro_key))
 
