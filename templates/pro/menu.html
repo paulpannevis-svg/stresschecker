@@ -79,7 +79,7 @@
       {%if lang=='de'%}Mein Abonnement{%elif lang=='en'%}My subscription{%else%}Mijn abonnement{%endif%}
     </h3>
     <p>
-      <strong>{{ subscription_info.plan_name }}</strong><br>
+      <strong>{% if tier_summary %}{{ tier_summary.tier_short }} — {{ tier_summary.period_label }}{% else %}{{ subscription_info.plan_name }}{% endif %}</strong><br>
       {%if lang=='de'%}Nächste Rechnung: {{ subscription_info.current_period_end_display }}{%elif lang=='en'%}Next billing: {{ subscription_info.current_period_end_display }}{%else%}Volgende factuur: {{ subscription_info.current_period_end_display }}{%endif%}
     </p>
     <a href="{{ url_for('manage_subscription') }}" class="btn btn-primary">
