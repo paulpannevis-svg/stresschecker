@@ -121,7 +121,7 @@
       {% if lang == 'de' %}Abonnement verwalten →{% elif lang == 'en' %}Manage subscription →{% else %}Abonnement beheren →{% endif %}
     </a>
 
-    {% if tier_summary and tier_summary.status == 'activated' and not cancel_pending %}
+    {% if pro_active and subscription_info.status in ['active', 'past_due', 'trialing'] and not cancel_pending %}
     {% set _confirm_msg = 'Sind Sie sicher? Ihr Abonnement läuft bis zum Ende der Abrechnungsperiode weiter und wird danach nicht verlängert.' if lang == 'de' else ('Are you sure? Your subscription stays active until the end of the billing period and will not renew after that.' if lang == 'en' else 'Bent u zeker? Uw abonnement stopt aan het einde van de factureringsperiode.') %}
     <form method="POST" action="{{ url_for('cancel_subscription') }}" onsubmit="return confirm('{{ _confirm_msg }}');" style="margin-top:10px;">
       <button type="submit" style="width:100%;background:none;border:1px solid var(--red);color:var(--red);border-radius:8px;padding:0.7rem;font-size:0.9rem;cursor:pointer;">

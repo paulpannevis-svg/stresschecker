@@ -2346,6 +2346,7 @@ def settings():
                             cancel_at_display=billing['cancel_at_display'],
                             cancel_msg=cancel_msg,
                             cancel_ok=cancel_ok,
+                            pro_active=has_active_pro_subscription(email),
                             active_pairings=get_active_pairings_count(get_user_key()))
 @app.route('/verloop')
 def verloop():
@@ -7647,12 +7648,18 @@ def get_pro_tier_summary(email, lang='nl'):
     cn = _sq.connect(DB_PATH)
     cn.row_factory = _sq.Row
     try:
+        # Prefereer een geactiveerde Pro-licentie; val anders terug op een licentie die
+        # gedekt wordt door een actief/past_due Stripe Pro-abonnement (betaald-maar-niet-
+        # geactiveerd, bv. webshop-cohort). Stuurt de billing-kaartweergave, niet route-toegang.
         lic = cn.execute(
             "SELECT license_key, max_profiles, expires_at, activated_at, status, origin, "
             "       product_name, stripe_subscription_id "
             "FROM licenses "
-            "WHERE email=? AND type='pro' AND status='activated' AND product='sc' "
-            "ORDER BY id DESC LIMIT 1",
+            "WHERE email=? AND type='pro' AND product='sc' "
+            "  AND (status='activated' "
+            "       OR stripe_subscription_id IN "
+            "          (SELECT subscription_id FROM subscriptions WHERE status IN ('active','past_due'))) "
+            "ORDER BY (status='activated') DESC, id DESC LIMIT 1",
             (email,)
         ).fetchone()
         if not lic:
@@ -7772,6 +7779,44 @@ def _find_subscription_row_by_email(email):
 
 def has_stripe_subscription(email):
     return _find_subscription_row_by_email(email) is not None
+
+
+def has_active_pro_subscription(email):
+    """True als de gebruiker Pro-billing-UI mag zien op basis van een actief/recoverable
+    Stripe Pro-abonnement — gelezen uit de LOKALE, webhook-gesyncte subscriptions-tabel
+    (GEEN live Stripe-API-call), met fallback op een geactiveerde Pro-licentie voor
+    niet-Stripe cohorts (marketing/legacy/manual/eval). Defensief: faalt naar False.
+
+    NB: dit stuurt alleen de WEERGAVE van de Pro-billing-kaart/facturen/opzegknop op
+    /instellingen — NIET de route-toegangscontrole (die blijft session-gebaseerd via
+    is_pro()/license_valid)."""
+    if not email:
+        return False
+    import sqlite3 as _sq
+    cn = _sq.connect(DB_PATH)
+    cn.row_factory = _sq.Row
+    try:
+        # 1) Stripe-pad: actief/past_due Pro-abonnement (email -> licenses -> subscriptions -> plans).
+        sub = cn.execute(
+            "SELECT s.status "
+            "  FROM licenses l "
+            "  JOIN subscriptions s ON s.subscription_id = l.stripe_subscription_id "
+            "  JOIN plans p ON p.plan_id = s.plan_id "
+            " WHERE l.email = ? AND p.tier LIKE 'pro%' "
+            " ORDER BY s.current_period_end DESC LIMIT 1",
+            (email,)).fetchone()
+        if sub and sub['status'] in ('active', 'past_due'):
+            return True
+        # 2) Fallback: geactiveerde Pro-licentie zonder Stripe (manual/legacy/marketing/eval).
+        lic = cn.execute(
+            "SELECT 1 FROM licenses "
+            " WHERE email = ? AND type='pro' AND status='activated' AND product='sc' LIMIT 1",
+            (email,)).fetchone()
+        return lic is not None
+    except Exception:
+        return False
+    finally:
+        cn.close()
 
 
 def get_subscription_info(email, lang='nl'):
