@@ -2324,6 +2324,15 @@ def settings():
     session['profile_gender'] = _gd
     session['sensor_pref'] = _sp
     _lang = session.get('lang', 'nl')
+    # Opzeg-resultaat (?cancel=ok|already|no_sub|error) → eenmalige banner.
+    _cancel_code = request.args.get('cancel')
+    cancel_msg, cancel_ok = '', False
+    if _cancel_code in CANCEL_RESULT_MESSAGES:
+        cancel_msg = CANCEL_RESULT_MESSAGES[_cancel_code].get(
+            _lang, CANCEL_RESULT_MESSAGES[_cancel_code]['nl'])
+        cancel_ok = _cancel_code in ('ok', 'already')
+    # Live Stripe billing-info (facturen + geplande opzegging); leeg/None bij niet-Stripe-cohort.
+    billing = get_pro_billing(email, _lang)
     return render_template('settings.html', lang=_lang, is_pro=session.get('license_type') in ('pro','pro_demo'),
                             profile_name=session.get('profile_name', ''),
                             profile_surname=session.get('profile_surname', ''),
@@ -2332,6 +2341,11 @@ def settings():
                             subscription_info=get_subscription_info(email, _lang),
                             tier_summary=get_pro_tier_summary(email, _lang),
                             kk_tier=kk_tier_label(),
+                            invoices=billing['invoices'],
+                            cancel_pending=billing['cancel_at_period_end'],
+                            cancel_at_display=billing['cancel_at_display'],
+                            cancel_msg=cancel_msg,
+                            cancel_ok=cancel_ok,
                             active_pairings=get_active_pairings_count(get_user_key()))
 @app.route('/verloop')
 def verloop():
@@ -7551,6 +7565,19 @@ def _format_date_numeric(iso_date, lang='nl'):
     return f"{d:02d}-{m:02d}-{year}"
 
 
+def _format_money(amount, currency='EUR', lang='nl'):
+    """Bedrag + valutasymbool per locale: NL/DE €12,50 — EN €12.50."""
+    symbol = {'EUR': '€', 'USD': '$', 'GBP': '£'}.get((currency or 'EUR').upper(),
+                                                      (currency or '').upper() + ' ')
+    try:
+        s = f"{float(amount):,.2f}"
+    except (TypeError, ValueError):
+        s = "0.00"
+    if lang in ('nl', 'de'):
+        s = s.replace(',', 'X').replace('.', ',').replace('X', '.')
+    return f"{symbol}{s}"
+
+
 PRO_PERIOD_LABELS = {
     ('year',  'nl'): 'Jaarabonnement',
     ('month', 'nl'): 'Maandabonnement',
@@ -7763,6 +7790,84 @@ def get_subscription_info(email, lang='nl'):
     }
 
 
+CANCEL_RESULT_MESSAGES = {
+    'ok': {
+        'nl': 'Je abonnement is opgezegd. Je houdt toegang tot het einde van de huidige factureringsperiode.',
+        'de': 'Ihr Abonnement wurde gekündigt. Sie behalten Zugriff bis zum Ende der aktuellen Abrechnungsperiode.',
+        'en': 'Your subscription has been cancelled. You keep access until the end of the current billing period.',
+    },
+    'already': {
+        'nl': 'Je abonnement stond al gepland om op te zeggen.',
+        'de': 'Ihr Abonnement war bereits zur Kündigung vorgemerkt.',
+        'en': 'Your subscription was already scheduled to cancel.',
+    },
+    'no_sub': {
+        'nl': 'Er is geen actief Stripe-abonnement gevonden om op te zeggen. Neem contact op via info@lifestylemonitors.com.',
+        'de': 'Es wurde kein aktives Stripe-Abonnement zum Kündigen gefunden. Kontaktieren Sie info@lifestylemonitors.de.',
+        'en': 'No active Stripe subscription was found to cancel. Please contact info@lifestylemonitors.com.',
+    },
+    'error': {
+        'nl': 'Het opzeggen is niet gelukt. Probeer het later opnieuw of neem contact op via info@lifestylemonitors.com.',
+        'de': 'Die Kündigung ist fehlgeschlagen. Bitte versuchen Sie es später erneut oder kontaktieren Sie info@lifestylemonitors.de.',
+        'en': 'Cancellation failed. Please try again later or contact info@lifestylemonitors.com.',
+    },
+}
+
+
+def get_pro_billing(email, lang='nl'):
+    """Live Stripe billing-info voor /instellingen: facturenhistorie (ALLE statussen —
+    paid + open/unpaid + void) plus of er al een opzegging gepland staat.
+    Read-only en defensief: faalt stil naar lege lijst zodat de settings-pagina
+    nooit 500't als Stripe onbereikbaar is of de cohort geen Stripe-abonnement heeft."""
+    out = {'invoices': [], 'cancel_at_period_end': False, 'cancel_at_display': '',
+           'subscription_id': None}
+    row = _find_subscription_row_by_email(email)
+    if not row or not row['subscription_id'] or not row['stripe_customer_id']:
+        return out
+    out['subscription_id'] = row['subscription_id']
+    key = _load_stripe_secret()
+    if not key:
+        return out
+    import stripe as _s
+    _s.api_key = key
+    # Facturen — alle statussen, nieuwste eerst.
+    try:
+        inv_list = _s.Invoice.list(customer=row['stripe_customer_id'], limit=12)
+        data = (inv_list.get('data') if isinstance(inv_list, dict)
+                else getattr(inv_list, 'data', None)) or []
+        import datetime as _dt
+        for inv in data:
+            d = inv if isinstance(inv, dict) else inv.to_dict()
+            created = d.get('created')
+            iso = _dt.datetime.utcfromtimestamp(created).isoformat() if created else ''
+            amount = (d.get('amount_due') or d.get('total') or 0) / 100.0
+            out['invoices'].append({
+                'number':         d.get('number') or (d.get('id') or '')[:14],
+                'date_display':   _format_date_numeric(iso, lang),
+                'amount_display': _format_money(amount, d.get('currency') or 'eur', lang),
+                'status':         d.get('status') or 'open',
+                'hosted_url':     d.get('hosted_invoice_url') or '',
+                'pdf_url':        d.get('invoice_pdf') or '',
+            })
+    except Exception as e:
+        app.logger.warning('get_pro_billing: Invoice.list faalde voor %s: %s',
+                           row['stripe_customer_id'], e)
+    # Geplande opzegging?
+    try:
+        sub = _s.Subscription.retrieve(row['subscription_id'])
+        sd = sub if isinstance(sub, dict) else sub.to_dict()
+        out['cancel_at_period_end'] = bool(sd.get('cancel_at_period_end'))
+        cancel_at = sd.get('cancel_at') or sd.get('current_period_end')
+        if out['cancel_at_period_end'] and cancel_at:
+            import datetime as _dt
+            out['cancel_at_display'] = _format_date_numeric(
+                _dt.datetime.utcfromtimestamp(cancel_at).isoformat(), lang)
+    except Exception as e:
+        app.logger.warning('get_pro_billing: Subscription.retrieve faalde voor %s: %s',
+                           row['subscription_id'], e)
+    return out
+
+
 @app.route('/account/manage-subscription')
 def manage_subscription():
     if not session.get('user_key'):
@@ -7790,6 +7895,41 @@ def manage_subscription():
     except _s.error.StripeError as e:
         app.logger.error('Spoor3: billing_portal.Session.create faalde voor %s: %s', customer_id, e)
         return redirect(url_for('license_screen', error='portal_unavailable'))
+
+
+@app.route('/pro/cancel-subscription', methods=['POST'])
+def cancel_subscription():
+    """Native opzegging: zet cancel_at_period_end=True op het Stripe-abonnement
+    (NIET direct deactiveren) zodat de gebruiker toegang houdt tot het einde van de
+    betaalde periode. Spiegelt wat de Stripe Customer Portal doet, maar in-app."""
+    if not session.get('user_key'):
+        return redirect(url_for('sc_login'))
+    email = session.get('email', '')
+    row = _find_subscription_row_by_email(email)
+    if not row or not row['subscription_id']:
+        return redirect(url_for('settings', cancel='no_sub'))
+    if row['status'] == 'canceled':
+        return redirect(url_for('settings', cancel='already'))
+    key = _load_stripe_secret()
+    if not key:
+        app.logger.error('cancel_subscription: STRIPE_SECRET_LIVE niet beschikbaar in %s',
+                         SPOOR3_STRIPE_KEYS_FILE)
+        return redirect(url_for('settings', cancel='error'))
+    import stripe as _s
+    _s.api_key = key
+    try:
+        sub = _s.Subscription.retrieve(row['subscription_id'])
+        sd = sub if isinstance(sub, dict) else sub.to_dict()
+        if sd.get('cancel_at_period_end'):
+            return redirect(url_for('settings', cancel='already'))
+        _s.Subscription.modify(row['subscription_id'], cancel_at_period_end=True)
+        app.logger.warning('cancel_subscription: cancel_at_period_end gezet op %s door user_key=%s',
+                           row['subscription_id'], session.get('user_key'))
+        return redirect(url_for('settings', cancel='ok'))
+    except _s.error.StripeError as e:
+        app.logger.error('cancel_subscription: modify faalde voor %s: %s',
+                         row['subscription_id'], e)
+        return redirect(url_for('settings', cancel='error'))
 
 
 # ===== LAB — experimentele functies =====

@@ -40,6 +40,11 @@
     <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">
       {% if lang == 'de' %}Mein Pro-Abonnement{% elif lang == 'en' %}My Pro subscription{% else %}Mijn Pro-abonnement{% endif %}
     </div>
+    {% if cancel_msg %}
+    <div style="background:{{ '#E8F5E9' if cancel_ok else '#FDECEA' }};border:1px solid {{ '#A5D6A7' if cancel_ok else '#F5C6C2' }};color:{{ '#1B5E20' if cancel_ok else '#9b271b' }};border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:0.85rem;line-height:1.4;">
+      {{ cancel_msg }}
+    </div>
+    {% endif %}
     <div style="font-size:1rem;font-weight:600;color:var(--text-primary);margin-bottom:4px;">
       <span style="color:var(--red);">{{ tier_summary.tier_short }}</span> — {{ tier_summary.period_label }}
     </div>
@@ -74,11 +79,56 @@
     </div>
     {% if subscription_info %}
     <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;border-top:1px solid var(--beige);padding-top:10px;">
-      {% if lang == 'de' %}Nächste Rechnung: {{ subscription_info.current_period_end_display }}{% elif lang == 'en' %}Next billing: {{ subscription_info.current_period_end_display }}{% else %}Volgende factuur: {{ subscription_info.current_period_end_display }}{% endif %}
+      {% if cancel_pending %}
+        <span style="color:var(--red);">
+          {% if lang == 'de' %}Kündigung geplant — aktiv bis {{ cancel_at_display }}
+          {% elif lang == 'en' %}Cancellation scheduled — active until {{ cancel_at_display }}
+          {% else %}Opzegging gepland — actief tot {{ cancel_at_display }}{% endif %}
+        </span>
+      {% else %}
+        {% if lang == 'de' %}Nächste Rechnung: {{ subscription_info.current_period_end_display }}{% elif lang == 'en' %}Next billing: {{ subscription_info.current_period_end_display }}{% else %}Volgende factuur: {{ subscription_info.current_period_end_display }}{% endif %}
+      {% endif %}
     </div>
+
+    {% if invoices %}
+    <div style="border-top:1px solid var(--beige);padding-top:12px;margin-bottom:14px;">
+      <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;">
+        {% if lang == 'de' %}Rechnungen{% elif lang == 'en' %}Invoices{% else %}Facturen{% endif %}
+      </div>
+      {% for inv in invoices %}
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:0.82rem;padding:6px 0;border-bottom:1px solid var(--beige);">
+        <span style="color:var(--text-muted);white-space:nowrap;">{{ inv.date_display }}</span>
+        <span style="color:var(--text-primary);font-weight:600;white-space:nowrap;">{{ inv.amount_display }}</span>
+        {% set _paid = inv.status == 'paid' %}
+        {% set _void = inv.status in ['void', 'draft'] %}
+        <span style="flex:0 0 auto;font-size:0.72rem;font-weight:700;padding:2px 8px;border-radius:10px;color:#fff;background:{{ '#2e7d32' if _paid else ('#9e9e9e' if _void else '#c0392b') }};">
+          {% if _paid %}{% if lang == 'de' %}Bezahlt{% elif lang == 'en' %}Paid{% else %}Betaald{% endif %}
+          {% elif inv.status == 'void' %}{% if lang == 'de' %}Storniert{% elif lang == 'en' %}Void{% else %}Vervallen{% endif %}
+          {% elif inv.status == 'draft' %}{% if lang == 'de' %}Entwurf{% elif lang == 'en' %}Draft{% else %}Concept{% endif %}
+          {% else %}{% if lang == 'de' %}Offen{% elif lang == 'en' %}Unpaid{% else %}Onbetaald{% endif %}{% endif %}
+        </span>
+        {% if inv.pdf_url or inv.hosted_url %}
+        <a href="{{ inv.pdf_url or inv.hosted_url }}" target="_blank" rel="noopener" style="flex:0 0 auto;color:#1565c0;text-decoration:none;font-size:0.78rem;">
+          {% if lang == 'de' %}Ansehen{% elif lang == 'en' %}View{% else %}Bekijk{% endif %} →
+        </a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     <a href="{{ url_for('manage_subscription') }}" class="btn btn-secondary" style="width:100%;">
       {% if lang == 'de' %}Abonnement verwalten →{% elif lang == 'en' %}Manage subscription →{% else %}Abonnement beheren →{% endif %}
     </a>
+
+    {% if tier_summary and tier_summary.status == 'activated' and not cancel_pending %}
+    {% set _confirm_msg = 'Sind Sie sicher? Ihr Abonnement läuft bis zum Ende der Abrechnungsperiode weiter und wird danach nicht verlängert.' if lang == 'de' else ('Are you sure? Your subscription stays active until the end of the billing period and will not renew after that.' if lang == 'en' else 'Bent u zeker? Uw abonnement stopt aan het einde van de factureringsperiode.') %}
+    <form method="POST" action="{{ url_for('cancel_subscription') }}" onsubmit="return confirm('{{ _confirm_msg }}');" style="margin-top:10px;">
+      <button type="submit" style="width:100%;background:none;border:1px solid var(--red);color:var(--red);border-radius:8px;padding:0.7rem;font-size:0.9rem;cursor:pointer;">
+        {% if lang == 'de' %}Abonnement kündigen{% elif lang == 'en' %}Cancel subscription{% else %}Abonnement opzeggen{% endif %}
+      </button>
+    </form>
+    {% endif %}
     {% endif %}
   </div>
   <script>
