@@ -82,9 +82,12 @@
       <strong>{% if tier_summary %}{{ tier_summary.tier_short }} — {{ tier_summary.period_label }}{% else %}{{ subscription_info.plan_name }}{% endif %}</strong><br>
       {%if lang=='de'%}Nächste Rechnung: {{ subscription_info.current_period_end_display }}{%elif lang=='en'%}Next billing: {{ subscription_info.current_period_end_display }}{%else%}Volgende factuur: {{ subscription_info.current_period_end_display }}{%endif%}
     </p>
+    {# Stripe Customer Portal-knop verwijderd 2026-06-25 op verzoek (zelfde als /instellingen).
+       NB: portal-only acties (betaalmethode/plan wijzigen, heractiveren na opzegging) hebben geen UI meer.
     <a href="{{ url_for('manage_subscription') }}" class="btn btn-primary">
       {%if lang=='de'%}Abonnement verwalten →{%elif lang=='en'%}Manage subscription →{%else%}Abonnement beheren →{%endif%}
     </a>
+    #}
   </div>
   {% endif %}
 
