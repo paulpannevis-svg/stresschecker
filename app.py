@@ -7764,7 +7764,7 @@ def _find_subscription_row_by_email(email):
     try:
         return cn.execute(
             "SELECT p.plan_id, p.name AS plan_name, p.tier, p.product_family, "
-            "       s.subscription_id, s.status, s.current_period_end, s.stripe_customer_id, "
+            "       s.subscription_id, s.status, s.current_period_end, s.cancel_at_period_end, s.stripe_customer_id, "
             "       l.license_key, l.email "
             "  FROM licenses l "
             "  JOIN subscriptions s ON s.subscription_id = l.stripe_subscription_id "
@@ -7831,6 +7831,7 @@ def get_subscription_info(email, lang='nl'):
         'status': row['status'],
         'current_period_end_iso': cpe.split('T')[0] if cpe else '',
         'current_period_end_display': _format_date_lang(cpe, lang),
+        'cancel_at_period_end': bool(row['cancel_at_period_end']),
         'license_key': row['license_key'],
         'stripe_customer_id': row['stripe_customer_id'],
     }

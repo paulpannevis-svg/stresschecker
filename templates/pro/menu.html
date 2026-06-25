@@ -82,6 +82,13 @@
       <strong>{% if tier_summary %}{{ tier_summary.tier_short }} — {{ tier_summary.period_label }}{% elif subscription_info %}{{ subscription_info.plan_name }}{% endif %}</strong><br>
       {% if subscription_info %}{%if lang=='de'%}Nächste Rechnung: {{ subscription_info.current_period_end_display }}{%elif lang=='en'%}Next billing: {{ subscription_info.current_period_end_display }}{%else%}Volgende factuur: {{ subscription_info.current_period_end_display }}{%endif%}{% endif %}
     </p>
+    {% if subscription_info and subscription_info.cancel_at_period_end %}
+    <p style="background:#FDECEA;border:1px solid #F5C6C2;color:#9b271b;border-radius:8px;padding:8px 10px;font-size:.8rem;margin:0 0 .8rem;">
+      {% if lang=='de' %}Kündigung geplant{% if subscription_info.current_period_end_display %} — aktiv bis {{ subscription_info.current_period_end_display }}{% endif %}
+      {% elif lang=='en' %}Cancellation scheduled{% if subscription_info.current_period_end_display %} — active until {{ subscription_info.current_period_end_display }}{% endif %}
+      {% else %}Opzegging gepland{% if subscription_info.current_period_end_display %} — actief tot {{ subscription_info.current_period_end_display }}{% endif %}{% endif %}
+    </p>
+    {% endif %}
     {# Stripe Customer Portal-knop verwijderd 2026-06-25 op verzoek (zelfde als /instellingen).
        NB: portal-only acties (betaalmethode/plan wijzigen, heractiveren na opzegging) hebben geen UI meer.
     <a href="{{ url_for('manage_subscription') }}" class="btn btn-primary">
