@@ -7841,7 +7841,9 @@ def _find_subscription_row_by_email(email):
             "  JOIN plans p ON p.plan_id = s.plan_id "
             " WHERE l.email = ? "
             "   AND s.status IN ('active', 'trialing', 'past_due', 'canceled') "
-            " ORDER BY s.current_period_end DESC LIMIT 1",
+            " ORDER BY CASE s.status WHEN 'active' THEN 1 WHEN 'trialing' THEN 2 "
+            "          WHEN 'past_due' THEN 3 ELSE 4 END ASC, "
+            "          s.current_period_end DESC LIMIT 1",
             (email,)
         ).fetchone()
     finally:

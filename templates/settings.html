@@ -85,6 +85,10 @@
           {% elif lang == 'en' %}Cancellation scheduled — active until {{ cancel_at_display }}
           {% else %}Opzegging gepland — actief tot {{ cancel_at_display }}{% endif %}
         </span>
+      {% elif subscription_info.status == 'canceled' %}
+        <span style="color:var(--text-muted);">
+          {% if lang == 'de' %}Kein aktives Abonnement{% elif lang == 'en' %}No active subscription{% else %}Geen actief abonnement{% endif %}
+        </span>
       {% else %}
         {% if lang == 'de' %}Nächste Rechnung: {{ subscription_info.current_period_end_display }}{% elif lang == 'en' %}Next billing: {{ subscription_info.current_period_end_display }}{% else %}Volgende factuur: {{ subscription_info.current_period_end_display }}{% endif %}
       {% endif %}
