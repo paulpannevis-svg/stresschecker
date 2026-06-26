@@ -8131,6 +8131,104 @@ def api_create_checkout_session():
     return jsonify({'session_url': sess.url})
 
 
+# Eenvoudige in-memory IP rate-limiter. NB: per worker → met 2 workers effectief ~2× de
+# limiet; voor een harde gedeelde limiet is een DB/Redis-store nodig (bewuste afweging).
+import threading as _rl_threading
+_RL_HITS = {}
+_RL_LOCK = _rl_threading.Lock()
+def _rate_limited(ip, bucket, max_hits, window_sec):
+    import time as _t
+    now = _t.time(); cutoff = now - window_sec; k = ((ip or '?'), bucket)
+    with _RL_LOCK:
+        hits = [t for t in _RL_HITS.get(k, ()) if t > cutoff]
+        if len(hits) >= max_hits:
+            _RL_HITS[k] = hits
+            return True
+        hits.append(now); _RL_HITS[k] = hits
+        if len(_RL_HITS) > 5000:   # lichte opschoning tegen ongebreidelde groei
+            for _kk in [_kk for _kk, _vv in list(_RL_HITS.items())
+                        if not [t for t in _vv if t > cutoff]]:
+                _RL_HITS.pop(_kk, None)
+        return False
+
+
+@app.route('/api/checkout/consumer', methods=['POST'])
+def checkout_consumer():
+    """Unauthenticated consumer-checkout voor de EXTERNE shop. Veilig via: IP-rate-limit,
+    consumer-only price-whitelist (plans tier 'base'), customer-hergebruik (dedup) en
+    customer_email i.p.v. eager Customer.create (geen junk-customers bij spam/afgebroken
+    checkout). LIVE-sleutel. ⚠️ Geen CORS-headers: de shop moet SERVER-SIDE posten."""
+    import sqlite3 as _sq, re as _re
+    # 1. Rate-limit per IP (5 / minuut). Achter nginx: eerste X-Forwarded-For.
+    _ip = ((request.headers.get('X-Forwarded-For') or request.remote_addr or '')
+           .split(',')[0].strip())[:64]
+    if _rate_limited(_ip, 'consumer-checkout', 5, 60):
+        return jsonify({'error': 'Too many requests'}), 429
+    # 2. Input
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip().lower()
+    product_id = (data.get('product_id') or '').strip()
+    if not email or not _re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email) or not product_id:
+        return jsonify({'error': 'Missing or invalid email/product_id'}), 400
+    # 3. Whitelist: ALLEEN consumer-prijzen (tier 'base', actief; geen pro/krankenkasse).
+    customer_id = None
+    cn = _sq.connect(DB_PATH); cn.row_factory = _sq.Row
+    try:
+        if not cn.execute(
+                "SELECT 1 FROM plans WHERE stripe_price_id=? AND is_active=1 "
+                "AND tier NOT LIKE 'pro%' AND tier NOT LIKE 'krankenkasse%'",
+                (product_id,)).fetchone():
+            return jsonify({'error': 'Invalid product'}), 400
+        # 4. Customer-hergebruik (dedup): users -> subscriptions (licenses-join).
+        r1 = cn.execute("SELECT stripe_customer_id FROM users "
+                        "WHERE email=? COLLATE NOCASE AND COALESCE(stripe_customer_id,'')<>''",
+                        (email,)).fetchone()
+        if r1:
+            customer_id = r1['stripe_customer_id']
+        if not customer_id:
+            r2 = cn.execute("SELECT s.stripe_customer_id FROM licenses l "
+                            "JOIN subscriptions s ON s.subscription_id=l.stripe_subscription_id "
+                            "WHERE l.email=? AND COALESCE(s.stripe_customer_id,'')<>'' "
+                            "ORDER BY s.updated_at DESC LIMIT 1", (email,)).fetchone()
+            if r2:
+                customer_id = r2['stripe_customer_id']
+    finally:
+        cn.close()
+
+    key = _load_stripe_secret()
+    if not key:
+        app.logger.error('consumer-checkout: STRIPE_SECRET_LIVE niet beschikbaar')
+        return jsonify({'error': 'stripe_unavailable'}), 500
+    import stripe as _s
+    _s.api_key = key
+    if not customer_id:   # Payment-Link-customers buiten onze DB
+        try:
+            _ex = _s.Customer.list(email=email, limit=1).data
+            if _ex:
+                customer_id = _ex[0].id
+        except Exception as e:
+            app.logger.warning('consumer-checkout: Customer.list faalde: %s', e)
+    # 5. Checkout Session — bestaande customer hergebruiken, anders customer_email
+    #    (Stripe maakt de customer pas bij betaling → geen junk-customers bij spam).
+    try:
+        _who = {'customer': customer_id} if customer_id else {'customer_email': email}
+        sess = _s.checkout.Session.create(
+            line_items=[{'price': product_id, 'quantity': 1}],
+            mode='subscription',
+            success_url='https://app.stresschecker.com/welkom?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url='https://lifestylemonitors.com/de',
+            **_who)
+    except _s.error.InvalidRequestError as e:
+        app.logger.warning('consumer-checkout: InvalidRequest (price=%s): %s', product_id, e)
+        return jsonify({'error': 'Invalid product'}), 400
+    except Exception as e:
+        app.logger.error('consumer-checkout: Session.create faalde (price=%s): %s', product_id, e)
+        return jsonify({'error': 'stripe_error'}), 500
+    app.logger.info('consumer-checkout ok: email=%s price=%s customer=%s',
+                    email, product_id, customer_id or '(via customer_email)')
+    return jsonify({'session_url': sess.url})
+
+
 # Mode-toggle: STRIPE_TEST_MODE=true => test-sleutel + test-prijzen. Default false (LIVE).
 # ⚠️ NOOIT op de live-prod-service zetten (zou ALLE checkouts naar test-mode sturen);
 # bedoeld voor staging / de test-client. Op import gelezen.
