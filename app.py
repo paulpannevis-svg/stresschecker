@@ -5593,15 +5593,15 @@ def _unreliable_signal_payload(lang):
     """Vaste 'signaal onbetrouwbaar'-boodschap bij quality_band 'slecht' (variant-B te
     onregelmatig). GEEN LLM-call, geen stellige duiding op ruis. Drietalig."""
     M = {
-        'nl': ('⚠️ Signaal onbetrouwbaar',
-               'Deze meting bevat signaalinterferentie. Herhaal de meting graag over enkele '
-               'uren, zodat je hart kan kalmeren.'),
-        'de': ('⚠️ Signal unzuverlässig',
-               'Diese Messung enthält Signalstörungen. Bitte wiederholen Sie die Messung '
-               'in einigen Stunden, damit Ihr Herz zur Ruhe kommen kann.'),
-        'en': ('⚠️ Unreliable signal',
-               'This measurement contains signal interference. Please repeat it in a few hours '
-               'so your heart can settle.'),
+        'nl': ('⚠️ Signaal niet stabiel genoeg',
+               'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, '
+               'sensorcontact of hartritme). Herhaal de meting.'),
+        'de': ('⚠️ Signal nicht stabil genug',
+               'Das Signal war zu unregelmäßig für eine zuverlässige Bewertung (Bewegung, '
+               'Sensorkontakt oder Herzrhythmus). Bitte wiederholen.'),
+        'en': ('⚠️ Signal not stable enough',
+               'The signal was too unstable to score reliably (movement, sensor contact, '
+               'or heart rhythm). Please repeat.'),
     }
     head, body = M.get(lang, M['nl'])
     return {'insight': head, 'reflection': body, 'question': '',

@@ -141,7 +141,7 @@ function buildChart(labels, vals, szVdata, marked){
   }
   // Tooltip-footer (baseline-toelichting per taal) inline; geen los lijn-label (vermijdt
   // dubbeling met legenda). Leeg object wanneer er geen baseline is.
-  var _provTipN=(_L=='de'?'zu unregelmäßig für eine zuverlässige Bewertung':_L=='en'?'too irregular to score reliably':'te onregelmatig om betrouwbaar te scoren');
+  var _provTipN=(_L=='de'?'Das Signal war zu unregelmäßig für eine zuverlässige Bewertung (Bewegung, Sensorkontakt oder Herzrhythmus). Bitte wiederholen.':_L=='en'?'The signal was too unstable to score reliably (movement, sensor contact, or heart rhythm). Please repeat.':'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.');
   var tooltipCfg={callbacks:{footer:function(items){
     var t=(BASELINE!=null && items.some(function(it){return it.dataset && it.dataset.label==='Baseline';}))?BASELINE_TIP:'';
     if(items.some(function(it){return it.datasetIndex===0 && marked[it.dataIndex];})) t=(t?t+'  ·  ':'')+'⚠ '+_provTipN;
@@ -221,10 +221,11 @@ else{
     var _conf=isNaN(_kwv)?'trusted':(_kwv>=85?'trusted':_kwv>=70?'limited':'untrusted');
     // Getal-onderdrukking: Slecht OF kwaliteit<70 -> markering i.p.v. getal; 70-84 -> getal + grijze stip; rest -> getal.
     var _suppress=(_slecht||_conf==='untrusted');
-    var _irrLabel={de:'Zu unregelmäßig',en:'Too irregular',nl:'Te onregelmatig'}['{{lang}}']||'Te onregelmatig';
-    var _warn=_slecht?'<span title="Te onregelmatig om betrouwbaar te scoren (hart of sensor)" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
+    var _irrLabel={de:'Nicht stabil genug',en:'Not stable enough',nl:'Niet stabiel genoeg'}['{{lang}}']||'Niet stabiel genoeg';
+    var _irrTip={de:'Das Signal war zu unregelmäßig für eine zuverlässige Bewertung (Bewegung, Sensorkontakt oder Herzrhythmus). Bitte wiederholen.',en:'The signal was too unstable to score reliably (movement, sensor contact, or heart rhythm). Please repeat.',nl:'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.'}['{{lang}}']||'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.';
+    var _warn=_slecht?'<span title="'+_irrTip+'" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
     var dot=_warn+'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+((_kwlow||_slecht)?'#bfbfbf':(ri<2?'#c0392b':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#27ae60':'#1e8449'))+'"></span>';
-    var riCell=_suppress?'<span title="Te onregelmatig om betrouwbaar te scoren (hart of sensor)" style="color:#c0392b;font-weight:600;white-space:nowrap;">'+_irrLabel+'</span>':ri;
+    var riCell=_suppress?'<span title="'+_irrTip+'" style="color:#c0392b;font-weight:600;white-space:nowrap;">'+_irrLabel+'</span>':ri;
     var mt=r.meting_type||'-';var mtL=mTYPE[mt.toLowerCase()]||mt;
     var dimL=r.dimensie?(dDIM[r.dimensie]||r.dimensie):'-';
     html+='<tr style="border-bottom:1px solid #eef0f3;"><td style="'+cTD+'white-space:nowrap;">'+date+'</td><td style="'+cTD+'white-space:nowrap;">'+tijd+'</td><td style="'+cTD+'white-space:nowrap;">'+dot+riCell+'</td><td style="'+cNUM+'">'+(r.bpm||'-')+'</td><td style="'+cNUM+'">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td style="'+cNUM+'">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td style="'+cTD+'">'+mtL+'</td><td style="'+cTD+'">'+(r.notes||'')+'</td><td style="'+cTD+'">'+dimL+'</td><td style="'+cTD+'white-space:nowrap;">'+(r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" style="font-size:.75rem;color:#0078ff;text-decoration:none;">&darr; Kubios</a>':'')+'</td></tr>';

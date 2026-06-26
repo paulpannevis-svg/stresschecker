@@ -272,11 +272,12 @@ function renderResults(results) {
     var _conf=isNaN(_kwv)?'trusted':(_kwv>=85?'trusted':_kwv>=70?'limited':'untrusted');
     // Getal-onderdrukking: Slecht OF kwaliteit<70 -> markering i.p.v. getal; 70-84 -> getal + grijze stip; rest -> getal.
     var _suppress=(_slecht||_conf==='untrusted');
-    var _irrLabel={de:'Zu unregelmäßig',en:'Too irregular',nl:'Te onregelmatig'}[LANG]||'Te onregelmatig';
+    var _irrLabel={de:'Nicht stabil genug',en:'Not stable enough',nl:'Niet stabiel genoeg'}[LANG]||'Niet stabiel genoeg';
+    var _irrTip={de:'Das Signal war zu unregelmäßig für eine zuverlässige Bewertung (Bewegung, Sensorkontakt oder Herzrhythmus). Bitte wiederholen.',en:'The signal was too unstable to score reliably (movement, sensor contact, or heart rhythm). Please repeat.',nl:'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.'}[LANG]||'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.';
     var col=(_kwlow||_slecht)?'#bfbfbf':(COLORS[z]||'#999');
-    var _warn=_slecht?'<span title="Te onregelmatig om betrouwbaar te scoren (hart of sensor)" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
+    var _warn=_slecht?'<span title="'+_irrTip+'" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
     var dot=_warn+'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+col+';margin-right:4px;"></span>';
-    var riCell=_suppress?'<span title="Te onregelmatig om betrouwbaar te scoren (hart of sensor)" style="color:#c0392b;font-weight:600;white-space:nowrap;">'+_irrLabel+'</span>':ri;
+    var riCell=_suppress?'<span title="'+_irrTip+'" style="color:#c0392b;font-weight:600;white-space:nowrap;">'+_irrLabel+'</span>':ri;
         var ctx_html2='';
         if(r.subjectief_score!=null||r.ctx_vitaliteit!=null||r.ctx_dimensie){
           var dDIM=LANG=='de'?{lichamelijk:'Körperlich',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spirituell',weet_niet:'?'}:LANG=='en'?{lichamelijk:'Physical',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spiritual',weet_niet:'?'}:{lichamelijk:'Lichamelijk',mentaal:'Mentaal',emotioneel:'Emotioneel',spiritueel:'Spiritueel',weet_niet:'?'};
