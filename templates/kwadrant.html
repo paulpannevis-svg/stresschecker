@@ -294,8 +294,8 @@ var vit=5;
   // i.p.v. de inline SD1/SD2-kopie. 'slecht' -> markeren ('flag'); rest -> 'clean'. De oude
   // HRV.rrIrregularity blijft in hrv.js als referentie (hier niet gebruikt). Getoonde RI = cur.ri
   // (niets herberekend uit RR). try/catch-terugval op 'clean' als hrv.js/RR ontbreekt.
-  var _irr='clean';
-  try{ var _q=HRV.qualityClassify(cur.rr_intervals); _irr=(_q&&_q.band==='slecht')?'flag':'clean'; }catch(e){}
+  var _irr='clean', _band='goed';
+  try{ var _q=HRV.qualityClassify(cur.rr_intervals); if(_q&&_q.band){_band=_q.band;} _irr=(_band==='slecht')?'flag':'clean'; }catch(e){}
   if(_irr==='flag') _gated=true;  // te onregelmatig: ook stip + gauge-naald grijzen
   // Eén systeem-van-record (cur.ri) voor label/stip-ring/gauge/getal — zelfde zone overal.
   // Biofeedback: getRaw-eindwaarde (bewuste uitzondering; window-mean-vs-eindwaarde = losse open kwestie, RMSSD_HERBEREKENING_OVERZICHT).
@@ -370,8 +370,23 @@ var vit=5;
   })();
   document.getElementById('bpmVal').textContent=bpm;document.getElementById('hrvVal').textContent=hrv+'%';
   if(document.getElementById('qualityPct'))document.getElementById('qualityPct').textContent=kw+'%';
-  if(document.getElementById('qualityStars'))document.getElementById('qualityStars').textContent=kw>=90?'★★★':kw>=70?'★★☆':'★☆☆';
-    if(document.getElementById('qualityLabel')){var ql=document.getElementById('qualityLabel');var lng='{{lang}}';if(kw>=90){ql.textContent=lng==='de'?'Ausgezeichnet':lng==='en'?'Excellent':'Uitstekend';ql.style.color='#00ffff';}else if(kw>=70){ql.textContent=lng==='de'?'Gut':lng==='en'?'Good':'Goed';ql.style.color='#ffcc00';}else if(kw>=50){ql.textContent=lng==='de'?'Mäßig':lng==='en'?'Fair':'Matig';ql.style.color='#f1c40f';}else{ql.textContent=lng==='de'?'Ungen\u00fcgend':lng==='en'?'Poor':'Onvoldoende';ql.style.color='#ff6666';}}
+  // Meetkwaliteit-sterren/label op de variant-B band (HRV.qualityClassify), NIET op kwaliteit%.
+  // slecht/redelijk/onbepaald -> ★★☆ (onbetrouwbaar/voorzichtig); goed -> ★★★. 'onbekend'-alias defensief.
+  (function(){
+    var _lng2='{{lang}}';
+    var _qmap={
+      slecht:   {s:'★★☆', nl:'Onbetrouwbaar', de:'Unzuverlässig', en:'Unreliable',   c:'#ff6666'},
+      redelijk: {s:'★★☆', nl:'Voorzichtig',   de:'Mit Vorsicht',  en:'With caution', c:'#f1c40f'},
+      onbepaald:{s:'★★☆', nl:'Voorzichtig',   de:'Mit Vorsicht',  en:'With caution', c:'#f1c40f'},
+      onbekend: {s:'★★☆', nl:'Voorzichtig',   de:'Mit Vorsicht',  en:'With caution', c:'#f1c40f'},
+      goed:     {s:'★★★', nl:'Goed',          de:'Gut',           en:'Good',         c:'#00ffff'}
+    };
+    var _qm=_qmap[_band]||_qmap.goed;
+    var _qs=document.getElementById('qualityStars');
+    if(_qs){_qs.textContent=_qm.s;_qs.style.color=_qm.c;}
+    var ql=document.getElementById('qualityLabel');
+    if(ql){ql.textContent=(_lng2==='de'?_qm.de:_lng2==='en'?_qm.en:_qm.nl);ql.style.color=_qm.c;}
+  })();
     if(document.getElementById('qualityAdvice')){document.getElementById('qualityAdvice').style.display=kw<70?'block':'none';}
   // Signaal-niet-stabiel box: tonen bij variant-B 'slecht' (_irr==='flag'); standaard uitgeklapt.
   if(document.getElementById('signalWarnBox')){
