@@ -8167,24 +8167,15 @@ def pro_upgrade():
         return redirect(url_for('sc_login'))
     lang = session.get('lang', 'nl')
     email = (session.get('email') or '').strip().lower()
+    sub = _find_subscription_row_by_email(email) if email else None
+    # State-aware: een ACTIEF/trialing abonnement -> Stripe-portal (tier WIJZIGEN op de
+    # bestaande subscription) i.p.v. de checkout (die een TWEEDE sub zou aanmaken =
+    # dubbele facturatie). Geen/canceled/past_due sub -> gewoon de upgrade/checkout-pagina.
+    if sub and sub['status'] in ('active', 'trialing'):
+        return redirect(url_for('manage_subscription'))
     current_tier = None
-    if email:
-        try:
-            import sqlite3 as _sq
-            cn = _sq.connect(DB_PATH); cn.row_factory = _sq.Row
-            row = cn.execute(
-                "SELECT p.name, p.tier, p.plan_id FROM licenses l "
-                "JOIN subscriptions s ON s.subscription_id=l.stripe_subscription_id "
-                "JOIN plans p ON p.plan_id=s.plan_id "
-                "WHERE l.email=? AND s.status IN ('active','trialing','past_due') "
-                "ORDER BY CASE s.status WHEN 'active' THEN 1 WHEN 'trialing' THEN 2 "
-                "         ELSE 3 END, s.current_period_end DESC LIMIT 1",
-                (email,)).fetchone()
-            if row:
-                current_tier = {'name': row['name'], 'tier': row['tier'], 'plan_id': row['plan_id']}
-            cn.close()
-        except Exception as e:
-            app.logger.warning('pro_upgrade: huidige-tier-lookup faalde (%s): %s', email, e)
+    if sub:
+        current_tier = {'name': sub['plan_name'], 'tier': sub['tier'], 'plan_id': sub['plan_id']}
     return render_template('pro/upgrade.html', lang=lang,
                            current_tier=current_tier, tiers=PRO_UPGRADE_TIERS,
                            test_mode=STRIPE_TEST_MODE)

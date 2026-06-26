@@ -89,6 +89,14 @@
       {% else %}Opzegging gepland{% if subscription_info.current_period_end_display %} — actief tot {{ subscription_info.current_period_end_display }}{% endif %}{% endif %}
     </p>
     {% endif %}
+    {# In-app upgrade/heractiveren: alleen tonen zonder actief abonnement (canceled/geen
+       Stripe-sub) -> /pro/upgrade (server-side checkout, customer-hergebruik). Actieve subs
+       krijgen GEEN link hier (consistent met de portal-verwijdering 2026-06-25). #}
+    {% if not subscription_info or subscription_info.status == 'canceled' %}
+    <a href="/pro/upgrade" style="display:inline-block;margin-top:.4rem;padding:9px 14px;background:#E8344E;color:#fff;border-radius:8px;font-size:.85rem;text-decoration:none;">
+      {% if lang=='de' %}Upgrade / erneut abonnieren{% elif lang=='en' %}Upgrade / resubscribe{% else %}Upgrade / opnieuw abonneren{% endif %} &rarr;
+    </a>
+    {% endif %}
     {# Stripe Customer Portal-knop verwijderd 2026-06-25 op verzoek (zelfde als /instellingen).
        NB: portal-only acties (betaalmethode/plan wijzigen, heractiveren na opzegging) hebben geen UI meer.
     <a href="{{ url_for('manage_subscription') }}" class="btn btn-primary">
