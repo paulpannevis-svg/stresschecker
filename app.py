@@ -46,15 +46,17 @@ def send_verification_code(email, code, lang='nl'):
         import sendgrid
         from sendgrid.helpers.mail import Mail, ReplyTo
         sg = sendgrid.SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
+        # Account-e-mail in de body: maakt een verkeerde-autofill-login meteen zichtbaar
+        # (account_email == de ontvanger 'email'; geldt voor alle call-sites).
         if lang == 'de':
             subject = 'Ihr Verifizierungscode – StressChecker'
-            body = f'Ihr Verifizierungscode lautet: {code}\n\nDieser Code ist 10 Minuten gültig.'
+            body = f'Verifikationscode für {email}: {code}\n\nDieser Code ist 10 Minuten gültig.'
         elif lang == 'en':
             subject = 'Your verification code – StressChecker'
-            body = f'Your verification code is: {code}\n\nThis code is valid for 10 minutes.'
+            body = f'Verification code for {email}: {code}\n\nThis code is valid for 10 minutes.'
         else:
             subject = 'Uw verificatiecode – StressChecker'
-            body = f'Uw verificatiecode is: {code}\n\nDeze code is 10 minuten geldig.'
+            body = f'Verificatiecode voor {email}: {code}\n\nDeze code is 10 minuten geldig.'
         msg = Mail(from_email='info@lifestylemonitors.com', to_emails=email, subject=subject, plain_text_content=body)
         msg.reply_to = ReplyTo(_reply_to_for_lang(lang))
         sg.send(msg)
