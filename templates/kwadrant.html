@@ -55,7 +55,6 @@ body{background:#f5f5f5;margin:0;}
 .kw-left .kw-metrics-row div[style*="color:#bbb"]{color:#888 !important;}
 .kw-left #qualityBadge{background:#E8F4F0 !important;border-color:#B0E5D5 !important;}
 .kw-left #qualityBadge > span{color:#5F5E5A !important;}
-.kw-left #qualityPct,.kw-left #qualityStars,.kw-left #qualityLabel{color:#0F6E56 !important;}
 
 </style>
 </div>
@@ -94,13 +93,19 @@ body{background:#f5f5f5;margin:0;}
   </div>
   <div class="kw-delta-row" id="deltaRow"></div>
   <div id="kompasHint" onclick="kwOpslaan()" style="margin-top:.8rem;font-size:.82rem;color:#888;text-align:center;cursor:pointer;text-decoration:underline;">{% if lang=="de" %}Deine ausführliche Deutung findest du auf der Ergebnisseite.{% elif lang=="en" %}Your full interpretation is on the Results page.{% else %}Je volledige duiding vind je op de Resultaten-pagina.{% endif %}</div>
-    <div id="qualityBadge" style="display:flex;align-items:center;justify-content:center;gap:.3rem;margin-top:.6rem;padding:.4rem .4rem;background:rgba(0,255,255,0.12);border:1px solid rgba(0,255,255,0.3);border-radius:6px;position:relative;width:100%;box-sizing:border-box;">
-      <span style="font-size:.68rem;color:#ccc;">{%if lang=="de"%}Messqualit&auml;t:{%elif lang=="en"%}Reading quality:{%else%}Meetkwaliteit:{%endif%}</span>
-      <span id="qualityPct" style="display:none;font-weight:700;color:#00ffff;font-size:.78rem;">--</span>
-      <span id="qualityStars" style="color:#00ffff;font-size:.75rem;"></span>
-      <span id="qualityLabel" style="font-size:.68rem;color:#00ffff;"></span>
-      <span style="cursor:pointer;font-size:.8rem;color:#ffd700;margin-left:.3rem;opacity:1;" onclick="var t=document.getElementById('qualityTip');t.style.display=t.style.display==='block'?'none':'block';">&#9432;</span>
-      <div id="qualityTip" style="display:none;position:absolute;bottom:110%;left:50%;transform:translateX(-50%);background:#333;color:#ccc;padding:.5rem .7rem;border-radius:6px;font-size:.68rem;line-height:1.5;width:240px;box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:10;text-align:left;">{%if lang=="de"%}Wie viele Herzschläge für die Messung brauchbar waren. Unter 70% ist das Ergebnis weniger zuverlässig — erwäge eine neue Messung.{%elif lang=="en"%}How many heartbeats were usable for the reading. Below 70% the result is less reliable — consider a new reading.{%else%}Hoeveel hartslagen bruikbaar waren voor de meting. Onder 70% is het resultaat minder betrouwbaar — overweeg een nieuwe meting.{%endif%}</div>
+    <!-- Blok 1: HARTRITME-KWALITEIT â op variant-B band (_band); stars+label via JS -->
+    <div id="rhythmQualBox" style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:.35rem;margin-top:.6rem;padding:.4rem .5rem;background:#E8F4F0;border:1px solid #B0E5D5;border-radius:6px;width:100%;box-sizing:border-box;">
+      <span style="font-size:.6rem;font-weight:800;letter-spacing:.05em;color:#5F5E5A;">{%if lang=="de"%}HERZRHYTHMUS-QUALITÄT{%elif lang=="en"%}HEART-RHYTHM QUALITY{%else%}HARTRITME-KWALITEIT{%endif%}</span>
+      <span id="qualityStars" style="font-size:.85rem;color:#0F6E56;">&nbsp;</span>
+      <span id="qualityLabel" style="font-size:.66rem;font-weight:700;color:#0F6E56;"></span>
+    </div>
+    <!-- Blok 2: SIGNAAL-STERKTE â op kwaliteit% (kw); percentage + indicator <70% + actie-tip -->
+    <div id="signalStrengthBox" style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:.35rem;margin-top:.4rem;padding:.4rem .5rem;background:#F4F1EC;border:1px solid #E0D8CC;border-radius:6px;position:relative;width:100%;box-sizing:border-box;">
+      <span style="font-size:.6rem;font-weight:800;letter-spacing:.05em;color:#5F5E5A;">{%if lang=="de"%}SIGNALSTÄRKE{%elif lang=="en"%}SIGNAL STRENGTH{%else%}SIGNAAL STERKTE{%endif%}</span>
+      <span id="qualityPct" style="font-weight:800;font-size:.82rem;color:#0F6E56;">--</span>
+      <span id="signalStrengthTip" style="display:none;font-size:.62rem;font-weight:700;color:#c0392b;"></span>
+      <span style="cursor:pointer;font-size:.78rem;color:#cc8400;" onclick="var t=document.getElementById('qualityTip');t.style.display=t.style.display==='block'?'none':'block';">&#9432;</span>
+      <div id="qualityTip" style="display:none;position:absolute;bottom:110%;left:50%;transform:translateX(-50%);background:#333;color:#eee;padding:.5rem .7rem;border-radius:6px;font-size:.66rem;line-height:1.5;width:240px;box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:10;text-align:left;">{%if lang=="de"%}Wie viele Herzschläge für die Messung brauchbar waren. Unter 70% ist das Ergebnis weniger zuverlässig — erwäge eine neue Messung.{%elif lang=="en"%}How many heartbeats were usable for the reading. Below 70% the result is less reliable — consider a new reading.{%else%}Hoeveel hartslagen bruikbaar waren voor de meting. Onder 70% is het resultaat minder betrouwbaar — overweeg een nieuwe meting.{%endif%}</div>
     </div>
     <div id="qualityAdvice" style="display:none;margin-top:.4rem;padding:.4rem .6rem;background:rgba(255,100,100,0.12);border:1px solid rgba(255,100,100,0.3);border-radius:6px;font-size:.7rem;line-height:1.5;color:#ffaaaa;">
       <strong style="color:#ff6666;">{%if lang=="de"%}Hinweis:{%elif lang=="en"%}Note:{%else%}Let op:{%endif%}</strong>
@@ -369,17 +374,23 @@ var vit=5;
     } else if(_c){_c.style.display='none';}
   })();
   document.getElementById('bpmVal').textContent=bpm;document.getElementById('hrvVal').textContent=hrv+'%';
-  if(document.getElementById('qualityPct'))document.getElementById('qualityPct').textContent=kw+'%';
+  (function(){ // SIGNAAL-STERKTE (kwaliteit%): percentage + kleur + actie-tip <70%
+    var _kwn=isNaN(Number(kw))?100:Number(kw), _lng3='{{lang}}';
+    var _pc=document.getElementById('qualityPct');
+    if(_pc){_pc.textContent=_kwn+'%';_pc.style.color=_kwn>=85?'#0F6E56':_kwn>=70?'#cc8400':'#c0392b';}
+    var _st=document.getElementById('signalStrengthTip');
+    if(_st){ if(_kwn<70){_st.textContent='⚠ '+(_lng3==='de'?'Sensorkontakt verbessern':_lng3==='en'?'Improve sensor contact':'Sensor-contact verbeteren');_st.style.display='inline';} else {_st.style.display='none';} }
+  })();
   // Meetkwaliteit-sterren/label op de variant-B band (HRV.qualityClassify), NIET op kwaliteit%.
   // slecht/redelijk/onbepaald -> ★★☆ (onbetrouwbaar/voorzichtig); goed -> ★★★. 'onbekend'-alias defensief.
   (function(){
     var _lng2='{{lang}}';
     var _qmap={
-      slecht:   {s:'★★☆', nl:'Onbetrouwbaar', de:'Unzuverlässig', en:'Unreliable',   c:'#ff6666'},
-      redelijk: {s:'★★☆', nl:'Voorzichtig',   de:'Mit Vorsicht',  en:'With caution', c:'#f1c40f'},
-      onbepaald:{s:'★★☆', nl:'Voorzichtig',   de:'Mit Vorsicht',  en:'With caution', c:'#f1c40f'},
-      onbekend: {s:'★★☆', nl:'Voorzichtig',   de:'Mit Vorsicht',  en:'With caution', c:'#f1c40f'},
-      goed:     {s:'★★★', nl:'Goed',          de:'Gut',           en:'Good',         c:'#00ffff'}
+      slecht:   {s:'★★☆', nl:'Onbetrouwbaar', de:'Unzuverlässig', en:'Unreliable',   c:'#c0392b'},
+      redelijk: {s:'★★☆', nl:'Voorzichtig',   de:'Mit Vorsicht',  en:'With caution', c:'#cc8400'},
+      onbepaald:{s:'★★☆', nl:'Voorzichtig',   de:'Mit Vorsicht',  en:'With caution', c:'#cc8400'},
+      onbekend: {s:'★★☆', nl:'Voorzichtig',   de:'Mit Vorsicht',  en:'With caution', c:'#cc8400'},
+      goed:     {s:'★★★', nl:'Goed',          de:'Gut',           en:'Good',         c:'#0F6E56'}
     };
     var _qm=_qmap[_band]||_qmap.goed;
     var _qs=document.getElementById('qualityStars');
