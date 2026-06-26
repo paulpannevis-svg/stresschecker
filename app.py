@@ -5600,6 +5600,26 @@ def _build_kompas_prompt(cur, lang, context, session_data=None, baseline_avg=Non
     lang_name = {'nl': 'Dutch', 'de': 'German', 'en': 'English'}.get(lang, 'Dutch')
     mt = (cur.get('meting_type') or 'basismeting').lower()
     suffix = f"\n\nRespond in {lang_name}."
+    # MEETKWALITEIT-GATE (STAP 4/5): leest quality_band UIT de meting-row (kolom, niet live
+    # herberekend; band gezet door analytics.quality_classify bij opslag). Alleen band 'goed'
+    # krijgt de normale, stellige duiding; 'slecht'/'redelijk' én onbepaald/NULL (veilige
+    # default) onderdrukken stelligheid. 'slecht' = variant-B te onregelmatig; gebruik NOOIT het
+    # woord 'aritmie'. Geldt voor alle meettypes (suffix gaat mee in elke system-prompt-return).
+    # Staat los van de (op prod dormante) hard-gate _row_irregular hierboven in api_feedback.
+    _qband_gate = (cur.get('quality_band') or '').strip().lower()
+    if _qband_gate != 'goed':
+        _qb_hard = (_qband_gate == 'slecht')
+        suffix += (
+            "\n\nMEETKWALITEIT-GATE (cruciaal): de signaalkwaliteit van DEZE meting is "
+            + ("te laag om betrouwbaar te scoren. " if _qb_hard else "beperkt of onbepaald. ")
+            + "Onderdruk stelligheid: formuleer je observatie nadrukkelijk voorzichtig en "
+            "voorlopig, niet als een betrouwbaar oordeel. Vermijd stellige conclusies over de "
+            "toestand van de persoon en leun niet zwaar op de exacte RI-waarde. "
+            + ("Benoem terloops dat deze meting te onregelmatig was om met zekerheid te duiden. "
+               if _qb_hard else "")
+            + "Gebruik NOOIT het woord 'aritmie' of medische diagnosetaal. "
+            "Houd de afsluitende reflectievraag open en mild."
+        )
 
     if mt == 'biofeedback' and session_data and session_data.get('valid'):
         w = session_data.get('windows') or {}
@@ -5745,26 +5765,26 @@ def api_feedback():
         if _is_client_query:
             db = get_pro_db()
             if mid_param:
-                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals FROM client_metingen WHERE id=? AND client_id=?', (mid_param, cid)).fetchone()
+                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band FROM client_metingen WHERE id=? AND client_id=?', (mid_param, cid)).fetchone()
                 rows = []
                 if cur_r:
                     rows.append(cur_r)
-                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals FROM client_metingen WHERE client_id=? AND ts < ? ORDER BY ts DESC LIMIT 1', (cid, cur_r['ts'])).fetchone()
+                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band FROM client_metingen WHERE client_id=? AND ts < ? ORDER BY ts DESC LIMIT 1', (cid, cur_r['ts'])).fetchone()
                     if prev_r: rows.append(prev_r)
             else:
-                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 2', (cid,)).fetchall()
+                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 2', (cid,)).fetchall()
             db.close()
         else:
             db = get_meting_db()
             if mid_param:
-                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals FROM metingen WHERE id=? AND user_key=?', (mid_param, get_user_key())).fetchone()
+                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band FROM metingen WHERE id=? AND user_key=?', (mid_param, get_user_key())).fetchone()
                 rows = []
                 if cur_r:
                     rows.append(cur_r)
-                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals FROM metingen WHERE user_key=? AND ts < ? ORDER BY ts DESC LIMIT 1', (get_user_key(), cur_r['ts'])).fetchone()
+                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band FROM metingen WHERE user_key=? AND ts < ? ORDER BY ts DESC LIMIT 1', (get_user_key(), cur_r['ts'])).fetchone()
                     if prev_r: rows.append(prev_r)
             else:
-                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 2', (get_user_key(),)).fetchall()
+                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 2', (get_user_key(),)).fetchall()
             db.close()
     except Exception as e:
         import traceback; traceback.print_exc()
