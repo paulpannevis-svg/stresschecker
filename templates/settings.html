@@ -87,7 +87,7 @@
         </span>
       {% elif subscription_info.status == 'canceled' %}
         <span style="color:var(--text-muted);">
-          {% if lang == 'de' %}Kein aktives Abonnement{% elif lang == 'en' %}No active subscription{% else %}Geen actief abonnement{% endif %}
+          {% if lang == 'de' %}Abonnement beendet am {{ subscription_info.current_period_end_display }}{% elif lang == 'en' %}Subscription ended on {{ subscription_info.current_period_end_display }}{% else %}Abonnement beëindigd op {{ subscription_info.current_period_end_display }}{% endif %}
         </span>
       {% else %}
         {% if lang == 'de' %}Nächste Rechnung: {{ subscription_info.current_period_end_display }}{% elif lang == 'en' %}Next billing: {{ subscription_info.current_period_end_display }}{% else %}Volgende factuur: {{ subscription_info.current_period_end_display }}{% endif %}

@@ -7876,7 +7876,9 @@ def has_active_pro_subscription(email):
             "  JOIN subscriptions s ON s.subscription_id = l.stripe_subscription_id "
             "  JOIN plans p ON p.plan_id = s.plan_id "
             " WHERE l.email = ? AND p.tier LIKE 'pro%' "
-            " ORDER BY s.current_period_end DESC LIMIT 1",
+            " ORDER BY CASE s.status WHEN 'active' THEN 1 WHEN 'trialing' THEN 2 "
+            "          WHEN 'past_due' THEN 3 ELSE 4 END ASC, "
+            "          s.current_period_end DESC LIMIT 1",
             (email,)).fetchone()
         if sub and sub['status'] in ('active', 'past_due'):
             return True
