@@ -69,6 +69,29 @@ body{background:#f5f5f5;margin:0;}
     <div class="kw-m hrv"><div class="kw-m-val" id="hrvVal">-</div><div class="kw-m-lbl">HRV %</div></div>
   </div>
   <div id="riCaveat" style="display:none;margin-top:.5rem;padding:.4rem .6rem;background:rgba(241,196,15,0.12);border:1px solid rgba(241,196,15,0.35);border-radius:6px;font-size:.7rem;line-height:1.5;color:#f1c40f;text-align:center;"></div>
+  <!-- Signaal-niet-stabiel waarschuwing: getoond door JS bij _irr==='flag' (variant-B 'slecht').
+       Standaard uitgeklapt; [−]/[+] klapt de body in/uit. Bewust licht-rood (valt op tegen donker thema). -->
+  <div id="signalWarnBox" style="display:none;margin-top:.6rem;padding:.55rem .7rem;background:#fdecea;border:2px solid #e74c3c;border-left:5px solid #e67e22;border-radius:8px;color:#7a1f1a;text-align:left;box-shadow:0 2px 10px rgba(231,76,60,0.3);">
+    <div style="display:flex;align-items:center;gap:.4rem;">
+      <span style="font-size:1rem;">&#9888;&#65039;</span>
+      <strong style="flex:1;font-size:.8rem;letter-spacing:.02em;color:#c0392b;">{%if lang=="de"%}SIGNAL NICHT STABIL GENUG{%elif lang=="en"%}SIGNAL NOT STABLE ENOUGH{%else%}SIGNAAL NIET STABIEL GENOEG{%endif%}</strong>
+      <span id="signalWarnToggle" onclick="kwToggleSignalWarn()" role="button" tabindex="0" style="cursor:pointer;font-weight:900;font-size:1.05rem;line-height:1;color:#c0392b;user-select:none;padding:0 .35rem;" title="{%if lang=='de'%}Ein-/ausklappen{%elif lang=='en'%}Collapse/expand{%else%}In-/uitklappen{%endif%}">&minus;</span>
+    </div>
+    <div id="signalWarnBody" style="margin-top:.45rem;font-size:.7rem;line-height:1.55;">
+      <div style="font-weight:700;margin-bottom:.15rem;">{%if lang=="de"%}M&ouml;gliche Ursachen:{%elif lang=="en"%}Possible reasons:{%else%}Mogelijke oorzaken:{%endif%}</div>
+      <ul style="margin:0 0 .5rem;padding-left:1.15rem;">
+        <li>{%if lang=="de"%}Bewegung oder Sprechen w&auml;hrend der Messung{%elif lang=="en"%}Movement or talking during the reading{%else%}Beweging of praten tijdens de meting{%endif%}</li>
+        <li>{%if lang=="de"%}Schlechter Sensorkontakt (Finger oder Ohr){%elif lang=="en"%}Poor sensor contact (finger or ear){%else%}Slecht sensorcontact (vinger of oor){%endif%}</li>
+        <li>{%if lang=="de"%}Ein vor&uuml;bergehend unregelm&auml;&szlig;iger Herzschlag{%elif lang=="en"%}A temporarily irregular heartbeat{%else%}Een tijdelijk onregelmatige hartslag{%endif%}</li>
+      </ul>
+      <div style="font-weight:700;margin-bottom:.15rem;">{%if lang=="de"%}Was jetzt zu tun ist:{%elif lang=="en"%}What to do now:{%else%}Wat nu te doen:{%endif%}</div>
+      <ol style="margin:0;padding-left:1.15rem;">
+        <li>{%if lang=="de"%}Sitzen Sie still und atmen Sie ruhig{%elif lang=="en"%}Sit still and breathe calmly{%else%}Zit stil en adem rustig{%endif%}</li>
+        <li>{%if lang=="de"%}Pr&uuml;fen Sie, ob der Sensor guten Kontakt hat{%elif lang=="en"%}Check that the sensor makes good contact{%else%}Controleer dat de sensor goed contact maakt{%endif%}</li>
+        <li>{%if lang=="de"%}Wiederholen Sie die Messung in einigen Stunden{%elif lang=="en"%}Repeat the reading in a few hours{%else%}Herhaal de meting over enkele uren{%endif%}</li>
+      </ol>
+    </div>
+  </div>
   <div class="kw-delta-row" id="deltaRow"></div>
   <div id="kompasHint" onclick="kwOpslaan()" style="margin-top:.8rem;font-size:.82rem;color:#888;text-align:center;cursor:pointer;text-decoration:underline;">{% if lang=="de" %}Deine ausführliche Deutung findest du auf der Ergebnisseite.{% elif lang=="en" %}Your full interpretation is on the Results page.{% else %}Je volledige duiding vind je op de Resultaten-pagina.{% endif %}</div>
     <div id="qualityBadge" style="display:flex;align-items:center;justify-content:center;gap:.3rem;margin-top:.6rem;padding:.4rem .4rem;background:rgba(0,255,255,0.12);border:1px solid rgba(0,255,255,0.3);border-radius:6px;position:relative;width:100%;box-sizing:border-box;">
@@ -115,6 +138,7 @@ function showTab(n,el){document.querySelectorAll('.kw-tab-content').forEach(t=>t
 const ZC=['#c0392b','#e67e22','#f1c40f','#82d228','#27ae60'];
 var lang='{{lang}}';
 const ZL=('{{ lang }}'==='de')?['Schwer belastet','Belastet','Leicht belastet','Im Gleichgewicht','Vital']:('{{ lang }}'==='en')?['Heavily strained','Strained','Lightly strained','In balance','Resilient']:['Zwaar belast','Belast','Licht belast','In balans','Veerkrachtig'];
+function kwToggleSignalWarn(){var b=document.getElementById('signalWarnBody'),t=document.getElementById('signalWarnToggle');if(!b||!t)return;var open=b.style.display!=='none';b.style.display=open?'none':'block';t.innerHTML=open?'+':'−';}
 function drawGauge(cv,ri,gated){
   const H=cv.height,W=cv.width,ctx=cv.getContext("2d");
   const cx=W/2,cy=H,r=H-12;
@@ -349,6 +373,11 @@ var vit=5;
   if(document.getElementById('qualityStars'))document.getElementById('qualityStars').textContent=kw>=90?'★★★':kw>=70?'★★☆':'★☆☆';
     if(document.getElementById('qualityLabel')){var ql=document.getElementById('qualityLabel');var lng='{{lang}}';if(kw>=90){ql.textContent=lng==='de'?'Ausgezeichnet':lng==='en'?'Excellent':'Uitstekend';ql.style.color='#00ffff';}else if(kw>=70){ql.textContent=lng==='de'?'Gut':lng==='en'?'Good':'Goed';ql.style.color='#ffcc00';}else if(kw>=50){ql.textContent=lng==='de'?'Mäßig':lng==='en'?'Fair':'Matig';ql.style.color='#f1c40f';}else{ql.textContent=lng==='de'?'Ungen\u00fcgend':lng==='en'?'Poor':'Onvoldoende';ql.style.color='#ff6666';}}
     if(document.getElementById('qualityAdvice')){document.getElementById('qualityAdvice').style.display=kw<70?'block':'none';}
+  // Signaal-niet-stabiel box: tonen bij variant-B 'slecht' (_irr==='flag'); standaard uitgeklapt.
+  if(document.getElementById('signalWarnBox')){
+    document.getElementById('signalWarnBox').style.display=(_irr==='flag')?'block':'none';
+    if(_irr==='flag'){var _swb=document.getElementById('signalWarnBody'),_swt=document.getElementById('signalWarnToggle');if(_swb){_swb.style.display='block';}if(_swt){_swt.innerHTML='−';}}
+  }
   const tsDatum=new Date(cur.ts);
   const ds=!isNaN(tsDatum)?tsDatum.toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'}):'';
   const dur=cur.duration||0;const mm=Math.floor(dur/60);const ss=String(dur%60).padStart(2,'0');
