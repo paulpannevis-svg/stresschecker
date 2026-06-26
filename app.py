@@ -3691,12 +3691,26 @@ def api_save_meting():
         # hangende) waarden bij andere meettypes.
         if str(data.get('meting_type', 'basismeting')).lower() != 'basismeting':
             _prediction = _sleep_q = _load_pd = _meaning = None
+        # Meetkwaliteit (variant-B) defensief: alleen als analytics.quality_classify aanwezig is.
+        # Zelfde idioom als de event-opslag (app.py:3815); ontbreekt de functie -> NULL.
+        _rr_save = str(data.get('rr_intervals', '') or '')
+        _qband = None
+        try:
+            _qc = getattr(__import__('analytics'), 'quality_classify', None)
+            if _qc and _rr_save:
+                import json as _json
+                _rrlist = _json.loads(_rr_save) if _rr_save.strip().startswith('[') else []
+                if _rrlist:
+                    _res = _qc(_rrlist)
+                    _qband = (_res or {}).get('band') if isinstance(_res, dict) else None
+        except Exception:
+            _qband = None
         if client_id > 0 and _is_pro_or_demo_pro():
             db = get_pro_db()
             # office_label vult alleen bij Krankenkasse-sessie; voor reguliere Pro blijft de kolom NULL
             _office = session.get('kk_office') if is_krankenkasse_session() else None
-            _vals=(int(client_id),get_user_key(),int(data.get('ts',__import__('datetime').datetime.now().timestamp()*1000)),float(data.get('ri',0)),int(data.get('bpm',0)),int(data.get('hrv',0)),float(data.get('rmssd',0)),float(data.get('sdnn',0)),float(data.get('pnn50',0)),int(data.get('beats',0)),int(data.get('duration',90)),str(data.get('sensor','demo')),str(data.get('notes','')),str(data.get('timeseries','')),str(data.get('rr_intervals','')),int(data.get('kwaliteit',100)),str(data.get('meting_type','basismeting')),str(data.get('ctx_dimensie','')),float(data.get('ctx_vitaliteit',0)) if data.get('ctx_vitaliteit') else None,_subj_score,_ctx_ongemak,_ctx_vrije_tekst,_office)
-            db.execute('INSERT INTO client_metingen (client_id,pro_key,ts,ri,bpm,hrv_pct,rmssd,sdnn,pnn50,beats,duration,sensor_type,notes,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,office_label) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',_vals)
+            _vals=(int(client_id),get_user_key(),int(data.get('ts',__import__('datetime').datetime.now().timestamp()*1000)),float(data.get('ri',0)),int(data.get('bpm',0)),int(data.get('hrv',0)),float(data.get('rmssd',0)),float(data.get('sdnn',0)),float(data.get('pnn50',0)),int(data.get('beats',0)),int(data.get('duration',90)),str(data.get('sensor','demo')),str(data.get('notes','')),str(data.get('timeseries','')),str(data.get('rr_intervals','')),int(data.get('kwaliteit',100)),str(data.get('meting_type','basismeting')),str(data.get('ctx_dimensie','')),float(data.get('ctx_vitaliteit',0)) if data.get('ctx_vitaliteit') else None,_subj_score,_ctx_ongemak,_ctx_vrije_tekst,_office,_qband)
+            db.execute('INSERT INTO client_metingen (client_id,pro_key,ts,ri,bpm,hrv_pct,rmssd,sdnn,pnn50,beats,duration,sensor_type,notes,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,office_label,quality_band) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',_vals)
             db.commit()
             db.close()
             return jsonify({'ok': True, 'client_id': int(client_id)})
@@ -3721,8 +3735,8 @@ def api_save_meting():
             except Exception:
                 _pred_hit = None
         db.execute('''INSERT INTO metingen
-            (user_key,ts,ri,bpm,hrv_pct,rmssd,beats,duration,sensor_type,notes,sdnn,pnn50,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,sleep_quality,load_prev_day,meaning_score,prediction,prediction_hit,pending)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)''', (
+            (user_key,ts,ri,bpm,hrv_pct,rmssd,beats,duration,sensor_type,notes,sdnn,pnn50,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,sleep_quality,load_prev_day,meaning_score,prediction,prediction_hit,quality_band,pending)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)''', (
             get_user_key(),
             int(data.get('ts', datetime.now().timestamp()*1000)),
             float(data.get('ri',0)), int(data.get('bpm',0)), int(data.get('hrv',0)),
@@ -3737,7 +3751,7 @@ def api_save_meting():
             _subj_score,
             _ctx_ongemak, _ctx_vrije_tekst,
             _sleep_q, _load_pd, _meaning,
-            _prediction, _pred_hit
+            _prediction, _pred_hit, _qband
         ))
         db.commit()
         session['after_meting'] = True
