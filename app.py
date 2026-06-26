@@ -8025,6 +8025,98 @@ def manage_subscription():
         return redirect(url_for('license_screen', error='portal_unavailable'))
 
 
+@app.route('/api/checkout/create-session', methods=['POST'])
+def api_create_checkout_session():
+    """Server-side Stripe Checkout met CUSTOMER-HERGEBRUIK (voorkomt de duplicate cus_*
+    die Payment Links per aankoop aanmaken). Login vereist; e-mail UIT de sessie (nooit
+    uit de request-body). product_id moet een ACTIEVE prijs in plans zijn (whitelist).
+    Customer-lookup: users.stripe_customer_id -> subscriptions (licenses-join) ->
+    stripe.Customer.list(email) -> anders nieuw + opslaan op users."""
+    import sqlite3 as _sq
+    # 1. Auth — sessie-e-mail, geen body-e-mail (JSON 401 i.p.v. redirect: dit is een API)
+    email = (session.get('email') or '').strip().lower()
+    if not email or not session.get('license_valid'):
+        return jsonify({'error': 'Niet ingelogd'}), 401
+    data = request.get_json(silent=True) or {}
+    product_id = (data.get('product_id') or '').strip()
+    tier = (data.get('tier') or '').strip()
+    if not product_id.startswith('price_'):
+        return jsonify({'error': 'invalid_product_id'}), 400
+
+    key = _load_stripe_secret()
+    if not key:
+        app.logger.error('checkout: STRIPE_SECRET niet beschikbaar (%s)', SPOOR3_STRIPE_KEYS_FILE)
+        return jsonify({'error': 'stripe_unavailable'}), 500
+
+    # 2. product_id-whitelist + bestaande customer (DB) in één connectie
+    customer_id = None
+    cn = _sq.connect(DB_PATH); cn.row_factory = _sq.Row
+    try:
+        if not cn.execute("SELECT 1 FROM plans WHERE stripe_price_id=? AND is_active=1",
+                          (product_id,)).fetchone():
+            return jsonify({'error': 'invalid_product_id'}), 400
+        r1 = cn.execute("SELECT stripe_customer_id FROM users "
+                        "WHERE email=? COLLATE NOCASE AND COALESCE(stripe_customer_id,'')<>''",
+                        (email,)).fetchone()
+        if r1:
+            customer_id = r1['stripe_customer_id']
+        if not customer_id:
+            r2 = cn.execute("SELECT s.stripe_customer_id FROM licenses l "
+                            "JOIN subscriptions s ON s.subscription_id=l.stripe_subscription_id "
+                            "WHERE l.email=? AND COALESCE(s.stripe_customer_id,'')<>'' "
+                            "ORDER BY s.updated_at DESC LIMIT 1", (email,)).fetchone()
+            if r2:
+                customer_id = r2['stripe_customer_id']
+    finally:
+        cn.close()
+
+    import stripe as _s
+    _s.api_key = key
+    # 3. Stripe-fallback (vangt Payment-Link-customers die niet in onze DB staan)
+    if not customer_id:
+        try:
+            _ex = _s.Customer.list(email=email, limit=1).data
+            if _ex:
+                customer_id = _ex[0].id
+        except Exception as e:
+            app.logger.warning('checkout: Customer.list faalde voor %s: %s', email, e)
+    # 4. Pas aanmaken als écht niets gevonden; opslaan op users (gekeyd op e-mail)
+    if not customer_id:
+        try:
+            customer_id = _s.Customer.create(email=email).id
+        except Exception as e:
+            app.logger.error('checkout: Customer.create faalde (%s): %s', email, e)
+            return jsonify({'error': 'stripe_error'}), 500
+        try:
+            cn2 = _sq.connect(DB_PATH)
+            cn2.execute("UPDATE users SET stripe_customer_id=? "
+                        "WHERE email=? COLLATE NOCASE AND COALESCE(stripe_customer_id,'')=''",
+                        (customer_id, email))
+            cn2.commit(); cn2.close()
+        except Exception as e:
+            app.logger.warning('checkout: opslaan customer_id faalde (%s): %s', email, e)
+
+    # 5. Checkout Session
+    try:
+        sess = _s.checkout.Session.create(
+            customer=customer_id,
+            line_items=[{'price': product_id, 'quantity': 1}],
+            mode='subscription',
+            success_url='https://app.stresschecker.com/pro?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url='https://app.stresschecker.com/pro',
+        )
+    except _s.error.InvalidRequestError as e:
+        app.logger.warning('checkout: InvalidRequest (price=%s email=%s): %s', product_id, email, e)
+        return jsonify({'error': 'invalid_product_id', 'detail': str(e)}), 400
+    except Exception as e:
+        app.logger.error('checkout: Session.create faalde (email=%s price=%s): %s', email, product_id, e)
+        return jsonify({'error': 'stripe_error'}), 500
+
+    app.logger.info('checkout-session ok: email=%s tier=%s customer=%s price=%s',
+                    email, tier or '-', customer_id, product_id)
+    return jsonify({'session_url': sess.url})
+
+
 @app.route('/pro/cancel-subscription', methods=['POST'])
 def cancel_subscription():
     """Native opzegging: zet cancel_at_period_end=True op het Stripe-abonnement
