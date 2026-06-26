@@ -2335,7 +2335,7 @@ def settings():
         cancel_ok = _cancel_code in ('ok', 'already')
     # Live Stripe billing-info (facturen + geplande opzegging); leeg/None bij niet-Stripe-cohort.
     billing = get_pro_billing(email, _lang)
-    return render_template('settings.html', lang=_lang, is_pro=session.get('license_type') in ('pro','pro_demo'),
+    _resp = make_response(render_template('settings.html', lang=_lang, is_pro=session.get('license_type') in ('pro','pro_demo'),
                             profile_name=session.get('profile_name', ''),
                             profile_surname=session.get('profile_surname', ''),
                             birth_year=_by,
@@ -2349,7 +2349,12 @@ def settings():
                             cancel_msg=cancel_msg,
                             cancel_ok=cancel_ok,
                             pro_active=has_active_pro_subscription(email),
-                            active_pairings=get_active_pairings_count(get_user_key()))
+                            active_pairings=get_active_pairings_count(get_user_key())))
+    # Billing-/abonnementpagina nooit cachen (iOS Safari/bfcache toonde stale abonnement-status).
+    _resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    _resp.headers['Pragma'] = 'no-cache'
+    _resp.headers['Expires'] = '0'
+    return _resp
 @app.route('/verloop')
 def verloop():
     if not session.get('license_valid') and not session.get('demo_mode'):
