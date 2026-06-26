@@ -7554,11 +7554,14 @@ SPOOR3_PORTAL_CONFIGURATION = 'bpc_1TVpFcHD28PM4o1K18URnQAI'
 SPOOR3_STRIPE_KEYS_FILE     = os.environ.get('SC_STRIPE_KEYS_FILE', '/opt/ic-license-server/data/stripe_keys.conf')
 
 
-def _load_stripe_secret():
+def _load_stripe_secret(test=False):
+    """STRIPE_SECRET_LIVE (default) of STRIPE_SECRET_TEST (test=True) uit de keys-conf.
+    test=False houdt alle bestaande callers (portal/cancel) op de LIVE-sleutel."""
+    _want = 'STRIPE_SECRET_TEST=' if test else 'STRIPE_SECRET_LIVE='
     try:
         with open(SPOOR3_STRIPE_KEYS_FILE) as f:
             for line in f:
-                if line.startswith('STRIPE_SECRET_LIVE='):
+                if line.startswith(_want):
                     return line.split('=', 1)[1].strip()
     except (OSError, IOError):
         pass
@@ -8043,30 +8046,40 @@ def api_create_checkout_session():
     if not product_id.startswith('price_'):
         return jsonify({'error': 'invalid_product_id'}), 400
 
-    key = _load_stripe_secret()
+    key = _load_stripe_secret(test=STRIPE_TEST_MODE)
     if not key:
-        app.logger.error('checkout: STRIPE_SECRET niet beschikbaar (%s)', SPOOR3_STRIPE_KEYS_FILE)
+        app.logger.error('checkout: STRIPE_SECRET (%s) niet beschikbaar (%s)',
+                         'TEST' if STRIPE_TEST_MODE else 'LIVE', SPOOR3_STRIPE_KEYS_FILE)
         return jsonify({'error': 'stripe_unavailable'}), 500
 
     # 2. product_id-whitelist + bestaande customer (DB) in één connectie
     customer_id = None
     cn = _sq.connect(DB_PATH); cn.row_factory = _sq.Row
     try:
-        if not cn.execute("SELECT 1 FROM plans WHERE stripe_price_id=? AND is_active=1",
-                          (product_id,)).fetchone():
+        # Whitelist: test-mode -> eigen test-prijs-set; live -> plans-tabel (canoniek).
+        if STRIPE_TEST_MODE:
+            _price_ok = product_id in TEST_VALID_PRICE_IDS
+        else:
+            _price_ok = cn.execute(
+                "SELECT 1 FROM plans WHERE stripe_price_id=? AND is_active=1",
+                (product_id,)).fetchone() is not None
+        if not _price_ok:
             return jsonify({'error': 'invalid_product_id'}), 400
-        r1 = cn.execute("SELECT stripe_customer_id FROM users "
-                        "WHERE email=? COLLATE NOCASE AND COALESCE(stripe_customer_id,'')<>''",
-                        (email,)).fetchone()
-        if r1:
-            customer_id = r1['stripe_customer_id']
-        if not customer_id:
-            r2 = cn.execute("SELECT s.stripe_customer_id FROM licenses l "
-                            "JOIN subscriptions s ON s.subscription_id=l.stripe_subscription_id "
-                            "WHERE l.email=? AND COALESCE(s.stripe_customer_id,'')<>'' "
-                            "ORDER BY s.updated_at DESC LIMIT 1", (email,)).fetchone()
-            if r2:
-                customer_id = r2['stripe_customer_id']
+        # DB-customer-hergebruik alleen LIVE: de opgeslagen cus_* zijn live-objecten en
+        # bestaan niet in test-mode. In test-mode komt de customer uit Stripe-list/create.
+        if not STRIPE_TEST_MODE:
+            r1 = cn.execute("SELECT stripe_customer_id FROM users "
+                            "WHERE email=? COLLATE NOCASE AND COALESCE(stripe_customer_id,'')<>''",
+                            (email,)).fetchone()
+            if r1:
+                customer_id = r1['stripe_customer_id']
+            if not customer_id:
+                r2 = cn.execute("SELECT s.stripe_customer_id FROM licenses l "
+                                "JOIN subscriptions s ON s.subscription_id=l.stripe_subscription_id "
+                                "WHERE l.email=? AND COALESCE(s.stripe_customer_id,'')<>'' "
+                                "ORDER BY s.updated_at DESC LIMIT 1", (email,)).fetchone()
+                if r2:
+                    customer_id = r2['stripe_customer_id']
     finally:
         cn.close()
 
@@ -8087,14 +8100,15 @@ def api_create_checkout_session():
         except Exception as e:
             app.logger.error('checkout: Customer.create faalde (%s): %s', email, e)
             return jsonify({'error': 'stripe_error'}), 500
-        try:
-            cn2 = _sq.connect(DB_PATH)
-            cn2.execute("UPDATE users SET stripe_customer_id=? "
-                        "WHERE email=? COLLATE NOCASE AND COALESCE(stripe_customer_id,'')=''",
-                        (customer_id, email))
-            cn2.commit(); cn2.close()
-        except Exception as e:
-            app.logger.warning('checkout: opslaan customer_id faalde (%s): %s', email, e)
+        if not STRIPE_TEST_MODE:   # test-customer NIET op live users-data opslaan
+            try:
+                cn2 = _sq.connect(DB_PATH)
+                cn2.execute("UPDATE users SET stripe_customer_id=? "
+                            "WHERE email=? COLLATE NOCASE AND COALESCE(stripe_customer_id,'')=''",
+                            (customer_id, email))
+                cn2.commit(); cn2.close()
+            except Exception as e:
+                app.logger.warning('checkout: opslaan customer_id faalde (%s): %s', email, e)
 
     # 5. Checkout Session
     try:
@@ -8115,6 +8129,65 @@ def api_create_checkout_session():
     app.logger.info('checkout-session ok: email=%s tier=%s customer=%s price=%s',
                     email, tier or '-', customer_id, product_id)
     return jsonify({'session_url': sess.url})
+
+
+# Mode-toggle: STRIPE_TEST_MODE=true => test-sleutel + test-prijzen. Default false (LIVE).
+# ⚠️ NOOIT op de live-prod-service zetten (zou ALLE checkouts naar test-mode sturen);
+# bedoeld voor staging / de test-client. Op import gelezen.
+STRIPE_TEST_MODE = os.environ.get('STRIPE_TEST_MODE', 'false').lower() == 'true'
+
+# LIVE: S+M canoniek uit plans (Stripe-geverifieerd). Pro L (maand) nog niet: geen
+# sc-pro-l-month-rij in plans (2 ambigue €29,95-prijzen) → toevoegen zodra canoniek.
+PRO_UPGRADE_TIERS_LIVE = [
+    {'key': 'sc-pro-s-month', 'price_id': 'price_1TUqWWHD28PM4o1K8W5S7dyi',
+     'label': 'Pro S', 'price': '€9,95', 'clients': 10},
+    {'key': 'sc-pro-m-month', 'price_id': 'price_1TXxxQHD28PM4o1KMY1CaL37',
+     'label': 'Pro M', 'price': '€19,95', 'clients': 30},
+]
+# TEST: aparte Stripe test-products (lookup_key sc-pro-*-month-test), incl. Pro L.
+PRO_UPGRADE_TIERS_TEST = [
+    {'key': 'sc-pro-s-month', 'price_id': 'price_1TmZyhHD28PM4o1KveHO4RRV',
+     'label': 'Pro S', 'price': '€9,95', 'clients': 10},
+    {'key': 'sc-pro-m-month', 'price_id': 'price_1TmZyiHD28PM4o1KRKG5jK0X',
+     'label': 'Pro M', 'price': '€19,95', 'clients': 30},
+    {'key': 'sc-pro-l-month', 'price_id': 'price_1TmZyjHD28PM4o1Kb0StA9O9',
+     'label': 'Pro L', 'price': '€29,95', 'clients': 50},
+]
+PRO_UPGRADE_TIERS = PRO_UPGRADE_TIERS_TEST if STRIPE_TEST_MODE else PRO_UPGRADE_TIERS_LIVE
+# Test-prijzen staan NIET in plans → eigen whitelist-set voor test-mode.
+TEST_VALID_PRICE_IDS = {t['price_id'] for t in PRO_UPGRADE_TIERS_TEST}
+
+
+@app.route('/pro/upgrade')
+def pro_upgrade():
+    """In-app upgrade-pagina met tier-knoppen die POST'en naar
+    /api/checkout/create-session (server-side Checkout met customer-hergebruik —
+    voorkomt de duplicate cus_* van de externe Payment Links)."""
+    if not session.get('license_valid'):
+        return redirect(url_for('sc_login'))
+    lang = session.get('lang', 'nl')
+    email = (session.get('email') or '').strip().lower()
+    current_tier = None
+    if email:
+        try:
+            import sqlite3 as _sq
+            cn = _sq.connect(DB_PATH); cn.row_factory = _sq.Row
+            row = cn.execute(
+                "SELECT p.name, p.tier, p.plan_id FROM licenses l "
+                "JOIN subscriptions s ON s.subscription_id=l.stripe_subscription_id "
+                "JOIN plans p ON p.plan_id=s.plan_id "
+                "WHERE l.email=? AND s.status IN ('active','trialing','past_due') "
+                "ORDER BY CASE s.status WHEN 'active' THEN 1 WHEN 'trialing' THEN 2 "
+                "         ELSE 3 END, s.current_period_end DESC LIMIT 1",
+                (email,)).fetchone()
+            if row:
+                current_tier = {'name': row['name'], 'tier': row['tier'], 'plan_id': row['plan_id']}
+            cn.close()
+        except Exception as e:
+            app.logger.warning('pro_upgrade: huidige-tier-lookup faalde (%s): %s', email, e)
+    return render_template('pro/upgrade.html', lang=lang,
+                           current_tier=current_tier, tiers=PRO_UPGRADE_TIERS,
+                           test_mode=STRIPE_TEST_MODE)
 
 
 @app.route('/pro/cancel-subscription', methods=['POST'])

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width:520px;margin:32px auto;padding:0 16px;">
+  <h2 style="color:#E8344E;text-align:center;margin-bottom:.4rem;">
+    {% if lang=='de' %}Abonnement upgraden{% elif lang=='en' %}Upgrade subscription{% else %}Abonnement upgraden{% endif %}
+  </h2>
+
+  {% if test_mode %}
+  <div style="text-align:center;background:#fff3cd;border:1px solid #ffe08a;color:#7a5c00;border-radius:8px;padding:8px 10px;margin:.4rem 0;font-size:.8rem;">
+    ⚠️ STRIPE TEST-MODUS — {% if lang=='de' %}keine echten Zahlungen{% elif lang=='en' %}no real payments{% else %}geen echte betalingen{% endif %}
+  </div>
+  {% endif %}
+
+  {% if current_tier %}
+  <p style="text-align:center;color:#666;margin-top:0;">
+    {% if lang=='de' %}Aktueller Tarif{% elif lang=='en' %}Current tier{% else %}Huidige tier{% endif %}:
+    <strong>{{ current_tier.name }}</strong>
+  </p>
+  {% endif %}
+
+  <div id="tierMsg" style="display:none;text-align:center;color:#c0392b;background:#fdecea;border:1px solid #f5c6c2;border-radius:8px;padding:8px 10px;margin:.6rem 0;font-size:.85rem;"></div>
+
+  {% for t in tiers %}
+  <button class="tier-btn" data-product-id="{{ t.price_id }}"
+          {% if current_tier and current_tier.plan_id == t.key %}disabled aria-disabled="true"{% endif %}
+          style="display:block;width:100%;padding:16px;margin:10px 0;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;color:#fff;background:{% if current_tier and current_tier.plan_id == t.key %}#bbb{% else %}#E8344E{% endif %};">
+    {% if current_tier and current_tier.plan_id == t.key %}
+      {% if lang=='de' %}Aktueller Tarif{% elif lang=='en' %}Current tier{% else %}Huidige tier{% endif %}: {{ t.label }}
+    {% else %}
+      {% if lang=='de' %}Upgrade auf{% elif lang=='en' %}Upgrade to{% else %}Upgrade naar{% endif %}
+      {{ t.label }} — {{ t.price }}/{% if lang=='de' %}Monat{% elif lang=='en' %}month{% else %}mnd{% endif %}
+    {% endif %}
+    <span style="display:block;font-size:.72rem;font-weight:400;opacity:.85;margin-top:2px;">
+      {% if lang=='de' %}bis zu {{ t.clients }} Klienten{% elif lang=='en' %}up to {{ t.clients }} clients{% else %}tot {{ t.clients }} cliënten{% endif %}
+    </span>
+    {% if test_mode %}<span style="display:block;font-size:.6rem;font-weight:400;opacity:.7;margin-top:2px;font-family:monospace;">{{ t.price_id }}</span>{% endif %}
+  </button>
+  {% endfor %}
+
+  <p style="text-align:center;font-size:.72rem;color:#999;margin-top:1rem;">
+    {% if lang=='de' %}Sichere Zahlung über Stripe.{% elif lang=='en' %}Secure payment via Stripe.{% else %}Veilige betaling via Stripe.{% endif %}
+  </p>
+  <a href="/pro" style="display:block;text-align:center;margin-top:.8rem;color:#888;font-size:.85rem;text-decoration:none;">
+    &#8592; {% if lang=='de' %}Zurück{% elif lang=='en' %}Back{% else %}Terug{% endif %}
+  </a>
+</div>
+
+<script>
+(function(){
+  var MSG = {de:'Fehler beim Start des Checkouts. Bitte erneut versuchen.',
+             en:'Error starting checkout. Please try again.',
+             nl:'Fout bij het starten van de checkout. Probeer opnieuw.'}['{{ lang }}'] || 'Error starting checkout.';
+  var box = document.getElementById('tierMsg');
+  document.querySelectorAll('.tier-btn').forEach(function(btn){
+    if (btn.disabled) return;
+    btn.addEventListener('click', async function(e){
+      e.preventDefault();
+      var product_id = btn.dataset.productId;
+      btn.disabled = true; box.style.display = 'none';
+      try {
+        var resp = await fetch('/api/checkout/create-session', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({product_id: product_id})
+        });
+        var data = await resp.json().catch(function(){ return {}; });
+        if (resp.ok && data.session_url) {
+          window.location.href = data.session_url;
+          return;
+        }
+        throw new Error(data.error || ('HTTP ' + resp.status));
+      } catch (err) {
+        console.error('Checkout error:', err);
+        box.textContent = MSG;
+        box.style.display = 'block';
+        btn.disabled = false;
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}
