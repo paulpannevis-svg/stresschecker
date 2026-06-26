@@ -5589,7 +5589,52 @@ def _basismeting_feiten(cur, recent_basis, phase, lang, age=None):
     return '\n'.join(lines)
 
 
+def _unreliable_signal_payload(lang):
+    """Vaste 'signaal onbetrouwbaar'-boodschap bij quality_band 'slecht' (variant-B te
+    onregelmatig). GEEN LLM-call, geen stellige duiding op ruis. Drietalig."""
+    M = {
+        'nl': ('⚠️ Signaal onbetrouwbaar',
+               'Deze meting bevat signaalinterferentie. Herhaal de meting graag over enkele '
+               'uren, zodat je hart kan kalmeren.'),
+        'de': ('⚠️ Signal unzuverlässig',
+               'Diese Messung enthält Signalstörungen. Bitte wiederholen Sie die Messung '
+               'in einigen Stunden, damit Ihr Herz zur Ruhe kommen kann.'),
+        'en': ('⚠️ Unreliable signal',
+               'This measurement contains signal interference. Please repeat it in a few hours '
+               'so your heart can settle.'),
+    }
+    head, body = M.get(lang, M['nl'])
+    return {'insight': head, 'reflection': body, 'question': '',
+            'source': 'quality_slecht_unreliable', 'irregular': True, 'quality_band': 'slecht'}
+
+
+# Hedge-prefix bovenin de user-message voor band 'redelijk'/'onbepaald'/NULL (de veilige
+# default). Bewust BOVEN het FEITEN-blok: een instructie aan de staart van de system-prompt
+# bleek te zwak om de 'FEITEN zijn leidend en al juist'-stelligheid te overrulen (empirisch
+# getest). Band 'slecht' komt hier niet langs (short-circuit vóór de LLM in api_feedback);
+# 'goed' krijgt geen prefix.
+_KOMPAS_HEDGE_PREFIX = (
+    "⚠️ MEETKWALITEIT BEPERKT/ONZEKER: het signaal van deze meting is van beperkte "
+    "kwaliteit. Dit OVERRULET de stelligheid van het FEITEN-blok hieronder. Interpreteer RI, "
+    "zone en vergelijkingen voorzichtig en voorlopig; doe GEEN stellige uitspraken over balans, "
+    "rust, afstemming of toestand. Houd de toon mild en open. Gebruik NOOIT het woord 'aritmie' "
+    "of medische diagnosetaal.\n\n"
+)
+
+
 def _build_kompas_prompt(cur, lang, context, session_data=None, baseline_avg=None):
+    """Wrapper rond _build_kompas_prompt_inner: prepend de meetkwaliteit-hedge aan de
+    user-message bij band 'redelijk'/'onbepaald'/NULL. 'goed' -> ongemoeid. 'slecht' bereikt
+    deze functie niet (short-circuit in api_feedback)."""
+    system_prompt, user_msg = _build_kompas_prompt_inner(
+        cur, lang, context, session_data=session_data, baseline_avg=baseline_avg)
+    _qb = (cur.get('quality_band') or '').strip().lower()
+    if _qb not in ('goed', 'slecht'):
+        user_msg = _KOMPAS_HEDGE_PREFIX + user_msg
+    return system_prompt, user_msg
+
+
+def _build_kompas_prompt_inner(cur, lang, context, session_data=None, baseline_avg=None):
     """Router: kiest prompt-template op basis van meting_type.
     Retourneert (system_prompt, user_message) tuple.
     Fallbacks: biofeedback zonder pre_ref → basismeting-template. Situ zonder label → basismeting-template.
@@ -5600,26 +5645,6 @@ def _build_kompas_prompt(cur, lang, context, session_data=None, baseline_avg=Non
     lang_name = {'nl': 'Dutch', 'de': 'German', 'en': 'English'}.get(lang, 'Dutch')
     mt = (cur.get('meting_type') or 'basismeting').lower()
     suffix = f"\n\nRespond in {lang_name}."
-    # MEETKWALITEIT-GATE (STAP 4/5): leest quality_band UIT de meting-row (kolom, niet live
-    # herberekend; band gezet door analytics.quality_classify bij opslag). Alleen band 'goed'
-    # krijgt de normale, stellige duiding; 'slecht'/'redelijk' én onbepaald/NULL (veilige
-    # default) onderdrukken stelligheid. 'slecht' = variant-B te onregelmatig; gebruik NOOIT het
-    # woord 'aritmie'. Geldt voor alle meettypes (suffix gaat mee in elke system-prompt-return).
-    # Staat los van de (op prod dormante) hard-gate _row_irregular hierboven in api_feedback.
-    _qband_gate = (cur.get('quality_band') or '').strip().lower()
-    if _qband_gate != 'goed':
-        _qb_hard = (_qband_gate == 'slecht')
-        suffix += (
-            "\n\nMEETKWALITEIT-GATE (cruciaal): de signaalkwaliteit van DEZE meting is "
-            + ("te laag om betrouwbaar te scoren. " if _qb_hard else "beperkt of onbepaald. ")
-            + "Onderdruk stelligheid: formuleer je observatie nadrukkelijk voorzichtig en "
-            "voorlopig, niet als een betrouwbaar oordeel. Vermijd stellige conclusies over de "
-            "toestand van de persoon en leun niet zwaar op de exacte RI-waarde. "
-            + ("Benoem terloops dat deze meting te onregelmatig was om met zekerheid te duiden. "
-               if _qb_hard else "")
-            + "Gebruik NOOIT het woord 'aritmie' of medische diagnosetaal. "
-            "Houd de afsluitende reflectievraag open en mild."
-        )
 
     if mt == 'biofeedback' and session_data and session_data.get('valid'):
         w = session_data.get('windows') or {}
@@ -5832,6 +5857,17 @@ def api_feedback():
     is_biofeedback = meting_type == 'biofeedback'
     is_situatie = meting_type == 'situatiemeting'
     dim = cur.get('ctx_dimensie') or ''
+
+    # ── Meetkwaliteit-short-circuit: band 'slecht' (variant-B te onregelmatig) ─────────────
+    # GEEN LLM-call: een vaste 'signaal onbetrouwbaar'-boodschap i.p.v. een stellige duiding op
+    # ruis (de eerdere soft-gate via de system-prompt bleek empirisch te zwak). Vóór de
+    # cache-check, zodat 'slecht' nooit gecachte stellige proza terugkrijgt. Alle meettypes.
+    if (cur.get('quality_band') or '').strip().lower() == 'slecht':
+        resp = jsonify(_unreliable_signal_payload(lang))
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
 
     # ── Onregelmatigheid-gate (v2): HUIDIGE basismeting zelf te onregelmatig? ──────────────
     # Geen AI-commentaar over een valse RI (geen LLM-call). Toon een neutrale kopregel +
