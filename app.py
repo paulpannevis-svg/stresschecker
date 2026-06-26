@@ -8241,6 +8241,8 @@ PRO_UPGRADE_TIERS_LIVE = [
      'label': 'Pro S', 'price': '€9,95', 'clients': 10},
     {'key': 'sc-pro-m-month', 'price_id': 'price_1TXxxQHD28PM4o1KMY1CaL37',
      'label': 'Pro M', 'price': '€19,95', 'clients': 30},
+    {'key': 'sc-pro-l-month', 'price_id': 'price_1TitLfHD28PM4o1KTQUvknmd',
+     'label': 'Pro L', 'price': '€29,95', 'clients': 50},
 ]
 # TEST: aparte Stripe test-products (lookup_key sc-pro-*-month-test), incl. Pro L.
 PRO_UPGRADE_TIERS_TEST = [
