@@ -80,7 +80,7 @@
     </h3>
     <p>
       <strong>{% if tier_summary %}{{ tier_summary.tier_short }} — {{ tier_summary.period_label }}{% elif subscription_info %}{{ subscription_info.plan_name }}{% endif %}</strong><br>
-      {% if subscription_info %}{%if lang=='de'%}Nächste Rechnung: {{ subscription_info.current_period_end_display }}{%elif lang=='en'%}Next billing: {{ subscription_info.current_period_end_display }}{%else%}Volgende factuur: {{ subscription_info.current_period_end_display }}{%endif%}{% endif %}
+      {% if subscription_info %}{% if subscription_info.status == 'canceled' %}{%if lang=='de'%}Abonnement beendet am {{ subscription_info.current_period_end_display }}{%elif lang=='en'%}Subscription ended on {{ subscription_info.current_period_end_display }}{%else%}Abonnement beëindigd op {{ subscription_info.current_period_end_display }}{%endif%}{% else %}{%if lang=='de'%}Nächste Rechnung: {{ subscription_info.current_period_end_display }}{%elif lang=='en'%}Next billing: {{ subscription_info.current_period_end_display }}{%else%}Volgende factuur: {{ subscription_info.current_period_end_display }}{%endif%}{% endif %}{% endif %}
     </p>
     {% if subscription_info and subscription_info.cancel_at_period_end %}
     <p style="background:#FDECEA;border:1px solid #F5C6C2;color:#9b271b;border-radius:8px;padding:8px 10px;font-size:.8rem;margin:0 0 .8rem;">
