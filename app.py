@@ -8168,17 +8168,16 @@ def pro_upgrade():
     lang = session.get('lang', 'nl')
     email = (session.get('email') or '').strip().lower()
     sub = _find_subscription_row_by_email(email) if email else None
-    # State-aware: een ACTIEF/trialing abonnement -> Stripe-portal (tier WIJZIGEN op de
-    # bestaande subscription) i.p.v. de checkout (die een TWEEDE sub zou aanmaken =
-    # dubbele facturatie). Geen/canceled/past_due sub -> gewoon de upgrade/checkout-pagina.
-    if sub and sub['status'] in ('active', 'trialing'):
-        return redirect(url_for('manage_subscription'))
+    # State-aware: een ACTIEF/trialing abonnement -> GEEN tier-knoppen (een 2e checkout
+    # zou een dubbele subscription maken). Toon i.p.v. checkout een support-bericht;
+    # tier-wijziging loopt via support (geen Stripe-portal, dat is bewust verwijderd).
+    active_sub = bool(sub and sub['status'] in ('active', 'trialing'))
     current_tier = None
     if sub:
         current_tier = {'name': sub['plan_name'], 'tier': sub['tier'], 'plan_id': sub['plan_id']}
     return render_template('pro/upgrade.html', lang=lang,
                            current_tier=current_tier, tiers=PRO_UPGRADE_TIERS,
-                           test_mode=STRIPE_TEST_MODE)
+                           test_mode=STRIPE_TEST_MODE, active_sub=active_sub)
 
 
 @app.route('/pro/cancel-subscription', methods=['POST'])

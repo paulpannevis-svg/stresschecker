@@ -18,6 +18,12 @@
   </p>
   {% endif %}
 
+  {% if active_sub %}
+  <div style="text-align:center;background:#eef5fb;border:1px solid #cfe0f0;color:#2c5d86;border-radius:8px;padding:14px 12px;margin:.6rem 0;font-size:.9rem;line-height:1.5;">
+    {% if lang=='de' %}Sie haben bereits ein aktives Abonnement. Um Ihren Tarif zu ändern, kontaktieren Sie bitte{% elif lang=='en' %}You already have an active subscription. To change your tier, please contact{% else %}Je hebt al een actief abonnement. Om je tier te wijzigen, neem contact op met{% endif %}
+    <a href="mailto:support@lifestylemonitors.com" style="color:#E8344E;text-decoration:none;font-weight:600;">support@lifestylemonitors.com</a>.
+  </div>
+  {% else %}
   <div id="tierMsg" style="display:none;text-align:center;color:#c0392b;background:#fdecea;border:1px solid #f5c6c2;border-radius:8px;padding:8px 10px;margin:.6rem 0;font-size:.85rem;"></div>
 
   {% for t in tiers %}
@@ -40,6 +46,7 @@
   <p style="text-align:center;font-size:.72rem;color:#999;margin-top:1rem;">
     {% if lang=='de' %}Sichere Zahlung über Stripe.{% elif lang=='en' %}Secure payment via Stripe.{% else %}Veilige betaling via Stripe.{% endif %}
   </p>
+  {% endif %}
   <a href="/pro" style="display:block;text-align:center;margin-top:.8rem;color:#888;font-size:.85rem;text-decoration:none;">
     &#8592; {% if lang=='de' %}Zurück{% elif lang=='en' %}Back{% else %}Terug{% endif %}
   </a>
