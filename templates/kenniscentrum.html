@@ -103,6 +103,7 @@
     <button class="kc-nav-btn" data-kc="sport" onclick="showKC('sport')">Sport</button>
     <button class="kc-nav-btn" data-kc="faq" onclick="showKC('faq')">FAQ</button>
     <button class="kc-nav-btn" data-kc="begrippen" onclick="showKC('begrippen')">{% if lang=="de" %}Begriffe{% elif lang=="en" %}Glossary{% else %}Begrippenlijst{% endif %}</button>
+    <button class="kc-nav-btn" data-kc="artikelen" onclick="showKC('artikelen')">{% if lang=="de" %}Artikel{% elif lang=="en" %}Articles{% else %}Artikelen{% endif %}</button>
   </div>
 
   <!-- ===== JE LICHAAM ===== -->
@@ -1238,6 +1239,16 @@
         {% endif %}
       </dl>
     </div>
+  </div>
+
+  <!-- ===== KENNISBANK-ARTIKELEN (uit kc_articles, consumer) ===== -->
+  <div class="kc-section" id="kc-artikelen">
+    {% for article in db_articles_by_audience('consumer') %}
+    <div class="kc-card">
+      <h3>{% if lang=="de" %}{{ article.title_de }}{% elif lang=="en" %}{{ article.title_en }}{% else %}{{ article.title_nl }}{% endif %}</h3>
+      {% if lang=="de" %}{{ render_body(article.body_de) }}{% elif lang=="en" %}{{ render_body(article.body_en) }}{% else %}{{ render_body(article.body_nl) }}{% endif %}
+    </div>
+    {% endfor %}
   </div>
 
   <a href="{{ url_for('menu') }}" class="back-link">← {% if lang=="de" %}Zurück zum Menü{% elif lang=="en" %}Back to menu{% else %}Terug naar menu{% endif %}</a>

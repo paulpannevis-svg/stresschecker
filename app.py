@@ -3139,6 +3139,37 @@ REPORT_BASE_DIR = '/opt/stresschecker/reports'
 REPORT_PUBLIC_BASE_URL = 'https://app.stresschecker.com'  # absolute link in mail
 
 
+# ===== KENNISCENTRUM DB-ARTIKELEN: BEGIN =====
+@app.template_global()
+def db_articles_by_audience(audience):
+    """Kenniscentrum-artikelen uit kc_articles (sc_measurements.db), op sort_order."""
+    try:
+        conn = sqlite3.connect(METING_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM kc_articles WHERE audience=? ORDER BY sort_order", (audience,))
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+
+@app.template_global()
+def render_body(body_text):
+    """Kenniscentrum-body: \n\n -> <p>, \n -> <br>; content ge-escaped (veilig tegen HTML-injectie)."""
+    if not body_text:
+        return ''
+    from markupsafe import Markup, escape
+    out = []
+    for para in body_text.split('\n\n'):
+        para = para.strip()
+        if para:
+            out.append('<p>' + str(escape(para)).replace('\n', '<br>') + '</p>')
+    return Markup('\n'.join(out))
+# ===== KENNISCENTRUM DB-ARTIKELEN: EINDE =====
+
+
 @app.template_global()
 def pct(part, total):
     """Jinja-helper: percentage als '54%' (rounded) of '–' bij nul-totaal."""

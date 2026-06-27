@@ -87,6 +87,7 @@
         <button class="kc-nav-btn" onclick="showKC('beroepen')">{% if lang=="de" %}Berufe{% elif lang=="en" %}Per Profession{% else %}Per Beroep{% endif %}</button>
         <button class="kc-nav-btn" onclick="showKC('motiveren')">{% if lang=="de" %}Motivieren{% elif lang=="en" %}Motivating{% else %}Motiveren{% endif %}</button>
         <button class="kc-nav-btn" onclick="showKC('gevoel')">{% if lang=="de" %}Selbsteinschätzung{% elif lang=="en" %}Self-assessment{% else %}Zelfbeoordeling{% endif %}</button>
+        <button class="kc-nav-btn" onclick="showKC('artikelen')">{% if lang=="de" %}Artikel{% elif lang=="en" %}Articles{% else %}Artikelen{% endif %}</button>
   </div>
 
   <!-- ===== METHODIEK ===== -->
@@ -909,6 +910,16 @@
     <p>{% if lang=="de" %}Die Verlaufgrafik zeigt sowohl die gemessenen Werte als auch die subjektiven Einschätzungen im Zeitverlauf. Nutzen Sie diese Daten als Gesprächsgrundlage: Wann stimmen Gefühl und Körper überein? Wann nicht – und warum?{% elif lang=="en" %}The progress graph shows both measured values and subjective assessments over time. Use this data as a basis for conversation: when do feeling and body align? When not – and why?{% else %}De verloopgrafiek toont zowel de gemeten waarden als de subjectieve inschattingen over tijd. Gebruik deze data als gespreksbasis: wanneer kloppen gevoel en lichaam overeen? Wanneer niet — en waarom?{% endif %}</p>
   </div>
 </div>
+
+  <!-- ===== KENNISBANK-ARTIKELEN (uit kc_articles, pro; artikel-5 overgeslagen) ===== -->
+  <div class="kc-section" id="kc-artikelen">
+    {% for article in db_articles_by_audience('pro') if article.slug in ['artikel-4', 'artikel-6', 'artikel-7'] %}
+    <div class="kc-card">
+      <h3>{% if lang=="de" %}{{ article.title_de }}{% elif lang=="en" %}{{ article.title_en }}{% else %}{{ article.title_nl }}{% endif %}</h3>
+      {% if lang=="de" %}{{ render_body(article.body_de) }}{% elif lang=="en" %}{{ render_body(article.body_en) }}{% else %}{{ render_body(article.body_nl) }}{% endif %}
+    </div>
+    {% endfor %}
+  </div>
 
 </div>
 
