@@ -1,5 +1,36 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-27 — PROD: Kenniscentrum — DB-gedreven artikelen live (7/7)
+
+De Kenniscentra waren tot nu toe volledig hardcoded HTML. Toegevoegd: een `kc_articles`-tabel
+(SQLite, `data/sc_measurements.db`) met 7 redactionele artikelen in NL/DE/EN, plus render-loops die
+ze tonen in een nieuwe **Artikelen/Articles**-tab — náást (niet in plaats van) de bestaande content.
+
+- **Data:** 7 artikelen in `kc_articles` (prod + staging). Consumer (3): stabiele meting, HRV — wat is
+  normaal, sensor-problemen. Pro (4 rijen): borderline HRV-detectie, segment-bewuste analyse, meting
+  herhalen, client-interpretatie. Tabel: `slug` UNIQUE, `title_*`/`body_*` NOT NULL, `audience`
+  CHECK('pro'|'consumer'), `sort_order`; geïndexeerd op `audience` + `section`. Alle bodies ≥ 600
+  tekens, alinea's (`\n\n`) behouden.
+- **Import:** `import_kenniscentrum_direct.py` (data inline in het script, géén DOCX-afhankelijkheid —
+  de oorspronkelijke `/mnt/user-data/…`-bron bestond niet op de VPS). Idempotent via `INSERT OR REPLACE`
+  op `slug`. Untracked gelaten.
+- **Render:** loops in `kenniscentrum.html` (consumer, `audience='consumer'`) en `kenniscentrum_pro.html`
+  (pro). Helpers in `app.py`: `db_articles_by_audience(audience)` (leest sc_measurements.db, op
+  `sort_order`) en `render_body(text)` (HTML-escape → `\n\n`→`<p>`, `\n`→`<br>`; XSS-veilig, returnt
+  Markup). `showKC` ongewijzigd (generiek).
+- **artikel-5 (segment-bewuste analyse) wordt NIET gerenderd.** Het beschrijft een 3-segmenten-★-analyse
+  die niet in het product zit (afgewezen + verwijderd 2026-06-27). Staat wél in de DB, maar de pro-loop
+  filtert via `slug IN ('artikel-4','artikel-6','artikel-7')`. Tonen pas als de feature live is of de
+  tekst herschreven.
+- **Gating ongewijzigd:** consumer-route `license_type ∈ {consumer, pro}`, pro-route `_is_pro_or_demo_pro()`.
+- **Test:** staging `test_client` met session-mock + `session['lang']` (deze routes negeren `?lang=`):
+  consumer + pro renderen in NL/DE/EN, artikel-4 zichtbaar, artikel-5 verborgen, geen lek. Prod-bestanden
+  byte-identiek aan staging; `kill -HUP` op prod (1879495) + staging (1844471) — routes 200/302, geen 500.
+- **Commit:** `9f64951` "Kenniscentrum: DB-artikelen live (7/7)" — feature-complete (2 templates + de 2
+  helpers, geïsoleerd; welkom/Stripe-wijzigingen bewust erbuiten). Geen echte git-remote → niet gepusht.
+  Rollback-backups: `app.py.backup-kcrender-27062026`, `templates/kenniscentrum*.backup-kcrender-27062026`,
+  `templates/kenniscentrum-backup-27062026.tar.gz`.
+
 ## 2026-06-13 — PROD: /pro dashboard — gelekte knop-HTML uit `<title>` verwijderd
 
 De `<title>` van het Pro-dashboard (`/pro`, `templates/pro/menu.html`) lekte HTML: in Google Analytics
