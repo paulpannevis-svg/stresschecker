@@ -334,6 +334,7 @@ def quality_classify(rr):
         'artefactPct': _jsround(art_pct * 10) / 10, 'artefactCount': art_count, 'maxRun': max_run,
         'sd1sd2': _jsround(ratio * 1000) / 1000, 'rmssd': _jsround(rmssd * 10) / 10,
         'laag1Slecht': (art_pct > QUAL_BAND_SLECHT or consecutive), 'laag2': laag2,
+        'is_borderline_band': (0.69 <= ratio < 0.70),
         'corrected': corr, 'scoreOK': (band in ('goed', 'redelijk')),
     }
 

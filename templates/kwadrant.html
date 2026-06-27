@@ -107,6 +107,17 @@ body{background:#f5f5f5;margin:0;}
       <span style="cursor:pointer;font-size:.78rem;color:#cc8400;" onclick="var t=document.getElementById('qualityTip');t.style.display=t.style.display==='block'?'none':'block';">&#9432;</span>
       <div id="qualityTip" style="display:none;position:absolute;bottom:110%;left:50%;transform:translateX(-50%);background:#333;color:#eee;padding:.5rem .7rem;border-radius:6px;font-size:.66rem;line-height:1.5;width:240px;box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:10;text-align:left;">{%if lang=="de"%}Wie viele Herzschläge für die Messung brauchbar waren. Unter 70% ist das Ergebnis weniger zuverlässig — erwäge eine neue Messung.{%elif lang=="en"%}How many heartbeats were usable for the reading. Below 70% the result is less reliable — consider a new reading.{%else%}Hoeveel hartslagen bruikbaar waren voor de meting. Onder 70% is het resultaat minder betrouwbaar — overweeg een nieuwe meting.{%endif%}</div>
     </div>
+    <!-- Pro-only: bij _band==='slecht' vervangt deze banner via JS de twee quality-kaders hierboven -->
+    <div id="proUnreliableBanner" style="display:none;margin-top:.6rem;padding:.7rem .8rem;background:#FDECEA;border:2px solid #c0392b;border-radius:8px;color:#a5281b;width:100%;box-sizing:border-box;">
+      <strong style="font-size:.9rem;">&#9888;&#65039; {%if lang=="de"%}MESSUNG UNZUVERLÄSSIG{%elif lang=="en"%}MEASUREMENT UNRELIABLE{%else%}METING ONBETROUWBAAR{%endif%}</strong>
+      <div style="font-size:.75rem;margin-top:.25rem;">{%if lang=="de"%}Herzrhythmus zu unregelm&auml;&szlig;ig &mdash; nicht f&uuml;r Analyse oder Klientenentscheidungen geeignet.{%elif lang=="en"%}Heart rhythm too irregular &mdash; not suitable for analysis or client decisions.{%else%}Hartritme te onregelmatig &mdash; niet geschikt voor analyse of cli&euml;ntbeslissingen.{%endif%}</div>
+      <div style="font-size:.7rem;color:#999;margin-top:.3rem;">{%if lang=="de"%}Roh-Signal{%elif lang=="en"%}Raw signal{%else%}Ruw signaal{%endif%}: <span id="proUnreliablePct">--</span>% &middot; {%if lang=="de"%}Was tun: Sensor pr&uuml;fen, Messung wiederholen.{%elif lang=="en"%}What to do: check sensor, repeat the reading.{%else%}Wat nu: controleer sensor, herhaal de meting.{%endif%}</div>
+    </div>
+    <!-- Pro-only: borderline-band (whole-series SD1/SD2 net onder 0.70). Zachte oranje waarschuwing
+         NAAST de sterren/kaders (band blijft ongewijzigd) — geen vals vertrouwen bij grenswaarde. -->
+    <div id="proBorderlineBanner" style="display:none;margin-top:.6rem;padding:.6rem .8rem;background:#FFF4E5;border:2px solid #FF8C00;border-radius:8px;color:#8a4b00;width:100%;box-sizing:border-box;">
+      <strong style="font-size:.82rem;">&#9888;&#65039; {%if lang=="de"%}Messung im Grenzbereich &mdash; nach Ruhe wiederholen{%elif lang=="en"%}Borderline reading &mdash; repeat after rest{%else%}Meting grenswaarde &mdash; herhaal na rust{%endif%}</strong>
+    </div>
     <div id="qualityAdvice" style="display:none;margin-top:.4rem;padding:.4rem .6rem;background:rgba(255,100,100,0.12);border:1px solid rgba(255,100,100,0.3);border-radius:6px;font-size:.7rem;line-height:1.5;color:#ffaaaa;">
       <strong style="color:#ff6666;">{%if lang=="de"%}Hinweis:{%elif lang=="en"%}Note:{%else%}Let op:{%endif%}</strong>
       {%if lang=="de"%}Die Messqualit&auml;t ist ungen&uuml;gend. Dies kann durch Bewegung, schlechten Sensorkontakt oder eine vor&uuml;bergehende Herzrhythmusst&ouml;rung verursacht werden. Wiederholen Sie die Messung unter ruhigen Bedingungen. Wenn die Qualit&auml;t wiederholt niedrig bleibt, konsultieren Sie einen Arzt.{%elif lang=="en"%}Reading quality is insufficient. This may be caused by movement, poor sensor contact, or a temporary heart rhythm irregularity. Repeat the reading under calm conditions. If quality remains consistently low, consult a doctor.{%else%}De meetkwaliteit is onvoldoende. Dit kan komen door beweging, slecht sensorcontact of een incidentele hartritmestoornis. Herhaal de meting onder rustige omstandigheden. Als de kwaliteit herhaaldelijk laag blijft, overleg dan met een arts.{%endif%}
@@ -299,8 +310,8 @@ var vit=5;
   // i.p.v. de inline SD1/SD2-kopie. 'slecht' -> markeren ('flag'); rest -> 'clean'. De oude
   // HRV.rrIrregularity blijft in hrv.js als referentie (hier niet gebruikt). Getoonde RI = cur.ri
   // (niets herberekend uit RR). try/catch-terugval op 'clean' als hrv.js/RR ontbreekt.
-  var _irr='clean', _band='goed';
-  try{ var _q=HRV.qualityClassify(cur.rr_intervals); if(_q&&_q.band){_band=_q.band;} _irr=(_band==='slecht')?'flag':'clean'; }catch(e){}
+  var _irr='clean', _band='goed', _borderline=false;
+  try{ var _q=HRV.qualityClassify(cur.rr_intervals); if(_q&&_q.band){_band=_q.band;} _borderline=!!(_q&&_q.is_borderline_band); _irr=(_band==='slecht')?'flag':'clean'; }catch(e){}
   if(_irr==='flag') _gated=true;  // te onregelmatig: ook stip + gauge-naald grijzen
   // Eén systeem-van-record (cur.ri) voor label/stip-ring/gauge/getal — zelfde zone overal.
   // Biofeedback: getRaw-eindwaarde (bewuste uitzondering; window-mean-vs-eindwaarde = losse open kwestie, RMSSD_HERBEREKENING_OVERZICHT).
@@ -399,6 +410,24 @@ var vit=5;
     if(ql){ql.textContent=(_lng2==='de'?_qm.de:_lng2==='en'?_qm.en:_qm.nl);ql.style.color=_qm.c;}
   })();
     if(document.getElementById('qualityAdvice')){document.getElementById('qualityAdvice').style.display=kw<70?'block':'none';}
+  // Pro-only onbetrouwbaar-banner: bij _band==='slecht' het misleidende SIGNAAL STERKTE%-kader +
+  // sterren-kader vervangen door een prominente rode waarschuwing. Consumer (IS_PRO=false) ongemoeid.
+  (function(){
+    var IS_PRO = {{ 'true' if is_pro else 'false' }};
+    if(IS_PRO && _band==='slecht'){
+      var _b=document.getElementById('proUnreliableBanner');
+      var _p=document.getElementById('proUnreliablePct');
+      if(_p){_p.textContent=(isNaN(kw)?'--':Math.round(kw));}
+      if(_b){_b.style.display='block';}
+      var _ssb=document.getElementById('signalStrengthBox'); if(_ssb){_ssb.style.display='none';}
+      var _rqb=document.getElementById('rhythmQualBox'); if(_rqb){_rqb.style.display='none';}
+    }
+    // Borderline-band: zachte oranje waarschuwing NAAST de kaders (band/sterren blijven staan).
+    // Alleen Pro, alleen wanneer niet al 'slecht' (anders toont de rode onbetrouwbaar-banner).
+    if(IS_PRO && _band!=='slecht' && _borderline){
+      var _bb=document.getElementById('proBorderlineBanner'); if(_bb){_bb.style.display='block';}
+    }
+  })();
   // Signaal-niet-stabiel box: tonen bij variant-B 'slecht' (_irr==='flag'); standaard uitgeklapt.
   if(document.getElementById('signalWarnBox')){
     document.getElementById('signalWarnBox').style.display=(_irr==='flag')?'block':'none';

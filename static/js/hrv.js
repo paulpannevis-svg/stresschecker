@@ -170,6 +170,7 @@ function qualityClassify(rr){
     artefactPct:Math.round(artPct*10)/10, artefactCount:artCount, maxRun:maxRun,
     sd1sd2:Math.round(pc.ratio*1000)/1000, rmssd:Math.round(pc.rmssd*10)/10,
     laag1Slecht:(artPct>QUAL_BAND_SLECHT||consecutive), laag2:laag2,
+    is_borderline_band:(pc.ratio>=0.69 && pc.ratio<0.70),
     corrected:corr, scoreOK:(band==='goed'||band==='redelijk')
   };
 }
