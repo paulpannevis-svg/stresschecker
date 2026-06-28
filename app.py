@@ -8973,6 +8973,43 @@ def vb_verify_2fa():
                            email=session.get('vb_2fa_email', ''))
 
 
+@app.route('/vb/demo')
+def vb_demo_login():
+    """Demo van de Pro Event/VB-flow: vooringevuld login-formulier, geen echte auth.
+    Bewust GEEN DB- of sessie-gebruik; puur showcase vanaf de welkom-demo-sectie."""
+    return render_template('vb/demo_login.html')
+
+
+@app.route('/vb/demo/dashboard', methods=['GET', 'POST'])
+def vb_demo_dashboard():
+    """Demo Pro Event-dashboard met vaste mock-data. Negeert het (vooringevulde)
+    login-formulier volledig, raakt geen database en bewaart niets."""
+    events = [
+        {'code': 'DEMO-7F3K', 'naam': 'Team Stress Meetdag', 'datum': '2026-06-28',
+         'deelnemers': 8, 'credits': 8, 'status': 'actief'},
+        {'code': 'DEMO-2A9L', 'naam': 'Kennismakingsworkshop', 'datum': '2026-06-15',
+         'deelnemers': 5, 'credits': 5, 'status': 'afgerond'},
+    ]
+    measurements = [
+        {'name': 'Sanne de Vries', 'ri': 7.8, 'hrv': 88, 'zone': 'Veerkrachtig', 'zclass': 'veerkrachtig', 'tijd': '14:23'},
+        {'name': 'Mark Bakker',    'ri': 6.4, 'hrv': 71, 'zone': 'In balans',    'zclass': 'balans',       'tijd': '14:25'},
+        {'name': 'Lisa Jansen',    'ri': 5.1, 'hrv': 58, 'zone': 'Let op',       'zclass': 'letop',        'tijd': '14:27'},
+        {'name': 'Tom Visser',     'ri': 4.2, 'hrv': 47, 'zone': 'Belast',       'zclass': 'belast',       'tijd': '14:29'},
+        {'name': 'Emma Smit',      'ri': 8.3, 'hrv': 95, 'zone': 'Veerkrachtig', 'zclass': 'veerkrachtig', 'tijd': '14:31'},
+        {'name': 'Noud Mulder',    'ri': 6.9, 'hrv': 76, 'zone': 'In balans',    'zclass': 'balans',       'tijd': '14:33'},
+        {'name': 'Fleur Dijkstra', 'ri': 3.6, 'hrv': 41, 'zone': 'Belast',       'zclass': 'belast',       'tijd': '14:35'},
+        {'name': 'Daan Bos',       'ri': 7.1, 'hrv': 80, 'zone': 'Veerkrachtig', 'zclass': 'veerkrachtig', 'tijd': '14:37'},
+    ]
+    return render_template('vb/demo_dashboard.html',
+                           vb_name='Jan Jansen (demo)',
+                           vb_email='janjansen@johson.com',
+                           tier='M',
+                           credits_available=42,
+                           credits_used=13,
+                           events=events,
+                           measurements=measurements)
+
+
 def _vb_fmt_ts(ts):
     if not ts:
         return ''
