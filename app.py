@@ -1112,8 +1112,21 @@ def _event_org_email(license_key):
 
 
 def _event_unlocked(event_code):
-    """True zodra de organiser 2FA voltooide voor dit event_code (per-event sessievlag)."""
-    return session.get(f'event_2fa_verified_{event_code}') == True
+    """True zodra de organiser toegang heeft tot dit event_code, via één van twee wegen:
+    (1) per-event kiosk-OTP voltooid (walk-up kiosk zonder VB-sessie), OF
+    (2) al ingelogd als VB-organiser (eigen 2FA bij /vb/login gedaan) én het event valt
+        onder zijn eigen event-licentie -> geen tweede OTP nodig in de dashboard-flow."""
+    if session.get(f'event_2fa_verified_{event_code}') == True:
+        return True
+    vb_lk = session.get('vb_license_key')
+    if vb_lk:
+        db = get_event_db()
+        row = db.execute(
+            "SELECT 1 FROM events WHERE event_code=? AND license_key=?",
+            (event_code, vb_lk)).fetchone()
+        db.close()
+        return row is not None
+    return False
 
 
 @app.route('/event-code-entry', methods=['GET', 'POST'])
