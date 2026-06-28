@@ -25,7 +25,8 @@
 | `retention.py` (standalone CLI, géén `import app`) | ✅ GEBOUWD + GETEST (kopie-DB) |
 | `auto_soft_delete_expired_users()` (gezaghebbende logica, niet kaal `license_expires`) | ✅ GETEST · ⏸️ dry-run-default, géén cron |
 | `hard_delete_archived_users()` (>180d + her-verificatie, cascade) | ✅ GETEST · ⏸️ dubbele grendel (geen cron + `RETENTION_HARD_DELETE_CLEARED=1`) |
-| GDPR Right to Erasure — anonimisering (`POST /api/user/delete-me`) | ✅ LIVE (opt-in, eigen account, `confirm`=eigen e-mail; geen UI-knop) |
+| GDPR Right to Erasure — anonimisering (`POST /api/user/delete-me`) | ✅ LIVE (opt-in, eigen account; 3-laags: sessie-auth + **CSRF-token** + `confirm`=eigen e-mail; geen UI-knop) |
+| CSRF-bescherming (`GET /api/user/csrf-token` + `X-CSRF-Token`) | ✅ LIVE (per-sessie random token, constant-time check) |
 | `data_lifecycle_log`-acties `anonymized` + `deleted` | ✅ getest (audit-trail compleet) |
 | Cron `auto_soft_delete.sh` / `hard_delete.sh` | ⏸️ DORMANT (bestaan, NIET in crontab) |
 | Invoice-archief | ➖ N.v.t. — geen lokale `invoices`-tabel; facturen + 10jr-bewaring in Stripe |
@@ -38,7 +39,17 @@
   precies waarom de cron dormant blijft tot validatie + clearing.
 - `email`/`password_hash` (users) en `name` (clients) zijn `NOT NULL`; anonimisering zet daarom een
   **tombstone** (`anon-<id>@deleted.invalid`, `ANONYMIZED_DISABLED`) i.p.v. `NULL`.
-- Er is **geen lokale `invoices`-tabel**; de spec-stap "invoices archiveren" verviel.
+- Er is **geen lokale `invoices`-tabel** (geverifieerd: alleen `billing_events`); de spec-stappen
+  "invoices archiveren / DELETE FROM invoices / INSERT INTO invoices_archive" zijn **niet van toepassing**.
+  Facturen + 10jr-bewaring leven in Stripe. `billing_events.payload_json` kan e-mail bevatten (ruwe
+  Stripe-webhook-payload) → bewust behouden als billing-audit; aparte scrub-afweging indien gewenst.
+
+**Dry-run geverifieerd (2026-06-28, read-only op echte data):** auto-soft-delete = **1 kandidaat (user 6,
+`stripe_subscription`, ~11d verlopen)**, hard-delete = **0 kandidaten**, **0 writes**. Bevestigt dat de cron
+mogelijk een net-verlopen account (user 6) zou archiveren → cron blijft UIT tot clearing.
+
+**Bekend gat:** `ADMIN_KK_TOKEN` is niet gezet in de prod-omgeving → `/admin/retention-dryrun` is nu
+fail-closed (altijd 403). Voor live dry-run-inspectie eerst de token in de omgeving zetten.
 
 **Activering (na clearing):** zie `ACTIVATION.md`. **Pauzeren/rollback:** `kill-switch.md` / `rollback_restore.sh`.
 

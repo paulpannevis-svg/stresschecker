@@ -8300,14 +8300,49 @@ def delete_user_data(user_id, email, reason='gdpr_erasure'):
         raise
 
 
+def _get_csrf_token():
+    """Lazily een per-sessie CSRF-token (opaque, random) aanmaken/teruggeven. BEWUST niet
+    e-mail-afgeleid → niet te reconstrueren door een aanvaller (anders dan _afmeld_token)."""
+    import secrets as _sec
+    tok = session.get('csrf_token')
+    if not tok:
+        tok = _sec.token_urlsafe(32)
+        session['csrf_token'] = tok
+    return tok
+
+
+def _csrf_ok():
+    """Constant-time check van het CSRF-token uit header X-CSRF-Token / form / JSON tegen de
+    sessie. Een cross-origin aanvaller kan het sessie-token niet uitlezen (SOP) → kan deze
+    waarde dus niet meesturen. Faalt gesloten (geen token in sessie → False)."""
+    import hmac
+    expected = session.get('csrf_token') or ''
+    given = request.headers.get('X-CSRF-Token', '')
+    if not given:
+        body = request.get_json(silent=True) or request.form or {}
+        given = (body.get('csrf_token') or '') if hasattr(body, 'get') else ''
+    return bool(expected) and bool(given) and hmac.compare_digest(str(given), str(expected))
+
+
+@app.route('/api/user/csrf-token', methods=['GET'])
+def api_user_csrf_token():
+    """Geef de ingelogde gebruiker zijn per-sessie CSRF-token (voor o.a. /api/user/delete-me)."""
+    if not session.get('license_valid'):
+        return jsonify({'error': 'not_authenticated'}), 401
+    return jsonify({'csrf_token': _get_csrf_token()})
+
+
 @app.route('/api/user/delete-me', methods=['POST'])
 def api_user_delete_me():
     """FASE 2 — GDPR Recht op vergetelheid (opt-in, alleen eigen account). Anonimiseert de
-    INGELOGDE gebruiker onomkeerbaar. Vereist POST + JSON/form `confirm` == eigen e-mailadres
-    (frictie tegen abusievelijke/CSRF-triggers). Logt daarna uit. Geen UI-knop bedraad — de
-    activering hiervan in de UI is een aparte, bewuste stap."""
+    INGELOGDE gebruiker onomkeerbaar. Verdediging in lagen: (1) sessie-auth, (2) CSRF-token
+    (X-CSRF-Token, via GET /api/user/csrf-token), (3) `confirm` == eigen e-mailadres. Logt
+    daarna uit. Geen UI-knop bedraad — UI-activering is een aparte, bewuste stap."""
     if not session.get('license_valid'):
         return jsonify({'error': 'not_authenticated'}), 401
+    if not _csrf_ok():
+        return jsonify({'error': 'csrf_failed',
+                        'hint': 'GET /api/user/csrf-token, stuur als header X-CSRF-Token'}), 403
     email = (session.get('email') or '').strip().lower()
     if not email:
         return jsonify({'error': 'no_email_in_session'}), 400
