@@ -629,7 +629,7 @@ def require_kk_admin(view):
     @functools.wraps(view)
     def _wrapped(*args, **kwargs):
         if not session.get('license_valid'):
-            return redirect(url_for('sc_login'))
+            return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
         if not is_kk_admin():
             return ("Forbidden — admin role required", 403)
         return view(*args, **kwargs)
@@ -712,12 +712,15 @@ def _enforce_session_idle_timeout():
     window = SESSION_IDLE_TIMEOUT_OPERATOR_SECONDS if session.get('_session_window') == 'operator_24h' else SESSION_IDLE_TIMEOUT_SECONDS
     if now - last > window:
         lang = session.get('lang', 'nl')
+        was_pro = session.get('license_type') == 'pro'  # Pro-context vastleggen vóór clear
         session.clear()
         if path.startswith('/api/') or (request.accept_mimetypes.best == 'application/json'):
             return jsonify({
                 'error': 'session_expired',
                 'message': 'Session expired after 30 minutes of inactivity. Please log in again.'
             }), 401
+        if was_pro:
+            return redirect(url_for('sc_login', timeout='1', type='pro', lang=lang))
         return redirect(url_for('sc_login', timeout='1', lang=lang))
     session['_last_activity'] = now
 
@@ -2456,7 +2459,7 @@ def biofeedback():
 @require_kk_office_if_krankenkasse
 def pro_menu():
     if not session.get('license_valid') and not session.get('demo_mode'):
-        return redirect(url_for('welcome'))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     if not _is_pro_or_demo_pro():
         return redirect(url_for('menu'))
     # Defense-in-depth: ruim legacy sticky cliënt-selectie op bij terugkeer naar Pro-menu
@@ -2502,7 +2505,7 @@ def pro_menu():
 @require_kk_office_if_krankenkasse
 def pro_eigen_metingen():
     if not session.get('license_valid') or not is_pro():
-        return redirect(url_for('welcome'))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     lang = session.get('lang', 'nl')
     pro_key = get_user_key()
     db = get_meting_db()
@@ -2536,7 +2539,7 @@ def pro_eigen_metingen():
 @require_kk_office_if_krankenkasse
 def pro_clients():
     if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
-        return redirect(url_for('welcome'))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     lang = session.get('lang', 'nl')
     pro_key = get_user_key()
     _demo = session.get('demo_mode') and session.get('license_type') == 'pro'
@@ -2572,7 +2575,7 @@ def pro_clients():
 @require_kk_office_if_krankenkasse
 def pro_dashboard():
     if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
-        return redirect(url_for('welcome'))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     import time as _t
     lang = session.get('lang', 'nl')
     pro_key = get_user_key()
@@ -2620,7 +2623,7 @@ def pro_locatie():
     waarde landt in session['kk_office'] en wordt door api_meting_opslaan op elke
     nieuwe meting in client_metingen.office_label opgeslagen."""
     if not session.get('license_valid') or not is_krankenkasse_session():
-        return redirect(url_for('welcome'))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     lang = session.get('lang', 'nl')
     license_code = session.get('license_code', '')
     db = sqlite3.connect(DB_PATH)
@@ -3427,7 +3430,7 @@ def _user_can_request_report():
 @app.route('/pro/rapport', methods=['GET'])
 def pro_rapport_form():
     if not _user_can_request_report():
-        return redirect(url_for('welcome'))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     lang = session.get('lang', 'nl')
     license_code = session.get('license_code', '')
     is_kk = is_krankenkasse_session()
@@ -3453,7 +3456,7 @@ def pro_rapport_form():
 @app.route('/pro/rapport/genereer', methods=['POST'])
 def pro_rapport_genereer():
     if not _user_can_request_report():
-        return redirect(url_for('welcome'))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     lang = session.get('lang', 'nl')
     license_code = session.get('license_code', '')
     user_email = session.get('email', '')
@@ -3530,7 +3533,7 @@ def rapport_download(uuid_str):
 @require_kk_office_if_krankenkasse
 def pro_client_add():
     if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
-        return redirect(url_for('welcome'))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     lang = session.get('lang', 'nl')
     is_kk = is_krankenkasse_session()
     if request.method == 'POST':
@@ -3570,7 +3573,7 @@ def pro_client_add():
 @require_kk_office_if_krankenkasse
 def pro_client_detail(cid):
     if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
-        return redirect(url_for('welcome'))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     lang = session.get('lang', 'nl')
     pro_key = get_user_key()
     db = get_pro_db()
@@ -3594,7 +3597,7 @@ def pro_client_detail(cid):
 @require_kk_office_if_krankenkasse
 def pro_client_measure(cid):
     if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
-        return redirect(url_for('welcome'))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     pro_key = get_user_key()
     db = get_pro_db()
     _demo = session.get('demo_mode') and session.get('license_type') == 'pro'
@@ -3618,7 +3621,7 @@ def pro_client_measure(cid):
 @app.route('/pro/client/<int:cid>/verwijderen', methods=['POST'])
 def pro_client_delete(cid):
     if (not session.get('license_valid') and not session.get('demo_mode')) or not _is_pro_or_demo_pro():
-        return redirect(url_for('welcome'))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     pro_key = get_user_key()
     db = get_pro_db()
     db.execute("UPDATE clients SET active=0 WHERE id=? AND pro_key=?", (cid, pro_key))
@@ -7488,7 +7491,7 @@ def kenniscentrum_pro():
     if session.get("is_demo"):
         return redirect(url_for("welcome"))
     if (not session.get("license_valid") and not session.get("demo_mode")) or not _is_pro_or_demo_pro():
-        return redirect(url_for("welcome"))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     lang = session.get("lang", "nl")
     return render_template("kenniscentrum_pro.html", lang=lang, is_pro=is_pro())
 @app.route('/sport-training')
@@ -7504,7 +7507,7 @@ def sport_training():
 @require_kk_office_if_krankenkasse
 def pro_meting_keuze():
     if (not session.get("license_valid") and not session.get("demo_mode")) or not _is_pro_or_demo_pro():
-        return redirect(url_for("welcome"))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     lang = session.get("lang", "nl")
     if not request.args.get('cid'):
         session.pop('last_client_id', None)
@@ -8295,7 +8298,7 @@ def pro_upgrade():
     /api/checkout/create-session (server-side Checkout met customer-hergebruik —
     voorkomt de duplicate cus_* van de externe Payment Links)."""
     if not session.get('license_valid'):
-        return redirect(url_for('sc_login'))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     lang = session.get('lang', 'nl')
     email = (session.get('email') or '').strip().lower()
     sub = _find_subscription_row_by_email(email) if email else None
@@ -8317,7 +8320,7 @@ def cancel_subscription():
     (NIET direct deactiveren) zodat de gebruiker toegang houdt tot het einde van de
     betaalde periode. Spiegelt wat de Stripe Customer Portal doet, maar in-app."""
     if not session.get('user_key'):
-        return redirect(url_for('sc_login'))
+        return redirect(url_for('sc_login', type='pro', lang=session.get('lang','nl')))
     email = session.get('email', '')
     row = _find_subscription_row_by_email(email)
     if not row or not row['subscription_id']:

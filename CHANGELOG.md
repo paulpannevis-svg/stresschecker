@@ -1,5 +1,26 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-28 — PROD: Pro-context auth — sessie-verlop/uitlog → Pro-login i.p.v. consumer-scherm
+
+Een ingelogde Pro-gebruiker die na sessie-verlop (>30 min) op Menu klikte, belandde op het
+**consumenten**-loginscherm i.p.v. de Pro-login. Oorzaak: redirects in Pro-context gaven de
+Pro-context (`?type=pro`) niet mee, waardoor `/login` in consumer-modus rendert (de Pro-login is
+`/login?type=pro` — toont de rode **PRO**-badge, zie `sc_login.html`).
+
+- **Sessie-idle-timeout-hook** (`_enforce_session_idle_timeout`): legt `was_pro` vast vóór
+  `session.clear()` en redirect Pro-sessies naar `sc_login?timeout=1&type=pro` (consumer ongewijzigd).
+  Dit is het centrale chokepoint voor élke route bij verloop.
+- **Alle Pro-route fallbacks** (16 plekken) bij niet-ingelogd → `sc_login?type=pro`: `/pro`,
+  `/pro/mijn-metingen`, `/pro/clienten`, `/pro/dashboard`, `/pro/locatie`, `/pro/rapport(/genereer)`,
+  `/pro/client/toevoegen|<id>|<id>/meten|<id>/verwijderen`, `/kenniscentrum-pro`, `/pro/meting`,
+  `/pro/upgrade`, `/pro/cancel-subscription`, plus de `require_kk_admin`-decorator.
+- **Bewust ongewijzigd**: `/pro` license-**verlopen** → `welkom?expired=1` (abonnement verlopen ≠
+  sessie; opnieuw inloggen helpt niet), `/kenniscentrum-pro` `is_demo` → `welkom` (demo-uitsluiting),
+  en `/pro` logged-in-niet-Pro → `menu` (juiste tier-routing, geen login-fallback). Consumer-routes
+  blijven naar `welkom`.
+- Geverifieerd via live curl: Pro-routes (anon) → `/login?type=pro&lang=nl`, consumer-routes → `/welkom`;
+  `/login?type=pro&timeout=1` toont PRO-badge + "Sessie verlopen…". Deploy = HUP 1879495.
+
 ## 2026-06-28 — PROD: Kenniscentrum Pro — artikelen inline op de Methodiek-tab
 
 De Pro-artikelen stonden alleen in een aparte, standaard verborgen **Artikelen**-tab — bezoekers van
