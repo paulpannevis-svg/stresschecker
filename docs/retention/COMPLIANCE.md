@@ -48,10 +48,23 @@
 `stripe_subscription`, ~11d verlopen)**, hard-delete = **0 kandidaten**, **0 writes**. Bevestigt dat de cron
 mogelijk een net-verlopen account (user 6) zou archiveren → cron blijft UIT tot clearing.
 
-**Bekend gat:** `ADMIN_KK_TOKEN` is niet gezet in de prod-omgeving → `/admin/retention-dryrun` is nu
-fail-closed (altijd 403). Voor live dry-run-inspectie eerst de token in de omgeving zetten.
-
 **Activering (na clearing):** zie `ACTIVATION.md`. **Pauzeren/rollback:** `kill-switch.md` / `rollback_restore.sh`.
+
+## Security (endpoint-bescherming)
+
+> CORRECTIE 2026-06-28: een eerdere notitie claimde "`ADMIN_KK_TOKEN` niet gezet → dry-run fail-closed".
+> Dat was **onjuist** — gebaseerd op `/proc/<pid>/environ`, dat dotenv-geladen vars niet toont. app.py doet
+> `load_dotenv()` (regel 5), dus `.env`-vars zitten runtime in `os.environ`. De token is wél actief.
+
+- **`GET /admin/retention-dryrun`** — vereist `X-Admin-Token` (of `?token=`), constant-time check
+  (`_admin_kk_authorized()` → `hmac.compare_digest` tegen `ADMIN_KK_TOKEN`, gezet in `/opt/stresschecker/.env`,
+  43-char `secrets.token_urlsafe`). **Geverifieerd live 2026-06-28:** geen token → **403**, juiste token → **200**
+  (toont user 6), foute token → **403**. (Token-waarde staat NIET in deze repo — alleen in `.env`.)
+- **`POST /api/user/delete-me`** — sessie-auth + CSRF-token (`X-CSRF-Token`) + `confirm`==eigen e-mail.
+- **`GET /api/user/csrf-token`** — sessie-auth.
+- *Opmerking (least-privilege):* `ADMIN_KK_TOKEN` is gedeeld — dezelfde token gate't ook 5 Krankenkasse-admin-
+  routes (`_admin_kk_authorized()` ×6). Optionele hardening: een aparte `RETENTION_ADMIN_TOKEN` voor de dry-run.
+  Niet gedaan (vereist code- + secret-wijziging) → aparte beslissing.
 
 ## Waar staat wat (feitelijk)
 
