@@ -266,6 +266,17 @@ def _full_name_filter(obj, surname=None):
     s = (s or '').strip()
     return (name + ' ' + s).strip() if s else name
 
+
+@app.template_filter('epoch')
+def _epoch_filter(ts, fmt='%d-%m-%Y %H:%M'):
+    """Unix-timestamp (sec) → geformatteerde lokale datum. Faalzacht: '' bij None/onparse-baar.
+    Gebruikt o.a. voor Stripe-velden zoals checkout_session.created (epoch-seconden)."""
+    import datetime as _dt
+    try:
+        return _dt.datetime.fromtimestamp(int(ts)).strftime(fmt)
+    except Exception:
+        return ''
+
 DB_PATH        = os.environ.get('SC_DB_PATH', '/opt/ic-license-server/data/saas_licenses.db')
 METING_DB_PATH = os.environ.get('SC_METING_DB', '/opt/stresschecker/data/sc_measurements.db')
 PRO_DB_PATH    = os.environ.get('SC_PRO_DB', '/opt/stresschecker/data/sc_pro.db')
@@ -924,7 +935,25 @@ def welcome():
             session['lang'] = 'en'
         else:
             session['lang'] = 'nl'
-    return render_template('welcome.html', lang=session.get('lang', 'nl'))
+    # Stripe-checkout-bevestiging: Stripe stuurt ?session_id={CHECKOUT_SESSION_ID}
+    # na consumer-checkout (success_url ~r8218). Read-only ophalen voor logging;
+    # faalzacht — de pagina mag nooit breken op een Stripe-fout.
+    checkout_session = None
+    session_id = request.args.get('session_id')
+    if session_id:
+        key = _load_stripe_secret()
+        if key:
+            try:
+                import stripe as _s
+                _s.api_key = key
+                checkout_session = _s.checkout.Session.retrieve(session_id)
+                app.logger.info('welkom: checkout %s status=%s payment=%s', session_id,
+                                getattr(checkout_session, 'status', '?'),
+                                getattr(checkout_session, 'payment_status', '?'))
+            except Exception as e:
+                app.logger.warning('welkom: Stripe retrieve faalde (%s): %s', session_id, e)
+    return render_template('welcome.html', lang=session.get('lang', 'nl'),
+                           checkout_session=checkout_session)
 
 
 # --- Wekelijkse-mail afmelding (AVG) ---------------------------------------

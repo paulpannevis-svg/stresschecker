@@ -60,6 +60,21 @@
   </div>
 {% endblock %}
 {% block content %}
+{% if checkout_session %}
+<div class="checkout-confirmation" style="background:#f0f8ff;border:2px solid #4CAF50;padding:20px;margin:20px auto;max-width:560px;border-radius:8px;">
+  <h2 style="color:#2e7d32;margin:0 0 .6rem;">&#9989; {% if lang=='de' %}Kauf bestätigt!{% elif lang=='en' %}Purchase confirmed!{% else %}Aankoop bevestigd!{% endif %}</h2>
+  {% if checkout_session.customer_details and checkout_session.customer_details.email %}
+  <p style="margin:.25rem 0;"><strong>{% if lang=='de' %}E-Mail{% else %}E-mail{% endif %}:</strong> {{ checkout_session.customer_details.email }}</p>
+  {% endif %}
+  <p style="margin:.25rem 0;"><strong>Status:</strong> {{ checkout_session.payment_status or 'pending' }}</p>
+  {% if checkout_session.amount_total %}
+  <p style="margin:.25rem 0;"><strong>{% if lang=='de' %}Betrag{% elif lang=='en' %}Amount{% else %}Bedrag{% endif %}:</strong> &euro;{{ '%.2f'|format(checkout_session.amount_total / 100) }}</p>
+  {% endif %}
+  <p style="margin-top:15px;color:#666;font-size:.95em;">
+    {% if lang=='de' %}Du erhältst in Kürze eine Bestätigungsmail mit deinem Aktivierungscode.{% elif lang=='en' %}You will receive a confirmation email with your activation code shortly.{% else %}Je ontvangt zo een bevestigingsmail met je activatiecode.{% endif %}
+  </p>
+</div>
+{% endif %}
 {% if spoor == 'navigatie' %}
 <div class="screen-hero" style="padding:48px 24px 24px;max-width:560px;margin:0 auto;">
   <h1 style="font-size:1.6rem;font-weight:700;color:var(--text);line-height:1.3;margin:0 0 1.2rem;">
