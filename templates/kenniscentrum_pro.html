@@ -162,7 +162,7 @@
     <!-- ===== INLINE VERDIEPENDE ARTIKELEN (teasers; volledige tekst in Artikelen-tab) ===== -->
     <div class="kc-articles-inline">
       <h3 class="kc-articles-inline-title">📚 {% if lang=="de" %}Vertiefende Artikel{% elif lang=="en" %}In-depth articles{% else %}Verdiepende artikelen{% endif %}</h3>
-      {% for article in db_articles_by_audience('pro') if article.slug in ['artikel-4', 'artikel-6', 'artikel-7'] %}
+      {% for article in db_articles_by_audience('pro') if article.slug in ['artikel-4', 'artikel-6', 'artikel-7', 'artikel-ri-gebruiken-coaching'] %}
       <div class="kc-article-item">
         <h4>{% if lang=="de" %}{{ article.title_de }}{% elif lang=="en" %}{{ article.title_en }}{% else %}{{ article.title_nl }}{% endif %}</h4>
         <p>{% if lang=="de" %}{{ article.body_de.split('\n\n')[0] }}{% elif lang=="en" %}{{ article.body_en.split('\n\n')[0] }}{% else %}{{ article.body_nl.split('\n\n')[0] }}{% endif %}</p>
@@ -932,7 +932,7 @@
 
   <!-- ===== KENNISBANK-ARTIKELEN (uit kc_articles, pro; artikel-5 overgeslagen) ===== -->
   <div class="kc-section" id="kc-artikelen">
-    {% for article in db_articles_by_audience('pro') if article.slug in ['artikel-4', 'artikel-6', 'artikel-7'] %}
+    {% for article in db_articles_by_audience('pro') if article.slug in ['artikel-4', 'artikel-6', 'artikel-7', 'artikel-ri-gebruiken-coaching'] %}
     <div class="kc-card">
       <h3>{% if lang=="de" %}{{ article.title_de }}{% elif lang=="en" %}{{ article.title_en }}{% else %}{{ article.title_nl }}{% endif %}</h3>
       {% if lang=="de" %}{{ render_body(article.body_de) }}{% elif lang=="en" %}{{ render_body(article.body_en) }}{% else %}{{ render_body(article.body_nl) }}{% endif %}
