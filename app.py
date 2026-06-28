@@ -8074,6 +8074,33 @@ def restore_user(user_id, who='admin'):
     _lifecycle_log('restored', user_id, None, who, 'user')
 
 
+def should_hard_delete(email, retention_until=None):
+    """FASE 2 BESLISSINGS-helper — PURE functie, verwijdert NIETS. Bestaat zodat de
+    (nog ongebouwde) hard-delete-cron de GEZAGHEBBENDE bron gebruikt i.p.v. kaal
+    `license_expires`. Hergebruikt pro_access_state (Stripe-sub current_period_end →
+    license_expires-fallback). Hard-delete-kandidaat alleen als: toegang verlopen ÉN
+    (indien meegegeven) het 180d-retentievenster `retention_until` voorbij is.
+    Returnt (delete: bool, reason: str). EXECUTIE blijft ongebouwd tot juridische clearing.
+
+    Testmatrix (zelfde 4 gevallen als de specificatie):
+      sub active + license_expires oud        → (False, access_valid)        KEEP
+      sub verlopen/canceled + license oud     → (True,  hard_delete:...)      DELETE
+      non-Stripe + license_expires verleden   → (True,  hard_delete:license_expired)
+      non-Stripe + license_expires toekomst   → (False, access_valid)        KEEP
+    """
+    import datetime as _dt
+    allowed, reason = pro_access_state(email)
+    if allowed:
+        return (False, 'access_valid')  # toegang nog geldig → NOOIT verwijderen
+    if retention_until:
+        try:
+            if _dt.datetime.fromisoformat(str(retention_until).replace('Z', '').strip()) >= _dt.datetime.utcnow():
+                return (False, 'within_retention_window')  # nog binnen 180d soft-delete-venster
+        except Exception:
+            pass
+    return (True, f'hard_delete:{reason}')
+
+
 def get_archived_notice(email):
     """Returnt dict met archiverings-info voor de UI-banner, of None. Read-only."""
     if not email:

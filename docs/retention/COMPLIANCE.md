@@ -34,6 +34,24 @@
 - [ ] Dry-run weken valideren (nooit een actieve klant flaggen)
 - [ ] Fase-2-scripts bouwen + kill-switch end-to-end testen
 
+## Blocker-audit 2026-06-28 (5 punten gereviewd vóór Fase 2)
+
+1. **DB-pad** — ⚠️ De aanname "users staat in sc_pro.db / saas_licenses.db users verwijderen" is
+   **ONJUIST en gevaarlijk**. Geverifieerd: `saas_licenses.db.users` is gezaghebbend (20 rijen, volledig
+   schema incl. password_hash/license_expires/stripe_*; `DB_PATH` wijst hier; 18 auth-queries lezen het)
+   en bevat de retentie-kolommen. `sc_pro.db.users` = vestigiale 1-rij-stub, **nergens gelezen**. De
+   retentie-code leest al de juiste DB. **NOOIT de saas_licenses.db users-tabel verwijderen/migreren.**
+   (Losse opruimkandidaat: de 1-rij `sc_pro.db.users` — apart, met back-up, niet nu.)
+2. **Kill-switch** — Fase 1 heeft GEEN crons (niets te pauzeren); docs benoemen dit. ✅
+3. **Dry-run auth** — `/admin/retention-dryrun` is token-gegate via `_admin_kk_authorized()` (fail-closed,
+   constant-time); anoniem → 403 (getest). Logt `[DRY-RUN]`. ✅
+4. **Rollback** — corrigeerd: `rollback_restore.sh` (juiste paden, integrity_check, pre-rollback-snapshot,
+   graceful HUP i.p.v. kill -9, dynamische master-PID, `--confirm`-vereist). Inert tot handmatig gebruik. ✅
+5. **Hard-delete-logica** — pure beslissingshelper `should_hard_delete(email, retention_until)` in app.py
+   hergebruikt `pro_access_state` (Stripe `current_period_end` → `license_expires`-fallback), NIET kaal
+   `license_expires`. 5 testgevallen groen (o.a. canceled sub + license_expires-toekomst → DELETE).
+   **Executie blijft ongebouwd** tot juridische clearing. ✅
+
 ## Support / verwijzingen
 
 - Jobs pauzeren? → `kill-switch.md`
