@@ -55,3 +55,15 @@ static/backup-download.tar.gz
 # Staging-config (secrets / lokaal, nooit in VCS)
 .env.staging
 data/stripe_keys*.conf
+
+# --- Toegevoegd 2026-06-28: de-clutter git status (NON-destructief; verwijdert niets) ---
+# hlm/ is BEWUST untracked maar draait LIVE op prod als blueprint (app.py:236,
+# `from hlm.routes import hlm`). NIET verwijderen — alleen uit `git status` houden.
+hlm/
+templates/hlm/
+# Stale backup-kopieën van VB-templates (de live bron is templates/vb/*.html, WEL tracked).
+templates/vb/backup/
+templates/vb/vb/
+# Backup-tarballs en kapotte template-artefacten (geen bron).
+templates/*.tar.gz
+*.BROKEN
