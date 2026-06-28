@@ -1,5 +1,20 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-28 — PROD: Kenniscentrum Pro — artikelen inline op de Methodiek-tab
+
+De Pro-artikelen stonden alleen in een aparte, standaard verborgen **Artikelen**-tab — bezoekers van
+`/kenniscentrum-pro` zagen ze niet op de landingstab (Methodiek). Toegevoegd: een teaser-sectie
+**"Verdiepende artikelen"** onderaan de Methodiek-tab, zodat alles op één landingspagina zichtbaar is.
+
+- **Template** `templates/kenniscentrum_pro.html`: inline `<div class="kc-articles-inline">` onderaan
+  de `kc-methodiek`-sectie met per artikel (slug-filter `artikel-4/6/7`, dus artikel-5 uitgesloten) de
+  titel + de eerste alinea van de body als teaser (`body_*.split('\n\n')[0]`) + een **"Lees meer →"**
+  link die de volledige **Artikelen**-bibliotheek-tab opent (`#kc-tab-artikelen`.click()). NL/DE/EN.
+- **De Artikelen-tab blijft ongewijzigd** als volledige bibliotheek (volledige bodies via `render_body`).
+- **CSS**: `.kc-articles-inline` / `.kc-article-item` / `.kc-article-more` (huisstijl #E8344E, #f9f6f2).
+- **Geen schema- of app.py-wijziging**; helper `db_articles_by_audience` ongewijzigd. Deploy = HUP
+  prod-master 1879495. Pro-gating ongemoeid: anoniem → 302 (artikelen niet zichtbaar).
+
 ## 2026-06-27 — PROD: Kenniscentrum — DB-gedreven artikelen live (7/7)
 
 De Kenniscentra waren tot nu toe volledig hardcoded HTML. Toegevoegd: een `kc_articles`-tabel
