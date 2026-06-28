@@ -1,5 +1,24 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-28 — PROD: Data-retentie Fase 1 — fundamenten (niet-destructief, omkeerbaar)
+
+DSGVO-fundering. **Geen** hard-delete/cron/cascade/anonimisering/invoice-archief — dat is bewust Fase 2.
+
+- **Schema (additief, nullable, idempotent):** `users` + `archived_at`, `retention_until`, `archived_reason`
+  (saas_licenses.db); `clients` + `archived_at` (sc_pro.db, = "deelnemers"); nieuwe audittabel
+  `data_lifecycle_log` (id, ts, action, user_id, reason, who, data_type, detail). DB's geback-upt vooraf.
+- **Helpers (app.py):** `_lifecycle_log()`, `soft_delete_user()` (zet archived_at + retention_until +180d,
+  OMKEERBAAR, geen rij verwijderd), `restore_user()`, `get_archived_notice()`. Geen auto-trigger (geen cron).
+- **`GET /api/user/data-export`** — GDPR-dataportabiliteit: read-only JSON van eigen user/licenties/
+  abonnement/metingen/deelnemers, als download. Auth: ingelogde gebruiker, eigen data. Logt `[DATA-EXPORT]`.
+- **`GET /admin/retention-dryrun`** — READ-ONLY veiligheidsrapport (admin-token): welke users zijn verlopen,
+  met verlop-bron (Stripe-sub vs license_expires), days_expired, cascade-aantallen, `phase2_hard_delete_
+  candidate` (>180d). Verwijdert niets. Logt `[DRY-RUN]`.
+- **UI:** archiverings-banner op `/menu` + `/pro` (alleen als `archived_at` gezet) met download- +
+  reactiveer-link. NL/DE/EN.
+- E2e geverifieerd: export (66 metingen/3 deelnemers), dryrun (Paul-M: verlopen 11d, niet-phase2),
+  soft-delete/restore + audit-log op throwaway-user (opgeruimd), banner toont/verbergt correct. HUP 1879495.
+
 ## 2026-06-28 — PROD: License-gate uitgebreid naar Consumer-cohort (Optie A)
 
 De live-subscriptions-gate (zie hieronder, Pro) nu óók voor **consumers**. Een consumer met een

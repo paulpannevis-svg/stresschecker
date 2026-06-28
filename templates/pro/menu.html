@@ -34,6 +34,14 @@
 </style>
 
 <div class="pro-wrap">
+  {% if archived_notice %}
+  <div style="background:#fff8f0;border:1px solid #E8344E;border-radius:12px;padding:.8rem 1rem;margin-bottom:.9rem;font-size:.83rem;color:#6B5360;line-height:1.5;">
+    <strong>{% if lang=="de" %}Ihr Konto ist archiviert{% elif lang=="en" %}Your account is archived{% else %}Je account is gearchiveerd{% endif %}</strong> ({{ archived_notice.archived_at }}).
+    {% if lang=="de" %}Ihre Daten bleiben bis {{ archived_notice.retention_until }} verfügbar.{% elif lang=="en" %}Your data remains available until {{ archived_notice.retention_until }}.{% else %}Je gegevens blijven beschikbaar tot {{ archived_notice.retention_until }}.{% endif %}
+    <a href="{{ url_for('api_user_data_export') }}" style="color:#E8344E;font-weight:600;">{% if lang=="de" %}Daten herunterladen{% elif lang=="en" %}Download data{% else %}Download je gegevens{% endif %}</a> ·
+    <a href="{{ url_for('pro_upgrade') }}" style="color:#E8344E;font-weight:600;">{% if lang=="de" %}Reaktivieren{% elif lang=="en" %}Reactivate{% else %}Reactiveren{% endif %}</a>
+  </div>
+  {% endif %}
   <!-- Welcome -->
   <div class="pro-welcome">
     <div class="pro-label">{%if lang=='de'%}Willkommen{%elif lang=='en'%}Welcome{%else%}Welkom{%endif%}</div>

@@ -2100,6 +2100,7 @@ def menu():
     _cn.close()
     return render_template("menu.html", lang=session.get("lang","nl"),
                            name=_naam,
+                           archived_notice=get_archived_notice(session.get('email','')),
                            license_type=session.get('license_type', 'free'), last_meting=_lm, demo_mode=session.get('demo_mode', False))
 
 @app.route('/gratis')
@@ -2574,6 +2575,7 @@ def pro_menu():
                            tier_summary=get_pro_tier_summary(_email, lang),
                            pro_active=has_active_pro_subscription(_email),
                            kk_tier=kk_tier_label(),
+                           archived_notice=get_archived_notice(_email),
                            active_pairings=get_active_pairings_count(pro_key))
 
 @app.route('/pro/mijn-metingen')
@@ -8019,6 +8021,209 @@ def pro_access_state(email):
     if u and _past(u['license_expires']):
         return (False, 'license_expired')
     return (True, 'ok')
+
+
+# ============================================================================
+# DATA RETENTION — FASE 1 (niet-destructief, OMKEERBAAR)
+# Audit-trail (data_lifecycle_log) + GDPR data-export + reversibele soft-delete
+# helper + dry-run retentie-rapport. GEEN cron, GEEN hard-delete, GEEN cascade,
+# GEEN anonimisering, GEEN invoice-archief — dat is bewust Fase 2.
+# ============================================================================
+RETENTION_SOFT_DELETE_DAYS = 180  # 6 maanden recovery-/downloadvenster na verlop
+
+
+def _lifecycle_log(action, user_id=None, reason=None, who='system', data_type=None, detail=None):
+    """Schrijf één audit-regel in data_lifecycle_log (saas_licenses.db). Faalzacht:
+    een logfout mag nooit de aanroepende request breken."""
+    try:
+        cn = sqlite3.connect(DB_PATH)
+        cn.execute(
+            "INSERT INTO data_lifecycle_log (action,user_id,reason,who,data_type,detail) "
+            "VALUES (?,?,?,?,?,?)", (action, user_id, reason, who, data_type, detail))
+        cn.commit()
+        cn.close()
+    except Exception:
+        pass
+
+
+def soft_delete_user(user_id, reason='subscription_expired', who='system'):
+    """OMKEERBAAR: markeer een user als gearchiveerd (logisch, NIET fysiek).
+    Zet archived_at (1e keer), retention_until (+180d) en archived_reason. Geen
+    enkele rij wordt verwijderd. Idempotent op archived_at via COALESCE."""
+    import datetime as _dt
+    now = _dt.datetime.utcnow()
+    until = (now + timedelta(days=RETENTION_SOFT_DELETE_DAYS)).isoformat()
+    cn = sqlite3.connect(DB_PATH)
+    cn.execute(
+        "UPDATE users SET archived_at=COALESCE(archived_at,?), retention_until=?, "
+        "archived_reason=? WHERE id=?", (now.isoformat(), until, reason, user_id))
+    cn.commit()
+    cn.close()
+    _lifecycle_log('archived', user_id, reason, who, 'user', detail=f'retention_until={until}')
+    return until
+
+
+def restore_user(user_id, who='admin'):
+    """OMKEERBAAR: hef archivering op (reactivering). Wist archived_at/retention_until/
+    archived_reason terug naar NULL."""
+    cn = sqlite3.connect(DB_PATH)
+    cn.execute("UPDATE users SET archived_at=NULL, retention_until=NULL, archived_reason=NULL "
+               "WHERE id=?", (user_id,))
+    cn.commit()
+    cn.close()
+    _lifecycle_log('restored', user_id, None, who, 'user')
+
+
+def get_archived_notice(email):
+    """Returnt dict met archiverings-info voor de UI-banner, of None. Read-only."""
+    if not email:
+        return None
+    try:
+        cn = sqlite3.connect(DB_PATH)
+        cn.row_factory = sqlite3.Row
+        r = cn.execute("SELECT archived_at, retention_until, archived_reason FROM users "
+                       "WHERE email=? COLLATE NOCASE", (email,)).fetchone()
+        cn.close()
+        if r and r['archived_at']:
+            return {'archived_at': (r['archived_at'] or '')[:10],
+                    'retention_until': (r['retention_until'] or '')[:10],
+                    'reason': r['archived_reason']}
+    except Exception:
+        pass
+    return None
+
+
+@app.route('/api/user/data-export', methods=['GET'])
+def api_user_data_export():
+    """GDPR-recht op dataportabiliteit: read-only export van alle eigen gegevens als
+    downloadbare JSON. Alleen de ingelogde gebruiker, alleen eigen data."""
+    if not session.get('license_valid'):
+        return jsonify({'error': 'not_authenticated'}), 401
+    email = (session.get('email') or '').strip().lower()
+    user_key = get_user_key()
+    import datetime as _dt
+    cn = sqlite3.connect(DB_PATH)
+    cn.row_factory = sqlite3.Row
+    u = cn.execute(
+        "SELECT id,email,display_name,surname,language,created_at,activated_at,"
+        "license_expires,archived_at,retention_until FROM users WHERE email=? COLLATE NOCASE",
+        (email,)).fetchone()
+    licenses = [dict(r) for r in cn.execute(
+        "SELECT license_key,product,type,status,created_at,activated_at FROM licenses "
+        "WHERE email=? COLLATE NOCASE", (email,)).fetchall()]
+    cn.close()
+    sub = _find_subscription_row_by_email(email)
+    # eigen metingen (consumer, sc_measurements.db)
+    mcn = sqlite3.connect(METING_DB_PATH)
+    mcn.row_factory = sqlite3.Row
+    metingen = [dict(r) for r in mcn.execute(
+        "SELECT id,ts,ri,bpm,hrv_pct,rmssd,sdnn,meting_type,subjectief_score,created_at "
+        "FROM metingen WHERE user_key=? ORDER BY id", (user_key,)).fetchall()]
+    mcn.close()
+    # deelnemers (Pro-cliënten, sc_pro.db) — alleen voor Pro
+    deelnemers = []
+    if is_pro():
+        pcn = sqlite3.connect(PRO_DB_PATH)
+        pcn.row_factory = sqlite3.Row
+        deelnemers = [dict(r) for r in pcn.execute(
+            "SELECT id,name,surname,birth_year,gender,created_at FROM clients "
+            "WHERE pro_key=? AND active=1", (user_key,)).fetchall()]
+        pcn.close()
+    _lifecycle_log('exported', u['id'] if u else None, None, 'user_request', 'export')
+    import logging
+    logging.getLogger().warning(f"[DATA-EXPORT] email={email!r} metingen={len(metingen)} deelnemers={len(deelnemers)}")
+    payload = {
+        'exported_at': _dt.datetime.utcnow().isoformat(),
+        'user': dict(u) if u else None,
+        'licenses': licenses,
+        'subscription': dict(sub) if sub else None,
+        'metingen': metingen,
+        'deelnemers': deelnemers,
+    }
+    resp = jsonify(payload)
+    resp.headers['Content-Disposition'] = 'attachment; filename="stresschecker-data-export.json"'
+    return resp
+
+
+@app.route('/admin/retention-dryrun', methods=['GET'])
+def admin_retention_dryrun():
+    """READ-ONLY veiligheidsrapport: welke users zóuden bij hard-delete (Fase 2)
+    geraakt worden? Verwijdert/wijzigt NIETS. Toont per kandidaat de verlop-bron +
+    cascade-aantallen. Admin-token vereist (X-Admin-Token / ?token=)."""
+    if not _admin_kk_authorized():
+        return ("Forbidden — admin token required", 403)
+    import datetime as _dt
+    now = _dt.datetime.utcnow()
+
+    def _parse(v):
+        try:
+            return _dt.datetime.fromisoformat(str(v).replace('Z', '').strip())
+        except Exception:
+            return None
+
+    cn = sqlite3.connect(DB_PATH)
+    cn.row_factory = sqlite3.Row
+    users = cn.execute("SELECT id,email,license_expires,archived_at,retention_until FROM users").fetchall()
+    # consumer-metingen per user_key tellen we via een aparte DB; pro-cliënten idem
+    rows = []
+    for u in users:
+        email = (u['email'] or '').strip().lower()
+        if not email:
+            continue
+        # gezaghebbende verlop-datum: Stripe-sub (canceled/verlopen) > license_expires
+        sub = _find_subscription_row_by_email(email)
+        expired_on = None
+        source = None
+        if sub is not None:
+            st = (sub['status'] or '').lower()
+            cpe = _parse(sub['current_period_end'])
+            if st in ('canceled', 'unpaid', 'incomplete_expired') and cpe:
+                expired_on, source = cpe, 'stripe_subscription'
+            elif st in ('active', 'trialing') and cpe and cpe < now:
+                expired_on, source = cpe, 'stripe_subscription'
+        if expired_on is None:
+            le = _parse(u['license_expires'])
+            if le and le < now:
+                expired_on, source = le, 'license_expires'
+        if expired_on is None:
+            continue  # geen positief verlop-bewijs → geen kandidaat (conservatief)
+        days_expired = (now - expired_on).days
+        rows.append({
+            'user_id': u['id'], 'email': email,
+            'expired_on': expired_on.date().isoformat(), 'source': source,
+            'days_expired': days_expired,
+            'already_archived': bool(u['archived_at']),
+            'phase2_hard_delete_candidate': days_expired > RETENTION_SOFT_DELETE_DAYS,
+        })
+    cn.close()
+    # cascade-aantallen (read-only): deelnemers + metingen tellen kost extra queries;
+    # alleen voor de (kleine) kandidatenlijst.
+    pcn = sqlite3.connect(PRO_DB_PATH)
+    mcn = sqlite3.connect(METING_DB_PATH)
+    for r in rows:
+        # user_key = sha256(email)[:32] — zelfde derivatie als get_user_key()
+        try:
+            uk = hashlib.sha256(r['email'].encode()).hexdigest()[:32]
+            r['deelnemers'] = pcn.execute("SELECT COUNT(*) FROM clients WHERE pro_key=?", (uk,)).fetchone()[0]
+            r['metingen'] = mcn.execute("SELECT COUNT(*) FROM metingen WHERE user_key=?", (uk,)).fetchone()[0]
+        except Exception:
+            r['deelnemers'] = r['metingen'] = None
+    pcn.close()
+    mcn.close()
+    n_total = len(rows)
+    n_phase2 = sum(1 for r in rows if r['phase2_hard_delete_candidate'])
+    _lifecycle_log('dryrun', None, None, 'admin', 'report',
+                   detail=f'candidates={n_total} phase2={n_phase2}')
+    import logging
+    logging.getLogger().warning(f"[DRY-RUN] retention candidates={n_total} phase2_hard_delete={n_phase2}")
+    return jsonify({
+        'generated_at': now.isoformat(),
+        'soft_delete_window_days': RETENTION_SOFT_DELETE_DAYS,
+        'note': 'READ-ONLY rapport. Verwijdert niets. phase2_hard_delete_candidate=verlopen >180d.',
+        'total_expired': n_total,
+        'phase2_hard_delete_candidates': n_phase2,
+        'records': sorted(rows, key=lambda r: -r['days_expired']),
+    })
 
 
 def has_active_pro_subscription(email):
