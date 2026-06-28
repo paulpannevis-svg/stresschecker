@@ -1,5 +1,22 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-28 — PROD: License-gate uitgebreid naar Consumer-cohort (Optie A)
+
+De live-subscriptions-gate (zie hieronder, Pro) nu óók voor **consumers**. Een consumer met een
+verlopen/opgezegd/past_due `sc-month`-abonnement wordt geblokkeerd op de meet-/resultaat-functies.
+
+- Tweede `before_request`-hook `_enforce_consumer_subscription` (`license_type=='consumer'`),
+  hergebruikt `pro_access_state` (cohort-agnostisch). Gated FEATURE-paden: `/kwadrant`,
+  `/resultaten`, `/mijn-metingen`, `/verloop`, `/biofeedback`, `/tips`, `/beroepen`, `/over-stress`,
+  `/sport-training`, `/kenniscentrum`, `/meetkeuze`, `/sensor-en-meten`, `/sc/sensor-keuze` +
+  prefixen `/api/meting*`, `/api/set_subjectief`, `/api/feedback`. DENY → 302 `/menu?expired=1`
+  (HTML) of 403 JSON. `/menu`, `/instellingen`, `/licentie`, checkout/activatie blijven bereikbaar.
+- **Free-mode (`license_type='free'`) en demo blijven ongemoeid** (niet 'consumer'); conservatief
+  (DENY enkel bij positief verlop-bewijs → no-sub/legacy consument behoudt toegang).
+- Webhook-sync overgeslagen (Optie A: live `subscriptions`-tabel = bron van waarheid).
+- E2e geverifieerd: consument met canceled sub → 302/403, `/menu`+`/instellingen` 200; actieve
+  consument → 200; free-mode → 200 (ongemoeid); Pro-gate regressie groen. Log `type=pro|consumer`.
+
 ## 2026-06-28 — PROD: License-gate — verlopen/opgezegd/past_due abonnement blokkeert Pro-functies
 
 **Beveiligingsfix.** Een ingelogde Pro-gebruiker met een verlopen/opgezegd Stripe-abonnement

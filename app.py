@@ -755,10 +755,49 @@ def _enforce_pro_subscription():
         return
     import logging
     logging.getLogger().warning(
-        f"[LICENSE-DENY] email={session.get('email','')!r} path={path!r} reason={reason}")
+        f"[LICENSE-DENY] email={session.get('email','')!r} type=pro path={path!r} reason={reason}")
     if is_api or (request.accept_mimetypes.best == 'application/json'):
         return jsonify({'error': 'subscription_required', 'reason': reason}), 403
     return redirect(url_for('pro_menu') + '?expired=1')
+
+
+# Consumer-FEATURE-routes (metingen + resultaten) die geblokkeerd worden bij verlopen/
+# niet-betaald consumer-abonnement. /menu, /instellingen, /licentie, /gratis, checkout/
+# activatie-routes blijven BEREIKBAAR zodat de klant kan verlengen. Free-mode-sessies
+# hebben license_type='free' (niet 'consumer') en worden hier dus NIET geraakt.
+_CONSUMER_GATED_PATHS = frozenset({
+    '/kwadrant', '/resultaten', '/mijn-metingen', '/verloop', '/biofeedback',
+    '/tips', '/beroepen', '/over-stress', '/sport-training', '/kenniscentrum',
+    '/meetkeuze', '/sensor-en-meten', '/sc/sensor-keuze',
+})
+_CONSUMER_GATED_PREFIXES = ('/api/meting', '/api/set_subjectief', '/api/feedback')
+
+
+@app.before_request
+def _enforce_consumer_subscription():
+    """Zelfde autoritatieve abonnements-gate, maar voor de CONSUMER-cohort op de meet-/
+    resultaat-FEATURE-routes. Hergebruikt pro_access_state (cohort-agnostisch: Stripe-sub
+    → live status, anders license_expires). Demo, free-mode en niet-consumer-sessies
+    blijven ongemoeid; conservatief (DENY enkel bij positief verlop-bewijs)."""
+    if request.method == 'OPTIONS':
+        return
+    if not session.get('license_valid') or session.get('demo_mode'):
+        return
+    if session.get('license_type') != 'consumer':
+        return
+    path = request.path or ''
+    gated = path in _CONSUMER_GATED_PATHS or any(path.startswith(p) for p in _CONSUMER_GATED_PREFIXES)
+    if not gated:
+        return
+    allowed, reason = pro_access_state(session.get('email', ''))  # cohort-agnostisch
+    if allowed:
+        return
+    import logging
+    logging.getLogger().warning(
+        f"[LICENSE-DENY] email={session.get('email','')!r} type=consumer path={path!r} reason={reason}")
+    if path.startswith('/api/') or (request.accept_mimetypes.best == 'application/json'):
+        return jsonify({'error': 'subscription_required', 'reason': reason}), 403
+    return redirect(url_for('menu') + '?expired=1')
 
 
 def get_meting_count_for_current_context():
