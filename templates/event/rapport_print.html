@@ -33,8 +33,10 @@
     </div>
   </div>
 
-  <!-- ENIGE renderbron: de bestaande PDF-route. Geen rapport-inhoud in dit omhulsel. -->
-  <iframe id="pdf" src="{{ pdf_url }}" title="rapport {{ code }}"></iframe>
+  <!-- ENIGE renderbron: de bestaande PDF-route. Geen rapport-inhoud in dit omhulsel.
+       #view=FitH = de PDF-viewer schaalt op paginabreedte i.p.v. hele-pagina-passend, zodat het
+       A4-rapport het scherm vult en leesbaar is (anders: kleine, grijs-omkaderde pagina). -->
+  <iframe id="pdf" src="{{ pdf_url }}#view=FitH" title="rapport {{ code }}"></iframe>
 
   <script>
     var f = document.getElementById('pdf');
