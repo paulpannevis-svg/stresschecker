@@ -725,6 +725,42 @@ def _enforce_session_idle_timeout():
     session['_last_activity'] = now
 
 
+# Pro-FEATURE-routes die geblokkeerd worden bij verlopen/niet-betaald abonnement.
+# /pro (menu), /instellingen, /pro/upgrade, /pro/cancel-subscription blijven BEREIKBAAR
+# zodat de klant de "abonnement beëindigd"-melding ziet en kan verlengen/opzeggen.
+_PRO_SUB_GATE_ALLOW = ('/pro/upgrade', '/pro/cancel-subscription')
+
+
+@app.before_request
+def _enforce_pro_subscription():
+    """Autoritatieve abonnements-gate op Pro-FEATURE-routes (los van de sticky sessie-
+    vlaggen). Vangt het geval 'verlopen/opgezegd/past_due abonnement, functies nog actief'.
+    Demo-Pro en niet-Pro-sessies blijven ongemoeid; niet-Stripe-cohorten worden alleen bij
+    een gezette, verlopen license_expires geweerd (zie pro_access_state)."""
+    if request.method == 'OPTIONS':
+        return
+    if not session.get('license_valid') or session.get('demo_mode'):
+        return
+    if session.get('license_type') != 'pro':
+        return
+    path = request.path or ''
+    is_api = path.startswith('/api/pro/')
+    is_page = path.startswith('/pro/') or path == '/kenniscentrum-pro'
+    if not (is_api or is_page):
+        return
+    if any(path.startswith(p) for p in _PRO_SUB_GATE_ALLOW):
+        return
+    allowed, reason = pro_access_state(session.get('email', ''))
+    if allowed:
+        return
+    import logging
+    logging.getLogger().warning(
+        f"[LICENSE-DENY] email={session.get('email','')!r} path={path!r} reason={reason}")
+    if is_api or (request.accept_mimetypes.best == 'application/json'):
+        return jsonify({'error': 'subscription_required', 'reason': reason}), 403
+    return redirect(url_for('pro_menu') + '?expired=1')
+
+
 def get_meting_count_for_current_context():
     """Telt metingen relevant voor de huidige sessie-context.
 
@@ -7896,6 +7932,54 @@ def _find_subscription_row_by_email(email):
 
 def has_stripe_subscription(email):
     return _find_subscription_row_by_email(email) is not None
+
+
+def pro_access_state(email):
+    """Autoritatieve Pro-toegangscontrole — LOS van de sessie-vlaggen die enkel bij login
+    gezet worden. Stripe-cohort → gate op de webhook-gesyncte `subscriptions`-tabel (live
+    status). Niet-Stripe-cohort (géén sub-rij: legacy/marketing/manual/eval/KK) → gate op
+    `users.license_expires`.
+
+    CONSERVATIEF: DENY alléén bij positief bewijs van verlop; bij twijfel/ontbrekende data
+    ALLOW — om legitieme niet-Stripe-klanten (vaak license_expires=NULL = doorlopend) niet
+    buiten te sluiten. Retourneert (allowed: bool, reason: str)."""
+    import datetime as _dt
+    now = _dt.datetime.utcnow()
+
+    def _past(val):
+        if not val:
+            return None  # onbekend → niet hierop blokkeren
+        try:
+            return _dt.datetime.fromisoformat(str(val).replace('Z', '').strip()) < now
+        except Exception:
+            return None
+
+    row = _find_subscription_row_by_email(email)
+    if row is not None:
+        status = (row['status'] or '').lower()
+        cpe_past = _past(row['current_period_end'])
+        if status in ('active', 'trialing'):
+            return (False, 'subscription_expired') if cpe_past else (True, 'ok')
+        if status == 'past_due':
+            return (False, 'payment_pending')          # Paul: betaling-in-progress → géén toegang
+        if status in ('canceled', 'unpaid', 'incomplete_expired'):
+            return (False, 'subscription_canceled')
+        return (True, 'ok')                            # onbekende status → niet blokkeren
+
+    # Niet-Stripe-cohort: enkel DENY bij een GEZETTE, verlopen license_expires.
+    import sqlite3 as _sq
+    cn = _sq.connect(DB_PATH)
+    cn.row_factory = _sq.Row
+    try:
+        u = cn.execute("SELECT license_expires FROM users WHERE email=? COLLATE NOCASE",
+                       (email,)).fetchone()
+    except Exception:
+        u = None
+    finally:
+        cn.close()
+    if u and _past(u['license_expires']):
+        return (False, 'license_expired')
+    return (True, 'ok')
 
 
 def has_active_pro_subscription(email):

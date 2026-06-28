@@ -1,5 +1,28 @@
 # StressChecker — Recente wijzigingen
 
+## 2026-06-28 — PROD: License-gate — verlopen/opgezegd/past_due abonnement blokkeert Pro-functies
+
+**Beveiligingsfix.** Een ingelogde Pro-gebruiker met een verlopen/opgezegd Stripe-abonnement
+behield volledige toegang tot alle Pro-functies. Oorzaak: route-toegang was puur sessie-gebaseerd
+(`is_pro()` = `session['license_type']`, gezet bij login), en de enige expiry-check (`users.license_expires`)
+stond alleen op `/pro`+`/menu` én was nooit gesynct met Stripe-opzegging (bleef op de activatie-datum).
+Géén `validator.py`, géén grace-period-veld, géén caching — een ontwerp-gat tussen twee bronnen.
+
+- **Nieuwe autoritatieve gate** `pro_access_state(email)`: Stripe-cohort → live `subscriptions`-tabel
+  (active/trialing + `current_period_end` toekomst = ALLOW; `past_due`/`canceled`/`unpaid` of
+  verlopen periode = DENY). Niet-Stripe-cohort (geen sub-rij: legacy/marketing/manual/eval/KK) →
+  `users.license_expires`. **Conservatief: DENY alleen bij positief bewijs van verlop**; ontbrekende
+  data (bv. `license_expires=NULL`) → ALLOW, om legitieme klanten niet buiten te sluiten.
+- **Centrale `before_request`-hook** dwingt dit af op álle Pro-FEATURE-routes (`/pro/*`,
+  `/kenniscentrum-pro`, `/api/pro/*`). DENY → HTML 302 naar `/pro?expired=1`, API → 403 JSON
+  `{reason}`. **Bewust bereikbaar bij verlop**: `/pro` (menu), `/instellingen`, `/pro/upgrade`,
+  `/pro/cancel-subscription` — zodat de klant de "beëindigd"-melding ziet en kan verlengen/opzeggen.
+  Demo-Pro en niet-Pro-sessies ongemoeid. Log `[LICENSE-DENY] email= path= reason=`.
+- Geverifieerd e2e met gesigneerde sessies: Paul-M (canceled 17-06) → features 302/403, `/pro`+
+  `/instellingen` 200; actief abonnement → 200; niet-Stripe/KK/onbekend → ALLOW. Deploy = HUP 1879495.
+- Webhook-sync van `license_expires` (apart voorstel) bewust NIET meegenomen: redundant t.o.v. deze
+  gate én zou de oude `/pro`-expiry-clear triggeren (uitloggen i.p.v. upgrade tonen). Zie overleg.
+
 ## 2026-06-28 — PROD: Pro-context auth — sessie-verlop/uitlog → Pro-login i.p.v. consumer-scherm
 
 Een ingelogde Pro-gebruiker die na sessie-verlop (>30 min) op Menu klikte, belandde op het
