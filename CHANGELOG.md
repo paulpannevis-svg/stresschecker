@@ -14,6 +14,12 @@ De Pro-artikelen stonden alleen in een aparte, standaard verborgen **Artikelen**
 - **CSS**: `.kc-articles-inline` / `.kc-article-item` / `.kc-article-more` (huisstijl #E8344E, #f9f6f2).
 - **Geen schema- of app.py-wijziging**; helper `db_articles_by_audience` ongewijzigd. Deploy = HUP
   prod-master 1879495. Pro-gating ongemoeid: anoniem → 302 (artikelen niet zichtbaar).
+- **Consumer idem** (`templates/kenniscentrum.html`): dezelfde teaser-sectie onderaan de landingstab
+  **"Je lichaam"** (`kc-lichaam`, het consumer-equivalent van Methodiek — er is geen Methodiek-tab).
+  3 consumer-artikelen (`audience='consumer'`, artikel-1/2/3), "Lees meer" opent de Artikelen-tab via
+  `[data-kc=artikelen]`. De landingstab is taalgesplitst (`{% if de %}/{% elif en %}/{% else nl %}`,
+  elke tak sluit zelf de sectie-`</div>`), dus het blok staat in alle drie de takken. NL/DE/EN
+  geverifieerd via standalone render (div-balans + 1 teaser-blok + 3 items per taal).
 
 ## 2026-06-27 — PROD: Kenniscentrum — DB-gedreven artikelen live (7/7)
 

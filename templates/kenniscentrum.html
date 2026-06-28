@@ -77,6 +77,13 @@
 .kc-landing-video{margin:0 0 1rem;}
 .video-wrapper{position:relative;width:100%;max-width:560px;aspect-ratio:16/9;margin:0 auto;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.1);}
 .video-wrapper iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+.kc-articles-inline{margin-top:1.2rem;border-top:1px solid #f0ebe4;padding-top:1rem}
+.kc-articles-inline-title{font-size:.95rem;font-weight:700;color:#333;margin-bottom:.6rem;display:flex;align-items:center;gap:.4rem}
+.kc-article-item{background:#f9f6f2;border-radius:8px;padding:.7rem .85rem;margin-bottom:.6rem}
+.kc-article-item h4{font-size:.86rem;font-weight:700;color:#333;margin:0 0 .3rem}
+.kc-article-item p{font-size:.81rem;color:#555;line-height:1.6;margin:0 0 .4rem}
+.kc-article-more{display:inline-block;font-size:.8rem;font-weight:600;color:#E8344E;text-decoration:none}
+.kc-article-more:hover{text-decoration:underline}
 
 </style>
 
@@ -195,6 +202,18 @@
       <p>Der Innere Kompass hat vier Richtungen: Ihr <strong>Körper</strong> sendet Signale, Ihre <strong>Emotionen</strong> weisen die Richtung, Ihre <strong>Gedanken</strong> erzählen eine Geschichte, und manchmal gibt es <strong>Intuition</strong> — ein Wissen jenseits der Logik. Die meisten Menschen hören nur auf ihre Gedanken. Der StressChecker hilft Ihnen, auch die anderen Richtungen zu lesen.</p>
       <p>Die App ist ein Gerüst, kein dauerhaftes Gebäude. Das Ziel ist nicht, dass Sie sie für immer nutzen — das Ziel ist, dass Sie lernen, selbst zu navigieren. <em>Resilient bei Rückschlägen, flexibel bei Veränderungen, unabhängig von externen Ratgebern.</em></p>
     </div>
+
+    <!-- ===== INLINE VERDIEPENDE ARTIKELEN (teasers; volledige tekst in Artikelen-tab) ===== -->
+    <div class="kc-articles-inline">
+      <h3 class="kc-articles-inline-title">📚 {% if lang=="de" %}Vertiefende Artikel{% elif lang=="en" %}In-depth articles{% else %}Verdiepende artikelen{% endif %}</h3>
+      {% for article in db_articles_by_audience('consumer') %}
+      <div class="kc-article-item">
+        <h4>{% if lang=="de" %}{{ article.title_de }}{% elif lang=="en" %}{{ article.title_en }}{% else %}{{ article.title_nl }}{% endif %}</h4>
+        <p>{% if lang=="de" %}{{ article.body_de.split('\n\n')[0] }}{% elif lang=="en" %}{{ article.body_en.split('\n\n')[0] }}{% else %}{{ article.body_nl.split('\n\n')[0] }}{% endif %}</p>
+        <a class="kc-article-more" href="#kc-artikelen" onclick="document.querySelector('[data-kc=artikelen]').click(); return false;">{% if lang=="de" %}Mehr lesen →{% elif lang=="en" %}Read more →{% else %}Lees meer →{% endif %}</a>
+      </div>
+      {% endfor %}
+    </div>
 </div>
     {% elif lang=="en" %}
     <div class="kc-card">
@@ -209,6 +228,18 @@
       </ul>
       <p>The Inner Compass has four directions: your <strong>body</strong> sends signals, your <strong>emotions</strong> point the way, your <strong>thoughts</strong> form a story, and sometimes there is <strong>intuition</strong> — a knowing beyond logic. Most people only listen to their thoughts. The StressChecker helps you learn to read the other directions too.</p>
       <p>The app is a scaffold, not a permanent structure. The goal isn't that you keep using it forever — the goal is that you learn to navigate yourself. <em>Resilient in setbacks, flexible in change, independent of external advice.</em></p>
+    </div>
+
+    <!-- ===== INLINE VERDIEPENDE ARTIKELEN (teasers; volledige tekst in Artikelen-tab) ===== -->
+    <div class="kc-articles-inline">
+      <h3 class="kc-articles-inline-title">📚 {% if lang=="de" %}Vertiefende Artikel{% elif lang=="en" %}In-depth articles{% else %}Verdiepende artikelen{% endif %}</h3>
+      {% for article in db_articles_by_audience('consumer') %}
+      <div class="kc-article-item">
+        <h4>{% if lang=="de" %}{{ article.title_de }}{% elif lang=="en" %}{{ article.title_en }}{% else %}{{ article.title_nl }}{% endif %}</h4>
+        <p>{% if lang=="de" %}{{ article.body_de.split('\n\n')[0] }}{% elif lang=="en" %}{{ article.body_en.split('\n\n')[0] }}{% else %}{{ article.body_nl.split('\n\n')[0] }}{% endif %}</p>
+        <a class="kc-article-more" href="#kc-artikelen" onclick="document.querySelector('[data-kc=artikelen]').click(); return false;">{% if lang=="de" %}Mehr lesen →{% elif lang=="en" %}Read more →{% else %}Lees meer →{% endif %}</a>
+      </div>
+      {% endfor %}
     </div>
 </div>
     {% else %}
@@ -327,6 +358,17 @@
       {% endif %}
     </div>
 
+    <!-- ===== INLINE VERDIEPENDE ARTIKELEN (teasers; volledige tekst in Artikelen-tab) ===== -->
+    <div class="kc-articles-inline">
+      <h3 class="kc-articles-inline-title">📚 {% if lang=="de" %}Vertiefende Artikel{% elif lang=="en" %}In-depth articles{% else %}Verdiepende artikelen{% endif %}</h3>
+      {% for article in db_articles_by_audience('consumer') %}
+      <div class="kc-article-item">
+        <h4>{% if lang=="de" %}{{ article.title_de }}{% elif lang=="en" %}{{ article.title_en }}{% else %}{{ article.title_nl }}{% endif %}</h4>
+        <p>{% if lang=="de" %}{{ article.body_de.split('\n\n')[0] }}{% elif lang=="en" %}{{ article.body_en.split('\n\n')[0] }}{% else %}{{ article.body_nl.split('\n\n')[0] }}{% endif %}</p>
+        <a class="kc-article-more" href="#kc-artikelen" onclick="document.querySelector('[data-kc=artikelen]').click(); return false;">{% if lang=="de" %}Mehr lesen →{% elif lang=="en" %}Read more →{% else %}Lees meer →{% endif %}</a>
+      </div>
+      {% endfor %}
+    </div>
 </div>
     {% endif %}
 
