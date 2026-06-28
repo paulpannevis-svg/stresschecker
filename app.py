@@ -811,6 +811,21 @@ def _enforce_consumer_subscription():
     return redirect(url_for('menu') + '?expired=1')
 
 
+@app.after_request
+def _no_store_event_pages(resp):
+    """Kiosk-/event-pagina's zijn dynamisch (deelnemer-invoer, meten, rapport) en mogen nooit
+    door browser/proxy gecached worden — anders toont een oud tabblad ná een deploy verouderde
+    knoppen/routes (bv. een oude /print-rapportlink i.p.v. /view). Eén scoped after_request dekt
+    alle /event/kiosk- en /event-code-routes ineens, ongeacht hoe de view de respons teruggeeft
+    (gerenderde HTML, PDF-Response of redirect)."""
+    p = request.path or ''
+    if p.startswith('/event/kiosk') or p.startswith('/event-code'):
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+    return resp
+
+
 def get_meting_count_for_current_context():
     """Telt metingen relevant voor de huidige sessie-context.
 
