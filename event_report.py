@@ -284,9 +284,12 @@ def _db_path():
     return os.environ.get('SC_EVENT_DB', DEFAULT_DB)
 
 
-def render_report(meting_code, lang='nl'):
-    """Genereer het momentopname-rapport → (pdf_bytes, info). Leest sc_event.db read-only.
-    Raise ValueError bij onbekende code / geen meting. Herbruikbaar vanuit CLI én app.py."""
+def render_report(meting_code, lang='nl', as_html=False, screen_mode=False, back_url=None, print_url=None):
+    """Genereer het momentopname-rapport. Standaard → (pdf_bytes, info) via WeasyPrint.
+    Met as_html=True → (html_str, info): exact DEZELFDE template als HTML-string, voor de
+    responsieve schermweergave; screen_mode/back_url/print_url voeden de scherm-only actiebalk
+    (WeasyPrint negeert @media screen, dus de PDF blijft byte-identiek). Leest sc_event.db
+    read-only. Raise ValueError bij onbekende code / geen meting. Herbruikbaar vanuit CLI én app.py."""
     code = (meting_code or '').strip().upper()
     if lang not in T:
         lang = 'nl'
@@ -377,13 +380,16 @@ def render_report(meting_code, lang='nl'):
         quad=__import__('event_quadrant').build_quadrant(
             p['bpm'], p['hrv_pct'], p['subjectief_score'], p['ri'], reliable, lang),
         generated_at=datetime.now().strftime('%Y-%m-%d %H:%M'),
+        screen_mode=screen_mode, back_url=back_url, print_url=print_url,
     )
 
-    from weasyprint import HTML
-    pdf_bytes = HTML(string=html_str, base_url=PROJECT_ROOT).write_pdf()
     info = {'name': p['name'], 'code': code, 'event_code': p['event_code'],
             'zone_label': zone_label, 'zone_key': zone_key, 'ri': ri_str,
             'reliable': reliable, 'lang': lang}
+    if as_html:
+        return html_str, info
+    from weasyprint import HTML
+    pdf_bytes = HTML(string=html_str, base_url=PROJECT_ROOT).write_pdf()
     return pdf_bytes, info
 
 

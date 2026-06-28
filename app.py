@@ -4316,6 +4316,28 @@ def event_rapport_fullscreen(event_code, meting_code):
     return redirect(url_for('event_report_pdf', event_code=event_code, meting_code=meting_code))
 
 
+@app.route('/event/kiosk/<event_code>/rapport/<meting_code>/view')
+def event_report_html(event_code, meting_code):
+    """Responsieve HTML-weergave van het momentopname-rapport: ZELFDE template/opmaak als de
+    PDF, maar schermvullend + mobiel (via @media screen). Zelfde renderbron
+    (event_report.render_report met as_html=True); de Print-knop opent de bestaande WeasyPrint-PDF
+    zodat de afdruk exact gelijk blijft. Gegate via _event_enabled(); ?lang=nl|de|en."""
+    if not _event_enabled():
+        return ('Event-modus niet beschikbaar', 404)
+    lang = request.args.get('lang', 'nl')
+    if lang not in ('nl', 'de', 'en'):
+        lang = 'nl'
+    import event_report as _evr
+    back_url = url_for('event_kiosk_meten', event_code=event_code, meting_code=meting_code)
+    print_url = url_for('event_report_pdf', event_code=event_code, meting_code=meting_code, lang=lang)
+    try:
+        html_str, _info = _evr.render_report(meting_code, lang, as_html=True,
+                                             screen_mode=True, back_url=back_url, print_url=print_url)
+    except ValueError as e:
+        return (str(e), 404)
+    return html_str
+
+
 @app.route('/event/kiosk/<event_code>/deelnemer/<meting_code>')
 def event_deelnemer_infopagina(event_code, meting_code):
     """On-screen deelnemer-infopagina (kaart-layout: gauge + biofeedback + duiding).

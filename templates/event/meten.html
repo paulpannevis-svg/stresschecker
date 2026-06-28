@@ -71,7 +71,7 @@
       <div class="lbl" id="qualOut" style="margin-top:.6rem"></div>
       <!-- Eén rapport-knop: opent de print-wrapper (PDF in iframe + Terug + Print). Bekijken
            én printen gebeurt daar; daarom geen aparte "Print"-knop meer op de uitslag. -->
-      <a class="report" href="/event/kiosk/{{ p.event_code }}/rapport/{{ p.meting_code }}/print" target="_blank" rel="noopener">Bekijk / print rapport →</a>
+      <a class="report" href="/event/kiosk/{{ p.event_code }}/rapport/{{ p.meting_code }}/view" target="_blank" rel="noopener">Bekijk / print rapport →</a>
       <div class="rep-hint">Gauge, kwadrant en gevoel-vs-meting — om samen te bespreken. Toont je meest betrouwbare meting.</div>
       <!-- "Nieuwe meting": 2e meting onder DEZELFDE participant_id via de bestaande code
            (code-terugkeer-mechanisme). Standaard verborgen; JS toont 'm alleen bij < 2
@@ -87,7 +87,7 @@
          alleen de slotboodschap + rapportlink. -->
     <div id="phase-capped" class="card" style="display:none">
       <div class="slotmsg" id="cappedMsg"></div>
-      <a class="report" href="/event/kiosk/{{ p.event_code }}/rapport/{{ p.meting_code }}/print" target="_blank" rel="noopener">Bekijk / print rapport →</a>
+      <a class="report" href="/event/kiosk/{{ p.event_code }}/rapport/{{ p.meting_code }}/view" target="_blank" rel="noopener">Bekijk / print rapport →</a>
       <a class="next" href="/event/kiosk/{{ p.event_code }}">Volgende deelnemer →</a>
     </div>
   </div>
