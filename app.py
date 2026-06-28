@@ -8253,6 +8253,86 @@ def admin_retention_dryrun():
     })
 
 
+def anonymize_user_at_erasure(user_id, email, who='user_request'):
+    """FASE 2 — GDPR Recht op vergetelheid via ANONIMISERING (geen hard-delete): PII-velden
+    onleesbaar maken, user_id + timestamps + (pseudonieme) metingen BEHOUDEN voor audit-trail
+    en anonieme analytics. email/password_hash zijn NOT NULL → tombstone i.p.v. NULL.
+    Spiegelt retention.anonymize_user_at_erasure() (los gehouden i.v.m. import-bijwerking)."""
+    import datetime as _dt
+    email = (email or '').strip().lower()
+    uk = hashlib.sha256(email.encode()).hexdigest()[:32]
+    tombstone = f'anon-{user_id}@deleted.invalid'
+    cn = sqlite3.connect(DB_PATH)
+    cn.execute(
+        "UPDATE users SET email=?, password_hash='ANONYMIZED_DISABLED', display_name=NULL, "
+        "surname=NULL, deleted_at=COALESCE(deleted_at,?) WHERE id=?",
+        (tombstone, _dt.datetime.utcnow().isoformat(), user_id))
+    cn.execute("UPDATE licenses SET email=? WHERE email=? COLLATE NOCASE", (tombstone, email))
+    cn.commit()
+    cn.close()
+    deelnemers = 0
+    try:
+        pcn = sqlite3.connect(PRO_DB_PATH)
+        cur = pcn.execute(
+            "UPDATE clients SET name='anonymized', surname=NULL, email=NULL, phone=NULL, "
+            "notes=NULL, archived_at=COALESCE(archived_at,?) WHERE pro_key=?",
+            (_dt.datetime.utcnow().isoformat(), uk))
+        deelnemers = cur.rowcount or 0
+        pcn.commit(); pcn.close()
+    except Exception:
+        pass
+    _lifecycle_log('anonymized', user_id, 'gdpr_erasure', who, 'user',
+                   detail=f'tombstone={tombstone}; deelnemers={deelnemers}')
+    return {'tombstone': tombstone, 'deelnemers': deelnemers}
+
+
+def delete_user_data(user_id, email, reason='gdpr_erasure'):
+    """GDPR Recht op vergetelheid: anonimiseer (NIET hard-delete) zodat de audit-trail
+    intact blijft. Facturen blijven in Stripe (10jr wettelijke bewaring; geen lokale
+    invoices-tabel). Faalt luid maar logt de poging."""
+    try:
+        out = anonymize_user_at_erasure(user_id, email, who='user_request')
+        _lifecycle_log('deleted', user_id, reason, 'user_request', 'user',
+                       detail='gdpr_erasure_anonymized')
+        return out
+    except Exception as e:
+        _lifecycle_log('deleted_failed', user_id, str(e), 'system', 'user')
+        raise
+
+
+@app.route('/api/user/delete-me', methods=['POST'])
+def api_user_delete_me():
+    """FASE 2 — GDPR Recht op vergetelheid (opt-in, alleen eigen account). Anonimiseert de
+    INGELOGDE gebruiker onomkeerbaar. Vereist POST + JSON/form `confirm` == eigen e-mailadres
+    (frictie tegen abusievelijke/CSRF-triggers). Logt daarna uit. Geen UI-knop bedraad — de
+    activering hiervan in de UI is een aparte, bewuste stap."""
+    if not session.get('license_valid'):
+        return jsonify({'error': 'not_authenticated'}), 401
+    email = (session.get('email') or '').strip().lower()
+    if not email:
+        return jsonify({'error': 'no_email_in_session'}), 400
+    body = request.get_json(silent=True) or request.form or {}
+    confirm = (body.get('confirm') or '').strip().lower()
+    if confirm != email:
+        return jsonify({'error': 'confirm_mismatch',
+                        'hint': 'POST {"confirm": "<je-eigen-emailadres>"}'}), 400
+    cn = sqlite3.connect(DB_PATH)
+    cn.row_factory = sqlite3.Row
+    u = cn.execute("SELECT id FROM users WHERE email=? COLLATE NOCASE", (email,)).fetchone()
+    cn.close()
+    if not u:
+        return jsonify({'error': 'user_not_found'}), 404
+    try:
+        out = delete_user_data(u['id'], email, reason='user_request')
+    except Exception:
+        return jsonify({'error': 'erasure_failed'}), 500
+    import logging
+    logging.getLogger().warning(f"[GDPR-ERASURE] user_id={u['id']} anonymized deelnemers={out.get('deelnemers')}")
+    session.clear()
+    return jsonify({'status': 'anonymized', 'message': 'Je account is geanonimiseerd (GDPR).',
+                    'deelnemers_anonymized': out.get('deelnemers', 0)})
+
+
 def has_active_pro_subscription(email):
     """True als de gebruiker Pro-billing-UI mag zien op basis van een actief/recoverable
     Stripe Pro-abonnement — gelezen uit de LOKALE, webhook-gesyncte subscriptions-tabel

@@ -9,11 +9,38 @@
 | Reversibele soft-delete (`soft_delete_user`/`restore_user`) | ✅ KLAAR (helper, geen auto-trigger) |
 | Dry-run rapport (`GET /admin/retention-dryrun`, admin-token) | ✅ LIVE |
 | UI archiverings-banner (`/menu`, `/pro`) | ✅ LIVE |
-| Hard-delete / cron / cascade / anonimisering / invoice-archief | ⛔ Fase 2 (niet gebouwd) |
 | Juridische/DPO-clearing | ⏳ PENDING |
 | Privacy Policy finaal | ⏳ PENDING (Paul) |
 
 **Bewaartermijn-parameters:** soft-delete-venster = `RETENTION_SOFT_DELETE_DAYS = 180` (app.py).
+
+## Fase 2 — status: SAFE DORMANT (code gebouwd + getest, auto-jobs UIT)
+
+> Code is gebouwd en op kopie-DB's getest; de **automatische** jobs draaien NIET en
+> wachten op juridische clearing. Alleen de opt-in GDPR-anonimisering (per gebruiker,
+> geen automatiek) is live als API.
+
+| Onderdeel | Status |
+|---|---|
+| `retention.py` (standalone CLI, géén `import app`) | ✅ GEBOUWD + GETEST (kopie-DB) |
+| `auto_soft_delete_expired_users()` (gezaghebbende logica, niet kaal `license_expires`) | ✅ GETEST · ⏸️ dry-run-default, géén cron |
+| `hard_delete_archived_users()` (>180d + her-verificatie, cascade) | ✅ GETEST · ⏸️ dubbele grendel (geen cron + `RETENTION_HARD_DELETE_CLEARED=1`) |
+| GDPR Right to Erasure — anonimisering (`POST /api/user/delete-me`) | ✅ LIVE (opt-in, eigen account, `confirm`=eigen e-mail; geen UI-knop) |
+| `data_lifecycle_log`-acties `anonymized` + `deleted` | ✅ getest (audit-trail compleet) |
+| Cron `auto_soft_delete.sh` / `hard_delete.sh` | ⏸️ DORMANT (bestaan, NIET in crontab) |
+| Invoice-archief | ➖ N.v.t. — geen lokale `invoices`-tabel; facturen + 10jr-bewaring in Stripe |
+| Auto-soft-delete + hard-delete LIVE zetten | ⛔ wacht op juridische clearing (zie `ACTIVATION.md`) |
+
+**Belangrijke correcties t.o.v. het oorspronkelijke spec-concept:**
+- Auto-soft-delete gebruikt de **gezaghebbende** verlop-bron (`subscriptions.current_period_end`
+  via licenses-join → `license_expires`-fallback), NIET kaal `license_expires`. Een live dry-run
+  op de echte data toont op 2026-06-28 reeds **1 reële kandidaat (user 6, verlopen Stripe-sub)** —
+  precies waarom de cron dormant blijft tot validatie + clearing.
+- `email`/`password_hash` (users) en `name` (clients) zijn `NOT NULL`; anonimisering zet daarom een
+  **tombstone** (`anon-<id>@deleted.invalid`, `ANONYMIZED_DISABLED`) i.p.v. `NULL`.
+- Er is **geen lokale `invoices`-tabel**; de spec-stap "invoices archiveren" verviel.
+
+**Activering (na clearing):** zie `ACTIVATION.md`. **Pauzeren/rollback:** `kill-switch.md` / `rollback_restore.sh`.
 
 ## Waar staat wat (feitelijk)
 
@@ -23,8 +50,8 @@
   **`/opt/stresschecker/data/sc_pro.db`**.
 - Consumer-metingen (`metingen`, key = `user_key` = sha256(email)[:32]):
   **`/opt/stresschecker/data/sc_measurements.db`**.
-- `data_lifecycle_log`-acties nu: `archived`, `restored`, `exported`, `dryrun`.
-  Fase 2 voegt toe: `deleted`, `anonymized`.
+- `data_lifecycle_log`-acties: `archived`, `restored`, `exported`, `dryrun` (Fase 1) +
+  `anonymized`, `deleted` (Fase 2 — bereikbaar via de live GDPR-erasure-endpoint).
 
 ## Wat moet nog (vóór Fase 2)
 
