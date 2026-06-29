@@ -1,50 +1,45 @@
-<!doctype html>
-<html lang="nl">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Event-meting — {{ p.meting_code }}</title>
-  <style>
-    /* Dashboard-breedte: exact dezelfde container als /vb/dashboard
-       (.wrap{max-width:780px;margin:5vh auto;padding:0 16px} + body bg #f6f4f0), zodat
-       rapport en dashboard visueel even breed zijn. text-align:center behoudt de
-       gecentreerde kiosk-uitslag (RI/band/knoppen). */
-    *{box-sizing:border-box}
-    body{font-family:system-ui,-apple-system,sans-serif;background:#f6f4f0;margin:0;color:#222;min-height:100vh}
-    .wrap{max-width:780px;margin:5vh auto;padding:0 16px;text-align:center}
-    .code{color:#777;font-size:.9rem;margin-bottom:1rem}
-    .card{background:#fff;border-radius:16px;padding:1.6rem;box-shadow:0 2px 10px rgba(0,0,0,.07)}
-    .big{font-size:2.6rem;font-weight:800;line-height:1}
-    .lbl{color:#777;font-size:.85rem;margin-top:.2rem}
-    .stats{display:flex;justify-content:space-around;margin:1.2rem 0}
-    button{width:100%;padding:.95rem;border:none;border-radius:12px;font-size:1.05rem;font-weight:700;cursor:pointer;margin-top:.6rem}
-    .start{background:#E8344E;color:#fff}
-    .stop{background:#555;color:#fff}
-    button:disabled{opacity:.45;cursor:default}
-    .report{display:block;margin-top:1.1rem;padding:.95rem;border-radius:12px;background:#2c3e63;color:#fff;
-            text-decoration:none;font-weight:700}
-    .rep-hint{font-size:.78rem;color:#999;margin-top:.45rem}
-    .again{display:block;margin-top:1rem;padding:.95rem;border-radius:12px;background:#E8344E;color:#fff;
-           text-decoration:none;font-weight:700}
-    .next{display:block;margin-top:1rem;padding:.95rem;border-radius:12px;background:#1f9d55;color:#fff;
+{% extends "base.html" %}
+{% block title %}Event-meting — {{ p.meting_code }}{% endblock %}
+{% block head %}
+<style>
+  /* Two-tier: de Pro-app-chrome (base.html: header + .app-main 900px beige) is de buitenlaag;
+     de kiosk-uitslag staat in een gecentreerde 780px-binnenlaag (.ev-inner) met focus op de
+     deelnemer-data. Alle kiosk-CSS is onder .ev-inner gescoped zodat het niet botst met de
+     globale .card/button-regels uit style.css. Pro-tokens: kaart radius 12 + schaduw 0 2px 12px. */
+  .ev-inner{max-width:780px;margin:0 auto;width:100%;text-align:center}
+  .ev-inner .code{color:#777;font-size:.9rem;margin-bottom:1rem}
+  .ev-inner .ev-card{background:#fff;border-radius:12px;padding:1.6rem;box-shadow:0 2px 12px rgba(0,0,0,.08);margin-bottom:1rem}
+  .ev-inner .big{font-size:2.6rem;font-weight:800;line-height:1}
+  .ev-inner .lbl{color:#777;font-size:.85rem;margin-top:.2rem}
+  .ev-inner .stats{display:flex;justify-content:space-around;margin:1.2rem 0}
+  .ev-inner button{width:100%;padding:.95rem;border:none;border-radius:12px;font-size:1.05rem;font-weight:700;cursor:pointer;margin-top:.6rem}
+  .ev-inner .start{background:#E8344E;color:#fff}
+  .ev-inner .stop{background:#555;color:#fff}
+  .ev-inner button:disabled{opacity:.45;cursor:default}
+  .ev-inner .report{display:block;margin-top:1.1rem;padding:.95rem;border-radius:12px;background:#2c3e63;color:#fff;
           text-decoration:none;font-weight:700}
-    .ri{font-size:3.2rem;font-weight:800}
-    .band{font-size:1.2rem;font-weight:700;margin-top:.3rem}
-    .banner{background:#fffae6;border:1px solid #f0d000;border-radius:10px;padding:.5rem .8rem;
-            font-size:.85rem;color:#7a6500;margin-bottom:1rem;text-align:left}
-    .slotmsg{margin-top:1rem;padding:.85rem 1rem;border-radius:12px;font-size:.92rem;line-height:1.45;text-align:left}
-    .slot-done{background:#eef6ee;color:#2c5d3a;border:1px solid #cfe5cf}
-    .slot-failed{background:#f4f5f7;color:#555;border:1px solid #ddd}
-  </style>
-</head>
-<body>
-  <div class="wrap">
+  .ev-inner .rep-hint{font-size:.78rem;color:#999;margin-top:.45rem}
+  .ev-inner .again{display:block;margin-top:1rem;padding:.95rem;border-radius:12px;background:#E8344E;color:#fff;
+         text-decoration:none;font-weight:700}
+  .ev-inner .next{display:block;margin-top:1rem;padding:.95rem;border-radius:12px;background:#1f9d55;color:#fff;
+        text-decoration:none;font-weight:700}
+  .ev-inner .ri{font-size:3.2rem;font-weight:800}
+  .ev-inner .band{font-size:1.2rem;font-weight:700;margin-top:.3rem}
+  .ev-inner .banner{background:#fffae6;border:1px solid #f0d000;border-radius:10px;padding:.5rem .8rem;
+          font-size:.85rem;color:#7a6500;margin-bottom:1rem;text-align:left}
+  .ev-inner .slotmsg{margin-top:1rem;padding:.85rem 1rem;border-radius:12px;font-size:.92rem;line-height:1.45;text-align:left}
+  .ev-inner .slot-done{background:#eef6ee;color:#2c5d3a;border:1px solid #cfe5cf}
+  .ev-inner .slot-failed{background:#f4f5f7;color:#555;border:1px solid #ddd}
+</style>
+{% endblock %}
+{% block content %}
+  <div class="ev-inner">
     {% if is_staging %}<div class="banner">STAGING · Event-modus (kiosk). Alleen voor test.</div>{% endif %}
     <div class="code">{% if p.name %}<b>{{ p.name }}</b> · {% endif %}code {{ p.meting_code }} · {{ p.opdrachtgever }}</div>
 
     <!-- Ontspanningsvraag VÓÓR de meting — exact dezelfde verwoording/schaal als de
          basismeting (voorbereiden.html V4). Opslag = event_metingen.subjectief_score (0-10). -->
-    <div id="phase-subj" class="card" style="text-align:left">
+    <div id="phase-subj" class="ev-card" style="text-align:left">
       <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.6rem;">Hoe ontspannen voel je je op dit moment?</div>
       <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-bottom:.3rem;">
         <span>Zeer gespannen</span><span>Volledig ontspannen</span>
@@ -57,7 +52,7 @@
       <div id="evSubjHint" style="text-align:center;font-size:.72rem;font-style:italic;color:#b0a8a0;margin-top:.3rem;">Beweeg de schuif om je eerste, eerlijke gevoel te kiezen.</div>
     </div>
 
-    <div id="phase-measure" class="card">
+    <div id="phase-measure" class="ev-card">
       <div class="stats">
         <div><div class="big" id="bpm">--</div><div class="lbl">bpm</div></div>
         <div><div class="big" id="beats">0</div><div class="lbl">slagen</div></div>
@@ -69,7 +64,7 @@
       <button class="stop" id="cancelBtn" onclick="cancelMeasure()" style="display:none">Annuleer</button>
     </div>
 
-    <div id="phase-result" class="card" style="display:none">
+    <div id="phase-result" class="ev-card" style="display:none">
       <div class="ri" id="riOut">--</div>
       <div class="lbl">Relax Index</div>
       <div class="band" id="bandOut"></div>
@@ -91,13 +86,14 @@
 
     <!-- Reeds-voltooid (deelnemer keert terug terwijl n_metingen >= 2): geen meetscherm,
          alleen de slotboodschap + rapportlink. -->
-    <div id="phase-capped" class="card" style="display:none">
+    <div id="phase-capped" class="ev-card" style="display:none">
       <div class="slotmsg" id="cappedMsg"></div>
       <a class="report" href="/event/kiosk/{{ p.event_code }}/rapport/{{ p.meting_code }}/view" target="_blank" rel="noopener">Bekijk / print rapport →</a>
       <a class="next" href="/event/kiosk/{{ p.event_code }}">Volgende deelnemer →</a>
     </div>
   </div>
-
+{% endblock %}
+{% block scripts %}
   <script src="/static/js/hrv.js?v=8"></script>
   <script src="/static/js/sensor.js"></script>
   <script>
@@ -310,5 +306,4 @@
       }
     }
   </script>
-</body>
-</html>
+{% endblock %}
