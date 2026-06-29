@@ -84,11 +84,12 @@
        De scherm-only actiebalk wordt alleen in de HTML-render meegegeven (screen_mode). ===== */
     .screenbar { display: none; }
     @media screen {
-      /* Schermvullend: geen 820px-kolom met grijze marges meer, maar volledige browserbreedte
-         en -hoogte. De interne gauge/kwadrant blijven gecentreerd binnen hun kolommen. */
-      html { background: #fff; }
-      body { max-width: none; width: 100%; margin: 0; min-height: 100vh; background: #fff;
-             padding: 56px 28px 28px; box-sizing: border-box; }
+      /* Dashboard-breedte: zelfde 780px-kolom als /vb/dashboard en het kiosk-uitslagscherm
+         (meten.html .wrap, box-sizing:border-box). Grijs veld (#f6f4f0) met een gecentreerde
+         witte rapport-kolom — visueel consistent met dashboard. */
+      html { background: #f6f4f0; }
+      body { max-width: 780px; width: 100%; margin: 0 auto; min-height: 100vh; background: #fff;
+             padding: 56px 16px 28px; box-sizing: border-box; }
       .screenbar { display: flex; position: fixed; top: 0; left: 0; right: 0; height: 40px;
                    background: #2c3e63; align-items: center; justify-content: space-between;
                    padding: 0 12px; box-sizing: border-box; z-index: 10; }
