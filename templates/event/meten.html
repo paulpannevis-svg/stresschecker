@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Event-meting — {{ p.meting_code }}</title>
   <style>
-    body{font-family:system-ui,-apple-system,sans-serif;background:#f4f5f7;margin:0;padding:1.5rem;color:#222;min-height:100vh;box-sizing:border-box}
+    /* Volledige reset: sluit elke geërfde ouder-constraint uit. Card/button/banner houden hun
+       eigen padding (class/element-selectors out-specifyen deze *-regel). */
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:100%;margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,sans-serif;background:#f4f5f7;color:#222;min-height:100vh;padding:.6rem}
     /* Fullwidth A: rapport-/meetscherm vult 100% van de schermbreedte, geen gecentreerde
        kolom, geen max-width — consistent op desktop, tablet en mobiel. */
     .wrap{width:100%;max-width:none;margin:0;text-align:center}
