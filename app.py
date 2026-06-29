@@ -4343,7 +4343,9 @@ def event_report_html(event_code, meting_code):
     if lang not in ('nl', 'de', 'en'):
         lang = 'nl'
     import event_report as _evr
-    back_url = url_for('event_kiosk_meten', event_code=event_code, meting_code=meting_code)
+    # "Terug" op het rapport gaat naar het deelnemer-invoerscherm (nieuwe deelnemer),
+    # NIET terug naar de meting-voorbereiding (slider) van deze zojuist voltooide meting.
+    back_url = url_for('event_kiosk_event', event_code=event_code)
     print_url = url_for('event_report_pdf', event_code=event_code, meting_code=meting_code, lang=lang)
     try:
         html_str, _info = _evr.render_report(meting_code, lang, as_html=True,
