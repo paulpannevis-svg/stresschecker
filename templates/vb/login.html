@@ -2,7 +2,8 @@
 {% block title %}VB Login — StressChecker Pro Event{% endblock %}
 {% block content %}
 {# Styling 1-op-1 gelijk aan de Pro-login (sc_login.html): 420px-container, dezelfde
-   kaart-met-velden, labels, input- en knop-opmaak. Alleen tekst/action zijn VB-specifiek. #}
+   kaart-met-velden, labels, input- en knop-opmaak. Footer-strings gelokaliseerd (NL/DE/EN);
+   titel "Vitaliteitsbureau-login" bewust onvertaald (Paul). #}
 <div style="max-width:420px;margin:40px auto;padding:0 16px;">
 
   <div style="text-align:center;margin-bottom:24px;">
@@ -22,7 +23,7 @@
                style="width:100%;border:none;outline:none;font-size:14px;background:transparent;font-family:inherit;">
       </div>
       <div style="padding:12px 16px;position:relative;">
-        <label style="display:block;font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Wachtwoord</label>
+        <label style="display:block;font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">{% if lang == 'de' %}Passwort{% elif lang == 'en' %}Password{% else %}Wachtwoord{% endif %}</label>
         <input type="password" name="password" id="pw-vb" required autocomplete="new-password" value=""
                style="width:100%;border:none;outline:none;font-size:14px;background:transparent;font-family:inherit;">
         <button type="button" onclick="var i=document.getElementById('pw-vb');i.type=i.type==='password'?'text':'password'" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#aaa;padding:0;">
@@ -31,25 +32,26 @@
       </div>
     </div>
 
-    <button type="submit" style="width:100%;background:var(--red);color:white;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Inloggen</button>
+    <button type="submit" style="width:100%;background:var(--red);color:white;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">{% if lang == 'de' %}Anmelden{% elif lang == 'en' %}Log in{% else %}Inloggen{% endif %}</button>
   </form>
 
   {# Footer 1-op-1 in dezelfde opmaak als de Pro-login, met VB-correcte bestemmingen:
      wachtwoord-reset draait op dezelfde users-tabel (werkt voor VB), accounts ontstaan via
-     event-pack-aankoop (geen consumenten-licentieactivatie) -> contact i.p.v. /licentie. #}
+     event-pack-aankoop (geen consumenten-licentieactivatie) -> contact i.p.v. /licentie.
+     Taal-bewuste contact-email conform reply-to-policy (DE=.de, anders .com). #}
   <div style="text-align:center;margin-top:14px;font-size:13px;">
-    <a href="{{ url_for('password_forgot') }}" style="color:var(--red);font-weight:600;text-decoration:none;">Wachtwoord vergeten?</a>
+    <a href="{{ url_for('password_forgot') }}" style="color:var(--red);font-weight:600;text-decoration:none;">{% if lang == 'de' %}Passwort vergessen?{% elif lang == 'en' %}Forgot password?{% else %}Wachtwoord vergeten?{% endif %}</a>
   </div>
 
   <div style="text-align:center;margin-top:16px;font-size:12px;color:#aaa;">
-    <a href="mailto:{% if lang == 'de' %}info@lifestylemonitors.de{% else %}info@lifestylemonitors.com{% endif %}" style="color:var(--red);font-weight:600;text-decoration:none;">Nog geen Pro Event-account? Neem contact op</a>
+    <a href="mailto:{% if lang == 'de' %}info@lifestylemonitors.de{% else %}info@lifestylemonitors.com{% endif %}" style="color:var(--red);font-weight:600;text-decoration:none;">{% if lang == 'de' %}Noch kein Pro Event-Konto? Kontaktieren Sie uns{% elif lang == 'en' %}No Pro Event account yet? Get in touch{% else %}Nog geen Pro Event-account? Neem contact op{% endif %}</a>
     &nbsp;·&nbsp;
-    <a href="{{ url_for('welcome') }}" style="color:#aaa;text-decoration:none;">Startpagina</a>
+    <a href="{{ url_for('welcome') }}" style="color:#aaa;text-decoration:none;">{% if lang == 'de' %}Startseite{% elif lang == 'en' %}Home{% else %}Startpagina{% endif %}</a>
   </div>
 
 </div>
 
   <div style="text-align:center;margin-top:12px;padding-bottom:8px;">
-    <a href="{{ url_for('password_forgot') }}" style="color:#aaa;font-size:12px;text-decoration:none;">Geen toegang meer tot je account? Vraag een nieuwe wachtwoord-link →</a>
+    <a href="{{ url_for('password_forgot') }}" style="color:#aaa;font-size:12px;text-decoration:none;">{% if lang == 'de' %}Keinen Zugang mehr zu Ihrem Konto? Neuen Passwort-Link anfordern →{% elif lang == 'en' %}Lost access to your account? Request a new password link →{% else %}Geen toegang meer tot je account? Vraag een nieuwe wachtwoord-link →{% endif %}</a>
   </div>
 {% endblock %}
