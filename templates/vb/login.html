@@ -1,23 +1,22 @@
-<!doctype html>
-<html lang="nl">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VB Login — StressChecker Pro Event</title>
-  <style>
-    body{font-family:system-ui,Arial,sans-serif;background:#f6f4f0;margin:0;color:#222}
-    .wrap{max-width:380px;margin:8vh auto;padding:0 16px}
-    .card{background:#fff;border:1px solid #ece7df;border-radius:12px;padding:24px}
-    h1{font-size:18px;margin:0 0 4px}
-    p.sub{color:#888;font-size:13px;margin:0 0 18px}
-    label{display:block;font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin:12px 0 5px}
-    input{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #e3ddd3;border-radius:8px;font-size:14px}
-    button{width:100%;margin-top:18px;padding:12px;border:none;border-radius:8px;background:#E84C5C;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
-    .err{background:#fdecec;border:1px solid #f5c2c2;color:#a12; padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:14px}
-  </style>
-</head>
-<body style="width:100%; margin:0; padding:0; overflow-x:hidden;">
-  <div class="wrap">
+{% extends "base.html" %}
+{% block title %}VB Login — StressChecker Pro Event{% endblock %}
+{% block head %}
+<style>
+  /* VB-login binnen de Pro-app-chrome (base.html: header/logo/taalwissel + .app-main beige).
+     Gecentreerde login-kaart op Pro-tokens (witte kaart radius 12 + schaduw, rood #E8344E). */
+  .vb-login{max-width:380px;margin:4vh auto;width:100%}
+  .vb-login .card{background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);padding:24px}
+  .vb-login h1{font-size:18px;margin:0 0 4px;color:#333}
+  .vb-login p.sub{color:#888;font-size:13px;margin:0 0 18px}
+  .vb-login label{display:block;font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin:12px 0 5px}
+  .vb-login input{width:100%;box-sizing:border-box;padding:11px 12px;border:2px solid #DDD5C8;border-radius:8px;font-size:14px;font-family:inherit;background:#fff}
+  .vb-login input:focus{outline:none;border-color:#E8344E}
+  .vb-login .err{background:#FDE8EB;border:1px solid #f5c2c2;color:#a12;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:14px}
+  .vb-login .btn-primary{margin-top:18px}
+</style>
+{% endblock %}
+{% block content %}
+  <div class="vb-login">
     <div class="card">
       <h1>Vitaliteitsbureau-login</h1>
       <p class="sub">StressChecker Pro Event-dashboard</p>
@@ -27,9 +26,8 @@
         <input type="email" id="email" name="email" required autocomplete="off" value="">
         <label for="password">Wachtwoord</label>
         <input type="password" id="password" name="password" required autocomplete="new-password" value="">
-        <button type="submit">Inloggen</button>
+        <button type="submit" class="btn-primary">Inloggen</button>
       </form>
     </div>
   </div>
-</body>
-</html>
+{% endblock %}
