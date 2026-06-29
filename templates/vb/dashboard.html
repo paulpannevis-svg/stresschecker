@@ -1,99 +1,92 @@
-<!doctype html>
-<html lang="nl">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VB Dashboard — {{ vb_name }}</title>
-  <style>
-    body{font-family:system-ui,Arial,sans-serif;background:#f6f4f0;margin:0;color:#222}
-    .wrap{max-width:780px;margin:5vh auto;padding:0 16px}
-    .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:18px}
-    h1{font-size:20px;margin:0}
-    .who{color:#888;font-size:13px}
-    .cards{display:flex;gap:14px;margin-bottom:22px;flex-wrap:wrap}
-    .stat{flex:1;min-width:150px;background:#fff;border:1px solid #ece7df;border-radius:12px;padding:18px}
-    .stat .n{font-size:30px;font-weight:700;color:#E84C5C}
-    .stat .l{font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-top:4px}
-    .stat.used .n{color:#b06a1f}
-    table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #ece7df;border-radius:12px;overflow:hidden}
-    th,td{padding:10px 14px;text-align:left;font-size:13px;border-bottom:1px solid #f0ece6}
-    th{background:#faf8f4;color:#888;text-transform:uppercase;font-size:10px;letter-spacing:.05em}
-    .empty{padding:22px 14px;color:#999;font-size:13px;text-align:center}
-    .actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
-    .actions button{padding:10px 16px;border:1px solid #d8d2c7;border-radius:8px;background:#fff;color:#555;font-size:13px;cursor:not-allowed}
-    .logout{font-size:12px;color:#999;text-decoration:none}
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="top">
-      <div>
-        <h1>Dashboard{% if tier %} — Pro Event {{ tier }}{% endif %}</h1>
-        <div class="who">{{ vb_name }} &middot; {{ vb_email }}</div>
-      </div>
-      <a class="logout" href="/vb/logout">Uitloggen</a>
+{% extends "base.html" %}
+{% block title %}VB Dashboard — {{ vb_name }}{% endblock %}
+{% block head %}
+<style>
+  /* Pro Event-dashboard binnen de Pro-app-chrome (base.html: header/logo/taalwissel +
+     .app-main 900px beige). Hier alleen dashboard-specifieke elementen op Pro-tokens
+     (witte kaarten radius 12 + zachte schaduw, rood-accent #E8344E). */
+  .vb-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:18px;width:100%;gap:12px;flex-wrap:wrap}
+  .vb-top h1{font-size:1.6rem;font-weight:800;color:#E8344E;letter-spacing:.04em;margin:0}
+  .vb-who{color:#888;font-size:13px;margin-top:2px}
+  .vb-logout{font-size:12px;color:#888;text-decoration:none;white-space:nowrap}
+  .vb-stats{display:flex;gap:14px;margin-bottom:22px;flex-wrap:wrap;width:100%}
+  .vb-stat{flex:1;min-width:150px;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);padding:20px}
+  .vb-stat .n{font-size:30px;font-weight:700;color:#E8344E}
+  .vb-stat.used .n{color:#b06a1f}
+  .vb-stat .l{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-top:4px}
+  .vb-newbar{display:flex;justify-content:space-between;align-items:center;margin:24px 0 8px;width:100%;flex-wrap:wrap;gap:10px}
+  .vb-newbar h2{font-size:14px;color:#555;margin:0}
+  .vb-form{margin:0;display:flex;gap:8px;flex-wrap:wrap}
+  .vb-form input{padding:8px 10px;font-size:12px;border:2px solid #DDD5C8;border-radius:8px;background:#fff;font-family:inherit}
+  .vb-newcode{background:#e8f5ee;border:1px solid #b8e0c8;border-radius:10px;padding:14px 16px;margin-bottom:18px;width:100%}
+  .vb-table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);overflow:hidden}
+  .vb-table th,.vb-table td{padding:10px 14px;text-align:left;font-size:13px;border-bottom:1px solid #f0ece6}
+  .vb-table th{background:#faf8f4;color:#888;text-transform:uppercase;font-size:10px;letter-spacing:.05em}
+  .vb-empty{padding:22px 14px;color:#999;font-size:13px;text-align:center}
+  .vb-rowbtn{padding:4px 8px;font-size:.75rem;color:#fff;border-radius:6px;text-decoration:none;display:inline-block}
+  .vb-actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;width:100%}
+  .vb-actions button{padding:10px 16px;border:1px solid #d8d2c7;border-radius:8px;background:#fff;color:#888;font-size:13px;cursor:not-allowed}
+</style>
+{% endblock %}
+{% block content %}
+  <div class="vb-top">
+    <div>
+      <h1>Dashboard{% if tier %} — Pro Event {{ tier }}{% endif %}</h1>
+      <div class="vb-who">{{ vb_name }} &middot; {{ vb_email }}</div>
     </div>
-
-    <div class="cards">
-      <div class="stat">
-        <div class="n">{{ credits_available }}</div>
-        <div class="l">Credits beschikbaar</div>
-      </div>
-      <div class="stat used">
-        <div class="n">{{ credits_used }}</div>
-        <div class="l">Credits gebruikt</div>
-      </div>
-    </div>
-
-    {% if new_event %}
-    <div style="background:#e8f5ee;border:1px solid #b8e0c8;border-radius:10px;padding:14px 16px;margin-bottom:18px;">
-      Nieuwe meetdag aangemaakt. Event-code voor de kiosk:
-      <strong style="font-size:18px;letter-spacing:.05em;">{{ new_event }}</strong>
-    </div>
-    {% endif %}
-
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <h2 style="font-size:14px;color:#555;margin:0;">Georganiseerde events</h2>
-      <form method="post" action="/vb/create-event" style="margin:0;">
-    <input type="text" name="event_naam" placeholder="Event naam" style="padding:6px 10px; font-size:12px; border:1px solid #ccc; border-radius:4px; width:120px;" required>
-    <input type="date" name="event_datum" style="padding:6px 10px; font-size:12px; border:1px solid #ccc; border-radius:4px;" required>
-    <input type="text" name="facilitator_label" placeholder="Facilitator" style="padding:6px 10px; font-size:12px; border:1px solid #ccc; border-radius:4px; width:120px;">
-        <button type="submit" style="padding:9px 14px;border:none;border-radius:8px;background:#E84C5C;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">+ Nieuwe event aanmaken</button>
-      </form>
-    </div>
-    <table>
-      <thead>
-        <tr><th>Event naam</th><th>Datum</th><th>Deelnemers</th><th>Metingen</th><th>Status</th></tr>
-      </thead>
-      <tbody>
-        {% for e in events %}
-        <tr>
-            </div>
-          <td><strong>{{ e.naam }}</strong></td><td>{{ e.datum }}</td>
-            </div>
-          <td>{{ e.deelnemers }}</td><td>{{ e.credits }}</td><td>{{ e.status }}</td>
-          <td style="display:flex;gap:20px;align-items:center;">
-            <div style="flex:0 0 auto;">
-  <a href="/event/kiosk/{{ e.code }}" style="padding:4px 8px;font-size:0.75rem;background:#E84C5C;color:white;border-radius:4px;text-decoration:none;display:inline-block;">🎯 Meting</a>
-            </div>
-            <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
-              <div style="font-weight:bold;font-size:0.75rem;color:#333;margin:0 0 2px 0;">Rapport</div>
-  <a href="/vb/rapport?event_code={{ e.code }}&type=pro" style="padding:4px 8px;font-size:0.75rem;background:#1f7a5a;color:white;border-radius:4px;text-decoration:none;display:inline-block;">📊 Pro</a>
-  <a href="/vb/rapport?event_code={{ e.code }}" style="padding:4px 8px;font-size:0.75rem;background:#0066cc;color:white;border-radius:4px;text-decoration:none;display:inline-block;">👥 Deelnemers</a>
-            </div>
-</td>
-        </tr>
-        {% else %}
-            </div>
-        <tr><td colspan="6" class="empty">Nog geen events. Klik op "Nieuwe event aanmaken".</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-
-    <div class="actions">
-      <button type="button" disabled title="Volgt">Rapport genereren</button>
-      <button type="button" disabled title="Volgt">CSV export</button>
-    </div>
+    <a class="vb-logout" href="/vb/logout">Uitloggen</a>
   </div>
-</body>
-</html>
+
+  <div class="vb-stats">
+    <div class="vb-stat"><div class="n">{{ credits_available }}</div><div class="l">Credits beschikbaar</div></div>
+    <div class="vb-stat used"><div class="n">{{ credits_used }}</div><div class="l">Credits gebruikt</div></div>
+  </div>
+
+  {% if new_event %}
+  <div class="vb-newcode">
+    Nieuwe meetdag aangemaakt. Event-code voor de kiosk:
+    <strong style="font-size:18px;letter-spacing:.05em;">{{ new_event }}</strong>
+  </div>
+  {% endif %}
+
+  <div class="vb-newbar">
+    <h2>Georganiseerde events</h2>
+    <form class="vb-form" method="post" action="/vb/create-event">
+      <input type="text" name="event_naam" placeholder="Event naam" required>
+      <input type="date" name="event_datum" required>
+      <input type="text" name="facilitator_label" placeholder="Facilitator">
+      <button type="submit" class="btn-primary" style="width:auto;min-height:0;padding:9px 14px;font-size:13px;">+ Nieuwe event aanmaken</button>
+    </form>
+  </div>
+
+  <table class="vb-table">
+    <thead>
+      <tr><th>Event naam</th><th>Datum</th><th>Deelnemers</th><th>Metingen</th><th>Status</th><th>Acties</th></tr>
+    </thead>
+    <tbody>
+      {% for e in events %}
+      <tr>
+        <td><strong>{{ e.naam }}</strong></td>
+        <td>{{ e.datum }}</td>
+        <td>{{ e.deelnemers }}</td>
+        <td>{{ e.credits }}</td>
+        <td>{{ e.status }}</td>
+        <td style="display:flex;gap:16px;align-items:center;">
+          <a class="vb-rowbtn" style="background:#E8344E;" href="/event/kiosk/{{ e.code }}">🎯 Meting</a>
+          <span style="display:flex;flex-direction:column;gap:4px;">
+            <a class="vb-rowbtn" style="background:#1f7a5a;" href="/vb/rapport?event_code={{ e.code }}&type=pro">📊 Pro</a>
+            <a class="vb-rowbtn" style="background:#0066cc;" href="/vb/rapport?event_code={{ e.code }}">👥 Deelnemers</a>
+          </span>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="vb-empty">Nog geen events. Klik op "Nieuwe event aanmaken".</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="vb-actions">
+    <button type="button" disabled title="Volgt">Rapport genereren</button>
+    <button type="button" disabled title="Volgt">CSV export</button>
+  </div>
+{% endblock %}
