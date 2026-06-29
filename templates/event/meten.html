@@ -77,7 +77,7 @@
       <!-- "Nieuwe meting": 2e meting onder DEZELFDE participant_id via de bestaande code
            (code-terugkeer-mechanisme). Standaard verborgen; JS toont 'm alleen bij < 2
            metingen (max-2-cap). Bij >= 2 blijft hij weg. -->
-      <a class="again" id="againBtn" href="/event/kiosk/{{ p.event_code }}/meten/{{ p.meting_code }}" style="display:none">Nieuwe meting →</a>
+      <a class="again" id="againBtn" href="/event/kiosk/{{ p.event_code }}/meten/{{ p.meting_code }}?nieuw=1" style="display:none">Nieuwe meting →</a>
       <!-- Slotboodschap bij 2 voltooide metingen (knop weg): JS vult done/failed o.b.v.
            has_reliable. -->
       <div class="slotmsg" id="slotMsg" style="display:none"></div>
@@ -110,6 +110,14 @@
     })();
     var CAPPED = {{ 'true' if capped else 'false' }};
     var HAS_RELIABLE = {{ 'true' if has_reliable else 'false' }};
+    // Bestaande uitslag (server-side, uit een eerdere meting). Bij herladen tonen we hiermee
+    // het uitslag-scherm met de drie knoppen i.p.v. de meet-slider — zodat "Terug" vanuit de
+    // /view-rapportpagina op het rapport-scherm landt, niet op de meting-voorbereiding.
+    // ?nieuw=1 (Nieuwe meting) en ?terug=1 (terugkerende deelnemer) forceren tóch de slider.
+    var _qs = new URLSearchParams(window.location.search);
+    var _forceSlider = (_qs.get('nieuw') === '1') || (_qs.get('terug') === '1');
+    var EXISTING_RESULT = {% if result %}{ ri: {{ result.ri }}, kwaliteit: {{ result.kwaliteit }}, quality_band: {{ result.quality_band|tojson }}, n: {{ n_metingen }}, hasReliable: {{ 'true' if has_reliable else 'false' }} }{% else %}null{% endif %};
+    if (_forceSlider) EXISTING_RESULT = null;
 
     // Slotboodschap bij 2 voltooide metingen (max-2-cap; knop is dan weg).
     //  done   = minstens één geslaagde meting -> definitief resultaat van vandaag.
@@ -143,6 +151,11 @@
       document.getElementById('phase-measure').style.display = 'none';
       renderSlot(document.getElementById('cappedMsg'), HAS_RELIABLE);
       document.getElementById('phase-capped').style.display = 'block';
+    } else if (EXISTING_RESULT) {
+      // Eerdere meting aanwezig (en geen ?nieuw/?terug): toon meteen het uitslag-scherm met de
+      // drie knoppen, gevoed uit de opgeslagen waarden — identieke opmaak als na een verse meting.
+      showResultPhase(EXISTING_RESULT.ri, EXISTING_RESULT.kwaliteit, EXISTING_RESULT.quality_band,
+                      EXISTING_RESULT.n, EXISTING_RESULT.hasReliable);
     }
 
     var rrIntervals = [], beatCount = 0, elapsed = 0, timer = null, active = false;
@@ -245,44 +258,51 @@
           }
           return;
         }
-        document.getElementById('phase-subj').style.display = 'none';
-        document.getElementById('phase-measure').style.display = 'none';
-        document.getElementById('phase-result').style.display = 'block';
-        // Gate-vlaggen (zelfde verhaal als kwadrant.html + de event-PDF): te onregelmatig
-        // (quality_band 'slecht') OF slecht signaal (kwaliteit < 85) -> geen stellige zone/RI tonen.
-        var _slecht = (j.quality_band === 'slecht');
-        var _gated = _slecht || (kwaliteit < 85);
-        // Zone-eerst (robuust tegen de RI-herrekening): label prominent, getal secundair.
-        // Bij 'slecht' geen positief zone-label maar 'Te onregelmatig' (markeren, niet corrigeren).
-        if (_slecht) {
-          document.getElementById('bandOut').textContent = 'Te onregelmatig';
-          document.getElementById('bandOut').style.color = '#c0392b';
-        } else {
-          document.getElementById('bandOut').textContent = HRV.getLabel(ri);
-          document.getElementById('bandOut').style.color = HRV.getColor(ri);
-        }
-        document.getElementById('riOut').textContent = _gated ? '--' : ri.toFixed(1);
-        document.getElementById('riOut').style.color = _gated ? '#999' : HRV.getColor(ri);
-        var q = 'Kwaliteit ' + kwaliteit + '%';
-        // quality_band (ritme-regelmaat: goed/matig/slecht) ALLEEN tonen bij een betrouwbaar
-        // signaal. Bij _gated (kwaliteit < 85 of 'slecht') is een positief "· goed" naast
-        // "Kwaliteit 0%" tegenstrijdig — dan alleen het onbetrouwbaar-voorbehoud.
-        if (j.quality_band && !_gated) q += ' · ' + j.quality_band;
-        if (_gated) q += ' — onbetrouwbaar';
-        document.getElementById('qualOut').textContent = q;
-        // Max-2-cap: "Nieuwe meting" alleen tonen zolang < 2 metingen. Bij >= 2 verdwijnt
-        // de knop en verschijnt de slotboodschap (done/failed o.b.v. has_reliable).
-        var again = document.getElementById('againBtn');
-        var slot = document.getElementById('slotMsg');
-        if (j.n_metingen != null && j.n_metingen >= 2) {
-          if (again) again.style.display = 'none';
-          renderSlot(slot, !!j.has_reliable);
-          slot.style.display = 'block';
-        } else {
-          if (again) again.style.display = 'block';
-          if (slot) slot.style.display = 'none';
-        }
+        showResultPhase(ri, kwaliteit, j.quality_band, j.n_metingen, j.has_reliable);
       }).catch(function (e) { alert('Opslaan mislukt: ' + e); });
+    }
+
+    // Toont het uitslag-scherm (#phase-result) met de drie knoppen, gevoed uit de RI/kwaliteit/
+    // band-waarden. Gebruikt zowel na een verse meting (finishMeasure) als bij herladen met een
+    // bestaande uitslag (EXISTING_RESULT), zodat beide paden identiek ogen.
+    function showResultPhase(ri, kwaliteit, quality_band, n_metingen, has_reliable) {
+      document.getElementById('phase-subj').style.display = 'none';
+      document.getElementById('phase-measure').style.display = 'none';
+      document.getElementById('phase-result').style.display = 'block';
+      // Gate-vlaggen (zelfde verhaal als kwadrant.html + de event-PDF): te onregelmatig
+      // (quality_band 'slecht') OF slecht signaal (kwaliteit < 85) -> geen stellige zone/RI tonen.
+      var _slecht = (quality_band === 'slecht');
+      var _gated = _slecht || (kwaliteit < 85);
+      // Zone-eerst (robuust tegen de RI-herrekening): label prominent, getal secundair.
+      // Bij 'slecht' geen positief zone-label maar 'Te onregelmatig' (markeren, niet corrigeren).
+      if (_slecht) {
+        document.getElementById('bandOut').textContent = 'Te onregelmatig';
+        document.getElementById('bandOut').style.color = '#c0392b';
+      } else {
+        document.getElementById('bandOut').textContent = HRV.getLabel(ri);
+        document.getElementById('bandOut').style.color = HRV.getColor(ri);
+      }
+      document.getElementById('riOut').textContent = _gated ? '--' : ri.toFixed(1);
+      document.getElementById('riOut').style.color = _gated ? '#999' : HRV.getColor(ri);
+      var q = 'Kwaliteit ' + kwaliteit + '%';
+      // quality_band (ritme-regelmaat: goed/matig/slecht) ALLEEN tonen bij een betrouwbaar
+      // signaal. Bij _gated (kwaliteit < 85 of 'slecht') is een positief "· goed" naast
+      // "Kwaliteit 0%" tegenstrijdig — dan alleen het onbetrouwbaar-voorbehoud.
+      if (quality_band && !_gated) q += ' · ' + quality_band;
+      if (_gated) q += ' — onbetrouwbaar';
+      document.getElementById('qualOut').textContent = q;
+      // Max-2-cap: "Nieuwe meting" alleen tonen zolang < 2 metingen. Bij >= 2 verdwijnt
+      // de knop en verschijnt de slotboodschap (done/failed o.b.v. has_reliable).
+      var again = document.getElementById('againBtn');
+      var slot = document.getElementById('slotMsg');
+      if (n_metingen != null && n_metingen >= 2) {
+        if (again) again.style.display = 'none';
+        renderSlot(slot, !!has_reliable);
+        slot.style.display = 'block';
+      } else {
+        if (again) again.style.display = 'block';
+        if (slot) slot.style.display = 'none';
+      }
     }
   </script>
 </body>

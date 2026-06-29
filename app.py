@@ -4227,9 +4227,25 @@ def event_kiosk_meten(event_code, meting_code):
                        "AND kwaliteit IS NOT NULL AND kwaliteit >= 85 "
                        "AND (quality_band IS NULL OR quality_band <> 'slecht')",
                        (row['participant_id'],)).fetchone()[0]
+    # Bestaande uitslag (voor de "Terug vanuit /view"-flow): bij herladen tonen we het
+    # uitslag-scherm met de drie knoppen (Bekijk/print, Nieuwe meting, Volgende deelnemer)
+    # i.p.v. opnieuw de meet-slider. Reliable-wint, dan de recentste; alleen metingen met een
+    # echte RI (NULL = volledig gegate/onbetrouwbaar → geen uitslagkaart, gewoon opnieuw meten).
+    # Het ?nieuw=1/?terug=1-pad in de template forceert de slider en omzeilt deze uitslag.
+    _res = db.execute(
+        "SELECT ri, kwaliteit, quality_band FROM event_metingen "
+        "WHERE participant_id=? AND ri IS NOT NULL "
+        "ORDER BY CASE WHEN kwaliteit IS NOT NULL AND kwaliteit >= 85 "
+        "  AND (quality_band IS NULL OR quality_band <> 'slecht') THEN 1 ELSE 0 END DESC, "
+        "  ts DESC, id DESC LIMIT 1",
+        (row['participant_id'],)).fetchone()
     db.close()
+    result = None
+    if _res is not None:
+        result = {'ri': _res['ri'], 'kwaliteit': _res['kwaliteit'] or 0,
+                  'quality_band': _res['quality_band'] or ''}
     return render_template('event/meten.html', p=row, n_metingen=_n,
-                           capped=(_n >= 2), has_reliable=bool(_nrel))
+                           capped=(_n >= 2), has_reliable=bool(_nrel), result=result)
 
 
 @app.route('/event/kiosk/<event_code>/wissen', methods=['GET'])
