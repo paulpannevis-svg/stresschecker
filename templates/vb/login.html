@@ -7,7 +7,7 @@
 
   <div style="text-align:center;margin-bottom:24px;">
     <div style="font-size:20px;font-weight:700;color:var(--red);">Vitaliteitsbureau-login</div>
-    <div style="font-size:13px;color:#888;margin-top:4px;">StressChecker <span style="background:#E8344E;color:#fff;font-size:.7rem;padding:2px 7px;border-radius:10px;font-weight:700;">PRO EVENT</span></div>
+    <div style="font-size:13px;color:#888;margin-top:4px;">StressChecker <span style="background:#E8344E;color:#fff;font-size:.7rem;padding:2px 7px;border-radius:10px;font-weight:700;">PRO</span></div>
   </div>
 
   {% if error %}
@@ -34,5 +34,22 @@
     <button type="submit" style="width:100%;background:var(--red);color:white;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Inloggen</button>
   </form>
 
+  {# Footer 1-op-1 in dezelfde opmaak als de Pro-login, met VB-correcte bestemmingen:
+     wachtwoord-reset draait op dezelfde users-tabel (werkt voor VB), accounts ontstaan via
+     event-pack-aankoop (geen consumenten-licentieactivatie) -> contact i.p.v. /licentie. #}
+  <div style="text-align:center;margin-top:14px;font-size:13px;">
+    <a href="{{ url_for('password_forgot') }}" style="color:var(--red);font-weight:600;text-decoration:none;">Wachtwoord vergeten?</a>
+  </div>
+
+  <div style="text-align:center;margin-top:16px;font-size:12px;color:#aaa;">
+    <a href="mailto:info@lifestylemonitors.com" style="color:var(--red);font-weight:600;text-decoration:none;">Nog geen Pro Event-account? Neem contact op</a>
+    &nbsp;·&nbsp;
+    <a href="{{ url_for('welcome') }}" style="color:#aaa;text-decoration:none;">Startpagina</a>
+  </div>
+
 </div>
+
+  <div style="text-align:center;margin-top:12px;padding-bottom:8px;">
+    <a href="{{ url_for('password_forgot') }}" style="color:#aaa;font-size:12px;text-decoration:none;">Geen toegang meer tot je account? Vraag een nieuwe wachtwoord-link →</a>
+  </div>
 {% endblock %}
