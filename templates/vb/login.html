@@ -49,6 +49,29 @@
     <a href="{{ url_for('welcome') }}" style="color:#aaa;text-decoration:none;">{% if lang == 'de' %}Startseite{% elif lang == 'en' %}Home{% else %}Startpagina{% endif %}</a>
   </div>
 
+  {# Event-pack-koopknoppen (S/M/L). URL's geverifieerd (HTTP 200) en verbatim overgenomen.
+     Openen in nieuw tabblad zodat de loginpagina behouden blijft. Redirect na betaling:
+     app.stresschecker.com/vb/order-success?tier=s|m|l. #}
+  <div style="margin-top:26px;border-top:1px solid #e8e2d8;padding-top:18px;">
+    <div style="text-align:center;font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">{% if lang == 'de' %}Event-Paket kaufen{% elif lang == 'en' %}Buy an event pack{% else %}Event-pack kopen{% endif %}</div>
+    <div style="display:flex;gap:8px;">
+      {% set _kopen = 'Kaufen →' if lang == 'de' else ('Buy →' if lang == 'en' else 'Kopen →') %}
+      {% set _credits = 'Credits' %}
+      {% for pack in [
+          {'label':'STARTER','price':'€99','credits':100,'url':'https://checkout.lifestylemonitors.de/b/3cIbJ1byp7QzdcJ7Gr53O0k'},
+          {'label':'STANDARD','price':'€199','credits':250,'url':'https://checkout.lifestylemonitors.de/b/6oU6oHdGxgn51u16Cn53O0j'},
+          {'label':'PREMIUM','price':'€349','credits':500,'url':'https://checkout.lifestylemonitors.de/b/28E3cvbyp8UD2y5gcX53O0i'} ] %}
+      <a href="{{ pack.url }}" target="_blank" rel="noopener"
+         style="flex:1;min-width:0;text-decoration:none;background:#fff;border:1px solid #eee;border-radius:12px;padding:14px 8px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.08);color:#333;">
+        <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;">{{ pack.label }}</div>
+        <div style="font-size:20px;font-weight:800;color:#333;margin:3px 0 1px;">{{ pack.price }}</div>
+        <div style="font-size:11px;color:#888;">{{ pack.credits }} {{ _credits }}</div>
+        <div style="margin-top:9px;background:var(--red);color:#fff;border-radius:8px;padding:7px 0;font-size:13px;font-weight:700;">{{ _kopen }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
 </div>
 
   <div style="text-align:center;margin-top:12px;padding-bottom:8px;">
