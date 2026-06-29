@@ -9001,7 +9001,7 @@ def vb_login():
                 send_verification_code(user['email'], _code, 'nl')
                 return redirect(url_for('vb_verify_2fa'))
             error = 'Onjuiste inloggegevens of geen event-licentie gevonden.'
-    return render_template('vb/login.html', error=error)
+    return render_template('vb/login.html', error=error, lang=session.get('lang', 'nl'))
 
 @app.route('/vb/logout')
 def vb_logout():

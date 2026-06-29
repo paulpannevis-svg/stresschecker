@@ -42,7 +42,7 @@
   </div>
 
   <div style="text-align:center;margin-top:16px;font-size:12px;color:#aaa;">
-    <a href="mailto:info@lifestylemonitors.com" style="color:var(--red);font-weight:600;text-decoration:none;">Nog geen Pro Event-account? Neem contact op</a>
+    <a href="mailto:{% if lang == 'de' %}info@lifestylemonitors.de{% else %}info@lifestylemonitors.com{% endif %}" style="color:var(--red);font-weight:600;text-decoration:none;">Nog geen Pro Event-account? Neem contact op</a>
     &nbsp;·&nbsp;
     <a href="{{ url_for('welcome') }}" style="color:#aaa;text-decoration:none;">Startpagina</a>
   </div>
