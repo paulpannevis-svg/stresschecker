@@ -122,18 +122,24 @@
       form.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     setOpen(false); // standaard ingeklapt (alleen wanneer JS draait)
-    form.addEventListener('submit', function (e) {
-      if (!open) {                 // 1e klik op de dichte knop = nieuw event
+    // BELANGRIJK: open/opslaan hangt aan de KLIK op de knop, NIET aan het form-'submit'-event.
+    // In dichte staat zijn de verplichte velden display:none; als de submit-knop dan native
+    // form-validatie triggert, ketst die af op een onzichtbaar required-veld ("not focusable")
+    // en vuurt het submit-event NOOIT → knop lijkt dood. preventDefault op de klik vóór het
+    // openklappen omzeilt die validatie volledig.
+    btn.addEventListener('click', function (e) {
+      if (!open) {                 // 1e klik: openklappen, niets versturen/valideren
         e.preventDefault();
         openCreate();
         return;
       }
-      if (!form.checkValidity()) {  // incompleet: foutmelding, niet versturen
+      if (!form.checkValidity()) {  // open + incompleet: eigen melding + native bubbels (velden zichtbaar)
         e.preventDefault();
         err.hidden = false;
         form.reportValidity();
+        return;
       }
-      // anders: native submit gaat door (create -> banner, of update -> redirect dashboard)
+      // open + geldig: GEEN preventDefault → native submit gaat door (create->banner / update->redirect)
     });
     if (cancel) cancel.addEventListener('click', function () { setOpen(false); });
     inputs.forEach(function (f) {

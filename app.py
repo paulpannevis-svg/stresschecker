@@ -819,7 +819,7 @@ def _no_store_event_pages(resp):
     alle /event/kiosk- en /event-code-routes ineens, ongeacht hoe de view de respons teruggeeft
     (gerenderde HTML, PDF-Response of redirect)."""
     p = request.path or ''
-    if p.startswith('/event/kiosk') or p.startswith('/event-code'):
+    if p.startswith('/event/kiosk') or p.startswith('/event-code') or p.startswith('/vb'):
         resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         resp.headers['Pragma'] = 'no-cache'
         resp.headers['Expires'] = '0'
