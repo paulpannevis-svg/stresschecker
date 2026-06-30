@@ -74,11 +74,11 @@
 
     <h2 style="font-size:14px;color:#555;">Deelnemers</h2>
     <table>
-      <thead><tr><th>Deelnemer</th><th>Relax Index</th><th>Zone</th><th>Tijdstip</th>{% if not pdf %}<th>Infopagina</th>{% endif %}</tr></thead>
+      <thead><tr><th>Deelnemer-ID</th><th>Relax Index</th><th>Zone</th><th>Tijdstip</th>{% if not pdf %}<th>Infopagina</th>{% endif %}</tr></thead>
       <tbody>
         {% for p in d.parts %}
         <tr>
-          <td>{{ p.name }}</td>
+          <td>ID-{{ '%03d' % loop.index }}</td>
           {% if p.reliable %}<td>{{ p.ri }}</td><td>{{ p.zone }}</td>
           {% else %}<td class="un" colspan="2">Onbetrouwbaar (te lage kwaliteit)</td>{% endif %}
           <td>{{ p.tijd }}</td>
