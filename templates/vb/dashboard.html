@@ -25,16 +25,17 @@
   .vb-table{width:100%;border-collapse:collapse;background:#fff;overflow:hidden;table-layout:fixed}
   /* Evenwichtige kolomverdeling (som = 100%); table-layout:fixed dwingt deze breedtes af i.p.v.
      content-gebaseerd (anders slokt ACTIES alle restruimte op). */
-  .vb-table th:nth-child(1),.vb-table td:nth-child(1){width:20%}  /* Event naam */
-  .vb-table th:nth-child(2),.vb-table td:nth-child(2){width:12%}  /* Datum */
+  .vb-table th:nth-child(1),.vb-table td:nth-child(1){width:18%}  /* Event naam */
+  .vb-table th:nth-child(2),.vb-table td:nth-child(2){width:10%}  /* Datum */
   .vb-table th:nth-child(3),.vb-table td:nth-child(3){width:12%}  /* Facilitator */
-  .vb-table th:nth-child(4),.vb-table td:nth-child(4){width:10%}  /* Deelnemers */
-  .vb-table th:nth-child(5),.vb-table td:nth-child(5){width:10%}  /* Metingen */
-  .vb-table th:nth-child(6),.vb-table td:nth-child(6){width:10%}  /* Status */
-  .vb-table th:nth-child(7),.vb-table td:nth-child(7){width:26%}  /* Acties */
-  /* ACTIES op één regel: niet wrappen, knoppen/icons niet laten krimpen. */
-  .vb-acties{display:flex;gap:8px;align-items:center;flex-wrap:nowrap}
-  .vb-acties > *{flex-shrink:0}
+  .vb-table th:nth-child(4),.vb-table td:nth-child(4){width:8%}   /* Deelnemers */
+  .vb-table th:nth-child(5),.vb-table td:nth-child(5){width:8%}   /* Metingen */
+  .vb-table th:nth-child(6),.vb-table td:nth-child(6){width:8%}   /* Status */
+  .vb-table th:nth-child(7),.vb-table td:nth-child(7){width:18%}  /* Acties */
+  .vb-table th:nth-child(8),.vb-table td:nth-child(8){width:18%}  /* Rapporten */
+  /* ACTIES + RAPPORTEN op één regel: niet wrappen, knoppen niet laten krimpen. */
+  .vb-acties,.vb-rapporten{display:flex;gap:8px;align-items:center;flex-wrap:nowrap}
+  .vb-acties > *,.vb-rapporten > *{flex-shrink:0}
   /* Lange event-namen/facilitators breken netjes binnen hun kolom i.p.v. te overflowen. */
   .vb-table td:nth-child(1),.vb-table td:nth-child(3){overflow-wrap:anywhere}
   .vb-table th,.vb-table td{padding:10px 14px;text-align:left;font-size:13px;border-bottom:1px solid #f0ece6}
@@ -181,7 +182,7 @@
   <div class="vb-tablewrap">
   <table class="vb-table">
     <thead>
-      <tr><th>Event naam</th><th>Datum</th><th>Facilitator</th><th>Deelnemers</th><th>Metingen</th><th>Status</th><th>Acties</th></tr>
+      <tr><th>Event naam</th><th>Datum</th><th>Facilitator</th><th>Deelnemers</th><th>Metingen</th><th>Status</th><th>Acties</th><th>Rapporten</th></tr>
     </thead>
     <tbody>
       {% for e in events %}
@@ -194,10 +195,6 @@
         <td>{{ e.status }}</td>
         <td class="vb-acties">
           <a class="vb-rowbtn" style="background:#E8344E;" href="/event/kiosk/{{ e.code }}">🎯 Meting</a>
-          <span style="display:flex;flex-direction:column;gap:4px;">
-            <a class="vb-rowbtn" style="background:#1f7a5a;" href="/vb/rapport?event_code={{ e.code }}&type=pro">📊 Pro</a>
-            <a class="vb-rowbtn" style="background:#0066cc;" href="/vb/rapport?event_code={{ e.code }}">👥 Deelnemers</a>
-          </span>
           <button type="button" class="vb-iconbtn vb-editbtn" title="Bewerken"
                   data-code="{{ e.code }}" data-naam="{{ e.naam }}" data-datum="{{ e.datum }}"
                   data-facilitator="{{ e.facilitator }}">✏️</button>
@@ -206,9 +203,13 @@
             <button type="submit" class="vb-iconbtn vb-delbtn" title="Verwijderen">🗑️</button>
           </form>
         </td>
+        <td class="vb-rapporten">
+          <a class="vb-rowbtn" style="background:#1f7a5a;" href="/vb/rapport?event_code={{ e.code }}&type=pro">📊 Pro</a>
+          <a class="vb-rowbtn" style="background:#0066cc;" href="/vb/rapport?event_code={{ e.code }}">👥 Deelnemers</a>
+        </td>
       </tr>
       {% else %}
-      <tr><td colspan="7" class="vb-empty">Nog geen events. Klik op "Nieuwe event aanmaken".</td></tr>
+      <tr><td colspan="8" class="vb-empty">Nog geen events. Klik op "Nieuwe event aanmaken".</td></tr>
       {% endfor %}
     </tbody>
   </table>
