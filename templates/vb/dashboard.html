@@ -193,7 +193,7 @@
         <td>{{ e.deelnemers }}</td>
         <td>{{ e.credits }}</td>
         <td>{{ e.status }}</td>
-        <td class="vb-acties">
+        <td><div class="vb-acties">
           <a class="vb-rowbtn" style="background:#E8344E;" href="/event/kiosk/{{ e.code }}">🎯 Meting</a>
           <button type="button" class="vb-iconbtn vb-editbtn" title="Bewerken"
                   data-code="{{ e.code }}" data-naam="{{ e.naam }}" data-datum="{{ e.datum }}"
@@ -202,11 +202,11 @@
                 onsubmit="return confirm('Dit event uit het dashboard verwijderen? De meetdata (deelnemers en metingen) blijft bewaard.');">
             <button type="submit" class="vb-iconbtn vb-delbtn" title="Verwijderen">🗑️</button>
           </form>
-        </td>
-        <td class="vb-rapporten">
+        </div></td>
+        <td><div class="vb-rapporten">
           <a class="vb-rowbtn" style="background:#1f7a5a;" href="/vb/rapport?event_code={{ e.code }}&type=pro">📊 Pro</a>
           <a class="vb-rowbtn" style="background:#0066cc;" href="/vb/rapport?event_code={{ e.code }}">👥 Deelnemers</a>
-        </td>
+        </div></td>
       </tr>
       {% else %}
       <tr><td colspan="8" class="vb-empty">Nog geen events. Klik op "Nieuwe event aanmaken".</td></tr>
