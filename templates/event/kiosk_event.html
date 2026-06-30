@@ -23,11 +23,19 @@
     .return{margin-top:1rem;background:#fbfbfc}
     .return h2{font-size:1rem;margin:0 0 .2rem}
     button.secondary{background:#666}
+    .lockbar{background:#fdecea;border:1px solid #f5b5ae;border-radius:10px;padding:.5rem .8rem;
+             font-size:.85rem;color:#8a1c10;margin-bottom:1rem;font-weight:600}
+    .lockwrap{margin-top:1.4rem;background:#f6f7fb;border:1px dashed #c7cdda;border-radius:12px;padding:.9rem 1rem}
+    .lockwrap label{margin:.1rem 0 .4rem;font-size:.88rem;color:#444;font-weight:600}
+    .lockwrap input{font-size:1.1rem;letter-spacing:.3rem;text-align:center}
+    .lockwrap button{margin-top:.7rem}
+    .lockerr{color:#8a1c10;font-size:.82rem;margin-top:.4rem}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="banner">STAGING · Event-modus (kiosk). Alleen voor test.</div>
+    {% if locked %}<div class="lockbar">🔒 Kiosk vergrendeld — deelnemer-modus{% if lock_until %} · ontgrendelt om {{ lock_until[11:16] }}{% endif %}</div>{% endif %}
     {% if notfound_msg %}<div class="notice">{{ notfound_msg }}</div>{% endif %}
     <h1>Nieuwe deelnemer</h1>
     <div class="sub">{{ ev.opdrachtgever }}{% if ev.naam %} · {{ ev.naam }}{% endif %} · {{ ev.event_code }}</div>
@@ -66,7 +74,29 @@
       </form>
     </div>
 
-    <a class="back" href="/event/kiosk">← Andere meetdag</a>
+    {% if not locked %}<a class="back" href="/event/kiosk">← Andere meetdag</a>{% endif %}
+
+    {% if locked %}
+    <div class="lockwrap">
+      <form method="POST" action="/event/kiosk/{{ ev.event_code }}/ontgrendel">
+        <label>Organisator: ontgrendel de kiosk</label>
+        <input type="password" name="pin" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+               placeholder="PIN" required autocomplete="off">
+        <button type="submit" class="secondary">🔓 Ontgrendel kiosk</button>
+        {% if lockerr == 'wrong' %}<div class="lockerr">Onjuiste PIN — probeer opnieuw.</div>{% endif %}
+      </form>
+    </div>
+    {% else %}
+    <div class="lockwrap">
+      <form method="POST" action="/event/kiosk/{{ ev.event_code }}/vergrendel">
+        <label>Organisator: vergrendel de kiosk (deelnemer-modus)</label>
+        <input type="password" name="pin" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+               placeholder="kies 4-cijferige PIN" required autocomplete="off">
+        <button type="submit" class="secondary">🔒 Vergrendel kiosk</button>
+        {% if lockerr == 'pin' %}<div class="lockerr">PIN moet precies 4 cijfers zijn.</div>{% endif %}
+      </form>
+    </div>
+    {% endif %}
   </div>
 </body>
 </html>

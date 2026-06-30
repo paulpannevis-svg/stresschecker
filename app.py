@@ -4091,11 +4091,88 @@ def _event_gen_code(db, table, col, prefix):
     raise RuntimeError('geen unieke code')
 
 
+# ── Event-kiosk PIN-slot (sessie-gebaseerd; GEEN DB) ─────────────────────────
+# Zet de kiosk in 'deelnemer-modus': nieuwe/terugkerende meting + eigen uitslag blijven
+# bereikbaar, maar navigatie naar de event-lijst en de wis-actie worden geblokkeerd tot
+# de organisator de gekozen 4-cijferige PIN invoert. Auto-expiry na 4 uur, lui geëvalueerd
+# (geen cron). Per event_code in de Flask-sessie; staat los van _event_enabled().
+_KIOSK_LOCK_HOURS = 4
+
+def _kiosk_lock_key(event_code):
+    return 'kiosklock_' + (event_code or '').strip().upper()
+
+def _kiosk_locked(event_code):
+    """True zolang deze sessie dit event vergrendeld heeft én het slot niet verlopen is."""
+    k = _kiosk_lock_key(event_code)
+    data = session.get(k)
+    if not isinstance(data, dict):
+        return False
+    try:
+        if datetime.fromisoformat(data['until']) < datetime.now():
+            session.pop(k, None); session.modified = True
+            return False
+    except (KeyError, ValueError):
+        session.pop(k, None); session.modified = True
+        return False
+    return True
+
+def _kiosk_lock_until(event_code):
+    data = session.get(_kiosk_lock_key(event_code))
+    return data.get('until') if isinstance(data, dict) else None
+
+def _any_kiosk_locked():
+    """event_code van een nog-geldig slot in deze sessie, of None (voor home-blokkade)."""
+    for k, v in list(session.items()):
+        if isinstance(k, str) and k.startswith('kiosklock_') and isinstance(v, dict):
+            try:
+                if datetime.fromisoformat(v.get('until', '')) >= datetime.now():
+                    return k[len('kiosklock_'):]
+            except ValueError:
+                pass
+    return None
+
+
+@app.route('/event/kiosk/<event_code>/vergrendel', methods=['POST'])
+def event_kiosk_lock(event_code):
+    """Organisator vergrendelt de kiosk met een 4-cijferige PIN (deelnemer-modus)."""
+    if not _event_enabled():
+        return ('Event-modus niet beschikbaar', 404)
+    pin = (request.form.get('pin') or '').strip()
+    if not (len(pin) == 4 and pin.isdigit()):
+        return redirect(url_for('event_kiosk_event', event_code=event_code, lockerr='pin'))
+    from werkzeug.security import generate_password_hash
+    session[_kiosk_lock_key(event_code)] = {
+        'pin_hash': generate_password_hash(pin),
+        'until': (datetime.now() + timedelta(hours=_KIOSK_LOCK_HOURS)).isoformat(timespec='seconds'),
+    }
+    session.modified = True
+    return redirect(url_for('event_kiosk_event', event_code=event_code))
+
+
+@app.route('/event/kiosk/<event_code>/ontgrendel', methods=['POST'])
+def event_kiosk_unlock(event_code):
+    """Organisator ontgrendelt met dezelfde PIN. Onjuiste PIN -> terug met lockerr=wrong."""
+    if not _event_enabled():
+        return ('Event-modus niet beschikbaar', 404)
+    pin = (request.form.get('pin') or '').strip()
+    k = _kiosk_lock_key(event_code)
+    data = session.get(k)
+    if isinstance(data, dict):
+        from werkzeug.security import check_password_hash
+        if not check_password_hash(data.get('pin_hash', ''), pin):
+            return redirect(url_for('event_kiosk_event', event_code=event_code, lockerr='wrong'))
+        session.pop(k, None); session.modified = True
+    return redirect(url_for('event_kiosk_event', event_code=event_code))
+
+
 @app.route('/event/kiosk')
 def event_kiosk_home():
     """Kiosk-landing (Fase 2b): toon open events. Gegate via _event_enabled()."""
     if not _event_enabled():
         return ('Event-modus niet beschikbaar', 404)
+    _locked_ev = _any_kiosk_locked()
+    if _locked_ev:
+        return redirect(url_for('event_kiosk_event', event_code=_locked_ev))
     db = get_event_db()
     events = db.execute(
         "SELECT e.event_code, e.opdrachtgever, e.naam, e.datum, e.status, "
@@ -4132,7 +4209,10 @@ def event_kiosk_event(event_code):
         lang = 'nl'
     notfound = request.args.get('notfound') == '1'
     return render_template('event/kiosk_event.html', ev=ev, lang=lang,
-                           notfound_msg=(_EVENT_RETURN_NOTFOUND[lang] if notfound else None))
+                           notfound_msg=(_EVENT_RETURN_NOTFOUND[lang] if notfound else None),
+                           locked=_kiosk_locked(event_code),
+                           lock_until=_kiosk_lock_until(event_code),
+                           lockerr=request.args.get('lockerr'))
 
 
 @app.route('/event/kiosk/<event_code>/terugkeer', methods=['POST'])
@@ -4262,6 +4342,8 @@ def event_kiosk_wipe_confirm(event_code):
         return ('Event-modus niet beschikbaar', 404)
     if not _event_unlocked(event_code):
         return redirect(url_for('event_code_request_otp'))
+    if _kiosk_locked(event_code):
+        return redirect(url_for('event_kiosk_event', event_code=event_code))
     db = get_event_db()
     ev = db.execute("SELECT * FROM events WHERE event_code=?", (event_code,)).fetchone()
     if not ev:
@@ -4284,6 +4366,8 @@ def event_kiosk_wipe_do(event_code):
         return ('Event-modus niet beschikbaar', 404)
     if not _event_unlocked(event_code):
         return redirect(url_for('event_code_request_otp'))
+    if _kiosk_locked(event_code):
+        return redirect(url_for('event_kiosk_event', event_code=event_code))
     db = get_event_db()
     ev = db.execute("SELECT * FROM events WHERE event_code=?", (event_code,)).fetchone()
     if not ev:
