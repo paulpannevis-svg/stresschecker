@@ -160,13 +160,14 @@
   <div class="vb-tablewrap">
   <table class="vb-table">
     <thead>
-      <tr><th>Event naam</th><th>Datum</th><th>Deelnemers</th><th>Metingen</th><th>Status</th><th>Acties</th></tr>
+      <tr><th>Event naam</th><th>Datum</th><th>Facilitator</th><th>Deelnemers</th><th>Metingen</th><th>Status</th><th>Acties</th></tr>
     </thead>
     <tbody>
       {% for e in events %}
       <tr>
         <td><strong>{{ e.naam or '—' }}</strong></td>
         <td>{{ e.datum_display }}</td>
+        <td>{{ e.facilitator or '—' }}</td>
         <td>{{ e.deelnemers }}</td>
         <td>{{ e.credits }}</td>
         <td>{{ e.status }}</td>
@@ -186,7 +187,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="vb-empty">Nog geen events. Klik op "Nieuwe event aanmaken".</td></tr>
+      <tr><td colspan="7" class="vb-empty">Nog geen events. Klik op "Nieuwe event aanmaken".</td></tr>
       {% endfor %}
     </tbody>
   </table>
