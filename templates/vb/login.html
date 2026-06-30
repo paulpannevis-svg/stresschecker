@@ -58,9 +58,9 @@
       {% set _kopen = 'Kaufen →' if lang == 'de' else ('Buy →' if lang == 'en' else 'Kopen →') %}
       {% set _credits = 'Credits' %}
       {% for pack in [
-          {'label':'STARTER','price':'€99','credits':100,'url':'https://checkout.lifestylemonitors.de/b/3cIbJ1byp7QzdcJ7Gr53O0k'},
-          {'label':'STANDARD','price':'€199','credits':250,'url':'https://checkout.lifestylemonitors.de/b/6oU6oHdGxgn51u16Cn53O0j'},
-          {'label':'PREMIUM','price':'€349','credits':500,'url':'https://checkout.lifestylemonitors.de/b/28E3cvbyp8UD2y5gcX53O0i'} ] %}
+          {'label':'SC Pro Event S','price':'€99','credits':100,'url':'https://checkout.lifestylemonitors.de/b/3cIbJ1byp7QzdcJ7Gr53O0k'},
+          {'label':'SC Pro Event M','price':'€199','credits':250,'url':'https://checkout.lifestylemonitors.de/b/6oU6oHdGxgn51u16Cn53O0j'},
+          {'label':'SC Pro Event L','price':'€349','credits':500,'url':'https://checkout.lifestylemonitors.de/b/28E3cvbyp8UD2y5gcX53O0i'} ] %}
       <a href="{{ pack.url }}" target="_blank" rel="noopener"
          style="flex:1;min-width:0;text-decoration:none;background:#fff;border:1px solid #eee;border-radius:12px;padding:14px 8px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.08);color:#333;">
         <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;">{{ pack.label }}</div>
