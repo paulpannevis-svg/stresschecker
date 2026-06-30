@@ -19,13 +19,23 @@
   .vb-form{margin:0;display:flex;gap:8px;flex-wrap:wrap}
   .vb-form input{padding:8px 10px;font-size:12px;border:2px solid #DDD5C8;border-radius:8px;background:#fff;font-family:inherit}
   .vb-newcode{background:#e8f5ee;border:1px solid #b8e0c8;border-radius:10px;padding:14px 16px;margin-bottom:18px;width:100%}
-  .vb-table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);overflow:hidden}
+  /* Horizontale scroll-omhulling: op smalle schermen mag de 6-koloms-tabel (incl. ACTIES)
+     niet afgesneden worden — wrapper scrollt i.p.v. de kolommen te pletten/af te kappen. */
+  .vb-tablewrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+  .vb-table{width:100%;border-collapse:collapse;background:#fff;overflow:hidden}
   .vb-table th,.vb-table td{padding:10px 14px;text-align:left;font-size:13px;border-bottom:1px solid #f0ece6}
   .vb-table th{background:#faf8f4;color:#888;text-transform:uppercase;font-size:10px;letter-spacing:.05em}
   .vb-empty{padding:22px 14px;color:#999;font-size:13px;text-align:center}
-  .vb-rowbtn{padding:4px 8px;font-size:.75rem;color:#fff;border-radius:6px;text-decoration:none;display:inline-block}
+  .vb-rowbtn{padding:4px 8px;font-size:.75rem;color:#fff;border-radius:6px;text-decoration:none;display:inline-block;white-space:nowrap}
   .vb-actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;width:100%}
   .vb-actions button{padding:10px 16px;border:1px solid #d8d2c7;border-radius:8px;background:#fff;color:#888;font-size:13px;cursor:not-allowed}
+  /* Mobiel: credits-kaarten elk volle breedte; tabel houdt min-breedte zodat de wrapper scrollt. */
+  @media (max-width:680px){
+    .vb-stat{flex-basis:100%}
+    .vb-table{min-width:560px}
+    .vb-table th,.vb-table td{padding:8px 10px;font-size:12px}
+    .vb-form input,.vb-form button{flex:1 1 100%}
+  }
 </style>
 {% endblock %}
 {% block content %}
@@ -59,6 +69,7 @@
     </form>
   </div>
 
+  <div class="vb-tablewrap">
   <table class="vb-table">
     <thead>
       <tr><th>Event naam</th><th>Datum</th><th>Deelnemers</th><th>Metingen</th><th>Status</th><th>Acties</th></tr>
@@ -84,6 +95,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 
   <div class="vb-actions">
     <button type="button" disabled title="Volgt">Rapport genereren</button>
