@@ -9199,8 +9199,9 @@ def vb_dashboard():
     total_metingen = 0
     edb = get_event_db()
     rows = edb.execute(
-        "SELECT event_id, event_code, naam, datum, status, created_at "
-        "FROM events WHERE license_key=? ORDER BY created_at DESC",
+        "SELECT event_id, event_code, naam, datum, facilitator_label, status, created_at "
+        "FROM events WHERE license_key=? AND (status IS NULL OR status <> 'verwijderd') "
+        "ORDER BY created_at DESC",
         (lic['license_key'],)).fetchall()
     for ev in rows:
         n_part = edb.execute(
@@ -9211,8 +9212,10 @@ def vb_dashboard():
             (ev['event_id'],)).fetchone()[0]
         total_metingen += n_met
         events.append({'code': ev['event_code'],
-                       'naam': ev['naam'] or '—',
-                       'datum': (ev['datum'] or ev['created_at'] or '')[:10],
+                       'naam': ev['naam'] or '',
+                       'facilitator': ev['facilitator_label'] or '',
+                       'datum': (ev['datum'] or '')[:10],
+                       'datum_display': (ev['datum'] or ev['created_at'] or '')[:10],
                        'deelnemers': n_part, 'credits': n_met,
                        'status': ev['status']})
     edb.close()
@@ -9265,4 +9268,57 @@ def vb_create_event():
     edb.close()
     app.logger.info('VB event aangemaakt: %s door %s', code, license_key)
     return redirect(url_for('vb_dashboard', new_event=code))
+
+
+@app.route('/vb/update-event/<event_code>', methods=['POST'])
+def vb_update_event(event_code):
+    """VB wijzigt een eigen meetdag (naam/datum/facilitator). Ownership-scoped op de eigen
+    event-licentie (event_code MOET bij session-license_key horen); raakt deelnemers/metingen niet aan."""
+    if not session.get('vb_user_id'):
+        return redirect(url_for('vb_login'))
+    license_key = session.get('vb_license_key')
+    naam = request.form.get('event_naam', '')
+    datum = request.form.get('event_datum', '')
+    facilitator = request.form.get('facilitator_label', '')
+    edb = sqlite3.connect(EVENT_DB_PATH)
+    edb.row_factory = sqlite3.Row
+    row = edb.execute(
+        "SELECT event_id FROM events WHERE event_code=? AND license_key=?",
+        (event_code, license_key)).fetchone()
+    if not row:
+        edb.close()
+        return redirect(url_for('vb_dashboard'))
+    edb.execute(
+        "UPDATE events SET naam=?, datum=?, facilitator_label=? WHERE event_code=? AND license_key=?",
+        (naam, datum, facilitator, event_code, license_key))
+    edb.commit()
+    edb.close()
+    app.logger.info('VB event gewijzigd: %s door %s', event_code, license_key)
+    return redirect(url_for('vb_dashboard'))
+
+
+@app.route('/vb/delete-event/<event_code>', methods=['POST'])
+def vb_delete_event(event_code):
+    """VB 'verwijdert' een eigen meetdag = SOFT-delete (status='verwijderd'): het event verdwijnt
+    uit het dashboard maar deelnemers + metingen blijven behouden (audit/herstelbaar via
+    status terug naar 'open'). Ownership-scoped op de eigen event-licentie. Verbruikte credits
+    worden NIET teruggegeven (metingen blijven bestaan)."""
+    if not session.get('vb_user_id'):
+        return redirect(url_for('vb_login'))
+    license_key = session.get('vb_license_key')
+    edb = sqlite3.connect(EVENT_DB_PATH)
+    edb.row_factory = sqlite3.Row
+    row = edb.execute(
+        "SELECT event_id FROM events WHERE event_code=? AND license_key=?",
+        (event_code, license_key)).fetchone()
+    if not row:
+        edb.close()
+        return redirect(url_for('vb_dashboard'))
+    edb.execute(
+        "UPDATE events SET status='verwijderd' WHERE event_code=? AND license_key=?",
+        (event_code, license_key))
+    edb.commit()
+    edb.close()
+    app.logger.info('VB event soft-deleted: %s door %s', event_code, license_key)
+    return redirect(url_for('vb_dashboard'))
 

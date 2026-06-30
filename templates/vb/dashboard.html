@@ -32,6 +32,12 @@
   /* State-aware aanmaak-knop: groen "Opslaan" wanneer het formulier openstaat. */
   #vbEventBtn.btn-save{background:#1f7a5a;border-color:#1f7a5a;color:#fff}
   .vb-formerr{margin-top:8px;color:#c0392b;font-size:12px;font-weight:600;background:#fadbd8;border-radius:8px;padding:7px 12px;display:inline-block}
+  /* Rij-acties: bewerken (✏️) + verwijderen (🗑️, soft-delete). */
+  .vb-iconbtn{background:none;border:1px solid #e6e0d6;cursor:pointer;font-size:15px;line-height:1;padding:5px 7px;border-radius:7px}
+  .vb-iconbtn:hover{background:#f4f0ea}
+  .vb-delbtn:hover{background:#fadbd8;border-color:#e9b8b1}
+  .vb-delform{display:inline;margin:0}
+  #vbEventCancel{background:none;border:none;color:#888;font-size:12px;text-decoration:underline;cursor:pointer;padding:0 6px}
   /* Mobiel: credits-kaarten elk volle breedte; tabel houdt min-breedte zodat de wrapper scrollt. */
   @media (max-width:680px){
     .vb-stat{flex-basis:100%}
@@ -70,6 +76,7 @@
         <input type="date" name="event_datum" required>
         <input type="text" name="facilitator_label" placeholder="Facilitator (optioneel)">
         <button type="submit" id="vbEventBtn" class="btn-primary" style="width:auto;min-height:0;padding:9px 14px;font-size:13px;">+ Nieuwe event aanmaken</button>
+        <button type="button" id="vbEventCancel" hidden>Annuleren</button>
       </form>
       <div id="vbEventErr" class="vb-formerr" hidden>Vul de naam en datum in.</div>
     </div>
@@ -80,36 +87,63 @@
      tot één knop: 1e klik opent de velden ("Opslaan", groen), 2e klik valideert (naam+datum verplicht,
      facilitator optioneel) en doet de NATIVE submit (zodat de "Event-code"-banner blijft werken). */
   (function () {
-    var form = document.getElementById('vbEventForm');
-    var btn  = document.getElementById('vbEventBtn');
-    var err  = document.getElementById('vbEventErr');
+    var form   = document.getElementById('vbEventForm');
+    var btn    = document.getElementById('vbEventBtn');
+    var cancel = document.getElementById('vbEventCancel');
+    var err    = document.getElementById('vbEventErr');
     if (!form || !btn) return;
+    var CREATE_ACTION = form.getAttribute('action');
     var inputs = Array.prototype.slice.call(form.querySelectorAll('input'));
+    var fNaam  = form.querySelector('[name="event_naam"]');
+    var fDatum = form.querySelector('[name="event_datum"]');
+    var fFac   = form.querySelector('[name="facilitator_label"]');
     var open = false;
-    function setOpen(o) {
+    function setOpen(o, editing) {
       open = o;
       inputs.forEach(function (f) { f.style.display = o ? '' : 'none'; });
       btn.textContent = o ? 'Opslaan' : '+ Nieuwe event aanmaken';
       btn.classList.toggle('btn-save', o);
-      if (!o) err.hidden = true;
+      if (cancel) cancel.hidden = !o;
+      if (!o) { err.hidden = true; form.setAttribute('action', CREATE_ACTION); }
+    }
+    function openCreate() {
+      form.setAttribute('action', CREATE_ACTION);
+      if (fNaam) fNaam.value = ''; if (fDatum) fDatum.value = ''; if (fFac) fFac.value = '';
+      setOpen(true);
+      if (fNaam) fNaam.focus();
+    }
+    function openEdit(d) {
+      form.setAttribute('action', '/vb/update-event/' + encodeURIComponent(d.code));
+      if (fNaam) fNaam.value = d.naam || '';
+      if (fDatum) fDatum.value = d.datum || '';
+      if (fFac) fFac.value = d.facilitator || '';
+      setOpen(true);
+      if (fNaam) fNaam.focus();
+      form.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     setOpen(false); // standaard ingeklapt (alleen wanneer JS draait)
     form.addEventListener('submit', function (e) {
-      if (!open) {                 // 1e klik: openklappen, nog niet versturen
+      if (!open) {                 // 1e klik op de dichte knop = nieuw event
         e.preventDefault();
-        setOpen(true);
-        if (inputs[0]) inputs[0].focus();
+        openCreate();
         return;
       }
-      if (!form.checkValidity()) {  // 2e klik, incompleet: foutmelding, niet versturen
+      if (!form.checkValidity()) {  // incompleet: foutmelding, niet versturen
         e.preventDefault();
         err.hidden = false;
         form.reportValidity();
       }
-      // anders: native submit gaat door (redirect + event-code-banner)
+      // anders: native submit gaat door (create -> banner, of update -> redirect dashboard)
     });
+    if (cancel) cancel.addEventListener('click', function () { setOpen(false); });
     inputs.forEach(function (f) {
       f.addEventListener('input', function () { if (form.checkValidity()) err.hidden = true; });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.vb-editbtn'), function (b) {
+      b.addEventListener('click', function () {
+        openEdit({ code: b.dataset.code, naam: b.dataset.naam,
+                   datum: b.dataset.datum, facilitator: b.dataset.facilitator });
+      });
     });
   })();
   </script>
@@ -122,17 +156,24 @@
     <tbody>
       {% for e in events %}
       <tr>
-        <td><strong>{{ e.naam }}</strong></td>
-        <td>{{ e.datum }}</td>
+        <td><strong>{{ e.naam or '—' }}</strong></td>
+        <td>{{ e.datum_display }}</td>
         <td>{{ e.deelnemers }}</td>
         <td>{{ e.credits }}</td>
         <td>{{ e.status }}</td>
-        <td style="display:flex;gap:16px;align-items:center;">
+        <td style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
           <a class="vb-rowbtn" style="background:#E8344E;" href="/event/kiosk/{{ e.code }}">🎯 Meting</a>
           <span style="display:flex;flex-direction:column;gap:4px;">
             <a class="vb-rowbtn" style="background:#1f7a5a;" href="/vb/rapport?event_code={{ e.code }}&type=pro">📊 Pro</a>
             <a class="vb-rowbtn" style="background:#0066cc;" href="/vb/rapport?event_code={{ e.code }}">👥 Deelnemers</a>
           </span>
+          <button type="button" class="vb-iconbtn vb-editbtn" title="Bewerken"
+                  data-code="{{ e.code }}" data-naam="{{ e.naam }}" data-datum="{{ e.datum }}"
+                  data-facilitator="{{ e.facilitator }}">✏️</button>
+          <form class="vb-delform" method="post" action="/vb/delete-event/{{ e.code }}"
+                onsubmit="return confirm('Dit event uit het dashboard verwijderen? De meetdata (deelnemers en metingen) blijft bewaard.');">
+            <button type="submit" class="vb-iconbtn vb-delbtn" title="Verwijderen">🗑️</button>
+          </form>
         </td>
       </tr>
       {% else %}
