@@ -29,6 +29,9 @@
   .vb-rowbtn{padding:4px 8px;font-size:.75rem;color:#fff;border-radius:6px;text-decoration:none;display:inline-block;white-space:nowrap}
   .vb-actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;width:100%}
   .vb-actions button{padding:10px 16px;border:1px solid #d8d2c7;border-radius:8px;background:#fff;color:#888;font-size:13px;cursor:not-allowed}
+  /* State-aware aanmaak-knop: groen "Opslaan" wanneer het formulier openstaat. */
+  #vbEventBtn.btn-save{background:#1f7a5a;border-color:#1f7a5a;color:#fff}
+  .vb-formerr{margin-top:8px;color:#c0392b;font-size:12px;font-weight:600;background:#fadbd8;border-radius:8px;padding:7px 12px;display:inline-block}
   /* Mobiel: credits-kaarten elk volle breedte; tabel houdt min-breedte zodat de wrapper scrollt. */
   @media (max-width:680px){
     .vb-stat{flex-basis:100%}
@@ -61,13 +64,55 @@
 
   <div class="vb-newbar">
     <h2>Georganiseerde events</h2>
-    <form class="vb-form" method="post" action="/vb/create-event">
-      <input type="text" name="event_naam" placeholder="Event naam" required>
-      <input type="date" name="event_datum" required>
-      <input type="text" name="facilitator_label" placeholder="Facilitator">
-      <button type="submit" class="btn-primary" style="width:auto;min-height:0;padding:9px 14px;font-size:13px;">+ Nieuwe event aanmaken</button>
-    </form>
+    <div>
+      <form class="vb-form" id="vbEventForm" method="post" action="/vb/create-event">
+        <input type="text" name="event_naam" placeholder="Event naam" required>
+        <input type="date" name="event_datum" required>
+        <input type="text" name="facilitator_label" placeholder="Facilitator (optioneel)">
+        <button type="submit" id="vbEventBtn" class="btn-primary" style="width:auto;min-height:0;padding:9px 14px;font-size:13px;">+ Nieuwe event aanmaken</button>
+      </form>
+      <div id="vbEventErr" class="vb-formerr" hidden>Vul de naam en datum in.</div>
+    </div>
   </div>
+  <script>
+  /* Progressive enhancement: zonder JS blijft dit een gewoon submit-formulier (alle velden zichtbaar,
+     knop = submit → /vb/create-event → redirect met event-code-banner). Mét JS klapt het formulier dicht
+     tot één knop: 1e klik opent de velden ("Opslaan", groen), 2e klik valideert (naam+datum verplicht,
+     facilitator optioneel) en doet de NATIVE submit (zodat de "Event-code"-banner blijft werken). */
+  (function () {
+    var form = document.getElementById('vbEventForm');
+    var btn  = document.getElementById('vbEventBtn');
+    var err  = document.getElementById('vbEventErr');
+    if (!form || !btn) return;
+    var inputs = Array.prototype.slice.call(form.querySelectorAll('input'));
+    var open = false;
+    function setOpen(o) {
+      open = o;
+      inputs.forEach(function (f) { f.style.display = o ? '' : 'none'; });
+      btn.textContent = o ? 'Opslaan' : '+ Nieuwe event aanmaken';
+      btn.classList.toggle('btn-save', o);
+      if (!o) err.hidden = true;
+    }
+    setOpen(false); // standaard ingeklapt (alleen wanneer JS draait)
+    form.addEventListener('submit', function (e) {
+      if (!open) {                 // 1e klik: openklappen, nog niet versturen
+        e.preventDefault();
+        setOpen(true);
+        if (inputs[0]) inputs[0].focus();
+        return;
+      }
+      if (!form.checkValidity()) {  // 2e klik, incompleet: foutmelding, niet versturen
+        e.preventDefault();
+        err.hidden = false;
+        form.reportValidity();
+      }
+      // anders: native submit gaat door (redirect + event-code-banner)
+    });
+    inputs.forEach(function (f) {
+      f.addEventListener('input', function () { if (form.checkValidity()) err.hidden = true; });
+    });
+  })();
+  </script>
 
   <div class="vb-tablewrap">
   <table class="vb-table">
