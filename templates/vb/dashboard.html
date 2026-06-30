@@ -25,13 +25,16 @@
   .vb-table{width:100%;border-collapse:collapse;background:#fff;overflow:hidden;table-layout:fixed}
   /* Evenwichtige kolomverdeling (som = 100%); table-layout:fixed dwingt deze breedtes af i.p.v.
      content-gebaseerd (anders slokt ACTIES alle restruimte op). */
-  .vb-table th:nth-child(1),.vb-table td:nth-child(1){width:22%}  /* Event naam */
+  .vb-table th:nth-child(1),.vb-table td:nth-child(1){width:20%}  /* Event naam */
   .vb-table th:nth-child(2),.vb-table td:nth-child(2){width:12%}  /* Datum */
-  .vb-table th:nth-child(3),.vb-table td:nth-child(3){width:13%}  /* Facilitator */
+  .vb-table th:nth-child(3),.vb-table td:nth-child(3){width:12%}  /* Facilitator */
   .vb-table th:nth-child(4),.vb-table td:nth-child(4){width:10%}  /* Deelnemers */
   .vb-table th:nth-child(5),.vb-table td:nth-child(5){width:10%}  /* Metingen */
   .vb-table th:nth-child(6),.vb-table td:nth-child(6){width:10%}  /* Status */
-  .vb-table th:nth-child(7),.vb-table td:nth-child(7){width:23%}  /* Acties */
+  .vb-table th:nth-child(7),.vb-table td:nth-child(7){width:26%}  /* Acties */
+  /* ACTIES op één regel: niet wrappen, knoppen/icons niet laten krimpen. */
+  .vb-acties{display:flex;gap:8px;align-items:center;flex-wrap:nowrap}
+  .vb-acties > *{flex-shrink:0}
   /* Lange event-namen/facilitators breken netjes binnen hun kolom i.p.v. te overflowen. */
   .vb-table td:nth-child(1),.vb-table td:nth-child(3){overflow-wrap:anywhere}
   .vb-table th,.vb-table td{padding:10px 14px;text-align:left;font-size:13px;border-bottom:1px solid #f0ece6}
@@ -189,7 +192,7 @@
         <td>{{ e.deelnemers }}</td>
         <td>{{ e.credits }}</td>
         <td>{{ e.status }}</td>
-        <td style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <td class="vb-acties">
           <a class="vb-rowbtn" style="background:#E8344E;" href="/event/kiosk/{{ e.code }}">🎯 Meting</a>
           <span style="display:flex;flex-direction:column;gap:4px;">
             <a class="vb-rowbtn" style="background:#1f7a5a;" href="/vb/rapport?event_code={{ e.code }}&type=pro">📊 Pro</a>
