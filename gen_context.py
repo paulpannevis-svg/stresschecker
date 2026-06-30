@@ -147,6 +147,14 @@ out.append("- Open punten Spoor 3:\n"
            "`systemctl restart stresschecker`. Was bij implementatie nog niet uitgevoerd "
            "(wachtte op expliciete operator-akkoord).\n\n")
 
+out.append("## Recente deploys (rollback-ankers)\n")
+out.append("- 30-06-2026: VB 2FA finalisatie — commit `6dc29e5` (app.py + "
+           "templates/vb/verify_2fa.html). Rollback-anker: `git reset --hard f4bb3a9` "
+           "(of `git revert 6dc29e5`) + `kill -HUP 1879495`. Session-OTP design "
+           "(10-min TTL, max-5-lockout); GEEN vb_otp_codes-tabel. Routes: "
+           "/vb/verify_2fa + nieuwe /vb/resend_2fa. Live op :8080 geverifieerd "
+           "(302->/vb/login zonder sessie).\n\n")
+
 with open('/opt/stresschecker/CONTEXT.md', 'w') as f:
     f.write(''.join(out))
 print("CONTEXT.md aangemaakt")
