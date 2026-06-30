@@ -9038,8 +9038,25 @@ def vb_verify_2fa():
                 session.pop(_k, None)
             return redirect(url_for('vb_dashboard'))
         error = 'Onjuiste code.'
-    return render_template('vb/verify_2fa.html', lang='nl', error=error,
-                           email=session.get('vb_2fa_email', ''))
+    return render_template('vb/verify_2fa.html', lang=session.get('lang', 'nl'), error=error,
+                           email=session.get('vb_2fa_email', ''),
+                           resent=(request.args.get('resent') == '1'))
+
+
+@app.route('/vb/resend_2fa', methods=['POST'])
+def vb_resend_2fa():
+    """Stuurt de VB-2FA-OTP opnieuw naar het e-mailadres uit de lopende 2FA-sessie.
+    Alleen geldig zolang er een pending 2FA-sessie is (geen nieuwe login nodig);
+    genereert een verse code en reset vervaltijd + pogingen."""
+    if 'vb_2fa_uid' not in session or 'vb_2fa_email' not in session:
+        return redirect(url_for('vb_login'))
+    import time as _t, random as _r
+    _code = str(_r.SystemRandom().randrange(100000, 1000000))
+    session['vb_2fa_code']     = _code
+    session['vb_2fa_expires']  = _t.time() + 600
+    session['vb_2fa_attempts'] = 0
+    send_verification_code(session['vb_2fa_email'], _code, session.get('lang', 'nl'))
+    return redirect(url_for('vb_verify_2fa', resent=1))
 
 
 @app.route('/vb/demo')

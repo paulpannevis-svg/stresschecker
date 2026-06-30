@@ -1,20 +1,61 @@
 {% extends "base.html" %}
-{% block title %}Verificatie — VB Dashboard{% endblock %}
 {% block content %}
+{# VB-2FA binnen de Pro-app-chrome (base.html). Drietalig (NL/DE/EN); Pro-tokens via var(--red).
+   Backend: session-OTP form-POST naar /vb/verify_2fa -> redirect /vb/dashboard; resend ->
+   /vb/resend_2fa. Geen JSON-API, geen event_id (zie route). #}
+{% set _T = {
+  'nl': {'tab':'Verificatie — VB Dashboard','title':'Verifieer je account','sent':'Code verstuurd naar','spam':'Geen e-mail? Kijk ook even in je spam.','label':'Voer OTP-code in','btn':'Verifiëren','busy':'Bezig…','err':'Ongeldige OTP. Probeer opnieuw.','resent':'Nieuwe code verstuurd.','back':'← Terug naar login','resend':'Code niet ontvangen? Opnieuw versturen'},
+  'de': {'tab':'Verifizierung — VB Dashboard','title':'Konto verifizieren','sent':'Code gesendet an','spam':'Keine E-Mail? Schauen Sie auch im Spam-Ordner.','label':'OTP-Code eingeben','btn':'Verifizieren','busy':'Wird geprüft…','err':'Ungültige OTP. Bitte versuchen Sie es erneut.','resent':'Neuer Code gesendet.','back':'← Zurück zum Login','resend':'Code nicht erhalten? Erneut senden'},
+  'en': {'tab':'Verification — VB Dashboard','title':'Verify your account','sent':'Code sent to','spam':"No email? Please also check your spam folder.",'label':'Enter OTP code','btn':'Verify','busy':'Verifying…','err':'Invalid OTP. Please try again.','resent':'New code sent.','back':'← Back to login','resend':"Didn't receive code? Resend"}
+} %}
+{% set t = _T.get(lang, _T['nl']) %}
 <div style="max-width:420px;margin:40px auto;padding:0 16px;">
-<div style="background:white;border-radius:14px;padding:28px 24px;box-shadow:0 2px 12px rgba(0,0,0,.08);text-align:center;">
-<div style="font-size:2.5rem;margin-bottom:8px;">&#128274;</div>
-<h2 style="font-size:1.2rem;font-weight:800;color:var(--red);margin:0 0 8px;">Verificatie</h2>
-<p style="font-size:.85rem;color:#666;margin:0 0 20px;">
-  Code gestuurd naar <strong>{{ email }}</strong>.
-  <span style="display:block;font-size:.78rem;color:#999;margin-top:6px;">Geen e-mail? Kijk ook even in je <strong>spam</strong>.</span>
-</p>
-{% if error %}<p style="color:var(--red);font-size:.85rem;">{{ error }}</p>{% endif %}
-<form method="POST">
-<input type="text" name="code" inputmode="numeric" maxlength="6" autofocus placeholder="000000" style="width:100%;text-align:center;font-size:2rem;letter-spacing:.5rem;padding:12px;border:2px solid #eee;border-radius:10px;outline:none;font-family:inherit;box-sizing:border-box;">
-<button type="submit" style="width:100%;margin-top:16px;padding:14px;background:var(--red);color:white;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">Bevestigen</button>
-</form>
-<a href="{{ url_for('vb_login') }}" style="display:block;margin-top:16px;font-size:.8rem;color:#aaa;text-decoration:none;">Terug</a>
+<div style="background:white;border-radius:12px;padding:28px 24px;box-shadow:0 2px 12px rgba(0,0,0,.08);text-align:center;">
+  <div style="font-size:2.5rem;margin-bottom:8px;">&#128274;</div>
+  <h2 style="font-size:1.2rem;font-weight:800;color:var(--red);margin:0 0 8px;">{{ t.title }}</h2>
+  <p style="font-size:.85rem;color:#666;margin:0 0 20px;">
+    {{ t.sent }} <strong>{{ email }}</strong>.
+    <span style="display:block;font-size:.78rem;color:#999;margin-top:6px;">{{ t.spam }}</span>
+  </p>
+
+  {% if resent %}<p style="background:#eef6ee;border:1px solid #cfe5cf;color:#2c5d3a;font-size:.82rem;border-radius:8px;padding:8px 12px;margin:0 0 14px;">{{ t.resent }}</p>{% endif %}
+  {% if error %}<p style="background:#FDE8EB;border:1px solid #f5c6cb;color:#a12;font-size:.85rem;border-radius:8px;padding:8px 12px;margin:0 0 14px;">{{ t.err }}</p>{% endif %}
+
+  <form method="POST" id="otp-form">
+    <label for="otp-vb" style="display:block;font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;text-align:left;">{{ t.label }}</label>
+    <input type="text" name="code" id="otp-vb" inputmode="numeric" maxlength="6" autocomplete="one-time-code" autofocus placeholder="000000"
+           style="width:100%;text-align:center;font-size:2rem;letter-spacing:.5rem;padding:12px;border:2px solid #DDD5C8;border-radius:10px;outline:none;font-family:inherit;box-sizing:border-box;">
+    <button type="submit" id="verify-btn" data-busy="{{ t.busy }}" disabled
+            style="width:100%;margin-top:16px;padding:14px;background:var(--red);color:white;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;">{{ t.btn }}</button>
+  </form>
+
+  <form method="POST" action="{{ url_for('vb_resend_2fa') }}" style="margin:14px 0 0;">
+    <button type="submit" style="background:none;border:none;color:var(--red);font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:underline;padding:0;">{{ t.resend }}</button>
+  </form>
+
+  <a href="{{ url_for('vb_login') }}" style="display:block;margin-top:14px;font-size:.8rem;color:#aaa;text-decoration:none;">{{ t.back }}</a>
 </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    var inp = document.getElementById('otp-vb');
+    var btn = document.getElementById('verify-btn');
+    var form = document.getElementById('otp-form');
+    if (!inp || !btn || !form) return;
+    function sync() {
+      var v = inp.value.replace(/\D/g, '').slice(0, 6); // alleen cijfers, max 6
+      if (v !== inp.value) inp.value = v;
+      btn.disabled = (v.length !== 6);
+    }
+    inp.addEventListener('input', sync);
+    sync();
+    // Loading-state bij verzenden (Enter of klik). De code is op dat moment 6 cijfers.
+    form.addEventListener('submit', function () {
+      btn.disabled = true;
+      btn.textContent = btn.getAttribute('data-busy');
+    });
+  })();
+</script>
 {% endblock %}
