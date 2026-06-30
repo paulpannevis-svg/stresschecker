@@ -57,10 +57,16 @@
     <div style="display:flex;gap:8px;">
       {% set _kopen = 'Kaufen →' if lang == 'de' else ('Buy →' if lang == 'en' else 'Kopen →') %}
       {% set _credits = 'Credits' %}
+      {# Stripe Payment Links per tier — geverifieerd tegen Stripe (S=€99 /28E3cv, M=€199 /6oU6oH,
+         L=€349 /3cIbJ1). DE heeft eigen Duitstalige checkout-links (zelfde bedragen). ?locale stelt
+         de checkout-taal in. LET OP: eerder stonden S en L verwisseld → live billing-bug, hier hersteld. #}
+      {% set _vb_s = 'https://checkout.lifestylemonitors.de/b/28E8wP45X0o7a0x3qb53O0m?locale=de' if lang == 'de' else 'https://checkout.lifestylemonitors.de/b/28E3cvbyp8UD2y5gcX53O0i?locale=' ~ lang %}
+      {% set _vb_m = 'https://checkout.lifestylemonitors.de/b/9B6aEX9qhc6P3C9e4P53O0o?locale=de' if lang == 'de' else 'https://checkout.lifestylemonitors.de/b/6oU6oHdGxgn51u16Cn53O0j?locale=' ~ lang %}
+      {% set _vb_l = 'https://checkout.lifestylemonitors.de/b/9B6aEX45Xgn5fkR6Cn53O0p?locale=de' if lang == 'de' else 'https://checkout.lifestylemonitors.de/b/3cIbJ1byp7QzdcJ7Gr53O0k?locale=' ~ lang %}
       {% for pack in [
-          {'label':'SC Pro Event S','price':'€99','credits':100,'url':'https://checkout.lifestylemonitors.de/b/3cIbJ1byp7QzdcJ7Gr53O0k'},
-          {'label':'SC Pro Event M','price':'€199','credits':250,'url':'https://checkout.lifestylemonitors.de/b/6oU6oHdGxgn51u16Cn53O0j'},
-          {'label':'SC Pro Event L','price':'€349','credits':500,'url':'https://checkout.lifestylemonitors.de/b/28E3cvbyp8UD2y5gcX53O0i'} ] %}
+          {'label':'SC Pro Event S','price':'€99','credits':100,'url':_vb_s},
+          {'label':'SC Pro Event M','price':'€199','credits':250,'url':_vb_m},
+          {'label':'SC Pro Event L','price':'€349','credits':500,'url':_vb_l} ] %}
       <a href="{{ pack.url }}" target="_blank" rel="noopener"
          style="flex:1;min-width:0;text-decoration:none;background:#fff;border:1px solid #eee;border-radius:12px;padding:14px 8px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.08);color:#333;">
         <div style="font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;">{{ pack.label }}</div>
