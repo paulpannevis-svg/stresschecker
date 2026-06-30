@@ -145,11 +145,14 @@
     inputs.forEach(function (f) {
       f.addEventListener('input', function () { if (form.checkValidity()) err.hidden = true; });
     });
-    Array.prototype.forEach.call(document.querySelectorAll('.vb-editbtn'), function (b) {
-      b.addEventListener('click', function () {
-        openEdit({ code: b.dataset.code, naam: b.dataset.naam,
-                   datum: b.dataset.datum, facilitator: b.dataset.facilitator });
-      });
+    // De ✏️-knoppen staan in de tabel ONDER dit script; bij uitvoering bestaan ze nog niet,
+    // dus directe binding (querySelectorAll op dat moment) bindt aan een lege lijst → knop dood.
+    // Event-delegation op document werkt ongeacht DOM-volgorde (en bij later toegevoegde rijen).
+    document.addEventListener('click', function (e) {
+      var b = e.target && e.target.closest ? e.target.closest('.vb-editbtn') : null;
+      if (!b) return;
+      openEdit({ code: b.dataset.code, naam: b.dataset.naam,
+                 datum: b.dataset.datum, facilitator: b.dataset.facilitator });
     });
   })();
   </script>
