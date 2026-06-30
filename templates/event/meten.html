@@ -52,6 +52,21 @@
       <div id="evSubjHint" style="text-align:center;font-size:.72rem;font-style:italic;color:#b0a8a0;margin-top:.3rem;">Beweeg de schuif om je eerste, eerlijke gevoel te kiezen.</div>
     </div>
 
+    <!-- Werkstress-vraag VÓÓR de meting — tweede context-setter naast ontspanning.
+         Opslag = event_metingen.work_stress_score (0-10). Beide moeten bewust beantwoord
+         zijn voordat 'Start meting' vrijkomt. -->
+    <div id="phase-work" class="ev-card" style="text-align:left">
+      <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.6rem;">In welke mate heb je last van werkstress?</div>
+      <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-bottom:.3rem;">
+        <span>Geen</span><span>Extreem veel</span>
+      </div>
+      <input type="range" id="evWorkSlider" min="0" max="10" value="5"
+        style="width:100%;accent-color:#E8344E;cursor:pointer;"
+        oninput="evWorkTouch()" onpointerdown="evWorkTouch()">
+      <div style="text-align:center;font-size:1.4rem;font-weight:700;color:#E8344E;margin-top:.4rem;"><span id="evWorkVal">—</span><span style="font-size:.85rem;font-weight:400;color:#aaa"> / 10</span></div>
+      <div id="evWorkHint" style="text-align:center;font-size:.72rem;font-style:italic;color:#b0a8a0;margin-top:.3rem;">Beweeg de schuif om je eerste, eerlijke gevoel te kiezen.</div>
+    </div>
+
     <div id="phase-measure" class="ev-card">
       <div class="stats">
         <div><div class="big" id="bpm">--</div><div class="lbl">bpm</div></div>
@@ -149,6 +164,7 @@
     // Reeds-voltooid bij paginalaad (>=2 metingen): toon alleen de slotboodschap.
     if (CAPPED) {
       document.getElementById('phase-subj').style.display = 'none';
+      document.getElementById('phase-work').style.display = 'none';
       document.getElementById('phase-measure').style.display = 'none';
       renderSlot(document.getElementById('cappedMsg'), HAS_RELIABLE);
       document.getElementById('phase-capped').style.display = 'block';
@@ -161,6 +177,12 @@
 
     var rrIntervals = [], beatCount = 0, elapsed = 0, timer = null, active = false;
     var _subjTouched = false;
+    var _workTouched = false;
+
+    // Start komt pas vrij als BEIDE vragen (ontspanning + werkstress) bewust beantwoord zijn.
+    function maybeEnableStart() {
+      document.getElementById('startBtn').disabled = !(_subjTouched && _workTouched);
+    }
 
     // Touched-tracking: de ontspanningsvraag moet BEWUST beantwoord worden. Tot dan toont
     // het cijfer '—' en blijft 'Start meting' uitgeschakeld. Geen stille default-5.
@@ -168,7 +190,15 @@
       _subjTouched = true;
       document.getElementById('evSubjVal').textContent = document.getElementById('evSubjSlider').value;
       var h = document.getElementById('evSubjHint'); if (h) h.style.display = 'none';
-      document.getElementById('startBtn').disabled = false;
+      maybeEnableStart();
+    }
+
+    // Idem voor de werkstress-vraag.
+    function evWorkTouch() {
+      _workTouched = true;
+      document.getElementById('evWorkVal').textContent = document.getElementById('evWorkSlider').value;
+      var h = document.getElementById('evWorkHint'); if (h) h.style.display = 'none';
+      maybeEnableStart();
     }
 
     function onBeat(rr) {
@@ -179,7 +209,7 @@
     }
 
     function startMeasure() {
-      if (active || !_subjTouched) return;
+      if (active || !_subjTouched || !_workTouched) return;
       active = true;
       document.getElementById('startBtn').disabled = true;
       // Annuleer is alleen tijdens het meten beschikbaar (idle = verborgen).
@@ -214,7 +244,12 @@
       document.getElementById('evSubjSlider').value = 5;
       document.getElementById('evSubjVal').textContent = '—';
       var _h = document.getElementById('evSubjHint'); if (_h) _h.style.display = '';
-      // Start blokkeren tot er opnieuw een vers cijfer is gekozen.
+      // Werkstress-cijfer eveneens wissen (beide vragen opnieuw afdwingen).
+      _workTouched = false;
+      document.getElementById('evWorkSlider').value = 5;
+      document.getElementById('evWorkVal').textContent = '—';
+      var _hw = document.getElementById('evWorkHint'); if (_hw) _hw.style.display = '';
+      // Start blokkeren tot er opnieuw verse cijfers zijn gekozen.
       document.getElementById('startBtn').disabled = true;
     }
 
@@ -248,7 +283,8 @@
           meting_code: MC, ri: ri, bpm: bpm, hrv: hrv, rmssd: rmssd,
           beats: beatCount, duration: elapsed, sensor: 'demo',
           kwaliteit: kwaliteit, rr_intervals: JSON.stringify(rrIntervals),
-          subjectief: _subjTouched ? parseInt(document.getElementById('evSubjSlider').value, 10) : null
+          subjectief: _subjTouched ? parseInt(document.getElementById('evSubjSlider').value, 10) : null,
+          work_stress: _workTouched ? parseInt(document.getElementById('evWorkSlider').value, 10) : null
         })
       }).then(function (r) { return r.json(); }).then(function (j) {
         if (!j.ok) {
@@ -268,6 +304,7 @@
     // bestaande uitslag (EXISTING_RESULT), zodat beide paden identiek ogen.
     function showResultPhase(ri, kwaliteit, quality_band, n_metingen, has_reliable) {
       document.getElementById('phase-subj').style.display = 'none';
+      document.getElementById('phase-work').style.display = 'none';
       document.getElementById('phase-measure').style.display = 'none';
       document.getElementById('phase-result').style.display = 'block';
       // Gate-vlaggen (zelfde verhaal als kwadrant.html + de event-PDF): te onregelmatig

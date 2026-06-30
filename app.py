@@ -481,6 +481,10 @@ def get_event_db():
     # = bewuste 5). Additief, alleen sc_event.db; basismeting/gedeelde tabellen onaangeraakt.
     try: conn.execute('ALTER TABLE event_metingen ADD COLUMN subjectief_score INTEGER')
     except Exception: pass
+    # Werkstress-cijfer (tweede context-setter naast ontspanning; 0-10, onaangeraakt = NULL).
+    # Additief/idempotent, alleen sc_event.db; zelfde semantiek als subjectief_score.
+    try: conn.execute('ALTER TABLE event_metingen ADD COLUMN work_stress_score INTEGER')
+    except Exception: pass
     # Koppeling event -> VB-event-licentie (saas_licenses.licenses.license_key, origin='event').
     # Additief/idempotent. NULL = CLI/legacy-event zonder licentie (geen credit-handhaving).
     try: conn.execute('ALTER TABLE events ADD COLUMN license_key TEXT')
@@ -4023,20 +4027,22 @@ def api_event_save_meting(event_code):
             except Exception:
                 return None
         _subjectief = _subj(data.get('subjectief'))
+        # Werkstress-cijfer: zelfde 0-10-validatie/semantiek als subjectief (bewust gekozen of NULL).
+        _work_stress = _subj(data.get('work_stress'))
 
         db.execute(
             'INSERT INTO event_metingen '
             '(event_id, participant_id, meting_code, ts, ri, bpm, hrv_pct, rmssd, sdnn, '
             ' pnn50, beats, duration, sensor_type, kwaliteit, rr_intervals, timeseries, quality_band, '
-            ' subjectief_score) '
-            'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            ' subjectief_score, work_stress_score) '
+            'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
             (part['event_id'], part['participant_id'], code,
              _i(data.get('ts')) or int(datetime.now().timestamp() * 1000),
              _f(data.get('ri')), _i(data.get('bpm')), _i(data.get('hrv')),
              _f(data.get('rmssd')), _f(data.get('sdnn')), _f(data.get('pnn50')),
              _i(data.get('beats')), _i(data.get('duration')) or 90,
              str(data.get('sensor', 'demo')), _i(data.get('kwaliteit')),
-             _rr, str(data.get('timeseries', '') or ''), _qband, _subjectief)
+             _rr, str(data.get('timeseries', '') or ''), _qband, _subjectief, _work_stress)
         )
         db.commit()
         _mid = db.execute('SELECT last_insert_rowid()').fetchone()[0]  # Get inserted meting_id
