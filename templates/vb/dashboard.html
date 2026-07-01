@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}VB Dashboard — {{ vb_name }}{% endblock %}
+{% block title %}{{ t.title }} — {{ vb_name }}{% endblock %}
 {% block head %}
 <style>
   /* Pro Event-dashboard binnen de Pro-app-chrome (base.html: header/logo/taalwissel +
@@ -76,33 +76,33 @@
       <h1>Dashboard{% if tier %} — Pro Event {{ tier }}{% endif %}</h1>
       <div class="vb-who">{{ vb_name }} &middot; {{ vb_email }}</div>
     </div>
-    <a class="vb-logout" href="/vb/logout">Uitloggen</a>
+    <a class="vb-logout" href="/vb/logout">{{ t.logout }}</a>
   </div>
 
   <div class="vb-stats">
-    <div class="vb-stat"><div class="n">{{ credits_available }}</div><div class="l">Credits beschikbaar</div></div>
-    <div class="vb-stat used"><div class="n">{{ credits_used }}</div><div class="l">Credits gebruikt</div></div>
+    <div class="vb-stat"><div class="n">{{ credits_available }}</div><div class="l">{{ t.cred_avail }}</div></div>
+    <div class="vb-stat used"><div class="n">{{ credits_used }}</div><div class="l">{{ t.cred_used }}</div></div>
   </div>
 
   {% if new_event %}
   <div class="vb-newcode">
-    Nieuwe meetdag aangemaakt. Event-code voor de kiosk:
+    {{ t.new_created }}
     <strong style="font-size:18px;letter-spacing:.05em;">{{ new_event }}</strong>
   </div>
   {% endif %}
 
   <div class="vb-newbar">
-    <h2>Georganiseerde events</h2>
+    <h2>{{ t.events_h2 }}</h2>
     <div>
       <form class="vb-form" id="vbEventForm" method="post" action="/vb/create-event">
-        <input type="text" name="event_naam" placeholder="Event naam" required>
-        <input type="text" name="event_opdrachtgever" placeholder="Opdrachtgever (optioneel)" maxlength="255">
+        <input type="text" name="event_naam" placeholder="{{ t.ph_naam }}" required>
+        <input type="text" name="event_opdrachtgever" placeholder="{{ t.ph_opdr }}" maxlength="255">
         <input type="date" name="event_datum" required>
-        <input type="text" name="facilitator_label" placeholder="Facilitator (optioneel)">
-        <button type="submit" id="vbEventBtn" class="btn-primary" style="width:auto;min-height:0;padding:9px 14px;font-size:13px;">+ Nieuwe event aanmaken</button>
-        <button type="button" id="vbEventCancel" hidden>Annuleren</button>
+        <input type="text" name="facilitator_label" placeholder="{{ t.ph_fac }}">
+        <button type="submit" id="vbEventBtn" class="btn-primary" style="width:auto;min-height:0;padding:9px 14px;font-size:13px;">{{ t.btn_new }}</button>
+        <button type="button" id="vbEventCancel" hidden>{{ t.btn_cancel }}</button>
       </form>
-      <div id="vbEventErr" class="vb-formerr" hidden>Vul de naam en datum in.</div>
+      <div id="vbEventErr" class="vb-formerr" hidden>{{ t.err_fill }}</div>
     </div>
   </div>
   <script>
@@ -111,6 +111,7 @@
      tot één knop: 1e klik opent de velden ("Opslaan", groen), 2e klik valideert (naam+datum verplicht,
      facilitator optioneel) en doet de NATIVE submit (zodat de "Event-code"-banner blijft werken). */
   (function () {
+    var VBI = { save: {{ t.btn_save|tojson }}, newBtn: {{ t.btn_new|tojson }} };
     var form   = document.getElementById('vbEventForm');
     var btn    = document.getElementById('vbEventBtn');
     var cancel = document.getElementById('vbEventCancel');
@@ -126,7 +127,7 @@
     function setOpen(o, editing) {
       open = o;
       inputs.forEach(function (f) { f.style.display = o ? '' : 'none'; });
-      btn.textContent = o ? 'Opslaan' : '+ Nieuwe event aanmaken';
+      btn.textContent = o ? VBI.save : VBI.newBtn;
       btn.classList.toggle('btn-save', o);
       if (cancel) cancel.hidden = !o;
       if (!o) { err.hidden = true; form.setAttribute('action', CREATE_ACTION); }
@@ -186,7 +187,7 @@
   <div class="vb-tablewrap">
   <table class="vb-table">
     <thead>
-      <tr><th>Event naam</th><th>Opdrachtgever</th><th>Datum</th><th>Facilitator</th><th>Status</th><th>Metingen</th><th>Acties</th><th>Rapporten</th></tr>
+      <tr><th>{{ t.th_naam }}</th><th>{{ t.th_opdr }}</th><th>{{ t.th_datum }}</th><th>{{ t.th_fac }}</th><th>{{ t.th_status }}</th><th>{{ t.th_metingen }}</th><th>{{ t.th_acties }}</th><th>{{ t.th_rapporten }}</th></tr>
     </thead>
     <tbody>
       {% for e in events %}
@@ -195,32 +196,32 @@
         <td>{{ e.opdrachtgever or '—' }}</td>
         <td>{{ e.datum_display }}</td>
         <td>{{ e.facilitator or '—' }}</td>
-        <td>{{ e.status }}</td>
+        <td>{{ t.st_open if e.status == 'open' else t.st_gesloten if e.status == 'gesloten' else (e.status or '—') }}</td>
         <td class="vb-metingen">{{ e.credits }}</td>
         <td><div class="vb-acties">
-          <a class="vb-rowbtn" style="background:#E8344E;" href="/event/kiosk/{{ e.code }}">🎯 Meting</a>
-          <button type="button" class="vb-iconbtn vb-editbtn" title="Bewerken"
+          <a class="vb-rowbtn" style="background:#E8344E;" href="/event/kiosk/{{ e.code }}">🎯 {{ t.btn_meting }}</a>
+          <button type="button" class="vb-iconbtn vb-editbtn" title="{{ t.t_edit }}"
                   data-code="{{ e.code }}" data-naam="{{ e.naam }}" data-opdrachtgever="{{ e.opdrachtgever }}"
                   data-datum="{{ e.datum }}" data-facilitator="{{ e.facilitator }}">✏️</button>
           <form class="vb-delform" method="post" action="/vb/delete-event/{{ e.code }}"
-                onsubmit="return confirm('Dit event uit het dashboard verwijderen? De meetdata (deelnemers en metingen) blijft bewaard.');">
-            <button type="submit" class="vb-iconbtn vb-delbtn" title="Verwijderen">🗑️</button>
+                onsubmit="return confirm('{{ t.confirm_del }}');">
+            <button type="submit" class="vb-iconbtn vb-delbtn" title="{{ t.t_del }}">🗑️</button>
           </form>
         </div></td>
         <td><div class="vb-rapporten">
           <a class="vb-rowbtn" style="background:#1f7a5a;" href="/vb/rapport?event_code={{ e.code }}&type=pro">📊 Pro</a>
-          <a class="vb-rowbtn" style="background:#0066cc;" href="/vb/deelnemers/{{ e.code }}">👥 Deelnemers</a>
+          <a class="vb-rowbtn" style="background:#0066cc;" href="/vb/deelnemers/{{ e.code }}">👥 {{ t.btn_deeln }}</a>
         </div></td>
       </tr>
       {% else %}
-      <tr><td colspan="8" class="vb-empty">Nog geen events. Klik op "Nieuwe event aanmaken".</td></tr>
+      <tr><td colspan="8" class="vb-empty">{{ t.empty }}</td></tr>
       {% endfor %}
     </tbody>
   </table>
   </div>
 
   <div class="vb-actions">
-    <button type="button" disabled title="Volgt">Rapport genereren</button>
-    <button type="button" disabled title="Volgt">CSV export</button>
+    <button type="button" disabled title="{{ t.soon }}">{{ t.gen_report }}</button>
+    <button type="button" disabled title="{{ t.soon }}">{{ t.csv }}</button>
   </div>
 {% endblock %}
