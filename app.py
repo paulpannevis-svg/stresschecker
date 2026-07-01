@@ -9359,6 +9359,104 @@ def vb_group_report():
     return html
 
 
+@app.route('/vb/deelnemers/<event_code>', methods=['GET'])
+def vb_deelnemers_list(event_code):
+    """Facilitator-deelnemerslijst (naam + tracking-code + RI/zone/intake) met zoeken op naam.
+    Alleen de VB die de meetdag bezit (events.license_key == sessie-licentie). Per deelnemer links
+    naar het BESTAANDE individuele rapport (view/PDF) + e-mailverzending. Niet-geanonimiseerd:
+    bedoeld voor de facilitator die de meetdag heeft uitgevoerd, niet voor de opdrachtgever."""
+    if not session.get('vb_user_id'):
+        return redirect(url_for('vb_login'))
+    code = (event_code or '').strip().upper()
+    edb = get_event_db()
+    ev = edb.execute(
+        "SELECT event_id, event_code, naam, opdrachtgever, license_key FROM events WHERE event_code=?",
+        (code,)).fetchone()
+    if not ev:
+        edb.close(); return "Onbekend event", 404
+    if ev['license_key'] != session.get('vb_license_key'):
+        edb.close(); abort(403)
+    # Zelfde lazy-backfill als het groepsrapport, zodat elke deelnemer een tracking-code heeft.
+    for _pr in edb.execute("SELECT participant_id FROM event_participants "
+                           "WHERE event_id=? AND (tracking_code IS NULL OR tracking_code='')",
+                           (ev['event_id'],)).fetchall():
+        _tc = _event_gen_tracking_code(edb, ev['event_id'])
+        edb.execute("UPDATE event_participants SET tracking_code=? WHERE participant_id=?",
+                    (_tc, _pr['participant_id']))
+    edb.commit()
+    data = _vb_group_data(edb, ev['event_id'])
+    edb.close()
+    q_raw = (request.args.get('q') or '').strip()
+    q = q_raw.lower()
+    parts = data['parts']
+    if q:
+        parts = [p for p in parts if q in (p.get('name') or '').lower()]
+    return render_template('vb/deelnemers_list.html', ev=ev, parts=parts,
+                           total=len(data['parts']), q=q_raw,
+                           mail=request.args.get('mail'), mailerr=request.args.get('mailerr'))
+
+
+def _is_valid_email(addr):
+    import re
+    return bool(re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$', addr or ''))
+
+
+@app.route('/vb/deelnemers/rapport-email', methods=['POST'])
+def vb_send_deelnemer_rapport_email():
+    """Mail het individuele momentopname-rapport (PDF) naar een opgegeven adres. Facilitator-only
+    (VB-login + eigenaarschap van de meetdag). Het adres wordt NIET opgeslagen; wel een audit-regel
+    (event/meting/tijd, zonder adres)."""
+    if not session.get('vb_user_id'):
+        return redirect(url_for('vb_login'))
+    meting_code = (request.form.get('meting_code') or '').strip().upper()
+    email_address = (request.form.get('email_address') or '').strip()
+    edb = get_event_db()
+    row = edb.execute(
+        "SELECT e.event_code, e.naam, e.license_key FROM event_participants p "
+        "JOIN events e ON e.event_id = p.event_id WHERE p.meting_code=?", (meting_code,)).fetchone()
+    edb.close()
+    if not row or row['license_key'] != session.get('vb_license_key'):
+        abort(403)
+    if not _is_valid_email(email_address):
+        return redirect(url_for('vb_deelnemers_list', event_code=row['event_code'], mailerr='invalid'))
+    try:
+        import event_report as _evr
+        pdf_bytes, info = _evr.render_report(meting_code, 'nl')
+        ok = _send_event_rapport_email(email_address, row['naam'] or 'meetdag',
+                                       info.get('code') or meting_code, pdf_bytes, 'nl')
+        # BEWUST: het e-mailadres wordt niet gelogd (privacy). Alleen event/meting/uitkomst.
+        app.logger.info('VB deelnemer-rapport gemaild: event=%s meting=%s ok=%s',
+                        row['event_code'], meting_code, ok)
+        _status = 'sent' if ok else 'failed'
+    except Exception as e:
+        app.logger.error('VB deelnemer-rapport mail-fout (event=%s): %s', row['event_code'], e)
+        _status = 'failed'
+    return redirect(url_for('vb_deelnemers_list', event_code=row['event_code'], mail=_status))
+
+
+def _send_event_rapport_email(to_email, event_naam, code, pdf_bytes, lang='nl'):
+    """Verstuur het rapport-PDF via SendGrid (zelfde client/patroon als de andere mails). Op
+    staging: alleen allow-listed adressen echt versturen, de rest naar het log."""
+    if os.environ.get('SC_ENV') == 'staging' and not _staging_mail_allowed(to_email):
+        print(f'[STAGING-MAIL] event-rapport to={to_email} code={code}', flush=True); return True
+    import base64, sendgrid
+    from sendgrid.helpers.mail import (Mail, ReplyTo, Attachment, FileContent, FileName,
+                                       FileType, Disposition)
+    sg = sendgrid.SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
+    subject = f'Uw gezondheidsrapport — {event_naam}'
+    body = (f'Geachte deelnemer,\n\nBijgevoegd ontvangt u uw gezondheidsrapport van {event_naam}.\n\n'
+            'Dit rapport bevat een momentopname van uw autonome zenuwstelselstatus (AZS), gemeten '
+            'tijdens de activiteit.\n\nMet vriendelijke groet,\nStressChecker Pro Event')
+    msg = Mail(from_email='info@lifestylemonitors.com', to_emails=to_email, subject=subject,
+               plain_text_content=body)
+    msg.reply_to = ReplyTo(_reply_to_for_lang(lang))
+    enc = base64.b64encode(pdf_bytes).decode()
+    msg.attachment = Attachment(FileContent(enc), FileName(f'rapport_{code}.pdf'),
+                                FileType('application/pdf'), Disposition('attachment'))
+    sg.send(msg)
+    return True
+
+
 @app.route('/vb/dashboard', methods=['GET'])
 def vb_dashboard():
     """VB dashboard: credits + (stub) events. Vereist VB-login met event-licentie."""

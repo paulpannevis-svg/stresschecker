@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Deelnemers — {{ ev.naam }}{% endblock %}
+{% block content %}
+<style>
+  .dl-wrap{max-width:1000px;margin:2vh auto;padding:0 16px}
+  .dl-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .dl-wrap h1{font-size:22px;color:#1A1A2E;margin:10px 0 2px}
+  .dl-sub{color:#666;font-size:13px;margin-bottom:18px}
+  .dl-back{display:inline-block;background:#eee;color:#555;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600}
+  .dl-flash{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
+  .dl-flash.ok{background:#D4EDDA;color:#155724;border:1px solid #b6dfc0}
+  .dl-flash.err{background:#F8D7DA;color:#721C24;border:1px solid #f0b8bd}
+  .dl-search{display:flex;gap:8px;margin:0 0 16px}
+  .dl-search input{flex:1;padding:10px 12px;border:1px solid #E8E8E8;border-radius:6px;font-size:14px}
+  .dl-btn{padding:9px 14px;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
+  .dl-btn.primary{background:#157347;color:#fff}
+  .dl-btn.sec{background:#fff;color:#555;border:1px solid #d8d2c7}
+  table.dl{width:100%;border-collapse:collapse;background:#fff;border:1px solid #ece7df;border-radius:10px;overflow:hidden}
+  table.dl th{background:#F8F9FA;padding:11px 12px;text-align:left;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.04em}
+  table.dl td{padding:11px 12px;border-bottom:1px solid #f0ece6;font-size:13px}
+  table.dl tbody tr:hover{background:#F8F9FA}
+  .dl-ri{font-weight:700;color:#157347}
+  .dl-code{font-family:monospace;background:#F5F5F5;padding:2px 6px;border-radius:3px;font-size:12px}
+  .zbadge{display:inline-block;padding:3px 8px;border-radius:3px;font-size:11px;font-weight:600}
+  .zone-veerkrachtig{background:#d7f0df;color:#0f5132}
+  .zone-in-balans{background:#e2f0d9;color:#2e5a13}
+  .zone-licht-belast{background:#FFF3CD;color:#856404}
+  .zone-belast{background:#fde4d2;color:#8a4b00}
+  .zone-zwaar-belast{background:#F8D7DA;color:#721C24}
+  .dl-un{color:#b06a1f;font-style:italic}
+  .dl-acts{display:flex;gap:6px}
+  .dl-icon{padding:6px 9px;border-radius:6px;text-decoration:none;font-size:13px;border:1px solid #e2e2e2;background:#fff;cursor:pointer}
+  .dl-empty{text-align:center;color:#999;padding:28px}
+  /* modal */
+  .dl-modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:1000}
+  .dl-modal[hidden]{display:none}
+  .dl-modal .box{background:#fff;padding:26px;border-radius:10px;max-width:440px;width:92%;position:relative}
+  .dl-modal h2{font-size:18px;margin:0 0 4px;color:#1A1A2E}
+  .dl-modal .who{color:#666;font-size:13px;margin-bottom:14px}
+  .dl-modal input[type=email]{width:100%;padding:10px 12px;border:1px solid #E8E8E8;border-radius:6px;font-size:14px;box-sizing:border-box;margin-bottom:6px}
+  .dl-modal .row{display:flex;gap:8px;margin-top:14px}
+  .dl-modal .row .dl-btn{flex:1;text-align:center}
+  .dl-modal .x{position:absolute;top:12px;right:16px;font-size:24px;color:#999;cursor:pointer;line-height:1}
+  .dl-privacy{font-size:11px;color:#999;margin-top:8px}
+</style>
+
+<div class="dl-wrap">
+  <div class="dl-top">
+    <a class="dl-back" href="{{ url_for('vb_dashboard') }}">&larr; Dashboard</a>
+  </div>
+  <h1>Deelnemersrapporten — {{ ev.naam }}</h1>
+  <div class="dl-sub">{{ total }} deelnemer(s){% if ev.opdrachtgever and ev.opdrachtgever != ev.naam %} &middot; {{ ev.opdrachtgever }}{% endif %} &middot; {{ ev.event_code }}</div>
+
+  {% if mail == 'sent' %}<div class="dl-flash ok">Rapport verzonden.</div>
+  {% elif mail == 'failed' %}<div class="dl-flash err">Verzenden mislukt — probeer het later opnieuw.</div>
+  {% elif mailerr == 'invalid' %}<div class="dl-flash err">Ongeldig e-mailadres.</div>{% endif %}
+
+  <form class="dl-search" method="get" action="{{ url_for('vb_deelnemers_list', event_code=ev.event_code) }}">
+    <input type="text" name="q" value="{{ q }}" placeholder="Zoeken op deelnemernaam…">
+    <button type="submit" class="dl-btn primary">Zoeken</button>
+    {% if q %}<a class="dl-btn sec" href="{{ url_for('vb_deelnemers_list', event_code=ev.event_code) }}">Wissen</a>{% endif %}
+  </form>
+
+  {% if parts %}
+  <table class="dl">
+    <thead><tr><th>Naam</th><th>Code</th><th>Relax Index</th><th>Zone</th><th>Ontsp.</th><th>Werkstr.</th><th>Acties</th></tr></thead>
+    <tbody>
+      {% for p in parts %}
+      <tr>
+        <td><strong>{{ p.name }}</strong></td>
+        <td><span class="dl-code">{{ p.tracking_code or '—' }}</span></td>
+        {% if p.reliable %}
+        <td class="dl-ri">{{ p.ri }}</td>
+        <td><span class="zbadge zone-{{ p.zone|lower|replace(' ', '-') }}">{{ p.zone }}</span></td>
+        {% else %}
+        <td class="dl-un" colspan="2">Onbetrouwbaar</td>
+        {% endif %}
+        <td>{{ p.ontspanning }}{% if p.ontspanning != '—' %}/10{% endif %}</td>
+        <td>{{ p.werkstress }}{% if p.werkstress != '—' %}/10{% endif %}</td>
+        <td><div class="dl-acts">
+          <a class="dl-icon" title="Bekijk rapport" target="_blank"
+             href="{{ url_for('event_report_html', event_code=ev.event_code, meting_code=p.meting_code) }}">👁️</a>
+          <a class="dl-icon" title="Download PDF"
+             href="{{ url_for('event_report_pdf', event_code=ev.event_code, meting_code=p.meting_code) }}">📄</a>
+          <button type="button" class="dl-icon" title="E-mail rapport"
+                  onclick="dlOpenMail('{{ p.meting_code }}', {{ (p.name or '')|tojson }})">✉️</button>
+        </div></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="dl-empty">Geen deelnemers gevonden{% if q %} voor “{{ q }}”{% endif %}.</div>
+  {% endif %}
+</div>
+
+<div id="dlModal" class="dl-modal" hidden>
+  <div class="box">
+    <span class="x" onclick="dlCloseMail()">&times;</span>
+    <h2>Rapport e-mailen</h2>
+    <div class="who">Naar deelnemer: <strong id="dlWho"></strong></div>
+    <form method="post" action="{{ url_for('vb_send_deelnemer_rapport_email') }}">
+      <input type="hidden" id="dlMetingCode" name="meting_code">
+      <label style="font-size:13px;color:#555;font-weight:600">E-mailadres van de deelnemer</label>
+      <input type="email" name="email_address" placeholder="naam@bedrijf.nl" required autocomplete="off">
+      <div class="dl-privacy">Het adres wordt alleen gebruikt om dit rapport te versturen en niet opgeslagen.</div>
+      <div class="row">
+        <button type="submit" class="dl-btn primary">Verzend</button>
+        <button type="button" class="dl-btn sec" onclick="dlCloseMail()">Annuleer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function dlOpenMail(code, naam){
+    document.getElementById('dlMetingCode').value = code;
+    document.getElementById('dlWho').textContent = naam || '(geen naam)';
+    document.getElementById('dlModal').hidden = false;
+  }
+  function dlCloseMail(){ document.getElementById('dlModal').hidden = true; }
+  document.getElementById('dlModal').addEventListener('click', function(e){ if(e.target===this) dlCloseMail(); });
+</script>
+{% endblock %}
