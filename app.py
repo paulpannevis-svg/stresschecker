@@ -9363,7 +9363,7 @@ def vb_dashboard():
     total_metingen = 0
     edb = get_event_db()
     rows = edb.execute(
-        "SELECT event_id, event_code, naam, datum, facilitator_label, status, created_at "
+        "SELECT event_id, event_code, naam, opdrachtgever, datum, facilitator_label, status, created_at "
         "FROM events WHERE license_key=? AND (status IS NULL OR status <> 'verwijderd') "
         "ORDER BY created_at DESC",
         (lic['license_key'],)).fetchall()
@@ -9375,8 +9375,12 @@ def vb_dashboard():
             "SELECT COUNT(*) FROM event_metingen WHERE event_id=?",
             (ev['event_id'],)).fetchone()[0]
         total_metingen += n_met
+        # Opdrachtgever alleen tonen als die AFWIJKT van de eventnaam (anders = geen aparte
+        # opdrachtgever ingevuld; opdrachtgever valt in dat geval terug op naam voor de kiosk).
+        _opdr = ev['opdrachtgever'] or ''
         events.append({'code': ev['event_code'],
                        'naam': ev['naam'] or '',
+                       'opdrachtgever': (_opdr if _opdr != (ev['naam'] or '') else ''),
                        'facilitator': ev['facilitator_label'] or '',
                        'datum': (ev['datum'] or '')[:10],
                        'datum_display': (ev['datum'] or ev['created_at'] or '')[:10],
@@ -9423,11 +9427,14 @@ def vb_create_event():
         edb.close()
         return redirect(url_for('vb_dashboard', err='code'))
     naam = request.form.get('event_naam', '')
+    # Opdrachtgever (commissioner) apart opgeslagen; valt terug op de eventnaam als leeg, zodat de
+    # kiosk-/print-schermen (die opdrachtgever als primair label tonen) nooit leeg zijn.
+    opdrachtgever = (request.form.get('event_opdrachtgever') or '').strip() or naam
     datum = request.form.get('event_datum', '')
     facilitator = request.form.get('facilitator_label', '')
     edb.execute(
         "INSERT INTO events (event_code, opdrachtgever, naam, datum, facilitator_label, status, license_key) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)", (code, naam, naam, datum, facilitator, 'open', license_key))
+        "VALUES (?, ?, ?, ?, ?, ?, ?)", (code, opdrachtgever, naam, datum, facilitator, 'open', license_key))
     edb.commit()
     edb.close()
     app.logger.info('VB event aangemaakt: %s door %s', code, license_key)
@@ -9442,6 +9449,7 @@ def vb_update_event(event_code):
         return redirect(url_for('vb_login'))
     license_key = session.get('vb_license_key')
     naam = request.form.get('event_naam', '')
+    opdrachtgever = (request.form.get('event_opdrachtgever') or '').strip() or naam
     datum = request.form.get('event_datum', '')
     facilitator = request.form.get('facilitator_label', '')
     edb = sqlite3.connect(EVENT_DB_PATH)
@@ -9453,8 +9461,8 @@ def vb_update_event(event_code):
         edb.close()
         return redirect(url_for('vb_dashboard'))
     edb.execute(
-        "UPDATE events SET naam=?, datum=?, facilitator_label=? WHERE event_code=? AND license_key=?",
-        (naam, datum, facilitator, event_code, license_key))
+        "UPDATE events SET naam=?, opdrachtgever=?, datum=?, facilitator_label=? WHERE event_code=? AND license_key=?",
+        (naam, opdrachtgever, datum, facilitator, event_code, license_key))
     edb.commit()
     edb.close()
     app.logger.info('VB event gewijzigd: %s door %s', event_code, license_key)

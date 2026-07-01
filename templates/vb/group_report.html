@@ -127,14 +127,15 @@
   <div class="wrap">
     <div class="report-header">
       <div class="confidential-top">Vertrouwelijk</div>
-      <h1>Groepsrapport {{ ev.naam or ev.opdrachtgever }}</h1>
+      {% set _title = ev.naam or ev.opdrachtgever or 'meetdag' %}
+      <h1>Groepsrapport {{ _title }}{% if ev.opdrachtgever and ev.opdrachtgever != _title %} — {{ ev.opdrachtgever }}{% else %} — [Opdrachtgever]{% endif %}</h1>
       {% if d.time_start %}
       <div class="event-dates">
         <p>Begin event: {{ d.time_start }}</p>
         <p>Einde event: {{ d.time_end }}</p>
       </div>
       {% endif %}
-      <div class="code">{{ ev.event_code }}{% if ev.opdrachtgever and ev.opdrachtgever != ev.naam %} &middot; {{ ev.opdrachtgever }}{% endif %}</div>
+      <div class="code">{{ ev.event_code }}</div>
     </div>
 
     {% if not d.enough %}

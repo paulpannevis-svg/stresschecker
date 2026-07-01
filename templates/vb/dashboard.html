@@ -95,6 +95,7 @@
     <div>
       <form class="vb-form" id="vbEventForm" method="post" action="/vb/create-event">
         <input type="text" name="event_naam" placeholder="Event naam" required>
+        <input type="text" name="event_opdrachtgever" placeholder="Opdrachtgever (optioneel)" maxlength="255">
         <input type="date" name="event_datum" required>
         <input type="text" name="facilitator_label" placeholder="Facilitator (optioneel)">
         <button type="submit" id="vbEventBtn" class="btn-primary" style="width:auto;min-height:0;padding:9px 14px;font-size:13px;">+ Nieuwe event aanmaken</button>
@@ -117,6 +118,7 @@
     var CREATE_ACTION = form.getAttribute('action');
     var inputs = Array.prototype.slice.call(form.querySelectorAll('input'));
     var fNaam  = form.querySelector('[name="event_naam"]');
+    var fOpdr  = form.querySelector('[name="event_opdrachtgever"]');
     var fDatum = form.querySelector('[name="event_datum"]');
     var fFac   = form.querySelector('[name="facilitator_label"]');
     var open = false;
@@ -130,13 +132,14 @@
     }
     function openCreate() {
       form.setAttribute('action', CREATE_ACTION);
-      if (fNaam) fNaam.value = ''; if (fDatum) fDatum.value = ''; if (fFac) fFac.value = '';
+      if (fNaam) fNaam.value = ''; if (fOpdr) fOpdr.value = ''; if (fDatum) fDatum.value = ''; if (fFac) fFac.value = '';
       setOpen(true);
       if (fNaam) fNaam.focus();
     }
     function openEdit(d) {
       form.setAttribute('action', '/vb/update-event/' + encodeURIComponent(d.code));
       if (fNaam) fNaam.value = d.naam || '';
+      if (fOpdr) fOpdr.value = d.opdrachtgever || '';
       if (fDatum) fDatum.value = d.datum || '';
       if (fFac) fFac.value = d.facilitator || '';
       setOpen(true);
@@ -173,7 +176,7 @@
     document.addEventListener('click', function (e) {
       var b = e.target && e.target.closest ? e.target.closest('.vb-editbtn') : null;
       if (!b) return;
-      openEdit({ code: b.dataset.code, naam: b.dataset.naam,
+      openEdit({ code: b.dataset.code, naam: b.dataset.naam, opdrachtgever: b.dataset.opdrachtgever,
                  datum: b.dataset.datum, facilitator: b.dataset.facilitator });
     });
   })();
@@ -182,12 +185,13 @@
   <div class="vb-tablewrap">
   <table class="vb-table">
     <thead>
-      <tr><th>Event naam</th><th>Datum</th><th>Facilitator</th><th>Deelnemers</th><th>Metingen</th><th>Status</th><th>Acties</th><th>Rapporten</th></tr>
+      <tr><th>Event naam</th><th>Opdrachtgever</th><th>Datum</th><th>Facilitator</th><th>Deelnemers</th><th>Metingen</th><th>Status</th><th>Acties</th><th>Rapporten</th></tr>
     </thead>
     <tbody>
       {% for e in events %}
       <tr>
         <td><strong>{{ e.naam or '—' }}</strong></td>
+        <td>{{ e.opdrachtgever or '—' }}</td>
         <td>{{ e.datum_display }}</td>
         <td>{{ e.facilitator or '—' }}</td>
         <td>{{ e.deelnemers }}</td>
@@ -196,8 +200,8 @@
         <td><div class="vb-acties">
           <a class="vb-rowbtn" style="background:#E8344E;" href="/event/kiosk/{{ e.code }}">🎯 Meting</a>
           <button type="button" class="vb-iconbtn vb-editbtn" title="Bewerken"
-                  data-code="{{ e.code }}" data-naam="{{ e.naam }}" data-datum="{{ e.datum }}"
-                  data-facilitator="{{ e.facilitator }}">✏️</button>
+                  data-code="{{ e.code }}" data-naam="{{ e.naam }}" data-opdrachtgever="{{ e.opdrachtgever }}"
+                  data-datum="{{ e.datum }}" data-facilitator="{{ e.facilitator }}">✏️</button>
           <form class="vb-delform" method="post" action="/vb/delete-event/{{ e.code }}"
                 onsubmit="return confirm('Dit event uit het dashboard verwijderen? De meetdata (deelnemers en metingen) blijft bewaard.');">
             <button type="submit" class="vb-iconbtn vb-delbtn" title="Verwijderen">🗑️</button>
@@ -209,7 +213,7 @@
         </div></td>
       </tr>
       {% else %}
-      <tr><td colspan="8" class="vb-empty">Nog geen events. Klik op "Nieuwe event aanmaken".</td></tr>
+      <tr><td colspan="9" class="vb-empty">Nog geen events. Klik op "Nieuwe event aanmaken".</td></tr>
       {% endfor %}
     </tbody>
   </table>
