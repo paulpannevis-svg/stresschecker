@@ -173,7 +173,7 @@
       <div class="code-keep">{{ t.code_keep }}</div>
     </div>
     <div class="meta-row">
-      {{ p.opdrachtgever }}{% if p.event_naam %} · {{ p.event_naam }}{% endif %}
+      {% set _nm = p.event_naam or p.opdrachtgever %}{{ _nm }}{% if p.opdrachtgever and p.opdrachtgever != _nm %} · {{ p.opdrachtgever }}{% endif %}
       {% if p.event_datum %} · {{ p.event_datum }}{% endif %}
       · {{ t.measured_at }}: {{ measured_at_str }}
       {% if age is not none %} · {{ t.age }}: {{ age }}{% endif %}
