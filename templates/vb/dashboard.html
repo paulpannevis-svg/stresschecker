@@ -26,18 +26,19 @@
   /* Evenwichtige kolomverdeling (som = 100%); table-layout:fixed dwingt deze breedtes af i.p.v.
      content-gebaseerd (anders slokt ACTIES alle restruimte op). */
   .vb-table th:nth-child(1),.vb-table td:nth-child(1){width:18%}  /* Event naam */
-  .vb-table th:nth-child(2),.vb-table td:nth-child(2){width:10%}  /* Datum */
-  .vb-table th:nth-child(3),.vb-table td:nth-child(3){width:12%}  /* Facilitator */
-  .vb-table th:nth-child(4),.vb-table td:nth-child(4){width:8%}   /* Deelnemers */
-  .vb-table th:nth-child(5),.vb-table td:nth-child(5){width:8%}   /* Metingen */
-  .vb-table th:nth-child(6),.vb-table td:nth-child(6){width:8%}   /* Status */
-  .vb-table th:nth-child(7),.vb-table td:nth-child(7){width:18%}  /* Acties */
-  .vb-table th:nth-child(8),.vb-table td:nth-child(8){width:18%}  /* Rapporten */
+  .vb-table th:nth-child(2),.vb-table td:nth-child(2){width:12%}  /* Opdrachtgever */
+  .vb-table th:nth-child(3),.vb-table td:nth-child(3){width:10%}  /* Datum */
+  .vb-table th:nth-child(4),.vb-table td:nth-child(4){width:12%}  /* Facilitator */
+  .vb-table th:nth-child(5),.vb-table td:nth-child(5){width:8%}   /* Status */
+  .vb-table th:nth-child(6),.vb-table td:nth-child(6){width:8%}   /* Metingen */
+  .vb-table th:nth-child(7),.vb-table td:nth-child(7){width:16%}  /* Acties */
+  .vb-table th:nth-child(8),.vb-table td:nth-child(8){width:16%}  /* Rapporten */
   /* ACTIES + RAPPORTEN op één regel: niet wrappen, knoppen niet laten krimpen. */
   .vb-acties,.vb-rapporten{display:flex;gap:8px;align-items:center;flex-wrap:nowrap}
   .vb-acties > *,.vb-rapporten > *{flex-shrink:0}
   /* Lange event-namen/facilitators breken netjes binnen hun kolom i.p.v. te overflowen. */
-  .vb-table td:nth-child(1),.vb-table td:nth-child(3){overflow-wrap:anywhere}
+  .vb-table td:nth-child(1),.vb-table td:nth-child(2),.vb-table td:nth-child(4){overflow-wrap:anywhere}
+  .vb-table td.vb-metingen{text-align:center;font-weight:700;color:#157347}
   .vb-table th,.vb-table td{padding:10px 14px;text-align:left;font-size:13px;border-bottom:1px solid #f0ece6}
   .vb-table th{background:#faf8f4;color:#888;text-transform:uppercase;font-size:10px;letter-spacing:.05em;white-space:nowrap}
   /* Dit dashboard mag breder dan de standaard 900px Pro-chrome zodat de 7-koloms events-tabel
@@ -185,7 +186,7 @@
   <div class="vb-tablewrap">
   <table class="vb-table">
     <thead>
-      <tr><th>Event naam</th><th>Opdrachtgever</th><th>Datum</th><th>Facilitator</th><th>Deelnemers</th><th>Metingen</th><th>Status</th><th>Acties</th><th>Rapporten</th></tr>
+      <tr><th>Event naam</th><th>Opdrachtgever</th><th>Datum</th><th>Facilitator</th><th>Status</th><th>Metingen</th><th>Acties</th><th>Rapporten</th></tr>
     </thead>
     <tbody>
       {% for e in events %}
@@ -194,9 +195,8 @@
         <td>{{ e.opdrachtgever or '—' }}</td>
         <td>{{ e.datum_display }}</td>
         <td>{{ e.facilitator or '—' }}</td>
-        <td>{{ e.deelnemers }}</td>
-        <td>{{ e.credits }}</td>
         <td>{{ e.status }}</td>
+        <td class="vb-metingen">{{ e.credits }}</td>
         <td><div class="vb-acties">
           <a class="vb-rowbtn" style="background:#E8344E;" href="/event/kiosk/{{ e.code }}">🎯 Meting</a>
           <button type="button" class="vb-iconbtn vb-editbtn" title="Bewerken"
@@ -213,7 +213,7 @@
         </div></td>
       </tr>
       {% else %}
-      <tr><td colspan="9" class="vb-empty">Nog geen events. Klik op "Nieuwe event aanmaken".</td></tr>
+      <tr><td colspan="8" class="vb-empty">Nog geen events. Klik op "Nieuwe event aanmaken".</td></tr>
       {% endfor %}
     </tbody>
   </table>
