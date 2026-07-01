@@ -489,6 +489,12 @@ def get_event_db():
     # Additief/idempotent. NULL = CLI/legacy-event zonder licentie (geen credit-handhaving).
     try: conn.execute('ALTER TABLE events ADD COLUMN license_key TEXT')
     except Exception: pass
+    # Anonieme deelnemer-trackingcode (werkgever-zichtbaar in het groepsrapport i.p.v. ID-001).
+    # BEWUST losgekoppeld van meting_code: meting_code is de ONGEAUTH infopagina-de-anon-sleutel
+    # en mag NIET aan de werkgever getoond worden. Additief/idempotent; uniekheid per event wordt
+    # in code afgedwongen (SQLite ALTER ADD COLUMN staat geen UNIQUE toe).
+    try: conn.execute('ALTER TABLE event_participants ADD COLUMN tracking_code TEXT')
+    except Exception: pass
     conn.commit()
     return conn
 
@@ -4091,6 +4097,21 @@ def _event_gen_code(db, table, col, prefix):
     raise RuntimeError('geen unieke code')
 
 
+# Alfabet zonder verwarrende tekens (geen I/O/1/0) — de code wordt door mensen gelezen/overgetypt.
+_EVENT_TRACK_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+
+def _event_gen_tracking_code(db, event_id):
+    """6-tekens anonieme deelnemer-trackingcode, uniek binnen DIT event. Werkgever-zichtbaar,
+    bevat geen persoonsgegevens. Los van meting_code (dat de infopagina-de-anon-sleutel is)."""
+    import secrets as _sec
+    for _ in range(100):
+        c = ''.join(_sec.choice(_EVENT_TRACK_ALPHABET) for _ in range(6))
+        if not db.execute('SELECT 1 FROM event_participants WHERE event_id=? AND tracking_code=?',
+                          (event_id, c)).fetchone():
+            return c
+    raise RuntimeError('geen unieke trackingcode')
+
+
 # ── Event-kiosk PIN-slot (sessie-gebaseerd; GEEN DB) ─────────────────────────
 # Zet de kiosk in 'deelnemer-modus': nieuwe/terugkerende meting + eigen uitslag blijven
 # bereikbaar, maar navigatie naar de event-lijst en de wis-actie worden geblokkeerd tot
@@ -4275,9 +4296,10 @@ def event_kiosk_new_participant(event_code):
     # Deelnemernaam (bewuste privacymodel-wijziging): alleen in sc_event.db.
     nm = (request.form.get('name') or '').strip()[:120] or None
     code = _event_gen_code(db, 'event_participants', 'meting_code', 'M-')
+    tcode = _event_gen_tracking_code(db, ev['event_id'])
     db.execute(
-        "INSERT INTO event_participants (event_id, meting_code, birth_year, gender, name) VALUES (?,?,?,?,?)",
-        (ev['event_id'], code, by, g, nm)
+        "INSERT INTO event_participants (event_id, meting_code, birth_year, gender, name, tracking_code) VALUES (?,?,?,?,?,?)",
+        (ev['event_id'], code, by, g, nm, tcode)
     )
     db.commit()
     db.close()
@@ -9202,7 +9224,7 @@ def _vb_group_data(edb, event_id):
     analytics.zone_for_ri/zone_label (geen eigen rekenlogica). Zone-eerst."""
     import analytics
     rows = edb.execute(
-        "SELECT p.name, p.meting_code, m.ri, m.kwaliteit, m.quality_band, m.ts, "
+        "SELECT p.name, p.meting_code, p.tracking_code, m.ri, m.kwaliteit, m.quality_band, m.ts, "
         "m.subjectief_score, m.work_stress_score "
         "FROM event_participants p "
         "JOIN event_metingen m ON m.id = ("
@@ -9244,6 +9266,7 @@ def _vb_group_data(edb, event_id):
                              '#fff3cd' if _versch <= 1.5 else '#f8d7da')
             versch_sum += _versch; versch_n += 1
         parts.append({'name': r['name'] or '—', 'meting_code': r['meting_code'],
+                      'tracking_code': (r['tracking_code'] if 'tracking_code' in r.keys() else None),
                       'ri': (f"{float(r['ri']):.1f}" if reliable else None),
                       'zone': analytics.zone_label(zk, 'nl') if zk else None,
                       'ontspanning': (_ont if _ont is not None else '—'),
@@ -9288,6 +9311,15 @@ def vb_group_report():
         edb.close(); return "Onbekend event", 404
     if ev['license_key'] != session.get('vb_license_key'):
         edb.close(); abort(403)
+    # Lazy-backfill: ken bestaande deelnemers (van vóór de trackingcode-kolom) alsnog een
+    # code toe, zodat het groepsrapport nooit ID-001 hoeft terug te vallen.
+    for _pr in edb.execute("SELECT participant_id FROM event_participants "
+                           "WHERE event_id=? AND (tracking_code IS NULL OR tracking_code='')",
+                           (ev['event_id'],)).fetchall():
+        _tc = _event_gen_tracking_code(edb, ev['event_id'])
+        edb.execute("UPDATE event_participants SET tracking_code=? WHERE participant_id=?",
+                    (_tc, _pr['participant_id']))
+    edb.commit()
     data = _vb_group_data(edb, ev['event_id'])
     edb.close()
     want_pdf = request.args.get('pdf') == '1'

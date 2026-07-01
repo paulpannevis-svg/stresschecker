@@ -105,21 +105,20 @@
 
     <h2 style="font-size:14px;color:#555;">Deelnemers</h2>
     <table>
-      <thead><tr><th>Deelnemer-ID</th><th>Ontspanning<br>(0-10)</th><th>Werkstress<br>(0-10)</th><th>Relax Index</th><th>Verschil<br>ANS-bewustzijn</th><th>Zone</th><th>Tijdstip</th></tr></thead>
+      <thead><tr><th>Deelnemer-code</th><th>Ontspanning<br>(0-10)</th><th>Werkstress<br>(0-10)</th><th>Relax Index</th><th>Verschil<br>ANS-bewustzijn</th><th>Zone</th></tr></thead>
       <tbody>
         {% for p in d.parts %}
         <tr>
-          <td>ID-{{ '%03d' % loop.index }}</td>
+          <td>{{ p.tracking_code or ('ID-%03d' % loop.index) }}</td>
           <td>{{ p.ontspanning }}</td>
           <td>{{ p.werkstress }}</td>
           {% if p.reliable %}<td>{{ p.ri }}</td>
           <td class="vcell"{% if p.verschil_color %} style="background:{{ p.verschil_color }}"{% endif %}>{{ p.verschil }}</td>
           <td>{{ p.zone }}</td>
           {% else %}<td class="un" colspan="3">Onbetrouwbaar (te lage kwaliteit)</td>{% endif %}
-          <td>{{ p.tijd }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="7" style="text-align:center;color:#999;padding:18px;">Nog geen metingen.</td></tr>
+        <tr><td colspan="6" style="text-align:center;color:#999;padding:18px;">Nog geen metingen.</td></tr>
         {% endfor %}
       </tbody>
     </table>
