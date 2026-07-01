@@ -71,6 +71,18 @@
     .intake .card .lab{font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-top:var(--s-xs)}
     .intake .card .hint{font-size:10.5px;color:#999;margin-top:6px;line-height:1.4}
 
+    /* Page-1 context boxes (operationeel) */
+    .ctxbox{background:var(--bg-light);border-left:4px solid var(--accent);padding:20px;
+            margin:0 0 var(--s-md);font-size:14px;line-height:1.6;color:var(--text);page-break-inside:avoid}
+    .ctxbox > p{margin:0 0 12px}
+    .ctxbox > p:last-child{margin-bottom:0}
+    .ctxbox ul,.ctxbox ol{margin:12px 0;padding-left:22px}
+    .ctxbox li{margin:8px 0;line-height:1.6}
+    .ctxbox strong{color:var(--dark)}
+    .ctxbox .accent{color:var(--accent);font-weight:600}
+    .ctxbox .measurement-note{margin:16px 0 0;font-size:13px;color:var(--text-2);
+            padding-top:16px;border-top:1px solid var(--border);font-style:italic}
+
     /* Deelnemers table */
     table{width:100%;border-collapse:collapse;font-size:13px}
     thead{background:var(--dark);color:#fff}
@@ -146,6 +158,20 @@
 
     <div class="section">
       <h2>Zoneverdeling</h2>
+      <div class="ctxbox zone-context">
+        <p>Er zijn <strong>{{ d.n }}</strong> deelnemer(s) gemeten. De meetuitslagen worden als volgt gekwalificeerd:</p>
+        <ul>
+          <li><strong>Veerkrachtig (8–10):</strong> optimale AZS-balans, goed hersteld</li>
+          <li><strong>In balans (6–8):</strong> normale, gezonde stress-respons</li>
+          <li><strong>Licht belast (4–6):</strong> het systeem staat licht onder druk</li>
+          <li><strong>Belast (2–4):</strong> verhoogde belasting van het AZS</li>
+          <li><strong>Zwaar belast (0–2):</strong> sterk belaste AZS-balans</li>
+        </ul>
+        {% if d.unreliable_pct > 0 %}
+        <p class="measurement-note"><strong>Noot:</strong> bij <strong>{{ d.unreliable_pct }}%</strong> van de
+          deelnemers kon geen betrouwbaar meetresultaat worden vastgesteld (technische oorzaken of onvoldoende signaal).</p>
+        {% endif %}
+      </div>
       <div class="zones">
         {% for z in d.zdist %}
         <div class="zrow"><div class="lab">{{ z.label }}</div>
@@ -169,6 +195,17 @@
 
     <div class="section">
       <h2>Gemiddelde intake-scores</h2>
+      <div class="ctxbox intake-context">
+        <p>Voorafgaand aan de fysieke meting werden twee vragen gesteld:</p>
+        <ol>
+          <li>"Hoe ontspannen voel je je op dit moment?" (schaal 0–10)</li>
+          <li>"In welke mate heb je last van werkstress?" (schaal 0–10)</li>
+        </ol>
+        <p>Het verschil tussen deze antwoorden en de gemeten AZS-status wordt weergegeven door:
+          <span class="accent">Verschil AZS-bewustzijn = {{ d.avg_verschil }}</span>.</p>
+        <p>Dit getal geeft aan in welke mate deelnemers hun werkelijke AZS-gesteldheid aanvoelen. Een klein
+          verschil (bijv. 1,0) betekent dat deelnemers hun spanning goed kunnen aanvoelen.</p>
+      </div>
       <div class="intake">
         <div class="card"><div class="num">{{ d.avg_ontspanning }} <small>/ 10</small></div><div class="lab">Ontspanning</div></div>
         <div class="card"><div class="num">{{ d.avg_werkstress }} <small>/ 10</small></div><div class="lab">Werkstress</div></div>
@@ -218,14 +255,9 @@
         <li><strong>Hartslag (BPM)</strong>: het aantal slagen per minuut. Een lagere rusthartslag hangt
           samen met een efficiënte hartfunctie en een AZS dat goed kan ontspannen.</li>
       </ul>
-      <p>De RI-schaal loopt van <strong>0 tot 10</strong> en is verdeeld in vijf zones:</p>
-      <ul>
-        <li><strong>8–10 — Veerkrachtig</strong>: optimale AZS-balans, goed hersteld</li>
-        <li><strong>6–8 — In balans</strong>: normale, gezonde stress-respons</li>
-        <li><strong>4–6 — Licht belast</strong>: het systeem staat licht onder druk</li>
-        <li><strong>2–4 — Belast</strong>: verhoogde belasting van het AZS</li>
-        <li><strong>0–2 — Zwaar belast</strong>: sterk belaste AZS-balans</li>
-      </ul>
+      <p>De RI-schaal loopt van <strong>0 tot 10</strong> en is verdeeld in vijf zones (Zwaar belast,
+        Belast, Licht belast, In balans en Veerkrachtig). De indeling en betekenis per zone staan bij de
+        <strong>Zoneverdeling</strong> eerder in dit rapport.</p>
 
       <h5>Waarom is AZS-gezondheid belangrijk?</h5>
       <p>Een gezond AZS is belangrijk voor duurzame inzetbaarheid. Wanneer mensen langdurig onder druk
@@ -272,16 +304,35 @@
       <p>Een team met goed herstelde medewerkers is op de lange termijn productiever, creatiever en
         stabieler. Dit zijn geen extra kosten, maar investeringen in duurzame inzetbaarheid.</p>
 
-      <h5>Verschil AZS-bewustzijn</h5>
-      <p>Dit rapport toont ook het verschil tussen de gemeten AZS-status (RI) en hoe medewerkers zich
-        voelen (ontspanning). Dit verschil kan wijzen op verschillen in lichaamsbesef.</p>
-      <p><strong>Uw groep:</strong> gemiddeld verschil {{ d.avg_verschil }}
-        {% if d.avg_verschil_num is none %}— nog onvoldoende gegevens voor een groepsbeeld.
-        {% elif d.avg_verschil_num <= 1.0 %}— goede aansluiting tussen voeling en meting.
-        {% elif d.avg_verschil_num <= 1.5 %}— matige aansluiting; enige aandacht waard.
-        {% else %}— groter verschil; training in stressherkenning kan waarde hebben.{% endif %}</p>
-      <p>Dit onderwerp vraagt om verder onderzoek en validatie. Voor vragen: raadpleeg een
-        bedrijfsarts.</p>
+      <h5>Verschil AZS-bewustzijn — wat betekent het?</h5>
+      <p>Het <strong>Verschil AZS-bewustzijn</strong> toont de kloof tussen wat het lichaam werkelijk doet
+        (de gemeten AZS-status via de Relax Index) en wat de deelnemer aangeeft te voelen (het antwoord op
+        "Hoe ontspannen voel je je?").</p>
+      <p>Dit verschil kan potentieel wijzen op verschillen in <strong>interoceptief bewustzijn</strong> —
+        het vermogen om interne lichaamssignalen waar te nemen.</p>
+      <p><strong>Interpretatie van het verschil:</strong></p>
+      <ul>
+        <li><strong>Verschil 0–1,0 (groen):</strong> goede aansluiting — deelnemers voelen hun lichaam goed
+          aan en kunnen zelf signaleren wanneer herstel nodig is.</li>
+        <li><strong>Verschil 1,0–1,5 (geel):</strong> matige aansluiting — enige mismatch tussen voeling en
+          werkelijke toestand.</li>
+        <li><strong>Verschil &gt; 1,5 (rood):</strong> groot verschil — deelnemers voelen hun AZS-toestand
+          onvoldoende aan, wat de vroege signalering van problemen kan bemoeilijken.</li>
+      </ul>
+      <p><strong>Voorzichtigheid:</strong> het is nog niet volledig duidelijk wat een groot verschil precies
+        betekent of hoe het zich vertaalt naar werkgedrag of gezondheid. Dit is een onderzoeksgebied in
+        opkomst. Mogelijke verklaringen kunnen zijn:</p>
+      <ul>
+        <li>beperkt zelfbewustzijn van lichaamssignalen (interoceptie);</li>
+        <li>psychologische factoren (ontkenning of normalisering van stress);</li>
+        <li>individuele verschillen in hoe mensen hun voeling rapporteren;</li>
+        <li>methodologische factoren (vraagformulering, meetmoment).</li>
+      </ul>
+      <p><strong>Aanbeveling:</strong> een groot verschil kan een aanleiding zijn voor individuele coaching
+        of training in lichaamsbewustzijn en stressherkenning. Dit vraagt echter om verder onderzoek en moet
+        altijd in context worden geplaatst met andere factoren (werkbelasting, gezondheid, slaap).</p>
+      <p><em>Dit onderzoeksgebied — interoceptie en werkgezondheid — is nog in ontwikkeling; Lifestyle
+        Monitors werkt aan verdere validatie van deze metingen.</em></p>
 
       <p class="callout">Een belast systeem kan wijzen op aanhoudende stress, vermoeidheid, ziekte, pijn,
         slaapgebrek of gebrek aan zingeving — de meting zegt niet welke. De RI is een momentopname en
