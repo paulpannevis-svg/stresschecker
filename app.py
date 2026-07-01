@@ -9453,6 +9453,7 @@ def vb_send_deelnemer_rapport_email():
         return redirect(url_for('vb_login'))
     meting_code = (request.form.get('meting_code') or '').strip().upper()
     email_address = (request.form.get('email_address') or '').strip()
+    lang = request.form.get('lang') if request.form.get('lang') in ('nl', 'de', 'en') else 'nl'
     edb = get_event_db()
     row = edb.execute(
         "SELECT e.event_code, e.naam, e.license_key FROM event_participants p "
@@ -9464,9 +9465,9 @@ def vb_send_deelnemer_rapport_email():
         return redirect(url_for('vb_deelnemers_list', event_code=row['event_code'], mailerr='invalid'))
     try:
         import event_report as _evr
-        pdf_bytes, info = _evr.render_report(meting_code, 'nl')
+        pdf_bytes, info = _evr.render_report(meting_code, lang)
         ok = _send_event_rapport_email(email_address, row['naam'] or 'meetdag',
-                                       info.get('code') or meting_code, pdf_bytes, 'nl')
+                                       info.get('code') or meting_code, pdf_bytes, lang)
         # BEWUST: het e-mailadres wordt niet gelogd (privacy). Alleen event/meting/uitkomst.
         app.logger.info('VB deelnemer-rapport gemaild: event=%s meting=%s ok=%s',
                         row['event_code'], meting_code, ok)
@@ -9486,10 +9487,22 @@ def _send_event_rapport_email(to_email, event_naam, code, pdf_bytes, lang='nl'):
     from sendgrid.helpers.mail import (Mail, ReplyTo, Attachment, FileContent, FileName,
                                        FileType, Disposition)
     sg = sendgrid.SendGridAPIClient(os.environ['SENDGRID_API_KEY'])
-    subject = f'Uw gezondheidsrapport — {event_naam}'
-    body = (f'Geachte deelnemer,\n\nBijgevoegd ontvangt u uw gezondheidsrapport van {event_naam}.\n\n'
-            'Dit rapport bevat een momentopname van uw autonome zenuwstelselstatus (AZS), gemeten '
-            'tijdens de activiteit.\n\nMet vriendelijke groet,\nStressChecker Pro Event')
+    if lang == 'de':
+        subject = f'Ihr Gesundheitsbericht — {event_naam}'
+        body = (f'Sehr geehrte Teilnehmerin, sehr geehrter Teilnehmer,\n\nanbei erhalten Sie Ihren '
+                f'Gesundheitsbericht von {event_naam}.\n\nDieser Bericht enthält eine Momentaufnahme Ihres '
+                'autonomen Nervensystems (AZS), gemessen während der Aktivität.\n\nMit freundlichen Grüßen,\n'
+                'StressChecker Pro Event')
+    elif lang == 'en':
+        subject = f'Your health report — {event_naam}'
+        body = (f'Dear participant,\n\nPlease find attached your health report from {event_naam}.\n\n'
+                'This report contains a snapshot of your autonomic nervous system (ANS), measured during '
+                'the activity.\n\nKind regards,\nStressChecker Pro Event')
+    else:
+        subject = f'Uw gezondheidsrapport — {event_naam}'
+        body = (f'Geachte deelnemer,\n\nBijgevoegd ontvangt u uw gezondheidsrapport van {event_naam}.\n\n'
+                'Dit rapport bevat een momentopname van uw autonome zenuwstelselstatus (AZS), gemeten '
+                'tijdens de activiteit.\n\nMet vriendelijke groet,\nStressChecker Pro Event')
     msg = Mail(from_email='info@lifestylemonitors.com', to_emails=to_email, subject=subject,
                plain_text_content=body)
     msg.reply_to = ReplyTo(_reply_to_for_lang(lang))

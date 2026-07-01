@@ -79,9 +79,9 @@
         <td>{{ p.werkstress }}{% if p.werkstress != '—' %}/10{% endif %}</td>
         <td><div class="dl-acts">
           <a class="dl-icon" title="{{ t.view }}" target="_blank"
-             href="{{ url_for('event_report_html', event_code=ev.event_code, meting_code=p.meting_code) }}">👁️</a>
+             href="{{ url_for('event_report_html', event_code=ev.event_code, meting_code=p.meting_code, lang=lang) }}">👁️</a>
           <a class="dl-icon" title="{{ t.pdf }}"
-             href="{{ url_for('event_report_pdf', event_code=ev.event_code, meting_code=p.meting_code) }}">📄</a>
+             href="{{ url_for('event_report_pdf', event_code=ev.event_code, meting_code=p.meting_code, lang=lang) }}">📄</a>
           <button type="button" class="dl-icon" title="{{ t.email }}"
                   onclick="dlOpenMail('{{ p.meting_code }}', {{ (p.name or '')|tojson }})">✉️</button>
         </div></td>
@@ -101,6 +101,7 @@
     <div class="who">{{ t.m_to }} <strong id="dlWho"></strong></div>
     <form method="post" action="{{ url_for('vb_send_deelnemer_rapport_email') }}">
       <input type="hidden" id="dlMetingCode" name="meting_code">
+      <input type="hidden" name="lang" value="{{ lang }}">
       <label style="font-size:13px;color:#555;font-weight:600">{{ t.m_label }}</label>
       <input type="email" name="email_address" placeholder="{{ t.m_ph }}" required autocomplete="off">
       <div class="dl-privacy">{{ t.m_privacy }}</div>
