@@ -198,40 +198,16 @@
       <p>Een team met goed herstelde medewerkers is op de lange termijn productiever, creatiever en
         stabieler. Dit zijn geen extra kosten, maar investeringen in duurzame inzetbaarheid.</p>
 
-      <h5>Verschil ANS-bewustzijn — hoe te lezen?</h5>
-      <p>Het <strong>Verschil ANS-bewustzijn</strong> toont de afstand tussen wat het lichaam laat
-        zien (RI) en wat de medewerker aangeeft te voelen (ontspanningsscore). Een dergelijk verschil
-        <strong>kan wijzen op</strong> hoe goed iemand de eigen ANS-toestand aanvoelt, maar is
-        nadrukkelijk geen vaststaande maat.</p>
-      <ul>
-        <li><strong>Verschil 0–1,0 (groen):</strong> voeling en meting liggen dicht bij elkaar; dit
-          kan wijzen op relatief goed lichaamsbesef.</li>
-        <li><strong>Verschil 1,0–1,5 (geel):</strong> enige afstand tussen voeling en meting.</li>
-        <li><strong>Verschil &gt; 1,5 (rood):</strong> een grotere afstand tussen voeling en meting;
-          dit kan meerdere oorzaken hebben (zie hieronder).</li>
-      </ul>
-
-      <h5>Voorzichtigheid bij interpretatie</h5>
-      <p>Het koppelen van een subjectieve ontspanningsscore aan een objectieve RI is een
-        <strong>opkomend onderzoeksgebied</strong>; er is nog geen gevalideerde norm voor wat een
-        "goed" of "slecht" verschil is. Een groot verschil hoeft niet te betekenen dat iemand slecht
-        naar het eigen lichaam luistert. Andere mogelijke verklaringen zijn onder meer:</p>
-      <ul>
-        <li>de ontspanningsvraag is subjectief en momentgebonden (stemming, interpretatie van de vraag,
-          hoe iemand zichzelf inschat);</li>
-        <li>de RI is een momentopname die o.a. door slaap, cafeïne, beweging vlak vóór de meting,
-          ziekte of pijn wordt beïnvloed;</li>
-        <li>de intakevraag wordt vóór de meting gesteld, waardoor beide niet exact hetzelfde moment
-          beschrijven;</li>
-        <li>de twee schalen meten verschillende dingen (lichamelijke versus ervaren ontspanning) die
-          niet per se hoeven samen te vallen;</li>
-        <li>individuele en culturele verschillen in het rapporteren van gevoelens.</li>
-      </ul>
-      <p style="background:#f4f1ec;border:1px solid #e0d8cc;border-radius:6px;padding:8px 12px;margin-top:12px;font-size:12px;color:#6b6b6b;">
-        <strong>Onderzoeksvoorbehoud:</strong> het verschil ANS-bewustzijn is een <em>verkennende</em>
-        indicator, geen gevalideerd meetinstrument en geen oordeel over individuele medewerkers.
-        Gebruik het als gespreksstarter op groepsniveau, niet als beoordelingscriterium, en bij
-        voorkeur in overleg met een gekwalificeerde professional.</p>
+      <h5>Verschil ANS-bewustzijn</h5>
+      <p>Dit rapport toont ook het verschil tussen de gemeten ANS-status (RI) en hoe medewerkers zich
+        voelen (ontspanning). Dit verschil kan wijzen op verschillen in lichaamsbesef.</p>
+      <p><strong>Uw groep:</strong> gemiddeld verschil {{ d.avg_verschil }}
+        {% if d.avg_verschil_num is none %}— nog onvoldoende gegevens voor een groepsbeeld.
+        {% elif d.avg_verschil_num <= 1.0 %}— goede aansluiting tussen voeling en meting.
+        {% elif d.avg_verschil_num <= 1.5 %}— matige aansluiting; enige aandacht waard.
+        {% else %}— groter verschil; training in stressherkenning kan waarde hebben.{% endif %}</p>
+      <p>Dit onderwerp vraagt om verder onderzoek en validatie. Voor vragen: raadpleeg een
+        bedrijfsarts (occupational health professional).</p>
 
       <p style="color:#8a5a12;background:#fdf3e7;border:1px solid #f3d6a8;border-radius:6px;padding:8px 12px;margin-top:12px;">
         Een belast systeem kan wijzen op stress, vermoeidheid, ziekte, pijn of herstel — de meting

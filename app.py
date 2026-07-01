@@ -9267,6 +9267,7 @@ def _vb_group_data(edb, event_id):
             'avg_ontspanning': (f"{ont_sum / ont_n:.1f}" if ont_n else '—'),
             'avg_werkstress': (f"{ws_sum / ws_n:.1f}" if ws_n else '—'),
             'avg_verschil': (f"{versch_sum / versch_n:.1f}" if versch_n else '—'),
+            'avg_verschil_num': (versch_sum / versch_n if versch_n else None),
             'zdist': zdist, 'time_range': tr, 'enough': n >= 5}
 
 
