@@ -153,7 +153,7 @@ function kwInfo(id){var el=document.getElementById(id),wasOpen=el.style.display=
 function showTab(n,el){document.querySelectorAll('.kw-tab-content').forEach(t=>t.classList.add('hidden'));document.querySelectorAll('.kw-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+n).classList.remove('hidden');el.classList.add('active');if(n==='details'&&typeof tsData!=='undefined'&&tsData&&tsData.length>1){setTimeout(function(){['RI','HRV','BPM'].forEach(function(key,ki){var cv=document.getElementById('chart'+['RI','HRV','BPM'][ki]);if(!cv)return;var ctx2=cv.getContext('2d');var dpr=window.devicePixelRatio||1;cv.width=cv.clientWidth*dpr||160*dpr;cv.height=55*dpr;var W2=cv.width,H2=cv.height;ctx2.scale(dpr,dpr);var cW=cv.clientWidth||160,cH=55;var vals=tsData.map(function(p){return ki===0?(p.rmssd>0?p.rmssd:null):ki===1?p.hrv:p.bpm;}).filter(function(v){return v!==undefined&&v!==null&&v>0;});if(vals.length===0)return;var mn=ki===0?0:ki===1?0:40,mx=ki===0?50:ki===1?100:120;var rng=mx-mn||1;ctx2.clearRect(0,0,W2,H2);ctx2.strokeStyle=ki===0?'#00ffff':ki===1?'#27ae60':'#e74c3c';ctx2.lineWidth=1.5;ctx2.beginPath();vals.forEach(function(v,i){var x=i/(vals.length-1)*W2;var y=H2-(v-mn)/rng*(H2-4)-2;i===0?ctx2.moveTo(x,y):ctx2.lineTo(x,y);});ctx2.stroke();});},100);}}
 const ZC=['#c0392b','#e67e22','#f1c40f','#82d228','#157347'];
 var lang='{{lang}}';
-const ZL=('{{ lang }}'==='de')?['Schwer belastet','Belastet','Leicht belastet','Im Gleichgewicht','Vital']:('{{ lang }}'==='en')?['Heavily strained','Strained','Lightly strained','In balance','Resilient']:['Zwaar belast','Belast','Licht belast','In balans','Veerkrachtig'];
+const ZL=('{{ lang }}'==='de')?['Stark belastet','Belastet','Leicht belastet','Im Gleichgewicht','Vital']:('{{ lang }}'==='en')?['Heavily strained','Strained','Lightly strained','In balance','Resilient']:['Zwaar belast','Belast','Licht belast','In balans','Veerkrachtig'];
 function kwToggleSignalWarn(){var b=document.getElementById('signalWarnBody'),t=document.getElementById('signalWarnToggle');if(!b||!t)return;var open=b.style.display!=='none';b.style.display=open?'none':'block';t.innerHTML=open?'+':'−';}
 function drawGauge(cv,ri,gated){
   const H=cv.height,W=cv.width,ctx=cv.getContext("2d");
@@ -241,8 +241,8 @@ ctx.save();ctx.translate(8,P.t+CH*0.43);ctx.rotate(-Math.PI/2);ctx.textAlign='ce
       {t:'LEICHT BELASTET',bpm:80,hrv:70,s:10,c:'#ffffff'},
       {t:'BELASTET',bpm:85,hrv:45,s:10,c:'#ffffff'},
       {t:'AKTIV BELASTET',bpm:100,hrv:175,s:10,c:'#ffffff'},
-      {t:'SCHWER BELASTET',bpm:60,hrv:25,s:10,c:'#ffffff'},
-      {t:'SCHWER BELASTET',bpm:100,hrv:25,s:10,c:'#ffffff'}
+      {t:'STARK BELASTET',bpm:60,hrv:25,s:10,c:'#ffffff'},
+      {t:'STARK BELASTET',bpm:100,hrv:25,s:10,c:'#ffffff'}
     ],
     en:[
       {t:'RESILIENT',bpm:75,hrv:170,s:11,c:'#ffffff'},

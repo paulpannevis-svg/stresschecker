@@ -79,7 +79,7 @@ function calculateHRVPercent(r,age,gen){if(!r||r.length<2)return 0;var a=age||50
 function lookupRelaxIndex(bpm,h){if(!bpm||h===undefined)return 1.0;var br=B.length-1;for(var i=0;i<B.length;i++){if(bpm<=B[i]){br=i;break;}}var ci=C.length-1;for(var j=0;j<C.length;j++){if(h<=C[j]){ci=j;break;}}return Math.min(10, Math.round((T[br][ci]/12)*10)/10);}
 function getLabel(r){var L=({
   nl:["Zwaar belast","Belast","Licht belast","In balans","Veerkrachtig"],
-  de:["Schwer belastet","Belastet","Leicht belastet","Im Gleichgewicht","Vital"],
+  de:["Stark belastet","Belastet","Leicht belastet","Im Gleichgewicht","Vital"],
   en:["Heavily strained","Strained","Lightly strained","In balance","Resilient"]
 })[window.SC_LANG]||["Zwaar belast","Belast","Licht belast","In balans","Veerkrachtig"];
 if(r>=8)return L[4];if(r>=6)return L[3];if(r>=4)return L[2];if(r>=2)return L[1];return L[0];}

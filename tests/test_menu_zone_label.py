@@ -32,7 +32,7 @@ from app import app
 
 # zone-key → (ri-representant, nl_label, de_label, en_label)
 _ZONES = [
-    ("zwaar_belast", 1.0, "Zwaar belast", "Schwer belastet", "Heavily strained"),
+    ("zwaar_belast", 1.0, "Zwaar belast", "Stark belastet", "Heavily strained"),
     ("belast",       3.0, "Belast",       "Belastet",        "Strained"),
     ("licht_belast", 5.0, "Licht belast", "Leicht belastet", "Lightly strained"),
     ("in_balans",    7.0, "In balans",    "Im Gleichgewicht", "In balance"),

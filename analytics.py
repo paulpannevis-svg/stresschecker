@@ -62,7 +62,7 @@ def gate_metrics(rr):
 # ============================================================================
 RI_ZONES = [
     # key,            min, max(<), nl,                de,                  en
-    ('zwaar_belast',  0.0, 2.0,    'Zwaar belast',    'Schwer belastet',   'Heavily strained'),
+    ('zwaar_belast',  0.0, 2.0,    'Zwaar belast',    'Stark belastet',   'Heavily strained'),
     ('belast',        2.0, 4.0,    'Belast',          'Belastet',          'Strained'),
     ('licht_belast',  4.0, 6.0,    'Licht belast',    'Leicht belastet',   'Lightly strained'),
     ('in_balans',     6.0, 8.0,    'In balans',       'Im Gleichgewicht',  'In balance'),
