@@ -22,7 +22,7 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="banner">STAGING · Event-modus (kiosk). Alleen voor test.</div>
+    {% if is_staging %}<div class="banner">STAGING · Event-modus (kiosk). Alleen voor test.</div>{% endif %}
     <h1>Kies een meetdag</h1>
     {% if events %}
       {% for e in events %}

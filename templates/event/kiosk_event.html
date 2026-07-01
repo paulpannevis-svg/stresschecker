@@ -34,7 +34,7 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="banner">STAGING · Event-modus (kiosk). Alleen voor test.</div>
+    {% if is_staging %}<div class="banner">STAGING · Event-modus (kiosk). Alleen voor test.</div>{% endif %}
     {% if locked %}<div class="lockbar">🔒 Kiosk vergrendeld — deelnemer-modus{% if lock_until %} · ontgrendelt om {{ lock_until[11:16] }}{% endif %}</div>{% endif %}
     {% if notfound_msg %}<div class="notice">{{ notfound_msg }}</div>{% endif %}
     <h1>Nieuwe deelnemer</h1>
