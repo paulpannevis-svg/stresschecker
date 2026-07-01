@@ -83,6 +83,17 @@
     .ctxbox .measurement-note{margin:16px 0 0;font-size:13px;color:var(--text-2);
             padding-top:16px;border-top:1px solid var(--border);font-style:italic}
 
+    /* Executive summary (intro) */
+    .exsum{background:var(--bg-light);border-left:4px solid var(--accent);padding:24px;
+           margin:0 0 var(--s-md);page-break-inside:avoid}
+    .exsum h2{margin:0 0 12px;font-size:22px;color:var(--dark);letter-spacing:-.3px}
+    .exsum h3{margin:20px 0 8px;font-size:15px;color:var(--dark);font-weight:600}
+    .exsum p{margin:0 0 12px;font-size:14px;line-height:1.6;color:var(--text)}
+    .exsum p:last-child{margin-bottom:0}
+    .sh-row{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0 4px}
+    .sh{flex:1;min-width:150px;background:#fff;border-left:3px solid var(--accent);padding:12px 14px;font-size:13px;color:var(--text)}
+    .sh strong{display:block;font-size:24px;color:var(--accent);margin-bottom:2px;line-height:1}
+
     /* Deelnemers table */
     table{width:100%;border-collapse:collapse;font-size:13px}
     thead{background:var(--dark);color:#fff}
@@ -142,6 +153,28 @@
     <div class="warn">Let op: {{ d.n }} deelnemer(s). Een geanonimiseerd groepsrapport is pas
       betrouwbaar/deelbaar vanaf <strong>5 deelnemers</strong> (kleine-aantallen-privacy).</div>
     {% endif %}
+
+    <div class="exsum">
+      <h2>Samenvatting</h2>
+      <p>Dit rapport presenteert een momentopname van de toestand van het autonome zenuwstelsel (AZS)
+        van uw team tijdens de activiteit.</p>
+      <div class="sh-row">
+        <div class="sh"><strong>{{ d.n }}</strong>deelnemers gescreend</div>
+        <div class="sh"><strong>{{ d.avg_ri }}/10</strong>gemiddelde Relax Index</div>
+        <div class="sh"><strong>{{ d.pct_in_balance }}%</strong>in balans of veerkrachtig</div>
+      </div>
+      <h3>Betekenis</h3>
+      {% if d.reliable_n %}
+      <p>Een gemiddelde Relax Index van <strong>{{ d.avg_ri }}</strong> suggereert dat uw team
+        <strong>{{ d.summary_interpretation }}</strong>. Dit is een momentopname op groepsniveau,
+        geen individuele of medische beoordeling.</p>
+      {% else %}
+      <p>Er zijn nog onvoldoende betrouwbare metingen om een groepsbeeld te geven.</p>
+      {% endif %}
+      <h3>Volgende stap</h3>
+      <p>Raadpleeg uw HR-vertegenwoordiger, bedrijfsarts en/of een adviesbureau voor duurzame
+        inzetbaarheid van medewerkers voor verdere begeleiding en aanbevelingen op basis van deze bevindingen.</p>
+    </div>
 
     <div class="hero">
       <div class="hero__num">{{ d.avg_ri }}</div>

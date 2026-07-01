@@ -9292,7 +9292,23 @@ def _vb_group_data(edb, event_id):
         return f"{_d.day} {_NL_MONTHS[_d.month]} {_d.year}, {_d.strftime('%H:%M')}"
     time_start = _nl_dt(min(ts_list)) if ts_list else None
     time_end = _nl_dt(max(ts_list)) if ts_list else None
+    # Samenvatting: % betrouwbare deelnemers in balans/veerkrachtig (RI >= 6,0) + duiding op gem. RI.
+    _avg_ri_num = (ri_sum / ri_n) if ri_n else None
+    _in_balance = zone_counts['in_balans'] + zone_counts['veerkrachtig']
+    pct_in_balance = (round(100 * _in_balance / ri_n) if ri_n else None)
+    if _avg_ri_num is None:
+        _interp = 'onvoldoende meetgegevens'
+    elif _avg_ri_num >= 8.0:
+        _interp = 'goed hersteld is en optimaal functioneert'
+    elif _avg_ri_num >= 6.0:
+        _interp = 'een gezonde stress-respons vertoont'
+    elif _avg_ri_num >= 4.0:
+        _interp = 'licht onder druk staat'
+    else:
+        _interp = 'verhoogde belasting signaleert'
     return {'parts': parts, 'n': n, 'reliable_n': ri_n, 'unreliable_n': unreliable,
+            'pct_in_balance': (pct_in_balance if pct_in_balance is not None else '—'),
+            'summary_interpretation': _interp,
             'unreliable_pct': round(100 * unreliable / n) if n else 0,
             'avg_ri': (f"{ri_sum / ri_n:.1f}" if ri_n else '—'),
             'avg_ontspanning': (f"{ont_sum / ont_n:.1f}" if ont_n else '—'),
