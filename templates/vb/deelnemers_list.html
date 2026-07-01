@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Deelnemers — {{ ev.naam }}{% endblock %}
+{% block title %}{{ t.title }} — {{ ev.naam }}{% endblock %}
 {% block content %}
 <style>
   .dl-wrap{max-width:1000px;margin:2vh auto;padding:0 16px}
@@ -46,24 +46,24 @@
 
 <div class="dl-wrap">
   <div class="dl-top">
-    <a class="dl-back" href="{{ url_for('vb_dashboard') }}">&larr; Dashboard</a>
+    <a class="dl-back" href="{{ url_for('vb_dashboard') }}">&larr; {{ t.back }}</a>
   </div>
-  <h1>Deelnemersrapporten — {{ ev.naam }}</h1>
-  <div class="dl-sub">{{ total }} deelnemer(s){% if ev.opdrachtgever and ev.opdrachtgever != ev.naam %} &middot; {{ ev.opdrachtgever }}{% endif %} &middot; {{ ev.event_code }}</div>
+  <h1>{{ t.h1 }} — {{ ev.naam }}</h1>
+  <div class="dl-sub">{{ total }} {{ t.n_part }}{% if ev.opdrachtgever and ev.opdrachtgever != ev.naam %} &middot; {{ ev.opdrachtgever }}{% endif %} &middot; {{ ev.event_code }}</div>
 
-  {% if mail == 'sent' %}<div class="dl-flash ok">Rapport verzonden.</div>
-  {% elif mail == 'failed' %}<div class="dl-flash err">Verzenden mislukt — probeer het later opnieuw.</div>
-  {% elif mailerr == 'invalid' %}<div class="dl-flash err">Ongeldig e-mailadres.</div>{% endif %}
+  {% if mail == 'sent' %}<div class="dl-flash ok">{{ t.sent }}</div>
+  {% elif mail == 'failed' %}<div class="dl-flash err">{{ t.failed }}</div>
+  {% elif mailerr == 'invalid' %}<div class="dl-flash err">{{ t.invalid }}</div>{% endif %}
 
   <form class="dl-search" method="get" action="{{ url_for('vb_deelnemers_list', event_code=ev.event_code) }}">
-    <input type="text" name="q" value="{{ q }}" placeholder="Zoeken op deelnemernaam…">
-    <button type="submit" class="dl-btn primary">Zoeken</button>
-    {% if q %}<a class="dl-btn sec" href="{{ url_for('vb_deelnemers_list', event_code=ev.event_code) }}">Wissen</a>{% endif %}
+    <input type="text" name="q" value="{{ q }}" placeholder="{{ t.search_ph }}">
+    <button type="submit" class="dl-btn primary">{{ t.search }}</button>
+    {% if q %}<a class="dl-btn sec" href="{{ url_for('vb_deelnemers_list', event_code=ev.event_code) }}">{{ t.clear }}</a>{% endif %}
   </form>
 
   {% if parts %}
   <table class="dl">
-    <thead><tr><th>Naam</th><th>Code</th><th>Relax Index</th><th>Zone</th><th>Ontsp.</th><th>Werkstr.</th><th>Acties</th></tr></thead>
+    <thead><tr><th>{{ t.th_name }}</th><th>{{ t.th_code }}</th><th>{{ t.th_ri }}</th><th>{{ t.th_zone }}</th><th>{{ t.th_ont }}</th><th>{{ t.th_ws }}</th><th>{{ t.th_act }}</th></tr></thead>
     <tbody>
       {% for p in parts %}
       <tr>
@@ -73,16 +73,16 @@
         <td class="dl-ri">{{ p.ri }}</td>
         <td><span class="zbadge zone-{{ p.zone|lower|replace(' ', '-') }}">{{ p.zone }}</span></td>
         {% else %}
-        <td class="dl-un" colspan="2">Onbetrouwbaar</td>
+        <td class="dl-un" colspan="2">{{ t.unreliable }}</td>
         {% endif %}
         <td>{{ p.ontspanning }}{% if p.ontspanning != '—' %}/10{% endif %}</td>
         <td>{{ p.werkstress }}{% if p.werkstress != '—' %}/10{% endif %}</td>
         <td><div class="dl-acts">
-          <a class="dl-icon" title="Bekijk rapport" target="_blank"
+          <a class="dl-icon" title="{{ t.view }}" target="_blank"
              href="{{ url_for('event_report_html', event_code=ev.event_code, meting_code=p.meting_code) }}">👁️</a>
-          <a class="dl-icon" title="Download PDF"
+          <a class="dl-icon" title="{{ t.pdf }}"
              href="{{ url_for('event_report_pdf', event_code=ev.event_code, meting_code=p.meting_code) }}">📄</a>
-          <button type="button" class="dl-icon" title="E-mail rapport"
+          <button type="button" class="dl-icon" title="{{ t.email }}"
                   onclick="dlOpenMail('{{ p.meting_code }}', {{ (p.name or '')|tojson }})">✉️</button>
         </div></td>
       </tr>
@@ -90,32 +90,33 @@
     </tbody>
   </table>
   {% else %}
-  <div class="dl-empty">Geen deelnemers gevonden{% if q %} voor “{{ q }}”{% endif %}.</div>
+  <div class="dl-empty">{{ t.empty }}{% if q %} {{ t.empty_for }} “{{ q }}”{% endif %}.</div>
   {% endif %}
 </div>
 
 <div id="dlModal" class="dl-modal" hidden>
   <div class="box">
     <span class="x" onclick="dlCloseMail()">&times;</span>
-    <h2>Rapport e-mailen</h2>
-    <div class="who">Naar deelnemer: <strong id="dlWho"></strong></div>
+    <h2>{{ t.m_title }}</h2>
+    <div class="who">{{ t.m_to }} <strong id="dlWho"></strong></div>
     <form method="post" action="{{ url_for('vb_send_deelnemer_rapport_email') }}">
       <input type="hidden" id="dlMetingCode" name="meting_code">
-      <label style="font-size:13px;color:#555;font-weight:600">E-mailadres van de deelnemer</label>
-      <input type="email" name="email_address" placeholder="naam@bedrijf.nl" required autocomplete="off">
-      <div class="dl-privacy">Het adres wordt alleen gebruikt om dit rapport te versturen en niet opgeslagen.</div>
+      <label style="font-size:13px;color:#555;font-weight:600">{{ t.m_label }}</label>
+      <input type="email" name="email_address" placeholder="{{ t.m_ph }}" required autocomplete="off">
+      <div class="dl-privacy">{{ t.m_privacy }}</div>
       <div class="row">
-        <button type="submit" class="dl-btn primary">Verzend</button>
-        <button type="button" class="dl-btn sec" onclick="dlCloseMail()">Annuleer</button>
+        <button type="submit" class="dl-btn primary">{{ t.m_send }}</button>
+        <button type="button" class="dl-btn sec" onclick="dlCloseMail()">{{ t.m_cancel }}</button>
       </div>
     </form>
   </div>
 </div>
 
 <script>
+  var DL_NO_NAME = {{ t.no_name|tojson }};
   function dlOpenMail(code, naam){
     document.getElementById('dlMetingCode').value = code;
-    document.getElementById('dlWho').textContent = naam || '(geen naam)';
+    document.getElementById('dlWho').textContent = naam || DL_NO_NAME;
     document.getElementById('dlModal').hidden = false;
   }
   function dlCloseMail(){ document.getElementById('dlModal').hidden = true; }

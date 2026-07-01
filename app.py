@@ -9359,6 +9359,48 @@ def vb_group_report():
     return html
 
 
+# Vertalingen voor de facilitator-deelnemerslijst (reageert op session['lang'] via de globale
+# taalwissel in base.html → /taal/<lang>). NL/DE/EN.
+_DEELN_STR = {
+    'nl': {'title': 'Deelnemers', 'back': 'Dashboard', 'h1': 'Deelnemersrapporten',
+           'n_part': 'deelnemer(s)', 'sent': 'Rapport verzonden.',
+           'failed': 'Verzenden mislukt — probeer het later opnieuw.', 'invalid': 'Ongeldig e-mailadres.',
+           'search_ph': 'Zoeken op deelnemernaam…', 'search': 'Zoeken', 'clear': 'Wissen',
+           'th_name': 'Naam', 'th_code': 'Code', 'th_ri': 'Relax Index', 'th_zone': 'Zone',
+           'th_ont': 'Ontsp.', 'th_ws': 'Werkstr.', 'th_act': 'Acties', 'unreliable': 'Onbetrouwbaar',
+           'view': 'Bekijk rapport', 'pdf': 'Download PDF', 'email': 'E-mail rapport',
+           'empty': 'Geen deelnemers gevonden', 'empty_for': 'voor',
+           'm_title': 'Rapport e-mailen', 'm_to': 'Naar deelnemer:',
+           'm_label': 'E-mailadres van de deelnemer', 'm_ph': 'naam@bedrijf.nl',
+           'm_privacy': 'Het adres wordt alleen gebruikt om dit rapport te versturen en niet opgeslagen.',
+           'm_send': 'Verzend', 'm_cancel': 'Annuleer', 'no_name': '(geen naam)'},
+    'de': {'title': 'Teilnehmer', 'back': 'Dashboard', 'h1': 'Teilnehmerberichte',
+           'n_part': 'Teilnehmer', 'sent': 'Bericht gesendet.',
+           'failed': 'Senden fehlgeschlagen — bitte später erneut versuchen.', 'invalid': 'Ungültige E-Mail-Adresse.',
+           'search_ph': 'Nach Teilnehmername suchen…', 'search': 'Suchen', 'clear': 'Löschen',
+           'th_name': 'Name', 'th_code': 'Code', 'th_ri': 'Relax Index', 'th_zone': 'Zone',
+           'th_ont': 'Entsp.', 'th_ws': 'Arb.-Stress', 'th_act': 'Aktionen', 'unreliable': 'Unzuverlässig',
+           'view': 'Bericht ansehen', 'pdf': 'PDF herunterladen', 'email': 'Bericht per E-Mail',
+           'empty': 'Keine Teilnehmer gefunden', 'empty_for': 'für',
+           'm_title': 'Bericht per E-Mail senden', 'm_to': 'An Teilnehmer:',
+           'm_label': 'E-Mail-Adresse des Teilnehmers', 'm_ph': 'name@firma.de',
+           'm_privacy': 'Die Adresse wird nur zum Versand dieses Berichts verwendet und nicht gespeichert.',
+           'm_send': 'Senden', 'm_cancel': 'Abbrechen', 'no_name': '(kein Name)'},
+    'en': {'title': 'Participants', 'back': 'Dashboard', 'h1': 'Participant reports',
+           'n_part': 'participant(s)', 'sent': 'Report sent.',
+           'failed': 'Sending failed — please try again later.', 'invalid': 'Invalid email address.',
+           'search_ph': 'Search by participant name…', 'search': 'Search', 'clear': 'Clear',
+           'th_name': 'Name', 'th_code': 'Code', 'th_ri': 'Relax Index', 'th_zone': 'Zone',
+           'th_ont': 'Relax.', 'th_ws': 'Work str.', 'th_act': 'Actions', 'unreliable': 'Unreliable',
+           'view': 'View report', 'pdf': 'Download PDF', 'email': 'Email report',
+           'empty': 'No participants found', 'empty_for': 'for',
+           'm_title': 'Email report', 'm_to': 'To participant:',
+           'm_label': "Participant's email address", 'm_ph': 'name@company.com',
+           'm_privacy': 'The address is only used to send this report and is not stored.',
+           'm_send': 'Send', 'm_cancel': 'Cancel', 'no_name': '(no name)'},
+}
+
+
 @app.route('/vb/deelnemers/<event_code>', methods=['GET'])
 def vb_deelnemers_list(event_code):
     """Facilitator-deelnemerslijst (naam + tracking-code + RI/zone/intake) met zoeken op naam.
@@ -9391,8 +9433,9 @@ def vb_deelnemers_list(event_code):
     parts = data['parts']
     if q:
         parts = [p for p in parts if q in (p.get('name') or '').lower()]
+    lang = session.get('lang') if session.get('lang') in ('nl', 'de', 'en') else 'nl'
     return render_template('vb/deelnemers_list.html', ev=ev, parts=parts,
-                           total=len(data['parts']), q=q_raw,
+                           total=len(data['parts']), q=q_raw, lang=lang, t=_DEELN_STR[lang],
                            mail=request.args.get('mail'), mailerr=request.args.get('mailerr'))
 
 
