@@ -37,6 +37,15 @@
     .btns a{padding:10px 16px;border-radius:8px;background:#E84C5C;color:#fff;text-decoration:none;font-size:13px;font-weight:600}
     .btns a.sec{background:#fff;color:#555;border:1px solid #d8d2c7}
     .foot{margin-top:18px;color:#aaa;font-size:11px}
+    .vcell{text-align:center;font-weight:600}
+    .vlegend{margin:8px 0 0;font-size:11px;color:#888;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+    .vlegend span{display:inline-flex;align-items:center;gap:5px}
+    .vlegend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+    .method{background:#faf8f4;border-top:2px solid #ece7df;border-radius:0 0 12px 12px;padding:18px 20px;margin-top:32px;font-size:13px;color:#555;line-height:1.6}
+    .method h4{margin:0 0 10px;color:#444;font-size:15px}
+    .method ul{margin:10px 0;padding-left:20px}
+    .method li{margin:6px 0}
+    .method strong{color:#444}
   </style>
 </head>
 <body>
@@ -54,7 +63,7 @@
 
     <div class="cards">
       <div class="stat"><div class="n">{{ d.n }}</div><div class="l">Deelnemers</div></div>
-      <div class="stat"><div class="n">{{ d.avg_ri }}</div><div class="l">Gem. Relax Index (1-10)</div></div>
+      <div class="stat"><div class="n">{{ d.avg_ri }}</div><div class="l">Gem. Relax Index (0-10)</div></div>
       <div class="stat"><div class="n">{{ d.unreliable_pct }}%</div><div class="l">Onbetrouwbaar</div></div>
     </div>
 
@@ -86,29 +95,65 @@
           <div class="v">{{ d.avg_ontspanning }} <small>/ 10</small></div></div>
         <div class="avgitem"><div class="l">Gemiddelde werkstress</div>
           <div class="v">{{ d.avg_werkstress }} <small>/ 10</small></div></div>
+        <div class="avgitem"><div class="l">Gem. ANS-bewustzijn (verschil)</div>
+          <div class="v">{{ d.avg_verschil }}</div>
+          <div style="font-size:11px;color:#999;margin-top:2px">hoe goed deelnemers hun ANS-toestand aanvoelen (kleiner = beter)</div></div>
       </div>
     </div>
 
     <h2 style="font-size:14px;color:#555;">Deelnemers</h2>
     <table>
-      <thead><tr><th>Deelnemer-ID</th><th>Ontspanning<br>(0-10)</th><th>Werkstress<br>(0-10)</th><th>Relax Index</th><th>Zone</th><th>Tijdstip</th></tr></thead>
+      <thead><tr><th>Deelnemer-ID</th><th>Ontspanning<br>(0-10)</th><th>Werkstress<br>(0-10)</th><th>Relax Index</th><th>Verschil<br>ANS-bewustzijn</th><th>Zone</th><th>Tijdstip</th></tr></thead>
       <tbody>
         {% for p in d.parts %}
         <tr>
           <td>ID-{{ '%03d' % loop.index }}</td>
           <td>{{ p.ontspanning }}</td>
           <td>{{ p.werkstress }}</td>
-          {% if p.reliable %}<td>{{ p.ri }}</td><td>{{ p.zone }}</td>
-          {% else %}<td class="un" colspan="2">Onbetrouwbaar (te lage kwaliteit)</td>{% endif %}
+          {% if p.reliable %}<td>{{ p.ri }}</td>
+          <td class="vcell"{% if p.verschil_color %} style="background:{{ p.verschil_color }}"{% endif %}>{{ p.verschil }}</td>
+          <td>{{ p.zone }}</td>
+          {% else %}<td class="un" colspan="3">Onbetrouwbaar (te lage kwaliteit)</td>{% endif %}
           <td>{{ p.tijd }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="6" style="text-align:center;color:#999;padding:18px;">Nog geen metingen.</td></tr>
+        <tr><td colspan="7" style="text-align:center;color:#999;padding:18px;">Nog geen metingen.</td></tr>
         {% endfor %}
       </tbody>
     </table>
+    <div class="vlegend">Verschil ANS-bewustzijn |RI − ontspanning|:
+      <span><i style="background:#d4edda"></i>≤ 1,0 goed</span>
+      <span><i style="background:#fff3cd"></i>1,0–2,0 matig</span>
+      <span><i style="background:#f8d7da"></i>&gt; 2,0 gering</span></div>
 
-    <div class="foot">Gegenereerd op basis van momentopnames; Relax Index 1-10, zone-indeling
+    <div class="method">
+      <h4>Over de Relax Index (RI) meetmethode</h4>
+      <p>De <strong>Relax Index (RI)</strong> is een objectieve maat voor de toestand van het
+        autonome zenuwstelsel (ANS). De RI wordt berekend uit twee fysiologische metingen:</p>
+      <ul>
+        <li><strong>Hartslagvariabiliteit (HRV)</strong>: de variatie in tijd tussen hartslagen.
+          Een hogere HRV wijst op een groter aanpassingsvermogen van het lichaam.</li>
+        <li><strong>Hartslag (BPM)</strong>: het aantal slagen per minuut. Een lagere rusthartslag
+          hangt samen met een lagere basisbelasting.</li>
+      </ul>
+      <p>De RI-schaal loopt van <strong>0 tot 10</strong> en is verdeeld in vijf zones:</p>
+      <ul>
+        <li><strong>8–10</strong>: Veerkrachtig — optimale ANS-balans, goed hersteld</li>
+        <li><strong>6–8</strong>: In balans — normale, gezonde stress-respons</li>
+        <li><strong>4–6</strong>: Licht belast — het systeem staat licht onder druk</li>
+        <li><strong>2–4</strong>: Belast — verhoogde belasting van het ANS</li>
+        <li><strong>0–2</strong>: Zwaar belast — sterk belaste ANS-balans</li>
+      </ul>
+      <p><strong>Verschil ANS-bewustzijn</strong>: dit toont het verschil tussen de objectieve RI
+        (wat het lichaam laat zien) en de subjectieve ontspanningsscore (wat de deelnemer voelt).
+        Een klein verschil duidt op goed lichaamsbesef; een groot verschil kan wijzen op minder
+        goede aansluiting bij de eigen lichaamssignalen. Het is een indicatie, geen diagnose.</p>
+      <p style="color:#8a5a12;background:#fdf3e7;border:1px solid #f3d6a8;border-radius:6px;padding:8px 12px;margin-top:12px;">
+        Een belast systeem kan wijzen op stress, vermoeidheid, ziekte, pijn of herstel — de meting
+        zegt niet welke. De RI is een momentopname en geen medische diagnose.</p>
+    </div>
+
+    <div class="foot">Gegenereerd op basis van momentopnames; Relax Index 0-10, zone-indeling
       volgens de StressChecker-norm. Onbetrouwbare metingen tellen niet mee in het gemiddelde of de zoneverdeling.</div>
   </div>
 </body>

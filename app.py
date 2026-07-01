@@ -9217,6 +9217,9 @@ def _vb_group_data(edb, event_id):
     # Intake-gemiddeldes over de getoonde deelnemers (één rij p.p., zelfde selectie als de
     # tabel → geen dubbeltelling bij retries). NULL/onaangeraakt telt niet mee.
     ont_sum, ont_n, ws_sum, ws_n = 0, 0, 0, 0
+    # ANS-bewustzijn: |RI - ontspanning| (beide 0-10, "hoe ontspannen"). Alleen bij een
+    # betrouwbare RI én een ingevuld ontspanningscijfer; anders geen verschil.
+    versch_sum, versch_n = 0.0, 0
     for r in rows:
         reliable = (r['ri'] is not None and r['kwaliteit'] is not None
                     and r['kwaliteit'] >= 85 and (r['quality_band'] or '') != 'slecht')
@@ -9234,11 +9237,19 @@ def _vb_group_data(edb, event_id):
             ont_sum += _ont; ont_n += 1
         if _ws is not None:
             ws_sum += _ws; ws_n += 1
+        _versch = None; _versch_color = ''
+        if reliable and _ont is not None:
+            _versch = abs(float(r['ri']) - _ont)
+            _versch_color = ('#d4edda' if _versch <= 1.0 else
+                             '#fff3cd' if _versch <= 2.0 else '#f8d7da')
+            versch_sum += _versch; versch_n += 1
         parts.append({'name': r['name'] or '—', 'meting_code': r['meting_code'],
                       'ri': (f"{float(r['ri']):.1f}" if reliable else None),
                       'zone': analytics.zone_label(zk, 'nl') if zk else None,
                       'ontspanning': (_ont if _ont is not None else '—'),
                       'werkstress': (_ws if _ws is not None else '—'),
+                      'verschil': (f"{_versch:.1f}" if _versch is not None else '—'),
+                      'verschil_color': _versch_color,
                       'reliable': reliable, 'tijd': _vb_fmt_ts(r['ts'])})
     n = len(parts)
     # Zone-balkkleuren identiek aan het kwadrant (kwadrant.html ZC, zelfde ZONE_KEYS-volgorde
@@ -9255,6 +9266,7 @@ def _vb_group_data(edb, event_id):
             'avg_ri': (f"{ri_sum / ri_n:.1f}" if ri_n else '—'),
             'avg_ontspanning': (f"{ont_sum / ont_n:.1f}" if ont_n else '—'),
             'avg_werkstress': (f"{ws_sum / ws_n:.1f}" if ws_n else '—'),
+            'avg_verschil': (f"{versch_sum / versch_n:.1f}" if versch_n else '—'),
             'zdist': zdist, 'time_range': tr, 'enough': n >= 5}
 
 
