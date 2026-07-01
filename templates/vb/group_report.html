@@ -55,7 +55,7 @@
     <div class="zones">
       {% for z in d.zdist %}
       <div class="zrow"><div class="lab">{{ z.label }}</div>
-        <div class="bar"><span style="width:{{ z.pct }}%"></span></div>
+        <div class="bar"><span style="width:{{ z.pct }}%;background:{{ z.color }}"></span></div>
         <div class="val">{{ z.n }} &middot; {{ z.pct }}%</div></div>
       {% endfor %}
       {% if d.unreliable_n %}
@@ -74,18 +74,19 @@
 
     <h2 style="font-size:14px;color:#555;">Deelnemers</h2>
     <table>
-      <thead><tr><th>Deelnemer-ID</th><th>Relax Index</th><th>Zone</th><th>Tijdstip</th>{% if not pdf %}<th>Infopagina</th>{% endif %}</tr></thead>
+      <thead><tr><th>Deelnemer-ID</th><th>Ontspanning<br>(0-10)</th><th>Werkstress<br>(0-10)</th><th>Relax Index</th><th>Zone</th><th>Tijdstip</th></tr></thead>
       <tbody>
         {% for p in d.parts %}
         <tr>
           <td>ID-{{ '%03d' % loop.index }}</td>
+          <td>{{ p.ontspanning }}</td>
+          <td>{{ p.werkstress }}</td>
           {% if p.reliable %}<td>{{ p.ri }}</td><td>{{ p.zone }}</td>
           {% else %}<td class="un" colspan="2">Onbetrouwbaar (te lage kwaliteit)</td>{% endif %}
           <td>{{ p.tijd }}</td>
-          {% if not pdf %}<td>{% if p.meting_code %}<a class="ipl" href="{{ url_for('event_deelnemer_infopagina', event_code=ev.event_code, meting_code=p.meting_code) }}">📄 Bekijk</a>{% endif %}</td>{% endif %}
         </tr>
         {% else %}
-        <tr><td colspan="{{ 5 if not pdf else 4 }}" style="text-align:center;color:#999;padding:18px;">Nog geen metingen.</td></tr>
+        <tr><td colspan="6" style="text-align:center;color:#999;padding:18px;">Nog geen metingen.</td></tr>
         {% endfor %}
       </tbody>
     </table>

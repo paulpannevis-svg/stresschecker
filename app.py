@@ -9202,7 +9202,8 @@ def _vb_group_data(edb, event_id):
     analytics.zone_for_ri/zone_label (geen eigen rekenlogica). Zone-eerst."""
     import analytics
     rows = edb.execute(
-        "SELECT p.name, p.meting_code, m.ri, m.kwaliteit, m.quality_band, m.ts "
+        "SELECT p.name, p.meting_code, m.ri, m.kwaliteit, m.quality_band, m.ts, "
+        "m.subjectief_score, m.work_stress_score "
         "FROM event_participants p "
         "JOIN event_metingen m ON m.id = ("
         "  SELECT m2.id FROM event_metingen m2 WHERE m2.participant_id=p.participant_id "
@@ -9224,13 +9225,22 @@ def _vb_group_data(edb, event_id):
             unreliable += 1
         if r['ts']:
             ts_list.append(int(r['ts']))
+        _ont = r['subjectief_score'] if 'subjectief_score' in r.keys() else None
+        _ws = r['work_stress_score'] if 'work_stress_score' in r.keys() else None
         parts.append({'name': r['name'] or '—', 'meting_code': r['meting_code'],
                       'ri': (f"{float(r['ri']):.1f}" if reliable else None),
                       'zone': analytics.zone_label(zk, 'nl') if zk else None,
+                      'ontspanning': (_ont if _ont is not None else '—'),
+                      'werkstress': (_ws if _ws is not None else '—'),
                       'reliable': reliable, 'tijd': _vb_fmt_ts(r['ts'])})
     n = len(parts)
+    # Zone-balkkleuren identiek aan het kwadrant (kwadrant.html ZC, zelfde ZONE_KEYS-volgorde
+    # zwaar_belast→veerkrachtig) zodat groepsrapport en kwadrant consistent zijn.
+    _zone_hex = {'zwaar_belast': '#c0392b', 'belast': '#e67e22', 'licht_belast': '#f1c40f',
+                 'in_balans': '#82d228', 'veerkrachtig': '#157347'}
     zdist = [{'label': analytics.zone_label(k, 'nl'), 'n': zone_counts[k],
-              'pct': round(100 * zone_counts[k] / n) if n else 0}
+              'pct': round(100 * zone_counts[k] / n) if n else 0,
+              'color': _zone_hex.get(k, '#E84C5C')}
              for k in analytics.ZONE_KEYS]
     tr = (_vb_fmt_ts(min(ts_list)) + ' – ' + _vb_fmt_ts(max(ts_list))) if ts_list else ''
     return {'parts': parts, 'n': n, 'reliable_n': ri_n, 'unreliable_n': unreliable,
