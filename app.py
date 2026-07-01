@@ -9241,7 +9241,7 @@ def _vb_group_data(edb, event_id):
         if reliable and _ont is not None:
             _versch = abs(float(r['ri']) - _ont)
             _versch_color = ('#d4edda' if _versch <= 1.0 else
-                             '#fff3cd' if _versch <= 2.0 else '#f8d7da')
+                             '#fff3cd' if _versch <= 1.5 else '#f8d7da')
             versch_sum += _versch; versch_n += 1
         parts.append({'name': r['name'] or '—', 'meting_code': r['meting_code'],
                       'ri': (f"{float(r['ri']):.1f}" if reliable else None),
