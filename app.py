@@ -9214,6 +9214,9 @@ def _vb_group_data(edb, event_id):
     parts, ts_list = [], []
     zone_counts = {k: 0 for k in analytics.ZONE_KEYS}
     ri_sum, ri_n, unreliable = 0.0, 0, 0
+    # Intake-gemiddeldes over de getoonde deelnemers (één rij p.p., zelfde selectie als de
+    # tabel → geen dubbeltelling bij retries). NULL/onaangeraakt telt niet mee.
+    ont_sum, ont_n, ws_sum, ws_n = 0, 0, 0, 0
     for r in rows:
         reliable = (r['ri'] is not None and r['kwaliteit'] is not None
                     and r['kwaliteit'] >= 85 and (r['quality_band'] or '') != 'slecht')
@@ -9227,6 +9230,10 @@ def _vb_group_data(edb, event_id):
             ts_list.append(int(r['ts']))
         _ont = r['subjectief_score'] if 'subjectief_score' in r.keys() else None
         _ws = r['work_stress_score'] if 'work_stress_score' in r.keys() else None
+        if _ont is not None:
+            ont_sum += _ont; ont_n += 1
+        if _ws is not None:
+            ws_sum += _ws; ws_n += 1
         parts.append({'name': r['name'] or '—', 'meting_code': r['meting_code'],
                       'ri': (f"{float(r['ri']):.1f}" if reliable else None),
                       'zone': analytics.zone_label(zk, 'nl') if zk else None,
@@ -9246,6 +9253,8 @@ def _vb_group_data(edb, event_id):
     return {'parts': parts, 'n': n, 'reliable_n': ri_n, 'unreliable_n': unreliable,
             'unreliable_pct': round(100 * unreliable / n) if n else 0,
             'avg_ri': (f"{ri_sum / ri_n:.1f}" if ri_n else '—'),
+            'avg_ontspanning': (f"{ont_sum / ont_n:.1f}" if ont_n else '—'),
+            'avg_werkstress': (f"{ws_sum / ws_n:.1f}" if ws_n else '—'),
             'zdist': zdist, 'time_range': tr, 'enough': n >= 5}
 
 
