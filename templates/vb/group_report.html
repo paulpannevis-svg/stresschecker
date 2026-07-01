@@ -1,22 +1,21 @@
 <!doctype html>
-<html lang="nl">
+<html lang="{{ lang or 'nl' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Groepsrapport — {{ ev.event_code }}</title>
+  <title>{{ t.html_title }} — {{ ev.event_code }}</title>
   <style>
     :root{
       --dark:#1A1A2E; --accent:#157347; --bg-light:#F8F9FA; --border:#E8E8E8;
       --text:#333333; --text-2:#666666;
       --s-xs:8px; --s-sm:16px; --s-md:24px; --s-lg:32px; --s-xl:48px;
     }
-    /* Print: uniforme paginamarges + VERTROUWELIJK + paginanummer + branding-footer op ELKE pagina */
     @page{
       size:A4;
       margin:16mm 15mm 24mm 15mm;
-      @top-right{ content:"VERTROUWELIJK"; font-size:8pt; color:#C0392B; font-weight:700; letter-spacing:1px; }
+      @top-right{ content:"{{ t.confidential_u }}"; font-size:8pt; color:#C0392B; font-weight:700; letter-spacing:1px; }
       @bottom-left{ content:element(pagefoot); }
-      @bottom-right{ content:"Pagina " counter(page) " van " counter(pages); font-size:8pt; color:#666666; }
+      @bottom-right{ content:"{{ t.page }} " counter(page) " {{ t.of }} " counter(pages); font-size:8pt; color:#666666; }
     }
     .pagefoot{ position:running(pagefoot); font-size:8pt; color:#666666; }
     .pagefoot img{ height:13pt; vertical-align:middle; margin-right:7px; }
@@ -29,32 +28,22 @@
           padding:{{ '0' if pdf else 'var(--s-lg)' }}}
     h2{font-size:22px;font-weight:600;color:var(--dark);letter-spacing:-.3px;margin:0 0 var(--s-md)}
     .cap{font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px}
-
-    /* Header */
     .report-header{position:relative;padding-bottom:var(--s-md);border-bottom:1px solid var(--border);margin-bottom:var(--s-lg)}
     .report-header h1{font-size:26px;font-weight:700;color:var(--dark);letter-spacing:-.5px;line-height:1.1;margin:0 0 12px}
     .report-header .event-dates{font-size:14px;color:var(--text-2)}
     .report-header .event-dates p{margin:4px 0}
     .report-header .code{color:var(--text-2);font-size:12px;letter-spacing:.5px;margin-top:10px}
     .confidential-top{position:absolute;top:0;right:0;font-size:12px;color:#C0392B;font-weight:700;text-transform:uppercase;letter-spacing:1px}
-
-    .warn{background:#fdf3e7;border:1px solid #f3d6a8;color:#8a5a12;padding:12px 16px;
-          border-radius:6px;font-size:13px;margin-bottom:var(--s-md)}
-
-    /* KPI hero */
-    .hero{background:var(--bg-light);padding:var(--s-lg) var(--s-md);text-align:center;
-          margin-bottom:var(--s-md);page-break-inside:avoid}
+    .warn{background:#fdf3e7;border:1px solid #f3d6a8;color:#8a5a12;padding:12px 16px;border-radius:6px;font-size:13px;margin-bottom:var(--s-md)}
+    .hero{background:var(--bg-light);padding:var(--s-lg) var(--s-md);text-align:center;margin-bottom:var(--s-md);page-break-inside:avoid}
     .hero__num{font-size:64px;font-weight:700;color:var(--accent);line-height:1;letter-spacing:-1px;margin-bottom:var(--s-xs)}
     .hero__lab{font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px}
     .hero__sub{font-size:14px;color:var(--text);margin-top:var(--s-sm)}
-    .hero__warn{display:inline-block;margin-top:var(--s-sm);font-size:12.5px;color:#8a5a12;
-                background:#fdf3e7;border:1px solid #f3d6a8;border-radius:6px;padding:6px 12px}
+    .hero__warn{display:inline-block;margin-top:var(--s-sm);font-size:12.5px;color:#8a5a12;background:#fdf3e7;border:1px solid #f3d6a8;border-radius:6px;padding:6px 12px}
     .kpis{display:flex;gap:var(--s-sm);margin-bottom:var(--s-lg)}
     .kpi{flex:1;background:var(--bg-light);padding:var(--s-sm);text-align:center}
     .kpi__n{font-size:28px;font-weight:700;color:var(--dark);line-height:1}
     .kpi__l{font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-top:6px}
-
-    /* Zoneverdeling */
     .section{margin-bottom:var(--s-lg)}
     .zones{background:var(--bg-light);padding:var(--s-md)}
     .zrow{display:flex;align-items:center;gap:var(--s-sm);margin:8px 0;font-size:13px}
@@ -62,30 +51,21 @@
     .bar{flex:1;background:#E8E8E8;border-radius:4px;height:16px;overflow:hidden}
     .bar > span{display:block;height:100%;background:var(--accent)}
     .zrow .val{width:66px;text-align:right;color:var(--text-2)}
-
-    /* Intake scores */
     .intake{display:flex;gap:var(--s-sm)}
     .intake .card{flex:1;background:var(--bg-light);padding:var(--s-md);text-align:center}
     .intake .card .num{font-size:36px;font-weight:700;color:var(--accent);line-height:1}
     .intake .card .num small{font-size:15px;font-weight:600;color:var(--text-2)}
     .intake .card .lab{font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-top:var(--s-xs)}
     .intake .card .hint{font-size:10.5px;color:#999;margin-top:6px;line-height:1.4}
-
-    /* Page-1 context boxes (operationeel) */
-    .ctxbox{background:var(--bg-light);border-left:4px solid var(--accent);padding:20px;
-            margin:0 0 var(--s-md);font-size:14px;line-height:1.6;color:var(--text);page-break-inside:avoid}
+    .ctxbox{background:var(--bg-light);border-left:4px solid var(--accent);padding:20px;margin:0 0 var(--s-md);font-size:14px;line-height:1.6;color:var(--text);page-break-inside:avoid}
     .ctxbox > p{margin:0 0 12px}
     .ctxbox > p:last-child{margin-bottom:0}
     .ctxbox ul,.ctxbox ol{margin:12px 0;padding-left:22px}
     .ctxbox li{margin:8px 0;line-height:1.6}
     .ctxbox strong{color:var(--dark)}
     .ctxbox .accent{color:var(--accent);font-weight:600}
-    .ctxbox .measurement-note{margin:16px 0 0;font-size:13px;color:var(--text-2);
-            padding-top:16px;border-top:1px solid var(--border);font-style:italic}
-
-    /* Executive summary (intro) */
-    .exsum{background:var(--bg-light);border-left:4px solid var(--accent);padding:24px;
-           margin:0 0 var(--s-md);page-break-inside:avoid}
+    .ctxbox .measurement-note{margin:16px 0 0;font-size:13px;color:var(--text-2);padding-top:16px;border-top:1px solid var(--border);font-style:italic}
+    .exsum{background:var(--bg-light);border-left:4px solid var(--accent);padding:24px;margin:0 0 var(--s-md);page-break-inside:avoid}
     .exsum h2{margin:0 0 12px;font-size:22px;color:var(--dark);letter-spacing:-.3px}
     .exsum h3{margin:20px 0 8px;font-size:15px;color:var(--dark);font-weight:600}
     .exsum p{margin:0 0 12px;font-size:14px;line-height:1.6;color:var(--text)}
@@ -93,8 +73,6 @@
     .sh-row{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0 4px}
     .sh{flex:1;min-width:150px;background:#fff;border-left:3px solid var(--accent);padding:12px 14px;font-size:13px;color:var(--text)}
     .sh strong{display:block;font-size:24px;color:var(--accent);margin-bottom:2px;line-height:1}
-
-    /* Deelnemers table */
     table{width:100%;border-collapse:collapse;font-size:13px}
     thead{background:var(--dark);color:#fff}
     th{padding:12px 13px;text-align:left;font-size:12px;font-weight:600;letter-spacing:.3px}
@@ -106,29 +84,20 @@
     .vlegend{margin:10px 0 0;font-size:11px;color:var(--text-2);display:flex;gap:16px;flex-wrap:wrap;align-items:center}
     .vlegend span{display:inline-flex;align-items:center;gap:5px}
     .vlegend i{width:12px;height:12px;border-radius:3px;display:inline-block}
-
-    /* Actions (screen only) */
     .btns{margin:var(--s-md) 0;display:flex;gap:12px}
     .btns a{padding:11px 18px;border-radius:6px;background:var(--accent);color:#fff;text-decoration:none;font-size:13px;font-weight:600}
     .btns a.sec{background:#fff;color:var(--text);border:1px solid var(--border)}
-
-    /* Methodology footer */
-    .method{background:var(--bg-light);border-left:4px solid var(--accent);
-            padding:var(--s-md) var(--s-lg);margin-top:var(--s-lg);font-size:14px;color:var(--text)}
+    .method{background:var(--bg-light);border-left:4px solid var(--accent);padding:var(--s-md) var(--s-lg);margin-top:var(--s-lg);font-size:14px;color:var(--text)}
     .method h4{margin:0 0 var(--s-sm);color:var(--dark);font-size:20px;font-weight:600;letter-spacing:-.3px}
     .method h5{margin:var(--s-md) 0 var(--s-xs);color:var(--dark);font-size:15px;font-weight:600}
     .method p{margin:var(--s-sm) 0;line-height:1.8}
-    .method .expertise-note{color:var(--text-2);font-style:italic;font-size:12.5px;
-            margin:0 0 var(--s-sm);padding-bottom:var(--s-sm);border-bottom:1px solid var(--border)}
+    .method .expertise-note{color:var(--text-2);font-style:italic;font-size:12.5px;margin:0 0 var(--s-sm);padding-bottom:var(--s-sm);border-bottom:1px solid var(--border)}
     .method ul{margin:var(--s-sm) 0;padding-left:20px}
     .method li{margin:6px 0;line-height:1.7}
     .method strong{color:var(--dark)}
     .callout{color:#8a5a12;background:#fdf3e7;border:1px solid #f3d6a8;border-radius:6px;padding:10px 14px;margin-top:var(--s-sm)}
-    .note-neutral{background:#f4f1ec;border:1px solid #e0d8cc;border-radius:6px;padding:10px 14px;margin-top:var(--s-sm);font-size:12.5px;color:var(--text-2)}
     .foot{margin-top:var(--s-md);color:#999;font-size:11px;line-height:1.6}
-    /* Screen-only branding footer (PDF gebruikt @page + .pagefoot) */
-    .branding{margin-top:var(--s-md);padding-top:var(--s-sm);border-top:1px solid var(--border);
-              display:flex;align-items:center;gap:12px;font-size:11px;color:var(--text-2)}
+    .branding{margin-top:var(--s-md);padding-top:var(--s-sm);border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:11px;color:var(--text-2)}
     .branding img{height:32px;width:32px}
     .branding .txt{flex:1}
     .branding .cf{font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px}
@@ -137,74 +106,67 @@
 <body>
   <div class="wrap">
     <div class="report-header">
-      <div class="confidential-top">Vertrouwelijk</div>
-      {% set _title = ev.naam or ev.opdrachtgever or 'meetdag' %}
-      <h1>Groepsrapport {{ _title }}{% if ev.opdrachtgever and ev.opdrachtgever != _title %} — {{ ev.opdrachtgever }}{% else %} — [Opdrachtgever]{% endif %}</h1>
+      <div class="confidential-top">{{ t.confidential }}</div>
+      {% set _title = ev.naam or ev.opdrachtgever or '—' %}
+      <h1>{{ t.title }} {{ _title }}{% if ev.opdrachtgever and ev.opdrachtgever != _title %} — {{ ev.opdrachtgever }}{% else %} — {{ t.opdr_ph }}{% endif %}</h1>
       {% if d.time_start %}
       <div class="event-dates">
-        <p>Begin event: {{ d.time_start }}</p>
-        <p>Einde event: {{ d.time_end }}</p>
+        <p>{{ t.ev_begin }} {{ d.time_start }}</p>
+        <p>{{ t.ev_end }} {{ d.time_end }}</p>
       </div>
       {% endif %}
       <div class="code">{{ ev.event_code }}</div>
     </div>
 
     {% if not d.enough %}
-    <div class="warn">Let op: {{ d.n }} deelnemer(s). Een geanonimiseerd groepsrapport is pas
-      betrouwbaar/deelbaar vanaf <strong>5 deelnemers</strong> (kleine-aantallen-privacy).</div>
+    <div class="warn">{{ t.warn_a }}{{ d.n }}{{ t.warn_b }}<strong>{{ t.warn_bold }}</strong>{{ t.warn_c }}</div>
     {% endif %}
 
     <div class="exsum">
-      <h2>Samenvatting</h2>
-      <p>Dit rapport laat een momentopname zien van de belastbaarheid en het herstelvermogen van de
-        medewerkers die hebben deelgenomen aan dit onderzoek. Dit is gemeten met behulp van de
-        autonome zenuwstelselstatus (AZS).</p>
+      <h2>{{ t.sum_h }}</h2>
+      <p>{{ t.sum_intro }}</p>
       <div class="sh-row">
-        <div class="sh"><strong>{{ d.n }}</strong>deelnemers gescreend</div>
-        <div class="sh"><strong>{{ d.avg_ri }}/10</strong>gemiddelde Relax Index</div>
-        <div class="sh"><strong>{{ d.pct_in_balance }}%</strong>in balans of veerkrachtig</div>
+        <div class="sh"><strong>{{ d.n }}</strong>{{ t.sh_screened }}</div>
+        <div class="sh"><strong>{{ d.avg_ri }}/10</strong>{{ t.sh_avg_ri }}</div>
+        <div class="sh"><strong>{{ d.pct_in_balance }}%</strong>{{ t.sh_in_balance }}</div>
       </div>
-      <h3>Betekenis</h3>
+      <h3>{{ t.sum_meaning }}</h3>
       {% if d.reliable_n %}
-      <p>Een gemiddelde Relax Index van <strong>{{ d.avg_ri }}</strong> suggereert dat uw team
-        <strong>{{ d.summary_interpretation }}</strong>. Dit is een momentopname op groepsniveau,
-        geen individuele of medische beoordeling.</p>
+      <p>{{ t.sum_interp_pre }}<strong>{{ d.avg_ri }}</strong>{{ t.sum_interp_mid }}<strong>{{ t['interp_' + d.summary_interp_key] }}</strong>{{ t.sum_interp_post }}</p>
       {% else %}
-      <p>Er zijn nog onvoldoende betrouwbare metingen om een groepsbeeld te geven.</p>
+      <p>{{ t.sum_insufficient }}</p>
       {% endif %}
-      <h3>Volgende stap</h3>
-      <p>Raadpleeg uw HR-vertegenwoordiger, bedrijfsarts en/of een adviesbureau voor duurzame
-        inzetbaarheid van medewerkers voor verdere begeleiding en aanbevelingen op basis van deze bevindingen.</p>
+      <h3>{{ t.sum_next_h }}</h3>
+      <p>{{ t.sum_next }}</p>
     </div>
 
     <div class="hero">
       <div class="hero__num">{{ d.avg_ri }}</div>
-      <div class="hero__lab">Gemiddelde Relax Index (0–10)</div>
-      <div class="hero__sub">Verschil AZS-bewustzijn: <strong>{{ d.avg_verschil }}</strong> &middot;
-        {% if d.avg_verschil_num is none %}—{% elif d.avg_verschil_num <= 1.0 %}goede aansluiting{% elif d.avg_verschil_num <= 1.5 %}matige aansluiting{% else %}groter verschil{% endif %}</div>
+      <div class="hero__lab">{{ t.hero_lab }}</div>
+      <div class="hero__sub">{{ t.hero_diff }}<strong>{{ d.avg_verschil }}</strong> &middot;
+        {% if d.avg_verschil_num is none %}—{% elif d.avg_verschil_num <= 1.0 %}{{ t.diff_good }}{% elif d.avg_verschil_num <= 1.5 %}{{ t.diff_mod }}{% else %}{{ t.diff_large }}{% endif %}</div>
       {% if d.avg_ri != '—' and d.avg_ri|float < 6.0 %}
-      <div class="hero__warn">Gemiddelde onder de In-balans-grens (RI 6,0) — aandacht waard.</div>
+      <div class="hero__warn">{{ t.hero_warn }}</div>
       {% endif %}
     </div>
     <div class="kpis">
-      <div class="kpi"><div class="kpi__n">{{ d.n }}</div><div class="kpi__l">Deelnemers</div></div>
-      <div class="kpi"><div class="kpi__n">{{ d.unreliable_pct }}%</div><div class="kpi__l">Onbetrouwbaar</div></div>
+      <div class="kpi"><div class="kpi__n">{{ d.n }}</div><div class="kpi__l">{{ t.kpi_part }}</div></div>
+      <div class="kpi"><div class="kpi__n">{{ d.unreliable_pct }}%</div><div class="kpi__l">{{ t.kpi_unrel }}</div></div>
     </div>
 
     <div class="section">
-      <h2>Zoneverdeling</h2>
+      <h2>{{ t.zone_h }}</h2>
       <div class="ctxbox zone-context">
-        <p>Er zijn <strong>{{ d.n }}</strong> deelnemer(s) gemeten. De meetuitslagen worden als volgt gekwalificeerd:</p>
+        <p>{{ t.zctx_pre }}<strong>{{ d.n }}</strong>{{ t.zctx_post }}</p>
         <ul>
-          <li><strong>Veerkrachtig (8–10):</strong> optimale AZS-balans, goed hersteld</li>
-          <li><strong>In balans (6–8):</strong> normale, gezonde stress-respons</li>
-          <li><strong>Licht belast (4–6):</strong> het systeem staat licht onder druk</li>
-          <li><strong>Belast (2–4):</strong> verhoogde belasting van het AZS</li>
-          <li><strong>Zwaar belast (0–2):</strong> sterk belaste AZS-balans</li>
+          <li>{{ t.zdef_veer|safe }}</li>
+          <li>{{ t.zdef_bal|safe }}</li>
+          <li>{{ t.zdef_licht|safe }}</li>
+          <li>{{ t.zdef_bel|safe }}</li>
+          <li>{{ t.zdef_zwaar|safe }}</li>
         </ul>
         {% if d.unreliable_pct > 0 %}
-        <p class="measurement-note"><strong>Noot:</strong> bij <strong>{{ d.unreliable_pct }}%</strong> van de
-          deelnemers kon geen betrouwbaar meetresultaat worden vastgesteld (technische oorzaken of onvoldoende signaal).</p>
+        <p class="measurement-note">{{ t.zctx_note.format(pct=d.unreliable_pct)|safe }}</p>
         {% endif %}
       </div>
       <div class="zones">
@@ -214,7 +176,7 @@
           <div class="val">{{ z.n }} &middot; {{ z.pct }}%</div></div>
         {% endfor %}
         {% if d.unreliable_n %}
-        <div class="zrow"><div class="lab un">Onbetrouwbaar</div>
+        <div class="zrow"><div class="lab un">{{ t.kpi_unrel }}</div>
           <div class="bar"><span style="width:{{ d.unreliable_pct }}%;background:#c98b3a"></span></div>
           <div class="val">{{ d.unreliable_n }} &middot; {{ d.unreliable_pct }}%</div></div>
         {% endif %}
@@ -223,36 +185,34 @@
 
     {% if not pdf %}
     <div class="btns">
-      <a href="/vb/rapport?event_code={{ ev.event_code }}&amp;pdf=1">Download PDF</a>
-      <a class="sec" href="/vb/dashboard">Terug</a>
+      <a href="/vb/rapport?event_code={{ ev.event_code }}&amp;pdf=1">{{ t.btn_pdf }}</a>
+      <a class="sec" href="/vb/dashboard">{{ t.btn_back }}</a>
     </div>
     {% endif %}
 
     <div class="section">
-      <h2>Gemiddelde intake-scores</h2>
+      <h2>{{ t.intake_h }}</h2>
       <div class="ctxbox intake-context">
-        <p>Voorafgaand aan de fysieke meting werden twee vragen gesteld:</p>
+        <p>{{ t.ictx_1 }}</p>
         <ol>
-          <li>"Hoe ontspannen voel je je op dit moment?" (schaal 0–10)</li>
-          <li>"In welke mate heb je last van werkstress?" (schaal 0–10)</li>
+          <li>{{ t.ictx_q1 }}</li>
+          <li>{{ t.ictx_q2 }}</li>
         </ol>
-        <p>Het verschil tussen deze antwoorden en de gemeten AZS-status wordt weergegeven door:
-          <span class="accent">Verschil AZS-bewustzijn = {{ d.avg_verschil }}</span>.</p>
-        <p>Dit getal geeft aan in welke mate deelnemers hun werkelijke AZS-gesteldheid aanvoelen. Een klein
-          verschil (bijv. 1,0) betekent dat deelnemers hun spanning goed kunnen aanvoelen.</p>
+        <p>{{ t.ictx_diff_pre }}<span class="accent">{{ t.ictx_diff_lab }}{{ d.avg_verschil }}</span>.</p>
+        <p>{{ t.ictx_explain }}</p>
       </div>
       <div class="intake">
-        <div class="card"><div class="num">{{ d.avg_ontspanning }} <small>/ 10</small></div><div class="lab">Ontspanning</div></div>
-        <div class="card"><div class="num">{{ d.avg_werkstress }} <small>/ 10</small></div><div class="lab">Werkstress</div></div>
-        <div class="card"><div class="num">{{ d.avg_verschil }}</div><div class="lab">AZS-bewustzijn</div>
-          <div class="hint">hoe goed deelnemers hun AZS-toestand aanvoelen (kleiner = beter)</div></div>
+        <div class="card"><div class="num">{{ d.avg_ontspanning }} <small>/ 10</small></div><div class="lab">{{ t.ic_ont }}</div></div>
+        <div class="card"><div class="num">{{ d.avg_werkstress }} <small>/ 10</small></div><div class="lab">{{ t.ic_ws }}</div></div>
+        <div class="card"><div class="num">{{ d.avg_verschil }}</div><div class="lab">{{ t.ic_diff }}</div>
+          <div class="hint">{{ t.ic_hint }}</div></div>
       </div>
     </div>
 
     <div class="section">
-      <h2>Deelnemers</h2>
+      <h2>{{ t.deeln_h }}</h2>
       <table>
-        <thead><tr><th>Deelnemer-code</th><th>Ontspanning<br>(0-10)</th><th>Werkstress<br>(0-10)</th><th>Relax Index</th><th>Verschil<br>AZS-bewustzijn</th><th>Zone</th></tr></thead>
+        <thead><tr><th>{{ t.th_code }}</th><th>{{ t.th_ont|safe }}</th><th>{{ t.th_ws|safe }}</th><th>{{ t.th_ri }}</th><th>{{ t.th_diff|safe }}</th><th>{{ t.th_zone }}</th></tr></thead>
         <tbody>
           {% for p in d.parts %}
           <tr>
@@ -262,128 +222,91 @@
             {% if p.reliable %}<td>{{ p.ri }}</td>
             <td class="vcell"{% if p.verschil_color %} style="background:{{ p.verschil_color }}"{% endif %}>{{ p.verschil }}</td>
             <td>{{ p.zone }}</td>
-            {% else %}<td class="un" colspan="3">Onbetrouwbaar (te lage kwaliteit)</td>{% endif %}
+            {% else %}<td class="un" colspan="3">{{ t.tbl_unrel }}</td>{% endif %}
           </tr>
           {% else %}
-          <tr><td colspan="6" style="text-align:center;color:#999;padding:18px;">Nog geen metingen.</td></tr>
+          <tr><td colspan="6" style="text-align:center;color:#999;padding:18px;">{{ t.tbl_empty }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
-      <div class="vlegend">Verschil AZS-bewustzijn |RI − ontspanning|:
-        <span><i style="background:#d4edda"></i>≤ 1,0 goed</span>
-        <span><i style="background:#fff3cd"></i>1,0–1,5 matig</span>
-        <span><i style="background:#f8d7da"></i>&gt; 1,5 gering</span></div>
+      <div class="vlegend">{{ t.vleg_pre }}
+        <span><i style="background:#d4edda"></i>{{ t.vleg_good }}</span>
+        <span><i style="background:#fff3cd"></i>{{ t.vleg_mod }}</span>
+        <span><i style="background:#f8d7da"></i>{{ t.vleg_low|safe }}</span></div>
     </div>
 
     <div class="method">
-      <p class="expertise-note">Deze analyse is gebaseerd op 14 jaar expertise in HRV-meting en
-        gevalideerde AZS-methodologie van Lifestyle Monitors.</p>
-      <h4>Over de Relax Index (RI) meetmethode en het autonome zenuwstelsel</h4>
+      <p class="expertise-note">{{ t.m_expertise }}</p>
+      <h4>{{ t.m_h4 }}</h4>
 
-      <h5>Wat is de Relax Index?</h5>
-      <p>De <strong>Relax Index (RI)</strong> is een objectieve maat voor de toestand van het
-        <strong>autonome zenuwstelsel (AZS)</strong> — het systeem dat automatisch hart, ademhaling,
-        spijsvertering en stressrespons reguleert. De RI wordt berekend uit twee fysiologische signalen:</p>
+      <h5>{{ t.m_h5_what }}</h5>
+      <p>{{ t.m_what|safe }}</p>
       <ul>
-        <li><strong>Hartslagvariabiliteit (HRV)</strong>: de variatie in tijd tussen hartslagen. Een
-          hogere HRV wijst op een flexibel AZS dat goed kan schakelen tussen inspanning en herstel.</li>
-        <li><strong>Hartslag (BPM)</strong>: het aantal slagen per minuut. Een lagere rusthartslag hangt
-          samen met een efficiënte hartfunctie en een AZS dat goed kan ontspannen.</li>
+        <li>{{ t.m_hrv|safe }}</li>
+        <li>{{ t.m_bpm|safe }}</li>
       </ul>
-      <p>De RI-schaal loopt van <strong>0 tot 10</strong> en is verdeeld in vijf zones (Zwaar belast,
-        Belast, Licht belast, In balans en Veerkrachtig). De indeling en betekenis per zone staan bij de
-        <strong>Zoneverdeling</strong> eerder in dit rapport.</p>
+      <p>{{ t.m_scale|safe }}</p>
 
-      <h5>Waarom is AZS-gezondheid belangrijk?</h5>
-      <p>Een gezond AZS is belangrijk voor duurzame inzetbaarheid. Wanneer mensen langdurig onder druk
-        staan zonder voldoende herstel, kan het AZS uit balans raken. Dat kan samengaan met:</p>
+      <h5>{{ t.m_h5_why }}</h5>
+      <p>{{ t.m_why }}</p>
       <ul>
-        <li>verminderde concentratie en besluitvorming;</li>
-        <li>een hoger risico op vermoeidheid, verzuim en burn-out;</li>
-        <li>minder creativiteit en probleemoplossend vermogen;</li>
-        <li>op termijn een lagere werkkwaliteit.</li>
+        <li>{{ t.m_why_1 }}</li>
+        <li>{{ t.m_why_2 }}</li>
+        <li>{{ t.m_why_3 }}</li>
+        <li>{{ t.m_why_4 }}</li>
       </ul>
-      <p>Voldoende <strong>herstelmomenten</strong> — regelmatige pauzes, beweging, ontspanning en slaap —
-        dragen bij aan een beter functionerend AZS en daarmee aan <strong>duurzamer presteren</strong>.</p>
+      <p>{{ t.m_why_rec|safe }}</p>
 
-      <h5>Actiepunten voor uw organisatie</h5>
-      <p>Dit rapport toont twee groepsindicatoren die aandacht verdienen:</p>
+      <h5>{{ t.m_h5_act }}</h5>
+      <p>{{ t.m_act }}</p>
       <ul>
-        <li><strong>Gemiddelde Relax Index ({{ d.avg_ri }})</strong><br>
-          Drempelwaarde aandacht: RI &lt; 6,0</li>
-        <li><strong>Gemiddeld AZS-bewustzijn (verschil: {{ d.avg_verschil }})</strong><br>
-          Drempelwaarde aandacht: verschil &gt; 1,5</li>
+        <li><strong>{{ t.m_act_ri_pre }}{{ d.avg_ri }})</strong><br>{{ t.m_act_ri_thr|safe }}</li>
+        <li><strong>{{ t.m_act_diff_pre }}{{ d.avg_verschil }})</strong><br>{{ t.m_act_diff_thr|safe }}</li>
       </ul>
-      <p class="callout"><strong>Belangrijk:</strong> een lage Relax Index kan veel oorzaken hebben — werkstress is
-        er slechts één van. Andere mogelijke oorzaken zijn vermoeidheid, ziekte, chronische pijn,
-        slaapgebrek of gebrek aan zingeving. Dit rapport adresseert uitsluitend het werkgebied.
-        Voor diagnose of behandeling van niet-werkgerelateerde factoren: verwijs naar een
-        bedrijfsarts of huisarts.</p>
+      <p class="callout">{{ t.m_important|safe }}</p>
 
-      <h5>Werkgerichte aanbevelingen voor duurzame prestatie</h5>
-      <p>Om de AZS-gezondheid van uw team op het werkgebied te ondersteunen, worden onderstaande
-        maatregelen aanbevolen:</p>
+      <h5>{{ t.m_h5_rec }}</h5>
+      <p>{{ t.m_rec }}</p>
       <ul>
-        <li><strong>Werklast en deadlines reviewen:</strong> zorg dat de werkbelasting haalbaar is
-          en in balans met herstelmogelijkheden.</li>
-        <li><strong>Pauzes en ontspanningsmomenten inbouwen:</strong> regelmatige pauzes, beweging
-          en mentale rust tijdens de werkdag helpen het AZS te herstellen.</li>
-        <li><strong>Herstelcultuur creëren:</strong> zorg dat "even niet werken" even waardevol is
-          als presteren, en moedig medewerkers aan pauzes daadwerkelijk te nemen.</li>
-        <li><strong>Stress-awareness-training:</strong> voor groepen met een hoog verschil
-          AZS-bewustzijn kan training in lichaamsbewustzijn en stressherkenning medewerkers helpen
-          hun eigen signalen beter op te merken.</li>
-        <li><strong>Individuele begeleiding:</strong> voor medewerkers met een zeer lage RI of een
-          groot verschil kan coaching of begeleiding (via HR of de bedrijfsarts) waardevol zijn.</li>
+        <li>{{ t.m_rec_1|safe }}</li>
+        <li>{{ t.m_rec_2|safe }}</li>
+        <li>{{ t.m_rec_3|safe }}</li>
+        <li>{{ t.m_rec_4|safe }}</li>
+        <li>{{ t.m_rec_5|safe }}</li>
       </ul>
-      <p>Een team met goed herstelde medewerkers is op de lange termijn productiever, creatiever en
-        stabieler. Dit zijn geen extra kosten, maar investeringen in duurzame inzetbaarheid.</p>
+      <p>{{ t.m_rec_close }}</p>
 
-      <h5>Verschil AZS-bewustzijn — wat betekent het?</h5>
-      <p>Het <strong>Verschil AZS-bewustzijn</strong> toont de kloof tussen wat het lichaam werkelijk doet
-        (de gemeten AZS-status via de Relax Index) en wat de deelnemer aangeeft te voelen (het antwoord op
-        "Hoe ontspannen voel je je?").</p>
-      <p>Dit verschil kan potentieel wijzen op verschillen in <strong>interoceptief bewustzijn</strong> —
-        het vermogen om interne lichaamssignalen waar te nemen.</p>
-      <p><strong>Interpretatie van het verschil:</strong></p>
+      <h5>{{ t.m_h5_diff }}</h5>
+      <p>{{ t.m_diff1|safe }}</p>
+      <p>{{ t.m_diff2|safe }}</p>
+      <p>{{ t.m_diff_ih|safe }}</p>
       <ul>
-        <li><strong>Verschil 0–1,0 (groen):</strong> goede aansluiting — deelnemers voelen hun lichaam goed
-          aan en kunnen zelf signaleren wanneer herstel nodig is.</li>
-        <li><strong>Verschil 1,0–1,5 (geel):</strong> matige aansluiting — enige mismatch tussen voeling en
-          werkelijke toestand.</li>
-        <li><strong>Verschil &gt; 1,5 (rood):</strong> groot verschil — deelnemers voelen hun AZS-toestand
-          onvoldoende aan, wat de vroege signalering van problemen kan bemoeilijken.</li>
+        <li>{{ t.m_diff_green|safe }}</li>
+        <li>{{ t.m_diff_yellow|safe }}</li>
+        <li>{{ t.m_diff_red|safe }}</li>
       </ul>
-      <p><strong>Voorzichtigheid:</strong> het is nog niet volledig duidelijk wat een groot verschil precies
-        betekent of hoe het zich vertaalt naar werkgedrag of gezondheid. Dit is een onderzoeksgebied in
-        opkomst. Mogelijke verklaringen kunnen zijn:</p>
+      <p>{{ t.m_caution|safe }}</p>
       <ul>
-        <li>beperkt zelfbewustzijn van lichaamssignalen (interoceptie);</li>
-        <li>psychologische factoren (ontkenning of normalisering van stress);</li>
-        <li>individuele verschillen in hoe mensen hun voeling rapporteren;</li>
-        <li>methodologische factoren (vraagformulering, meetmoment).</li>
+        <li>{{ t.m_caution_1 }}</li>
+        <li>{{ t.m_caution_2 }}</li>
+        <li>{{ t.m_caution_3 }}</li>
+        <li>{{ t.m_caution_4 }}</li>
       </ul>
-      <p><strong>Aanbeveling:</strong> een groot verschil kan een aanleiding zijn voor individuele coaching
-        of training in lichaamsbewustzijn en stressherkenning. Dit vraagt echter om verder onderzoek en moet
-        altijd in context worden geplaatst met andere factoren (werkbelasting, gezondheid, slaap).</p>
-      <p><em>Dit onderzoeksgebied — interoceptie en werkgezondheid — is nog in ontwikkeling; Lifestyle
-        Monitors werkt aan verdere validatie van deze metingen.</em></p>
+      <p>{{ t.m_diff_rec|safe }}</p>
+      <p>{{ t.m_research|safe }}</p>
 
-      <p class="callout">Een belast systeem kan wijzen op aanhoudende stress, vermoeidheid, ziekte, pijn,
-        slaapgebrek of gebrek aan zingeving — de meting zegt niet welke. De RI is een momentopname en
-        geen medische diagnose.</p>
+      <p class="callout">{{ t.m_nodiag }}</p>
     </div>
 
-    <div class="foot">Gegenereerd op basis van momentopnames; Relax Index 0-10, zone-indeling
-      volgens de StressChecker-norm. Onbetrouwbare metingen tellen niet mee in het gemiddelde of de zoneverdeling.</div>
+    <div class="foot">{{ t.foot }}</div>
 
     {% if pdf %}
-    <div class="pagefoot"><img src="static/img/Logo_Kompas_Mini_512.png" alt="Lifestyle Monitors">Dit rapport is gegenereerd met StressChecker Pro Event van Lifestyle Monitors &middot; <span class="cf">Vertrouwelijk</span>{% if generated %} &middot; {{ generated }}{% endif %}</div>
+    <div class="pagefoot"><img src="static/img/Logo_Kompas_Mini_512.png" alt="Lifestyle Monitors">{{ t.brand }} &middot; <span class="cf">{{ t.confidential }}</span>{% if generated %} &middot; {{ generated }}{% endif %}</div>
     {% else %}
     <footer class="branding">
       <img src="/static/img/Logo_Kompas_Mini_512.png" alt="Lifestyle Monitors">
-      <div class="txt">Dit rapport is gegenereerd met StressChecker Pro Event van Lifestyle Monitors<br>
-        <span class="cf">Vertrouwelijk</span>{% if generated %} &middot; {{ generated }}{% endif %}</div>
+      <div class="txt">{{ t.brand }}<br>
+        <span class="cf">{{ t.confidential }}</span>{% if generated %} &middot; {{ generated }}{% endif %}</div>
     </footer>
     {% endif %}
   </div>

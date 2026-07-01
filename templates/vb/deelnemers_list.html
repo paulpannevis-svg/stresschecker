@@ -71,7 +71,7 @@
         <td><span class="dl-code">{{ p.tracking_code or '—' }}</span></td>
         {% if p.reliable %}
         <td class="dl-ri">{{ p.ri }}</td>
-        <td><span class="zbadge zone-{{ p.zone|lower|replace(' ', '-') }}">{{ p.zone }}</span></td>
+        <td><span class="zbadge zone-{{ (p.zone_key or '')|replace('_', '-') }}">{{ p.zone }}</span></td>
         {% else %}
         <td class="dl-un" colspan="2">{{ t.unreliable }}</td>
         {% endif %}

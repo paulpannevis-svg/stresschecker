@@ -9217,7 +9217,7 @@ def _vb_fmt_ts(ts):
         return ''
 
 
-def _vb_group_data(edb, event_id):
+def _vb_group_data(edb, event_id, lang='nl'):
     """Aggregeer een meetdag voor het groepsrapport. Per deelnemer de MEEST RECENTE
     GESLAAGDE meting (kwaliteit>=85 EN band!='slecht'; anders laatste) — zelfde
     reliable-wins-selectie als event_report.render_report. Zones via canonieke
@@ -9268,7 +9268,7 @@ def _vb_group_data(edb, event_id):
         parts.append({'name': r['name'] or '—', 'meting_code': r['meting_code'],
                       'tracking_code': (r['tracking_code'] if 'tracking_code' in r.keys() else None),
                       'ri': (f"{float(r['ri']):.1f}" if reliable else None),
-                      'zone': analytics.zone_label(zk, 'nl') if zk else None,
+                      'zone': analytics.zone_label(zk, lang) if zk else None, 'zone_key': zk,
                       'ontspanning': (_ont if _ont is not None else '—'),
                       'werkstress': (_ws if _ws is not None else '—'),
                       'verschil': (f"{_versch:.1f}" if _versch is not None else '—'),
@@ -9279,7 +9279,7 @@ def _vb_group_data(edb, event_id):
     # zwaar_belast→veerkrachtig) zodat groepsrapport en kwadrant consistent zijn.
     _zone_hex = {'zwaar_belast': '#c0392b', 'belast': '#e67e22', 'licht_belast': '#f1c40f',
                  'in_balans': '#82d228', 'veerkrachtig': '#157347'}
-    zdist = [{'label': analytics.zone_label(k, 'nl'), 'n': zone_counts[k],
+    zdist = [{'label': analytics.zone_label(k, lang), 'n': zone_counts[k],
               'pct': round(100 * zone_counts[k] / n) if n else 0,
               'color': _zone_hex.get(k, '#E84C5C')}
              for k in analytics.ZONE_KEYS]
@@ -9296,19 +9296,20 @@ def _vb_group_data(edb, event_id):
     _avg_ri_num = (ri_sum / ri_n) if ri_n else None
     _in_balance = zone_counts['in_balans'] + zone_counts['veerkrachtig']
     pct_in_balance = (round(100 * _in_balance / ri_n) if ri_n else None)
+    # Taal-onafhankelijke sleutel; de tekst zit in _GRP_STR[lang]['interp_<key>'].
     if _avg_ri_num is None:
-        _interp = 'onvoldoende meetgegevens'
+        _interp = 'none'
     elif _avg_ri_num >= 8.0:
-        _interp = 'goed hersteld is en optimaal functioneert'
+        _interp = 'optimal'
     elif _avg_ri_num >= 6.0:
-        _interp = 'een gezonde stress-respons vertoont'
+        _interp = 'healthy'
     elif _avg_ri_num >= 4.0:
-        _interp = 'licht onder druk staat'
+        _interp = 'light'
     else:
-        _interp = 'verhoogde belasting signaleert'
+        _interp = 'strained'
     return {'parts': parts, 'n': n, 'reliable_n': ri_n, 'unreliable_n': unreliable,
             'pct_in_balance': (pct_in_balance if pct_in_balance is not None else '—'),
-            'summary_interpretation': _interp,
+            'summary_interp_key': _interp,
             'unreliable_pct': round(100 * unreliable / n) if n else 0,
             'avg_ri': (f"{ri_sum / ri_n:.1f}" if ri_n else '—'),
             'avg_ontspanning': (f"{ont_sum / ont_n:.1f}" if ont_n else '—'),
@@ -9317,6 +9318,249 @@ def _vb_group_data(edb, event_id):
             'avg_verschil_num': (versch_sum / versch_n if versch_n else None),
             'zdist': zdist, 'time_range': tr, 'time_start': time_start, 'time_end': time_end,
             'enough': n >= 5}
+
+
+# ── Groepsrapport-vertalingen (NL/DE/EN). NL houdt "AZS"; DE/EN gebruiken "ANS".
+# Zone-labels komen los via analytics.zone_label(k, lang) (Vital/Stark belastet in DE). #}
+_GRP_STR = {
+'nl': {
+  'html_title': 'Groepsrapport', 'confidential': 'Vertrouwelijk', 'confidential_u': 'VERTROUWELIJK',
+  'title': 'Groepsrapport', 'opdr_ph': '[Opdrachtgever]', 'ev_begin': 'Begin event:', 'ev_end': 'Einde event:',
+  'page': 'Pagina', 'of': 'van',
+  'warn_a': 'Let op: ', 'warn_b': ' deelnemer(s). Een geanonimiseerd groepsrapport is pas betrouwbaar/deelbaar vanaf ',
+  'warn_bold': '5 deelnemers', 'warn_c': ' (kleine-aantallen-privacy).',
+  'sum_h': 'Samenvatting',
+  'sum_intro': 'Dit rapport laat een momentopname zien van de belastbaarheid en het herstelvermogen van de medewerkers die hebben deelgenomen aan dit onderzoek. Dit is gemeten met behulp van de autonome zenuwstelselstatus (AZS).',
+  'sh_screened': 'deelnemers gescreend', 'sh_avg_ri': 'gemiddelde Relax Index', 'sh_in_balance': 'in balans of veerkrachtig',
+  'sum_meaning': 'Betekenis', 'sum_interp_pre': 'Een gemiddelde Relax Index van ', 'sum_interp_mid': ' suggereert dat uw team ',
+  'sum_interp_post': '. Dit is een momentopname op groepsniveau, geen individuele of medische beoordeling.',
+  'interp_optimal': 'goed hersteld is en optimaal functioneert', 'interp_healthy': 'een gezonde stress-respons vertoont',
+  'interp_light': 'licht onder druk staat', 'interp_strained': 'verhoogde belasting signaleert',
+  'sum_insufficient': 'Er zijn nog onvoldoende betrouwbare metingen om een groepsbeeld te geven.',
+  'sum_next_h': 'Volgende stap',
+  'sum_next': 'Raadpleeg uw HR-vertegenwoordiger, bedrijfsarts en/of een adviesbureau voor duurzame inzetbaarheid van medewerkers voor verdere begeleiding en aanbevelingen op basis van deze bevindingen.',
+  'hero_lab': 'Gemiddelde Relax Index (0–10)', 'hero_diff': 'Verschil AZS-bewustzijn: ',
+  'diff_good': 'goede aansluiting', 'diff_mod': 'matige aansluiting', 'diff_large': 'groter verschil',
+  'hero_warn': 'Gemiddelde onder de In-balans-grens (RI 6,0) — aandacht waard.',
+  'kpi_part': 'Deelnemers', 'kpi_unrel': 'Onbetrouwbaar',
+  'zone_h': 'Zoneverdeling', 'zctx_pre': 'Er zijn ', 'zctx_post': ' deelnemer(s) gemeten. De meetuitslagen worden als volgt gekwalificeerd:',
+  'zdef_veer': '<strong>Veerkrachtig (8–10):</strong> optimale AZS-balans, goed hersteld',
+  'zdef_bal': '<strong>In balans (6–8):</strong> normale, gezonde stress-respons',
+  'zdef_licht': '<strong>Licht belast (4–6):</strong> het systeem staat licht onder druk',
+  'zdef_bel': '<strong>Belast (2–4):</strong> verhoogde belasting van het AZS',
+  'zdef_zwaar': '<strong>Zwaar belast (0–2):</strong> sterk belaste AZS-balans',
+  'zctx_note': '<strong>Noot:</strong> bij <strong>{pct}%</strong> van de deelnemers kon geen betrouwbaar meetresultaat worden vastgesteld (technische oorzaken of onvoldoende signaal).',
+  'btn_pdf': 'Download PDF', 'btn_back': 'Terug',
+  'intake_h': 'Gemiddelde intake-scores',
+  'ictx_1': 'Voorafgaand aan de fysieke meting werden twee vragen gesteld:',
+  'ictx_q1': '"Hoe ontspannen voel je je op dit moment?" (schaal 0–10)', 'ictx_q2': '"In welke mate heb je last van werkstress?" (schaal 0–10)',
+  'ictx_diff_pre': 'Het verschil tussen deze antwoorden en de gemeten AZS-status wordt weergegeven door: ',
+  'ictx_diff_lab': 'Verschil AZS-bewustzijn = ',
+  'ictx_explain': 'Dit getal geeft aan in welke mate deelnemers hun werkelijke AZS-gesteldheid aanvoelen. Een klein verschil (bijv. 1,0) betekent dat deelnemers hun spanning goed kunnen aanvoelen.',
+  'ic_ont': 'Ontspanning', 'ic_ws': 'Werkstress', 'ic_diff': 'AZS-bewustzijn',
+  'ic_hint': 'hoe goed deelnemers hun AZS-toestand aanvoelen (kleiner = beter)',
+  'deeln_h': 'Deelnemers', 'th_code': 'Deelnemer-code', 'th_ont': 'Ontspanning<br>(0-10)', 'th_ws': 'Werkstress<br>(0-10)',
+  'th_ri': 'Relax Index', 'th_diff': 'Verschil<br>AZS-bewustzijn', 'th_zone': 'Zone',
+  'tbl_unrel': 'Onbetrouwbaar (te lage kwaliteit)', 'tbl_empty': 'Nog geen metingen.',
+  'vleg_pre': 'Verschil AZS-bewustzijn |RI − ontspanning|:', 'vleg_good': '≤ 1,0 goed', 'vleg_mod': '1,0–1,5 matig', 'vleg_low': '&gt; 1,5 gering',
+  'm_expertise': 'Deze analyse is gebaseerd op 14 jaar expertise in HRV-meting en gevalideerde AZS-methodologie van Lifestyle Monitors.',
+  'm_h4': 'Over de Relax Index (RI) meetmethode en het autonome zenuwstelsel', 'm_h5_what': 'Wat is de Relax Index?',
+  'm_what': 'De <strong>Relax Index (RI)</strong> is een objectieve maat voor de toestand van het <strong>autonome zenuwstelsel (AZS)</strong> — het systeem dat automatisch hart, ademhaling, spijsvertering en stressrespons reguleert. De RI wordt berekend uit twee fysiologische signalen:',
+  'm_hrv': '<strong>Hartslagvariabiliteit (HRV)</strong>: de variatie in tijd tussen hartslagen. Een hogere HRV wijst op een flexibel AZS dat goed kan schakelen tussen inspanning en herstel.',
+  'm_bpm': '<strong>Hartslag (BPM)</strong>: het aantal slagen per minuut. Een lagere rusthartslag hangt samen met een efficiënte hartfunctie en een AZS dat goed kan ontspannen.',
+  'm_scale': 'De RI-schaal loopt van <strong>0 tot 10</strong> en is verdeeld in vijf zones (Zwaar belast, Belast, Licht belast, In balans en Veerkrachtig). De indeling en betekenis per zone staan bij de <strong>Zoneverdeling</strong> eerder in dit rapport.',
+  'm_h5_why': 'Waarom is AZS-gezondheid belangrijk?',
+  'm_why': 'Een gezond AZS is belangrijk voor duurzame inzetbaarheid. Wanneer mensen langdurig onder druk staan zonder voldoende herstel, kan het AZS uit balans raken. Dat kan samengaan met:',
+  'm_why_1': 'verminderde concentratie en besluitvorming;', 'm_why_2': 'een hoger risico op vermoeidheid, verzuim en burn-out;',
+  'm_why_3': 'minder creativiteit en probleemoplossend vermogen;', 'm_why_4': 'op termijn een lagere werkkwaliteit.',
+  'm_why_rec': 'Voldoende <strong>herstelmomenten</strong> — regelmatige pauzes, beweging, ontspanning en slaap — dragen bij aan een beter functionerend AZS en daarmee aan <strong>duurzamer presteren</strong>.',
+  'm_h5_act': 'Actiepunten voor uw organisatie', 'm_act': 'Dit rapport toont twee groepsindicatoren die aandacht verdienen:',
+  'm_act_ri_pre': 'Gemiddelde Relax Index (', 'm_act_ri_thr': 'Drempelwaarde aandacht: RI &lt; 6,0',
+  'm_act_diff_pre': 'Gemiddeld AZS-bewustzijn (verschil: ', 'm_act_diff_thr': 'Drempelwaarde aandacht: verschil &gt; 1,5',
+  'm_important': '<strong>Belangrijk:</strong> een lage Relax Index kan veel oorzaken hebben — werkstress is er slechts één van. Andere mogelijke oorzaken zijn vermoeidheid, ziekte, chronische pijn, slaapgebrek of gebrek aan zingeving. Dit rapport adresseert uitsluitend het werkgebied. Voor diagnose of behandeling van niet-werkgerelateerde factoren: verwijs naar een bedrijfsarts of huisarts.',
+  'm_h5_rec': 'Werkgerichte aanbevelingen voor duurzame prestatie',
+  'm_rec': 'Om de AZS-gezondheid van uw team op het werkgebied te ondersteunen, worden onderstaande maatregelen aanbevolen:',
+  'm_rec_1': '<strong>Werklast en deadlines reviewen:</strong> zorg dat de werkbelasting haalbaar is en in balans met herstelmogelijkheden.',
+  'm_rec_2': '<strong>Pauzes en ontspanningsmomenten inbouwen:</strong> regelmatige pauzes, beweging en mentale rust tijdens de werkdag helpen het AZS te herstellen.',
+  'm_rec_3': '<strong>Herstelcultuur creëren:</strong> zorg dat "even niet werken" even waardevol is als presteren, en moedig medewerkers aan pauzes daadwerkelijk te nemen.',
+  'm_rec_4': '<strong>Stress-awareness-training:</strong> voor groepen met een hoog verschil AZS-bewustzijn kan training in lichaamsbewustzijn en stressherkenning medewerkers helpen hun eigen signalen beter op te merken.',
+  'm_rec_5': '<strong>Individuele begeleiding:</strong> voor medewerkers met een zeer lage RI of een groot verschil kan coaching of begeleiding (via HR of de bedrijfsarts) waardevol zijn.',
+  'm_rec_close': 'Een team met goed herstelde medewerkers is op de lange termijn productiever, creatiever en stabieler. Dit zijn geen extra kosten, maar investeringen in duurzame inzetbaarheid.',
+  'm_h5_diff': 'Verschil AZS-bewustzijn — wat betekent het?',
+  'm_diff1': 'Het <strong>Verschil AZS-bewustzijn</strong> toont de kloof tussen wat het lichaam werkelijk doet (de gemeten AZS-status via de Relax Index) en wat de deelnemer aangeeft te voelen (het antwoord op "Hoe ontspannen voel je je?").',
+  'm_diff2': 'Dit verschil kan potentieel wijzen op verschillen in <strong>interoceptief bewustzijn</strong> — het vermogen om interne lichaamssignalen waar te nemen.',
+  'm_diff_ih': '<strong>Interpretatie van het verschil:</strong>',
+  'm_diff_green': '<strong>Verschil 0–1,0 (groen):</strong> goede aansluiting — deelnemers voelen hun lichaam goed aan en kunnen zelf signaleren wanneer herstel nodig is.',
+  'm_diff_yellow': '<strong>Verschil 1,0–1,5 (geel):</strong> matige aansluiting — enige mismatch tussen voeling en werkelijke toestand.',
+  'm_diff_red': '<strong>Verschil &gt; 1,5 (rood):</strong> groot verschil — deelnemers voelen hun AZS-toestand onvoldoende aan, wat de vroege signalering van problemen kan bemoeilijken.',
+  'm_caution': '<strong>Voorzichtigheid:</strong> het is nog niet volledig duidelijk wat een groot verschil precies betekent of hoe het zich vertaalt naar werkgedrag of gezondheid. Dit is een onderzoeksgebied in opkomst. Mogelijke verklaringen kunnen zijn:',
+  'm_caution_1': 'beperkt zelfbewustzijn van lichaamssignalen (interoceptie);', 'm_caution_2': 'psychologische factoren (ontkenning of normalisering van stress);',
+  'm_caution_3': 'individuele verschillen in hoe mensen hun voeling rapporteren;', 'm_caution_4': 'methodologische factoren (vraagformulering, meetmoment).',
+  'm_diff_rec': '<strong>Aanbeveling:</strong> een groot verschil kan een aanleiding zijn voor individuele coaching of training in lichaamsbewustzijn en stressherkenning. Dit vraagt echter om verder onderzoek en moet altijd in context worden geplaatst met andere factoren (werkbelasting, gezondheid, slaap).',
+  'm_research': '<em>Dit onderzoeksgebied — interoceptie en werkgezondheid — is nog in ontwikkeling; Lifestyle Monitors werkt aan verdere validatie van deze metingen.</em>',
+  'm_nodiag': 'Een belast systeem kan wijzen op aanhoudende stress, vermoeidheid, ziekte, pijn, slaapgebrek of gebrek aan zingeving — de meting zegt niet welke. De RI is een momentopname en geen medische diagnose.',
+  'foot': 'Gegenereerd op basis van momentopnames; Relax Index 0-10, zone-indeling volgens de StressChecker-norm. Onbetrouwbare metingen tellen niet mee in het gemiddelde of de zoneverdeling.',
+  'brand': 'Dit rapport is gegenereerd met StressChecker Pro Event van Lifestyle Monitors',
+},
+'de': {
+  'html_title': 'Gruppenbericht', 'confidential': 'Vertraulich', 'confidential_u': 'VERTRAULICH',
+  'title': 'Gruppenbericht', 'opdr_ph': '[Auftraggeber]', 'ev_begin': 'Beginn:', 'ev_end': 'Ende:',
+  'page': 'Seite', 'of': 'von',
+  'warn_a': 'Hinweis: ', 'warn_b': ' Teilnehmer. Ein anonymisierter Gruppenbericht ist erst ab ',
+  'warn_bold': '5 Teilnehmern', 'warn_c': ' zuverlässig und teilbar (Datenschutz bei kleinen Gruppen).',
+  'sum_h': 'Zusammenfassung',
+  'sum_intro': 'Dieser Bericht zeigt eine Momentaufnahme der Belastbarkeit und Erholungsfähigkeit der Mitarbeitenden, die an dieser Untersuchung teilgenommen haben. Gemessen wurde dies anhand des Zustands des autonomen Nervensystems (ANS).',
+  'sh_screened': 'Teilnehmer gescreent', 'sh_avg_ri': 'durchschnittlicher Relax Index', 'sh_in_balance': 'im Gleichgewicht oder vital',
+  'sum_meaning': 'Bedeutung', 'sum_interp_pre': 'Ein durchschnittlicher Relax Index von ', 'sum_interp_mid': ' deutet darauf hin, dass Ihr Team ',
+  'sum_interp_post': '. Dies ist eine Momentaufnahme auf Gruppenebene, keine individuelle oder medizinische Beurteilung.',
+  'interp_optimal': 'gut erholt ist und optimal funktioniert', 'interp_healthy': 'eine gesunde Stressreaktion zeigt',
+  'interp_light': 'unter leichtem Druck steht', 'interp_strained': 'eine erhöhte Belastung signalisiert',
+  'sum_insufficient': 'Es liegen noch nicht genügend zuverlässige Messungen für ein Gruppenbild vor.',
+  'sum_next_h': 'Nächster Schritt',
+  'sum_next': 'Wenden Sie sich an Ihre Personalabteilung, Ihren Betriebsarzt und/oder eine Beratung für nachhaltige Beschäftigungsfähigkeit, um auf Basis dieser Ergebnisse weitere Begleitung und Empfehlungen zu erhalten.',
+  'hero_lab': 'Durchschnittlicher Relax Index (0–10)', 'hero_diff': 'Differenz ANS-Bewusstsein: ',
+  'diff_good': 'gute Übereinstimmung', 'diff_mod': 'mäßige Übereinstimmung', 'diff_large': 'größere Differenz',
+  'hero_warn': 'Durchschnitt unter der Gleichgewichtsgrenze (RI 6,0) — beachtenswert.',
+  'kpi_part': 'Teilnehmer', 'kpi_unrel': 'Unzuverlässig',
+  'zone_h': 'Zonenverteilung', 'zctx_pre': 'Es wurden ', 'zctx_post': ' Teilnehmer gemessen. Die Messergebnisse werden wie folgt eingestuft:',
+  'zdef_veer': '<strong>Vital (8–10):</strong> optimales ANS-Gleichgewicht, gut erholt',
+  'zdef_bal': '<strong>Im Gleichgewicht (6–8):</strong> normale, gesunde Stressreaktion',
+  'zdef_licht': '<strong>Leicht belastet (4–6):</strong> das System steht unter leichtem Druck',
+  'zdef_bel': '<strong>Belastet (2–4):</strong> erhöhte Belastung des ANS',
+  'zdef_zwaar': '<strong>Stark belastet (0–2):</strong> stark belastetes ANS-Gleichgewicht',
+  'zctx_note': '<strong>Hinweis:</strong> bei <strong>{pct}%</strong> der Teilnehmer konnte kein zuverlässiges Messergebnis ermittelt werden (technische Ursachen oder unzureichendes Signal).',
+  'btn_pdf': 'PDF herunterladen', 'btn_back': 'Zurück',
+  'intake_h': 'Durchschnittliche Intake-Werte',
+  'ictx_1': 'Vor der körperlichen Messung wurden zwei Fragen gestellt:',
+  'ictx_q1': '„Wie entspannt fühlen Sie sich in diesem Moment?" (Skala 0–10)', 'ictx_q2': '„Inwieweit leiden Sie unter Arbeitsstress?" (Skala 0–10)',
+  'ictx_diff_pre': 'Die Differenz zwischen diesen Antworten und dem gemessenen ANS-Zustand wird dargestellt durch: ',
+  'ictx_diff_lab': 'Differenz ANS-Bewusstsein = ',
+  'ictx_explain': 'Diese Zahl gibt an, inwieweit die Teilnehmer ihren tatsächlichen ANS-Zustand wahrnehmen. Eine kleine Differenz (z. B. 1,0) bedeutet, dass die Teilnehmer ihre Anspannung gut wahrnehmen können.',
+  'ic_ont': 'Entspannung', 'ic_ws': 'Arbeitsstress', 'ic_diff': 'ANS-Bewusstsein',
+  'ic_hint': 'wie gut Teilnehmer ihren ANS-Zustand wahrnehmen (kleiner = besser)',
+  'deeln_h': 'Teilnehmer', 'th_code': 'Teilnehmer-Code', 'th_ont': 'Entspannung<br>(0-10)', 'th_ws': 'Arbeitsstress<br>(0-10)',
+  'th_ri': 'Relax Index', 'th_diff': 'Differenz<br>ANS-Bewusstsein', 'th_zone': 'Zone',
+  'tbl_unrel': 'Unzuverlässig (zu geringe Qualität)', 'tbl_empty': 'Noch keine Messungen.',
+  'vleg_pre': 'Differenz ANS-Bewusstsein |RI − Entspannung|:', 'vleg_good': '≤ 1,0 gut', 'vleg_mod': '1,0–1,5 mäßig', 'vleg_low': '&gt; 1,5 gering',
+  'm_expertise': 'Diese Analyse basiert auf 14 Jahren Erfahrung in der HRV-Messung und der validierten ANS-Methodik von Lifestyle Monitors.',
+  'm_h4': 'Über die Relax-Index-(RI)-Messmethode und das autonome Nervensystem', 'm_h5_what': 'Was ist der Relax Index?',
+  'm_what': 'Der <strong>Relax Index (RI)</strong> ist ein objektives Maß für den Zustand des <strong>autonomen Nervensystems (ANS)</strong> — des Systems, das automatisch Herz, Atmung, Verdauung und Stressreaktion steuert. Der RI wird aus zwei physiologischen Signalen berechnet:',
+  'm_hrv': '<strong>Herzratenvariabilität (HRV)</strong>: die zeitliche Variation zwischen den Herzschlägen. Eine höhere HRV weist auf ein flexibles ANS hin, das gut zwischen Anspannung und Erholung wechseln kann.',
+  'm_bpm': '<strong>Herzfrequenz (BPM)</strong>: die Anzahl der Schläge pro Minute. Eine niedrigere Ruheherzfrequenz hängt mit einer effizienten Herzfunktion und einem ANS zusammen, das gut entspannen kann.',
+  'm_scale': 'Die RI-Skala reicht von <strong>0 bis 10</strong> und ist in fünf Zonen unterteilt (Stark belastet, Belastet, Leicht belastet, Im Gleichgewicht und Vital). Die Einteilung und Bedeutung je Zone finden Sie unter der <strong>Zonenverteilung</strong> weiter oben in diesem Bericht.',
+  'm_h5_why': 'Warum ist die ANS-Gesundheit wichtig?',
+  'm_why': 'Ein gesundes ANS ist wichtig für die nachhaltige Beschäftigungsfähigkeit. Wenn Menschen längere Zeit unter Druck stehen, ohne ausreichend zu regenerieren, kann das ANS aus dem Gleichgewicht geraten. Das kann einhergehen mit:',
+  'm_why_1': 'verminderte Konzentration und Entscheidungsfähigkeit;', 'm_why_2': 'ein höheres Risiko für Müdigkeit, Fehlzeiten und Burn-out;',
+  'm_why_3': 'weniger Kreativität und Problemlösungsfähigkeit;', 'm_why_4': 'langfristig eine geringere Arbeitsqualität.',
+  'm_why_rec': 'Ausreichende <strong>Erholungsmomente</strong> — regelmäßige Pausen, Bewegung, Entspannung und Schlaf — tragen zu einem besser funktionierenden ANS und damit zu <strong>nachhaltigerer Leistung</strong> bei.',
+  'm_h5_act': 'Handlungspunkte für Ihre Organisation', 'm_act': 'Dieser Bericht zeigt zwei Gruppenindikatoren, die Aufmerksamkeit verdienen:',
+  'm_act_ri_pre': 'Durchschnittlicher Relax Index (', 'm_act_ri_thr': 'Aufmerksamkeitsschwelle: RI &lt; 6,0',
+  'm_act_diff_pre': 'Durchschnittliches ANS-Bewusstsein (Differenz: ', 'm_act_diff_thr': 'Aufmerksamkeitsschwelle: Differenz &gt; 1,5',
+  'm_important': '<strong>Wichtig:</strong> Ein niedriger Relax Index kann viele Ursachen haben — Arbeitsstress ist nur eine davon. Weitere mögliche Ursachen sind Müdigkeit, Krankheit, chronische Schmerzen, Schlafmangel oder fehlende Sinnhaftigkeit. Dieser Bericht bezieht sich ausschließlich auf den Arbeitsbereich. Für die Diagnose oder Behandlung nicht arbeitsbezogener Faktoren wenden Sie sich bitte an einen Betriebsarzt oder Hausarzt.',
+  'm_h5_rec': 'Arbeitsbezogene Empfehlungen für nachhaltige Leistung',
+  'm_rec': 'Um die ANS-Gesundheit Ihres Teams im Arbeitsbereich zu unterstützen, werden die folgenden Maßnahmen empfohlen:',
+  'm_rec_1': '<strong>Arbeitslast und Fristen überprüfen:</strong> sorgen Sie dafür, dass die Arbeitsbelastung machbar und mit Erholungsmöglichkeiten im Gleichgewicht ist.',
+  'm_rec_2': '<strong>Pausen und Entspannungsmomente einplanen:</strong> regelmäßige Pausen, Bewegung und mentale Ruhe während des Arbeitstages helfen dem ANS, sich zu erholen.',
+  'm_rec_3': '<strong>Erholungskultur schaffen:</strong> sorgen Sie dafür, dass „kurz nicht arbeiten" ebenso wertvoll ist wie Leistung, und ermutigen Sie die Mitarbeitenden, Pausen tatsächlich zu nehmen.',
+  'm_rec_4': '<strong>Stress-Awareness-Training:</strong> für Gruppen mit einer hohen Differenz ANS-Bewusstsein kann ein Training in Körperwahrnehmung und Stresserkennung den Mitarbeitenden helfen, ihre eigenen Signale besser wahrzunehmen.',
+  'm_rec_5': '<strong>Individuelle Begleitung:</strong> für Mitarbeitende mit einem sehr niedrigen RI oder einer großen Differenz kann Coaching oder Begleitung (über die Personalabteilung oder den Betriebsarzt) wertvoll sein.',
+  'm_rec_close': 'Ein Team mit gut erholten Mitarbeitenden ist langfristig produktiver, kreativer und stabiler. Dies sind keine zusätzlichen Kosten, sondern Investitionen in nachhaltige Beschäftigungsfähigkeit.',
+  'm_h5_diff': 'Differenz ANS-Bewusstsein — was bedeutet das?',
+  'm_diff1': 'Die <strong>Differenz ANS-Bewusstsein</strong> zeigt die Kluft zwischen dem, was der Körper tatsächlich tut (der gemessene ANS-Zustand über den Relax Index), und dem, was der Teilnehmer angibt zu fühlen (die Antwort auf „Wie entspannt fühlen Sie sich?").',
+  'm_diff2': 'Diese Differenz kann möglicherweise auf Unterschiede im <strong>interozeptiven Bewusstsein</strong> hinweisen — der Fähigkeit, innere Körpersignale wahrzunehmen.',
+  'm_diff_ih': '<strong>Interpretation der Differenz:</strong>',
+  'm_diff_green': '<strong>Differenz 0–1,0 (grün):</strong> gute Übereinstimmung — die Teilnehmer nehmen ihren Körper gut wahr und können selbst signalisieren, wann Erholung nötig ist.',
+  'm_diff_yellow': '<strong>Differenz 1,0–1,5 (gelb):</strong> mäßige Übereinstimmung — eine gewisse Diskrepanz zwischen Wahrnehmung und tatsächlichem Zustand.',
+  'm_diff_red': '<strong>Differenz &gt; 1,5 (rot):</strong> große Differenz — die Teilnehmer nehmen ihren ANS-Zustand unzureichend wahr, was die frühzeitige Erkennung von Problemen erschweren kann.',
+  'm_caution': '<strong>Vorsicht:</strong> Es ist noch nicht vollständig geklärt, was eine große Differenz genau bedeutet oder wie sie sich auf Arbeitsverhalten oder Gesundheit auswirkt. Dies ist ein aufkommendes Forschungsgebiet. Mögliche Erklärungen können sein:',
+  'm_caution_1': 'eingeschränkte Wahrnehmung von Körpersignalen (Interozeption);', 'm_caution_2': 'psychologische Faktoren (Verleugnung oder Normalisierung von Stress);',
+  'm_caution_3': 'individuelle Unterschiede in der Art, wie Menschen ihr Empfinden angeben;', 'm_caution_4': 'methodische Faktoren (Frageformulierung, Messzeitpunkt).',
+  'm_diff_rec': '<strong>Empfehlung:</strong> eine große Differenz kann ein Anlass für individuelles Coaching oder ein Training in Körperwahrnehmung und Stresserkennung sein. Dies erfordert jedoch weitere Forschung und sollte stets im Zusammenhang mit anderen Faktoren (Arbeitsbelastung, Gesundheit, Schlaf) betrachtet werden.',
+  'm_research': '<em>Dieses Forschungsgebiet — Interozeption und Arbeitsgesundheit — befindet sich noch in der Entwicklung; Lifestyle Monitors arbeitet an der weiteren Validierung dieser Messungen.</em>',
+  'm_nodiag': 'Ein belastetes System kann auf anhaltenden Stress, Müdigkeit, Krankheit, Schmerzen, Schlafmangel oder fehlende Sinnhaftigkeit hinweisen — die Messung sagt nicht, worauf. Der RI ist eine Momentaufnahme und keine medizinische Diagnose.',
+  'foot': 'Erstellt auf Basis von Momentaufnahmen; Relax Index 0-10, Zoneneinteilung gemäß der StressChecker-Norm. Unzuverlässige Messungen zählen nicht in den Durchschnitt oder die Zonenverteilung.',
+  'brand': 'Dieser Bericht wurde mit StressChecker Pro Event von Lifestyle Monitors erstellt',
+},
+'en': {
+  'html_title': 'Group report', 'confidential': 'Confidential', 'confidential_u': 'CONFIDENTIAL',
+  'title': 'Group report', 'opdr_ph': '[Commissioner]', 'ev_begin': 'Event start:', 'ev_end': 'Event end:',
+  'page': 'Page', 'of': 'of',
+  'warn_a': 'Note: ', 'warn_b': ' participant(s). An anonymised group report is only reliable and shareable from ',
+  'warn_bold': '5 participants', 'warn_c': ' onwards (small-numbers privacy).',
+  'sum_h': 'Summary',
+  'sum_intro': 'This report shows a snapshot of the resilience and recovery capacity of the employees who took part in this assessment. This was measured using the state of the autonomic nervous system (ANS).',
+  'sh_screened': 'participants screened', 'sh_avg_ri': 'average Relax Index', 'sh_in_balance': 'in balance or resilient',
+  'sum_meaning': 'Meaning', 'sum_interp_pre': 'An average Relax Index of ', 'sum_interp_mid': ' suggests that your team ',
+  'sum_interp_post': '. This is a group-level snapshot, not an individual or medical assessment.',
+  'interp_optimal': 'is well recovered and functioning optimally', 'interp_healthy': 'shows a healthy stress response',
+  'interp_light': 'is under light pressure', 'interp_strained': 'signals elevated strain',
+  'sum_insufficient': 'There are not yet enough reliable measurements to give a group picture.',
+  'sum_next_h': 'Next step',
+  'sum_next': 'Consult your HR representative, occupational physician and/or an advisory service for sustainable employability for further guidance and recommendations based on these findings.',
+  'hero_lab': 'Average Relax Index (0–10)', 'hero_diff': 'ANS-awareness difference: ',
+  'diff_good': 'good alignment', 'diff_mod': 'moderate alignment', 'diff_large': 'larger difference',
+  'hero_warn': 'Average below the in-balance threshold (RI 6.0) — worth attention.',
+  'kpi_part': 'Participants', 'kpi_unrel': 'Unreliable',
+  'zone_h': 'Zone distribution', 'zctx_pre': 'A total of ', 'zctx_post': ' participant(s) were measured. The results are classified as follows:',
+  'zdef_veer': '<strong>Resilient (8–10):</strong> optimal ANS balance, well recovered',
+  'zdef_bal': '<strong>In balance (6–8):</strong> normal, healthy stress response',
+  'zdef_licht': '<strong>Lightly strained (4–6):</strong> the system is under mild pressure',
+  'zdef_bel': '<strong>Strained (2–4):</strong> increased load on the ANS',
+  'zdef_zwaar': '<strong>Heavily strained (0–2):</strong> heavily loaded ANS balance',
+  'zctx_note': '<strong>Note:</strong> for <strong>{pct}%</strong> of participants no reliable measurement could be established (technical causes or insufficient signal).',
+  'btn_pdf': 'Download PDF', 'btn_back': 'Back',
+  'intake_h': 'Average intake scores',
+  'ictx_1': 'Before the physical measurement, two questions were asked:',
+  'ictx_q1': '"How relaxed do you feel right now?" (scale 0–10)', 'ictx_q2': '"To what extent do you experience work stress?" (scale 0–10)',
+  'ictx_diff_pre': 'The difference between these answers and the measured ANS state is shown by: ',
+  'ictx_diff_lab': 'ANS-awareness difference = ',
+  'ictx_explain': 'This number indicates how well participants sense their actual ANS state. A small difference (e.g. 1.0) means participants can sense their tension well.',
+  'ic_ont': 'Relaxation', 'ic_ws': 'Work stress', 'ic_diff': 'ANS awareness',
+  'ic_hint': 'how well participants sense their ANS state (smaller = better)',
+  'deeln_h': 'Participants', 'th_code': 'Participant code', 'th_ont': 'Relaxation<br>(0-10)', 'th_ws': 'Work stress<br>(0-10)',
+  'th_ri': 'Relax Index', 'th_diff': 'Difference<br>ANS awareness', 'th_zone': 'Zone',
+  'tbl_unrel': 'Unreliable (quality too low)', 'tbl_empty': 'No measurements yet.',
+  'vleg_pre': 'ANS-awareness difference |RI − relaxation|:', 'vleg_good': '≤ 1.0 good', 'vleg_mod': '1.0–1.5 moderate', 'vleg_low': '&gt; 1.5 low',
+  'm_expertise': 'This analysis is based on 14 years of expertise in HRV measurement and the validated ANS methodology of Lifestyle Monitors.',
+  'm_h4': 'About the Relax Index (RI) measurement method and the autonomic nervous system', 'm_h5_what': 'What is the Relax Index?',
+  'm_what': 'The <strong>Relax Index (RI)</strong> is an objective measure of the state of the <strong>autonomic nervous system (ANS)</strong> — the system that automatically regulates the heart, breathing, digestion and stress response. The RI is calculated from two physiological signals:',
+  'm_hrv': '<strong>Heart rate variability (HRV)</strong>: the variation in time between heartbeats. A higher HRV indicates a flexible ANS that can switch well between exertion and recovery.',
+  'm_bpm': '<strong>Heart rate (BPM)</strong>: the number of beats per minute. A lower resting heart rate is associated with efficient heart function and an ANS that can relax well.',
+  'm_scale': 'The RI scale runs from <strong>0 to 10</strong> and is divided into five zones (Heavily strained, Strained, Lightly strained, In balance and Resilient). The classification and meaning per zone can be found under the <strong>Zone distribution</strong> earlier in this report.',
+  'm_h5_why': 'Why is ANS health important?',
+  'm_why': 'A healthy ANS is important for sustainable employability. When people are under pressure for a long time without sufficient recovery, the ANS can become unbalanced. This can be accompanied by:',
+  'm_why_1': 'reduced concentration and decision-making;', 'm_why_2': 'a higher risk of fatigue, absenteeism and burnout;',
+  'm_why_3': 'less creativity and problem-solving ability;', 'm_why_4': 'lower quality of work over time.',
+  'm_why_rec': 'Sufficient <strong>recovery moments</strong> — regular breaks, movement, relaxation and sleep — contribute to a better-functioning ANS and thus to <strong>more sustainable performance</strong>.',
+  'm_h5_act': 'Action points for your organisation', 'm_act': 'This report shows two group indicators that deserve attention:',
+  'm_act_ri_pre': 'Average Relax Index (', 'm_act_ri_thr': 'Attention threshold: RI &lt; 6.0',
+  'm_act_diff_pre': 'Average ANS awareness (difference: ', 'm_act_diff_thr': 'Attention threshold: difference &gt; 1.5',
+  'm_important': '<strong>Important:</strong> a low Relax Index can have many causes — work stress is only one of them. Other possible causes include fatigue, illness, chronic pain, lack of sleep or a lack of meaning. This report addresses the work domain only. For diagnosis or treatment of non-work-related factors, please consult an occupational physician or GP.',
+  'm_h5_rec': 'Work-focused recommendations for sustainable performance',
+  'm_rec': 'To support the ANS health of your team in the work domain, the following measures are recommended:',
+  'm_rec_1': '<strong>Review workload and deadlines:</strong> ensure the workload is achievable and balanced with recovery opportunities.',
+  'm_rec_2': '<strong>Build in breaks and moments of relaxation:</strong> regular breaks, movement and mental rest during the workday help the ANS recover.',
+  'm_rec_3': '<strong>Create a recovery culture:</strong> make "not working for a moment" as valued as performing, and encourage employees to actually take breaks.',
+  'm_rec_4': '<strong>Stress-awareness training:</strong> for groups with a high ANS-awareness difference, training in body awareness and stress recognition can help employees notice their own signals better.',
+  'm_rec_5': '<strong>Individual support:</strong> for employees with a very low RI or a large difference, coaching or support (via HR or the occupational physician) can be valuable.',
+  'm_rec_close': 'A team with well-recovered employees is more productive, creative and stable in the long run. These are not additional costs, but investments in sustainable employability.',
+  'm_h5_diff': 'ANS-awareness difference — what does it mean?',
+  'm_diff1': 'The <strong>ANS-awareness difference</strong> shows the gap between what the body actually does (the measured ANS state via the Relax Index) and what the participant reports feeling (the answer to "How relaxed do you feel?").',
+  'm_diff2': 'This difference may potentially indicate differences in <strong>interoceptive awareness</strong> — the ability to perceive internal body signals.',
+  'm_diff_ih': '<strong>Interpretation of the difference:</strong>',
+  'm_diff_green': '<strong>Difference 0–1.0 (green):</strong> good alignment — participants sense their body well and can signal for themselves when recovery is needed.',
+  'm_diff_yellow': '<strong>Difference 1.0–1.5 (yellow):</strong> moderate alignment — some mismatch between perception and actual state.',
+  'm_diff_red': '<strong>Difference &gt; 1.5 (red):</strong> large difference — participants sense their ANS state insufficiently, which can hinder the early detection of problems.',
+  'm_caution': '<strong>Caution:</strong> it is not yet fully understood what a large difference means exactly, or how it translates to work behaviour or health. This is an emerging area of research. Possible explanations may include:',
+  'm_caution_1': 'limited awareness of body signals (interoception);', 'm_caution_2': 'psychological factors (denial or normalisation of stress);',
+  'm_caution_3': 'individual differences in how people report their perception;', 'm_caution_4': 'methodological factors (question wording, timing of measurement).',
+  'm_diff_rec': '<strong>Recommendation:</strong> a large difference can be a reason for individual coaching or training in body awareness and stress recognition. However, this requires further research and should always be placed in context with other factors (workload, health, sleep).',
+  'm_research': '<em>This area of research — interoception and occupational health — is still developing; Lifestyle Monitors is working on further validation of these measurements.</em>',
+  'm_nodiag': 'A strained system can indicate persistent stress, fatigue, illness, pain, lack of sleep or a lack of meaning — the measurement does not say which. The RI is a snapshot and not a medical diagnosis.',
+  'foot': 'Generated from snapshots; Relax Index 0-10, zone classification per the StressChecker standard. Unreliable measurements do not count towards the average or the zone distribution.',
+  'brand': 'This report was generated with StressChecker Pro Event by Lifestyle Monitors',
+},
+}
 
 
 @app.route('/vb/rapport')
@@ -9345,11 +9589,12 @@ def vb_group_report():
         edb.execute("UPDATE event_participants SET tracking_code=? WHERE participant_id=?",
                     (_tc, _pr['participant_id']))
     edb.commit()
-    data = _vb_group_data(edb, ev['event_id'])
+    lang = session.get('lang') if session.get('lang') in ('nl', 'de', 'en') else 'nl'
+    data = _vb_group_data(edb, ev['event_id'], lang)
     edb.close()
     want_pdf = request.args.get('pdf') == '1'
-    html = render_template('vb/group_report.html', ev=ev, d=data, pdf=want_pdf,
-                           generated=datetime.now().strftime('%d-%m-%Y'))
+    html = render_template('vb/group_report.html', ev=ev, d=data, pdf=want_pdf, lang=lang,
+                           t=_GRP_STR[lang], generated=datetime.now().strftime('%d-%m-%Y'))
     if want_pdf:
         from weasyprint import HTML
         pdf_bytes = HTML(string=html, base_url=app.root_path).write_pdf()
@@ -9426,14 +9671,14 @@ def vb_deelnemers_list(event_code):
         edb.execute("UPDATE event_participants SET tracking_code=? WHERE participant_id=?",
                     (_tc, _pr['participant_id']))
     edb.commit()
-    data = _vb_group_data(edb, ev['event_id'])
+    lang = session.get('lang') if session.get('lang') in ('nl', 'de', 'en') else 'nl'
+    data = _vb_group_data(edb, ev['event_id'], lang)
     edb.close()
     q_raw = (request.args.get('q') or '').strip()
     q = q_raw.lower()
     parts = data['parts']
     if q:
         parts = [p for p in parts if q in (p.get('name') or '').lower()]
-    lang = session.get('lang') if session.get('lang') in ('nl', 'de', 'en') else 'nl'
     return render_template('vb/deelnemers_list.html', ev=ev, parts=parts,
                            total=len(data['parts']), q=q_raw, lang=lang, t=_DEELN_STR[lang],
                            mail=request.args.get('mail'), mailerr=request.args.get('mailerr'))
