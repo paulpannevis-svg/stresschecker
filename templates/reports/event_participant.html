@@ -246,6 +246,19 @@
   </div>
   {% endif %}
 
+  {# Werkstress-beleving vs. meting — beschrijvend, niet-oordelend; geen werkstress -> blok weg. #}
+  {% if wm.show %}
+  <div class="gm">
+    <h3>{{ wm.heading }}</h3>
+    {% if wm.reliable %}
+      <div class="nums"><span>{{ wm.ws_label }}: <b>{{ wm.werkstress }}</b> / 10</span></div>
+      <p class="text">{{ wm.text }}</p>
+    {% else %}
+      <p class="neutral">{{ wm.text }}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <div class="note">{{ t.method }}</div>
 
   <div class="foot">{{ t.generated }}: {{ generated_at }} · {{ t.snapshot_note }}</div>

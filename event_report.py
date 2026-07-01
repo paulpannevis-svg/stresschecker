@@ -215,6 +215,114 @@ def gevoel_meting(subjectief, ri, reliable, lang, irregular=False):
     }
 
 
+# ── Werkstress vs. meting (event-intake work_stress_score 0-10) ──────────────
+# Beschrijvend, niet-oordelend — zelfde toon als gevoel_meting. Archetype uit de combinatie
+# van werkstress-beleving, ontspanning-beleving en de gemeten RI. GEEN diagnose: de 'onder-
+# liggende'-tekst claimt NIET "verborgen stress", maar benoemt het verschil + andere oorzaken.
+_WS_RI_HIGH_ZONES = {'in balans', 'veerkrachtig', 'im gleichgewicht', 'vital', 'in balance', 'resilient'}
+_WS_STRESS_HIGH, _WS_STRESS_LOW = 7, 3
+_WS_COMFORT_HIGH, _WS_COMFORT_LOW = 6, 3
+
+def _ws_ri_is_high(ri):
+    if ri is None:
+        return None
+    if isinstance(ri, str):
+        return ri.strip().lower() in _WS_RI_HIGH_ZONES
+    try:
+        return float(ri) >= 6.0
+    except (TypeError, ValueError):
+        return None
+
+def classify_werkstress_archetype(werk, ontspa, ri):
+    """werkstress (0-10), ontspanning (0-10), ri (numeriek of zone-string) -> archetype-sleutel."""
+    if werk is None or ontspa is None:
+        return 'default'
+    hi = _ws_ri_is_high(ri)
+    if werk >= _WS_STRESS_HIGH and ontspa <= _WS_COMFORT_LOW and hi is False:
+        return 'congruent_belast'
+    if werk <= _WS_STRESS_LOW and ontspa >= _WS_COMFORT_HIGH and hi is True:
+        return 'congruent_evenwicht'
+    if werk >= _WS_STRESS_HIGH and ontspa >= _WS_COMFORT_HIGH and hi is True:
+        return 'dissonantie_resilience'
+    if werk <= _WS_STRESS_LOW and ontspa <= _WS_COMFORT_LOW and hi is False:
+        return 'dissonantie_onderliggende'
+    return 'default'
+
+WERKSTRESS_METING = {
+    'nl': {
+        'heading': 'Werkstress en meting naast elkaar', 'ws_label': 'Werkstress',
+        'congruent_belast': 'Je gaf aan behoorlijk wat werkstress te ervaren, en de meting laat op '
+            'dit moment ook een belast beeld zien. Je beleving en je hartritme wijzen nu dezelfde kant op.',
+        'congruent_evenwicht': 'Je gaf aan weinig werkstress te ervaren, en de meting laat op dit '
+            'moment een ontspannen beeld zien. Je beleving en je hartritme sluiten mooi op elkaar aan.',
+        'dissonantie_resilience': 'Je gaf aan werkstress te ervaren, terwijl de meting op dit moment '
+            'een relatief kalm beeld laat zien. Je lichaam lijkt de belasting nu goed op te vangen — '
+            'beleving en meting belichten elk een andere kant.',
+        'dissonantie_onderliggende': 'Je gaf aan weinig werkstress te ervaren, terwijl de meting op dit '
+            'moment een wat meer belast beeld laat zien. Zo\'n verschil kan allerlei oorzaken hebben — '
+            'denk aan slaap, inspanning vlak vóór de meting, cafeïne of iets anders — en zegt op zichzelf '
+            'niets zekers. Het kan een rustig aanknopingspunt zijn om even bij stil te staan.',
+        'default': 'Je beleving van werkstress en de meting liggen dicht bij elkaar of geven samen een '
+            'gemengd beeld. Geen van beide is "fout" — ze belichten elk een andere kant.',
+        'unreliable': 'De meting was te onzeker om naast je werkstress-beleving te leggen.',
+        'irregular': 'Deze vergelijking is onbetrouwbaar — je meting was te onregelmatig.',
+    },
+    'de': {
+        'heading': 'Arbeitsstress und Messung nebeneinander', 'ws_label': 'Arbeitsstress',
+        'congruent_belast': 'Sie gaben an, spürbar Arbeitsstress zu erleben, und die Messung zeigt in '
+            'diesem Moment ebenfalls ein belastetes Bild. Ihr Empfinden und Ihr Herzrhythmus weisen '
+            'jetzt in dieselbe Richtung.',
+        'congruent_evenwicht': 'Sie gaben an, wenig Arbeitsstress zu erleben, und die Messung zeigt in '
+            'diesem Moment ein entspanntes Bild. Empfinden und Herzrhythmus passen gut zusammen.',
+        'dissonantie_resilience': 'Sie gaben Arbeitsstress an, während die Messung in diesem Moment ein '
+            'relativ ruhiges Bild zeigt. Ihr Körper scheint die Belastung derzeit gut aufzufangen — beide '
+            'beleuchten eine andere Seite.',
+        'dissonantie_onderliggende': 'Sie gaben wenig Arbeitsstress an, während die Messung in diesem '
+            'Moment ein etwas belasteteres Bild zeigt. Ein solcher Unterschied kann viele Ursachen haben '
+            '— etwa Schlaf, Anstrengung kurz vor der Messung, Koffein oder anderes — und sagt für sich '
+            'genommen nichts Sicheres. Es kann ein ruhiger Anlass sein, kurz innezuhalten.',
+        'default': 'Ihr Empfinden von Arbeitsstress und die Messung liegen nahe beieinander oder ergeben '
+            'zusammen ein gemischtes Bild. Keine von beiden ist „falsch" — sie beleuchten jeweils eine andere Seite.',
+        'unreliable': 'Die Messung war zu unsicher, um sie neben Ihr Arbeitsstress-Empfinden zu legen.',
+        'irregular': 'Dieser Vergleich ist unzuverlässig — Ihre Messung war zu unregelmäßig.',
+    },
+    'en': {
+        'heading': 'Work stress and measurement side by side', 'ws_label': 'Work stress',
+        'congruent_belast': 'You indicated noticeable work stress, and the reading currently also shows '
+            'a strained picture. Your experience and your heart rhythm point the same way right now.',
+        'congruent_evenwicht': 'You indicated little work stress, and the reading currently shows a '
+            'relaxed picture. Experience and heart rhythm line up well.',
+        'dissonantie_resilience': 'You indicated work stress, while the reading currently shows a '
+            'relatively calm picture. Your body seems to be absorbing the load well right now — each '
+            'highlights a different side.',
+        'dissonantie_onderliggende': 'You indicated little work stress, while the reading currently shows '
+            'a somewhat more strained picture. Such a difference can have many causes — sleep, exertion '
+            'just before the reading, caffeine or something else — and on its own says nothing certain. '
+            'It can be a gentle prompt to pause and reflect.',
+        'default': 'Your sense of work stress and the reading are close together, or together give a mixed '
+            'picture. Neither is "wrong" — each highlights a different side.',
+        'unreliable': 'The reading was too uncertain to compare with your sense of work stress.',
+        'irregular': 'This comparison is unreliable — your reading was too irregular.',
+    },
+}
+
+# Alias voor externe validatiescripts die WERKSTRESS_COMMENTARY verwachten.
+WERKSTRESS_COMMENTARY = WERKSTRESS_METING
+
+def werkstress_meting(work, ontspa, ri, reliable, lang, irregular=False):
+    """Werkstress-beleving (0-10) vs. meting (RI). Beschrijvend blok; geen werkstress -> blok weg."""
+    w = WERKSTRESS_METING.get(lang, WERKSTRESS_METING['nl'])
+    if work is None:
+        return {'show': False}
+    if irregular:
+        return {'show': True, 'reliable': False, 'heading': w['heading'], 'text': w['irregular']}
+    if not reliable or ri is None:
+        return {'show': True, 'reliable': False, 'heading': w['heading'], 'text': w['unreliable']}
+    arch = classify_werkstress_archetype(work, ontspa, ri)
+    return {'show': True, 'reliable': True, 'heading': w['heading'], 'archetype': arch,
+            'ws_label': w['ws_label'], 'werkstress': int(work), 'text': w[arch]}
+
+
 def quality_stars(kwaliteit, hrv_pct=None):
     """Meetkwaliteit → sterren (max 3). Grenzen = riConfidence (85/70), consistent met de
     afkeurlijn (<85). Presentatie-only, GEEN nieuwe berekening:
@@ -308,7 +416,7 @@ def render_report(meting_code, lang='nl', as_html=False, screen_mode=False, back
         "SELECT p.meting_code, p.name, p.birth_year, p.gender, "
         "       e.event_code, e.opdrachtgever, e.naam AS event_naam, e.datum AS event_datum, "
         "       m.ri, m.bpm, m.hrv_pct, m.rmssd, m.kwaliteit, m.quality_band, m.ts, m.created_at, "
-        "       m.subjectief_score, "
+        "       m.subjectief_score, m.work_stress_score, "
         "       (SELECT COUNT(*) FROM event_metingen m2 WHERE m2.participant_id = p.participant_id) AS n_metingen "
         "FROM event_participants p "
         "JOIN events e ON e.event_id = p.event_id "
@@ -377,6 +485,8 @@ def render_report(meting_code, lang='nl', as_html=False, screen_mode=False, back
         stars=quality_stars(p['kwaliteit'], p['hrv_pct']),
         gm=gevoel_meting(p['subjectief_score'], p['ri'], reliable, lang,
                          irregular=((p['quality_band'] or '') == 'slecht')),
+        wm=werkstress_meting(p.get('work_stress_score'), p['subjectief_score'], p['ri'], reliable, lang,
+                             irregular=((p['quality_band'] or '') == 'slecht')),
         quad=__import__('event_quadrant').build_quadrant(
             p['bpm'], p['hrv_pct'], p['subjectief_score'], p['ri'], reliable, lang),
         generated_at=datetime.now().strftime('%Y-%m-%d %H:%M'),
