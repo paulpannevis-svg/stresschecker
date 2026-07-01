@@ -27,7 +27,8 @@
   <div class="wrap">
     <div class="banner">STAGING · Event-modus. Alleen voor test.</div>
     <h1>Deelnemergegevens wissen</h1>
-    <div class="sub">{{ ev.opdrachtgever }}{% if ev.naam %} · {{ ev.naam }}{% endif %} · {{ ev.event_code }}</div>
+    {% set _nm = ev.naam or ev.opdrachtgever %}
+    <div class="sub">{{ _nm }}{% if ev.opdrachtgever and ev.opdrachtgever != _nm %} · {{ ev.opdrachtgever }}{% endif %} · {{ ev.event_code }}</div>
     <div class="card">
       {% if error %}<div class="err">De ingevoerde code kwam niet overeen. Er is niets gewist.</div>{% endif %}
       <div class="warn">

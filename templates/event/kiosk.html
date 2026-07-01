@@ -27,9 +27,8 @@
     {% if events %}
       {% for e in events %}
         <a class="ev" href="/event/kiosk/{{ e.event_code }}">
-          <b>{{ e.opdrachtgever }}</b>
-          <div class="meta">{{ e.naam or '' }} {% if e.datum %}· {{ e.datum }}{% endif %}
-            · code {{ e.event_code }} · {{ e.n }} deelnemer(s)</div>
+          <b>{{ e.naam or e.opdrachtgever }}</b>
+          <div class="meta">{% if e.opdrachtgever and e.opdrachtgever != (e.naam or e.opdrachtgever) %}{{ e.opdrachtgever }} · {% endif %}{% if e.datum %}{{ e.datum }} · {% endif %}code {{ e.event_code }} · {{ e.n }} deelnemer(s)</div>
         </a>
         <a class="wipe" href="/event/kiosk/{{ e.event_code }}/wissen">Deelnemergegevens wissen</a>
       {% endfor %}
