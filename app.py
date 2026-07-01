@@ -9827,8 +9827,8 @@ _VB_DASH_STR = {
            'th_status': 'Status', 'th_metingen': 'Metingen', 'th_acties': 'Acties', 'th_rapporten': 'Rapporten',
            'btn_meting': 'Meting', 'btn_deeln': 'Deelnemers', 't_edit': 'Bewerken', 't_del': 'Verwijderen',
            'confirm_del': 'Dit event uit het dashboard verwijderen? De meetdata (deelnemers en metingen) blijft bewaard.',
-           'empty': 'Nog geen events. Klik op "Nieuwe event aanmaken".', 'gen_report': 'Rapport genereren',
-           'csv': 'CSV export', 'soon': 'Volgt', 'st_open': 'open', 'st_gesloten': 'gesloten'},
+           'empty': 'Nog geen events. Klik op "Nieuwe event aanmaken".',
+           'st_open': 'open', 'st_gesloten': 'gesloten'},
     'de': {'title': 'Dashboard', 'logout': 'Abmelden', 'cred_avail': 'Credits verfügbar',
            'cred_used': 'Credits verbraucht', 'new_created': 'Neuer Messtag erstellt. Event-Code für den Kiosk:',
            'events_h2': 'Organisierte Events', 'ph_naam': 'Event-Name', 'ph_opdr': 'Auftraggeber (optional)',
@@ -9838,8 +9838,8 @@ _VB_DASH_STR = {
            'th_status': 'Status', 'th_metingen': 'Messungen', 'th_acties': 'Aktionen', 'th_rapporten': 'Berichte',
            'btn_meting': 'Messung', 'btn_deeln': 'Teilnehmer', 't_edit': 'Bearbeiten', 't_del': 'Löschen',
            'confirm_del': 'Dieses Event aus dem Dashboard entfernen? Die Messdaten (Teilnehmer und Messungen) bleiben erhalten.',
-           'empty': 'Noch keine Events. Klicken Sie auf „Neues Event erstellen".', 'gen_report': 'Bericht erstellen',
-           'csv': 'CSV-Export', 'soon': 'Folgt', 'st_open': 'offen', 'st_gesloten': 'geschlossen'},
+           'empty': 'Noch keine Events. Klicken Sie auf „Neues Event erstellen".',
+           'st_open': 'offen', 'st_gesloten': 'geschlossen'},
     'en': {'title': 'Dashboard', 'logout': 'Log out', 'cred_avail': 'Credits available',
            'cred_used': 'Credits used', 'new_created': 'New measurement day created. Event code for the kiosk:',
            'events_h2': 'Organised events', 'ph_naam': 'Event name', 'ph_opdr': 'Commissioner (optional)',
@@ -9849,8 +9849,8 @@ _VB_DASH_STR = {
            'th_status': 'Status', 'th_metingen': 'Measurements', 'th_acties': 'Actions', 'th_rapporten': 'Reports',
            'btn_meting': 'Measure', 'btn_deeln': 'Participants', 't_edit': 'Edit', 't_del': 'Delete',
            'confirm_del': 'Remove this event from the dashboard? The measurement data (participants and measurements) is kept.',
-           'empty': 'No events yet. Click "Create new event".', 'gen_report': 'Generate report',
-           'csv': 'CSV export', 'soon': 'Coming soon', 'st_open': 'open', 'st_gesloten': 'closed'},
+           'empty': 'No events yet. Click "Create new event".',
+           'st_open': 'open', 'st_gesloten': 'closed'},
 }
 
 

@@ -50,8 +50,6 @@
   }
   .vb-empty{padding:22px 14px;color:#999;font-size:13px;text-align:center}
   .vb-rowbtn{padding:4px 8px;font-size:.75rem;color:#fff;border-radius:6px;text-decoration:none;display:inline-block;white-space:nowrap}
-  .vb-actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;width:100%}
-  .vb-actions button{padding:10px 16px;border:1px solid #d8d2c7;border-radius:8px;background:#fff;color:#888;font-size:13px;cursor:not-allowed}
   /* State-aware aanmaak-knop: groen "Opslaan" wanneer het formulier openstaat. */
   #vbEventBtn.btn-save{background:#1f7a5a;border-color:#1f7a5a;color:#fff}
   .vb-formerr{margin-top:8px;color:#c0392b;font-size:12px;font-weight:600;background:#fadbd8;border-radius:8px;padding:7px 12px;display:inline-block}
@@ -218,10 +216,5 @@
       {% endfor %}
     </tbody>
   </table>
-  </div>
-
-  <div class="vb-actions">
-    <button type="button" disabled title="{{ t.soon }}">{{ t.gen_report }}</button>
-    <button type="button" disabled title="{{ t.soon }}">{{ t.csv }}</button>
   </div>
 {% endblock %}
