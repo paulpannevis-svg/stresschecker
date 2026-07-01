@@ -9284,6 +9284,14 @@ def _vb_group_data(edb, event_id):
               'color': _zone_hex.get(k, '#E84C5C')}
              for k in analytics.ZONE_KEYS]
     tr = (_vb_fmt_ts(min(ts_list)) + ' – ' + _vb_fmt_ts(max(ts_list))) if ts_list else ''
+    # Nederlandse begin-/eind-tijd voor de titel ("30 juni 2026, 09:00").
+    _NL_MONTHS = ['', 'januari', 'februari', 'maart', 'april', 'mei', 'juni',
+                  'juli', 'augustus', 'september', 'oktober', 'november', 'december']
+    def _nl_dt(ms):
+        _d = datetime.fromtimestamp(int(ms) / 1000)
+        return f"{_d.day} {_NL_MONTHS[_d.month]} {_d.year}, {_d.strftime('%H:%M')}"
+    time_start = _nl_dt(min(ts_list)) if ts_list else None
+    time_end = _nl_dt(max(ts_list)) if ts_list else None
     return {'parts': parts, 'n': n, 'reliable_n': ri_n, 'unreliable_n': unreliable,
             'unreliable_pct': round(100 * unreliable / n) if n else 0,
             'avg_ri': (f"{ri_sum / ri_n:.1f}" if ri_n else '—'),
@@ -9291,7 +9299,8 @@ def _vb_group_data(edb, event_id):
             'avg_werkstress': (f"{ws_sum / ws_n:.1f}" if ws_n else '—'),
             'avg_verschil': (f"{versch_sum / versch_n:.1f}" if versch_n else '—'),
             'avg_verschil_num': (versch_sum / versch_n if versch_n else None),
-            'zdist': zdist, 'time_range': tr, 'enough': n >= 5}
+            'zdist': zdist, 'time_range': tr, 'time_start': time_start, 'time_end': time_end,
+            'enough': n >= 5}
 
 
 @app.route('/vb/rapport')
@@ -9323,7 +9332,8 @@ def vb_group_report():
     data = _vb_group_data(edb, ev['event_id'])
     edb.close()
     want_pdf = request.args.get('pdf') == '1'
-    html = render_template('vb/group_report.html', ev=ev, d=data, pdf=want_pdf)
+    html = render_template('vb/group_report.html', ev=ev, d=data, pdf=want_pdf,
+                           generated=datetime.now().strftime('%d-%m-%Y'))
     if want_pdf:
         from weasyprint import HTML
         pdf_bytes = HTML(string=html, base_url=app.root_path).write_pdf()

@@ -10,6 +10,17 @@
       --text:#333333; --text-2:#666666;
       --s-xs:8px; --s-sm:16px; --s-md:24px; --s-lg:32px; --s-xl:48px;
     }
+    /* Print: uniforme paginamarges + VERTROUWELIJK + paginanummer + branding-footer op ELKE pagina */
+    @page{
+      size:A4;
+      margin:16mm 15mm 24mm 15mm;
+      @top-right{ content:"VERTROUWELIJK"; font-size:8pt; color:#C0392B; font-weight:700; letter-spacing:1px; }
+      @bottom-left{ content:element(pagefoot); }
+      @bottom-right{ content:"Pagina " counter(page) " van " counter(pages); font-size:8pt; color:#666666; }
+    }
+    .pagefoot{ position:running(pagefoot); font-size:8pt; color:#666666; }
+    .pagefoot img{ height:13pt; vertical-align:middle; margin-right:7px; }
+    .pagefoot .cf{ font-weight:700; color:#333333; letter-spacing:.5px; }
     *{box-sizing:border-box}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
          color:var(--text);line-height:1.6;margin:0;
@@ -20,10 +31,12 @@
     .cap{font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px}
 
     /* Header */
-    .report-header{padding-bottom:var(--s-md);border-bottom:1px solid var(--border);margin-bottom:var(--s-lg)}
-    .report-header h1{font-size:26px;font-weight:700;color:var(--dark);letter-spacing:-.5px;line-height:1.1;margin:0}
-    .report-header .sub{color:var(--text-2);font-size:14px;margin-top:6px}
-    .report-header .code{color:var(--text-2);font-size:12px;letter-spacing:.5px;margin-top:2px}
+    .report-header{position:relative;padding-bottom:var(--s-md);border-bottom:1px solid var(--border);margin-bottom:var(--s-lg)}
+    .report-header h1{font-size:26px;font-weight:700;color:var(--dark);letter-spacing:-.5px;line-height:1.1;margin:0 0 12px}
+    .report-header .event-dates{font-size:14px;color:var(--text-2)}
+    .report-header .event-dates p{margin:4px 0}
+    .report-header .code{color:var(--text-2);font-size:12px;letter-spacing:.5px;margin-top:10px}
+    .confidential-top{position:absolute;top:0;right:0;font-size:12px;color:#C0392B;font-weight:700;text-transform:uppercase;letter-spacing:1px}
 
     .warn{background:#fdf3e7;border:1px solid #f3d6a8;color:#8a5a12;padding:12px 16px;
           border-radius:6px;font-size:13px;margin-bottom:var(--s-md)}
@@ -90,14 +103,26 @@
     .callout{color:#8a5a12;background:#fdf3e7;border:1px solid #f3d6a8;border-radius:6px;padding:10px 14px;margin-top:var(--s-sm)}
     .note-neutral{background:#f4f1ec;border:1px solid #e0d8cc;border-radius:6px;padding:10px 14px;margin-top:var(--s-sm);font-size:12.5px;color:var(--text-2)}
     .foot{margin-top:var(--s-md);color:#999;font-size:11px;line-height:1.6}
+    /* Screen-only branding footer (PDF gebruikt @page + .pagefoot) */
+    .branding{margin-top:var(--s-md);padding-top:var(--s-sm);border-top:1px solid var(--border);
+              display:flex;align-items:center;gap:12px;font-size:11px;color:var(--text-2)}
+    .branding img{height:32px;width:32px}
+    .branding .txt{flex:1}
+    .branding .cf{font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="report-header">
-      <h1>Groepsrapport meetdag</h1>
-      <div class="sub">{{ ev.opdrachtgever }}{% if ev.naam %} — {{ ev.naam }}{% endif %}{% if d.time_range %} &middot; {{ d.time_range }}{% endif %}</div>
-      <div class="code">{{ ev.event_code }}</div>
+      <div class="confidential-top">Vertrouwelijk</div>
+      <h1>Groepsrapport {{ ev.naam or ev.opdrachtgever }}</h1>
+      {% if d.time_start %}
+      <div class="event-dates">
+        <p>Begin event: {{ d.time_start }}</p>
+        <p>Einde event: {{ d.time_end }}</p>
+      </div>
+      {% endif %}
+      <div class="code">{{ ev.event_code }}{% if ev.opdrachtgever and ev.opdrachtgever != ev.naam %} &middot; {{ ev.opdrachtgever }}{% endif %}</div>
     </div>
 
     {% if not d.enough %}
@@ -108,7 +133,7 @@
     <div class="hero">
       <div class="hero__num">{{ d.avg_ri }}</div>
       <div class="hero__lab">Gemiddelde Relax Index (0–10)</div>
-      <div class="hero__sub">Verschil ANS-bewustzijn: <strong>{{ d.avg_verschil }}</strong> &middot;
+      <div class="hero__sub">Verschil AZS-bewustzijn: <strong>{{ d.avg_verschil }}</strong> &middot;
         {% if d.avg_verschil_num is none %}—{% elif d.avg_verschil_num <= 1.0 %}goede aansluiting{% elif d.avg_verschil_num <= 1.5 %}matige aansluiting{% else %}groter verschil{% endif %}</div>
       {% if d.avg_ri != '—' and d.avg_ri|float < 6.0 %}
       <div class="hero__warn">Gemiddelde onder de In-balans-grens (RI 6,0) — aandacht waard.</div>
@@ -147,15 +172,15 @@
       <div class="intake">
         <div class="card"><div class="num">{{ d.avg_ontspanning }} <small>/ 10</small></div><div class="lab">Ontspanning</div></div>
         <div class="card"><div class="num">{{ d.avg_werkstress }} <small>/ 10</small></div><div class="lab">Werkstress</div></div>
-        <div class="card"><div class="num">{{ d.avg_verschil }}</div><div class="lab">ANS-bewustzijn</div>
-          <div class="hint">hoe goed deelnemers hun ANS-toestand aanvoelen (kleiner = beter)</div></div>
+        <div class="card"><div class="num">{{ d.avg_verschil }}</div><div class="lab">AZS-bewustzijn</div>
+          <div class="hint">hoe goed deelnemers hun AZS-toestand aanvoelen (kleiner = beter)</div></div>
       </div>
     </div>
 
     <div class="section">
       <h2>Deelnemers</h2>
       <table>
-        <thead><tr><th>Deelnemer-code</th><th>Ontspanning<br>(0-10)</th><th>Werkstress<br>(0-10)</th><th>Relax Index</th><th>Verschil<br>ANS-bewustzijn</th><th>Zone</th></tr></thead>
+        <thead><tr><th>Deelnemer-code</th><th>Ontspanning<br>(0-10)</th><th>Werkstress<br>(0-10)</th><th>Relax Index</th><th>Verschil<br>AZS-bewustzijn</th><th>Zone</th></tr></thead>
         <tbody>
           {% for p in d.parts %}
           <tr>
@@ -172,7 +197,7 @@
           {% endfor %}
         </tbody>
       </table>
-      <div class="vlegend">Verschil ANS-bewustzijn |RI − ontspanning|:
+      <div class="vlegend">Verschil AZS-bewustzijn |RI − ontspanning|:
         <span><i style="background:#d4edda"></i>≤ 1,0 goed</span>
         <span><i style="background:#fff3cd"></i>1,0–1,5 matig</span>
         <span><i style="background:#f8d7da"></i>&gt; 1,5 gering</span></div>
@@ -180,31 +205,31 @@
 
     <div class="method">
       <p class="expertise-note">Deze analyse is gebaseerd op 14 jaar expertise in HRV-meting en
-        gevalideerde ANS-methodologie van Lifestyle Monitors.</p>
+        gevalideerde AZS-methodologie van Lifestyle Monitors.</p>
       <h4>Over de Relax Index (RI) meetmethode en het autonome zenuwstelsel</h4>
 
       <h5>Wat is de Relax Index?</h5>
       <p>De <strong>Relax Index (RI)</strong> is een objectieve maat voor de toestand van het
-        <strong>autonome zenuwstelsel (ANS)</strong> — het systeem dat automatisch hart, ademhaling,
+        <strong>autonome zenuwstelsel (AZS)</strong> — het systeem dat automatisch hart, ademhaling,
         spijsvertering en stressrespons reguleert. De RI wordt berekend uit twee fysiologische signalen:</p>
       <ul>
         <li><strong>Hartslagvariabiliteit (HRV)</strong>: de variatie in tijd tussen hartslagen. Een
-          hogere HRV wijst op een flexibel ANS dat goed kan schakelen tussen inspanning en herstel.</li>
+          hogere HRV wijst op een flexibel AZS dat goed kan schakelen tussen inspanning en herstel.</li>
         <li><strong>Hartslag (BPM)</strong>: het aantal slagen per minuut. Een lagere rusthartslag hangt
-          samen met een efficiënte hartfunctie en een ANS dat goed kan ontspannen.</li>
+          samen met een efficiënte hartfunctie en een AZS dat goed kan ontspannen.</li>
       </ul>
       <p>De RI-schaal loopt van <strong>0 tot 10</strong> en is verdeeld in vijf zones:</p>
       <ul>
-        <li><strong>8–10 — Veerkrachtig</strong>: optimale ANS-balans, goed hersteld</li>
+        <li><strong>8–10 — Veerkrachtig</strong>: optimale AZS-balans, goed hersteld</li>
         <li><strong>6–8 — In balans</strong>: normale, gezonde stress-respons</li>
         <li><strong>4–6 — Licht belast</strong>: het systeem staat licht onder druk</li>
-        <li><strong>2–4 — Belast</strong>: verhoogde belasting van het ANS</li>
-        <li><strong>0–2 — Zwaar belast</strong>: sterk belaste ANS-balans</li>
+        <li><strong>2–4 — Belast</strong>: verhoogde belasting van het AZS</li>
+        <li><strong>0–2 — Zwaar belast</strong>: sterk belaste AZS-balans</li>
       </ul>
 
-      <h5>Waarom is ANS-gezondheid belangrijk?</h5>
-      <p>Een gezond ANS is belangrijk voor duurzame inzetbaarheid. Wanneer mensen langdurig onder druk
-        staan zonder voldoende herstel, kan het ANS uit balans raken. Dat kan samengaan met:</p>
+      <h5>Waarom is AZS-gezondheid belangrijk?</h5>
+      <p>Een gezond AZS is belangrijk voor duurzame inzetbaarheid. Wanneer mensen langdurig onder druk
+        staan zonder voldoende herstel, kan het AZS uit balans raken. Dat kan samengaan met:</p>
       <ul>
         <li>verminderde concentratie en besluitvorming;</li>
         <li>een hoger risico op vermoeidheid, verzuim en burn-out;</li>
@@ -212,34 +237,34 @@
         <li>op termijn een lagere werkkwaliteit.</li>
       </ul>
       <p>Voldoende <strong>herstelmomenten</strong> — regelmatige pauzes, beweging, ontspanning en slaap —
-        dragen bij aan een beter functionerend ANS en daarmee aan <strong>duurzamer presteren</strong>.</p>
+        dragen bij aan een beter functionerend AZS en daarmee aan <strong>duurzamer presteren</strong>.</p>
 
       <h5>Actiepunten voor uw organisatie</h5>
       <p>Dit rapport toont twee groepsindicatoren die aandacht verdienen:</p>
       <ul>
         <li><strong>Gemiddelde Relax Index ({{ d.avg_ri }})</strong><br>
           Drempelwaarde aandacht: RI &lt; 6,0</li>
-        <li><strong>Gemiddeld ANS-bewustzijn (verschil: {{ d.avg_verschil }})</strong><br>
+        <li><strong>Gemiddeld AZS-bewustzijn (verschil: {{ d.avg_verschil }})</strong><br>
           Drempelwaarde aandacht: verschil &gt; 1,5</li>
       </ul>
       <p class="callout"><strong>Belangrijk:</strong> een lage Relax Index kan veel oorzaken hebben — werkstress is
         er slechts één van. Andere mogelijke oorzaken zijn vermoeidheid, ziekte, chronische pijn,
         slaapgebrek of gebrek aan zingeving. Dit rapport adresseert uitsluitend het werkgebied.
         Voor diagnose of behandeling van niet-werkgerelateerde factoren: verwijs naar een
-        bedrijfsarts (occupational health professional) of huisarts.</p>
+        bedrijfsarts (arbeidsgezondheidkundige) of huisarts.</p>
 
       <h5>Werkgerichte aanbevelingen voor duurzame prestatie</h5>
-      <p>Om de ANS-gezondheid van uw team op het werkgebied te ondersteunen, worden onderstaande
+      <p>Om de AZS-gezondheid van uw team op het werkgebied te ondersteunen, worden onderstaande
         maatregelen aanbevolen:</p>
       <ul>
         <li><strong>Werklast en deadlines reviewen:</strong> zorg dat de werkbelasting haalbaar is
           en in balans met herstelmogelijkheden.</li>
         <li><strong>Pauzes en ontspanningsmomenten inbouwen:</strong> regelmatige pauzes, beweging
-          en mentale rust tijdens de werkdag helpen het ANS te herstellen.</li>
+          en mentale rust tijdens de werkdag helpen het AZS te herstellen.</li>
         <li><strong>Herstelcultuur creëren:</strong> zorg dat "even niet werken" even waardevol is
           als presteren, en moedig medewerkers aan pauzes daadwerkelijk te nemen.</li>
         <li><strong>Stress-awareness-training:</strong> voor groepen met een hoog verschil
-          ANS-bewustzijn kan training in lichaamsbewustzijn en stressherkenning medewerkers helpen
+          AZS-bewustzijn kan training in lichaamsbewustzijn en stressherkenning medewerkers helpen
           hun eigen signalen beter op te merken.</li>
         <li><strong>Individuele begeleiding:</strong> voor medewerkers met een zeer lage RI of een
           groot verschil kan coaching of begeleiding (via HR of de bedrijfsarts) waardevol zijn.</li>
@@ -247,8 +272,8 @@
       <p>Een team met goed herstelde medewerkers is op de lange termijn productiever, creatiever en
         stabieler. Dit zijn geen extra kosten, maar investeringen in duurzame inzetbaarheid.</p>
 
-      <h5>Verschil ANS-bewustzijn</h5>
-      <p>Dit rapport toont ook het verschil tussen de gemeten ANS-status (RI) en hoe medewerkers zich
+      <h5>Verschil AZS-bewustzijn</h5>
+      <p>Dit rapport toont ook het verschil tussen de gemeten AZS-status (RI) en hoe medewerkers zich
         voelen (ontspanning). Dit verschil kan wijzen op verschillen in lichaamsbesef.</p>
       <p><strong>Uw groep:</strong> gemiddeld verschil {{ d.avg_verschil }}
         {% if d.avg_verschil_num is none %}— nog onvoldoende gegevens voor een groepsbeeld.
@@ -256,14 +281,25 @@
         {% elif d.avg_verschil_num <= 1.5 %}— matige aansluiting; enige aandacht waard.
         {% else %}— groter verschil; training in stressherkenning kan waarde hebben.{% endif %}</p>
       <p>Dit onderwerp vraagt om verder onderzoek en validatie. Voor vragen: raadpleeg een
-        bedrijfsarts (occupational health professional).</p>
+        bedrijfsarts (arbeidsgezondheidkundige).</p>
 
-      <p class="callout">Een belast systeem kan wijzen op stress, vermoeidheid, ziekte, pijn of herstel — de meting
-        zegt niet welke. De RI is een momentopname en geen medische diagnose.</p>
+      <p class="callout">Een belast systeem kan wijzen op aanhoudende stress, vermoeidheid, ziekte, pijn,
+        slaapgebrek of gebrek aan zingeving — de meting zegt niet welke. De RI is een momentopname en
+        geen medische diagnose.</p>
     </div>
 
     <div class="foot">Gegenereerd op basis van momentopnames; Relax Index 0-10, zone-indeling
       volgens de StressChecker-norm. Onbetrouwbare metingen tellen niet mee in het gemiddelde of de zoneverdeling.</div>
+
+    {% if pdf %}
+    <div class="pagefoot"><img src="static/img/sc_logo_500px.png" alt="Lifestyle Monitors">Dit rapport is gegenereerd met StressChecker Pro Event van Lifestyle Monitors &middot; <span class="cf">Vertrouwelijk</span>{% if generated %} &middot; {{ generated }}{% endif %}</div>
+    {% else %}
+    <footer class="branding">
+      <img src="/static/img/sc_logo_500px.png" alt="Lifestyle Monitors">
+      <div class="txt">Dit rapport is gegenereerd met StressChecker Pro Event van Lifestyle Monitors<br>
+        <span class="cf">Vertrouwelijk</span>{% if generated %} &middot; {{ generated }}{% endif %}</div>
+    </footer>
+    {% endif %}
   </div>
 </body>
 </html>
