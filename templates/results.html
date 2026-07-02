@@ -14,6 +14,18 @@
 .mt-results th:nth-child(7),.mt-results td:nth-child(7){min-width:110px;}
 .mt-results th:nth-child(8),.mt-results td:nth-child(8){min-width:100px;max-width:200px;}
 .mt-results th:nth-child(9),.mt-results td:nth-child(9){min-width:100px;max-width:200px;word-wrap:break-word;}
+/* Horizontale scroll-affordance (optie B): fade-edge rechts + tekst/chevron-hint.
+   Beide verschijnen ALLEEN als de tabel breder is dan de container (JS zet .mt-has-overflow)
+   en de fade verdwijnt zodra volledig naar rechts gescrolld (.mt-at-end). Op brede schermen
+   waar alles past: geen hint, geen fade. */
+.mt-scrollwrap{position:relative;}
+.mt-scrollwrap::after{content:"";position:absolute;top:0;right:0;bottom:0;width:42px;pointer-events:none;border-radius:0 12px 12px 0;background:linear-gradient(to right,rgba(255,255,255,0),rgba(255,255,255,.97));opacity:0;transition:opacity .18s ease;}
+.mt-scrollwrap.mt-has-overflow::after{opacity:1;}
+.mt-scrollwrap.mt-at-end::after{opacity:0;}
+.mt-hint{align-items:center;gap:.35rem;font-size:.72rem;color:#8a8a8a;margin:0 0 .45rem .2rem;}
+.mt-hint .mt-chev{display:inline-block;color:#0078ff;font-weight:700;animation:mt-nudge 1.4s ease-in-out infinite;}
+@keyframes mt-nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(3px)}}
+@media (prefers-reduced-motion:reduce){.mt-hint .mt-chev{animation:none;}}
 </style>
 
 <div class="screen">
@@ -224,7 +236,9 @@ function renderResults(results) {
   const kubTip = LANG=='de'?'Kubios-Export (RR-Rohdaten) herunterladen':LANG=='en'?'Download Kubios export (raw RR data)':'Kubios-export (ruwe RR-data) downloaden';
   const kubLabel = LANG=='de'?'Kubios-Export':LANG=='en'?'Kubios export':'Kubios export';
   function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-  var html = '<div class="table-responsive" style="background:#fff;border-radius:12px;padding:1.25rem 1.5rem;width:100%;box-sizing:border-box;">';
+  var hScroll = LANG=='de'?'Für den Kubios-Export nach rechts scrollen':LANG=='en'?'Scroll right for the Kubios export':'Scroll voor de Kubios-export';
+  var html = '<div class="mt-hint" id="mtHint" style="display:none">'+hScroll+' <span class="mt-chev">&#8594;</span></div>';
+  html += '<div class="mt-scrollwrap"><div class="table-responsive" style="background:#fff;border-radius:12px;padding:1.25rem 1.5rem;width:100%;box-sizing:border-box;">';
   html += '<table class="meting-tabel mt-results"><tr><th>'+hDatum+'</th><th>'+hTijd+'</th><th>RI</th><th>BPM</th><th class="hide-on-tablet">HRV%</th><th class="hide-on-tablet">RMSSD</th><th>'+hMeting+'</th><th style="padding:.4rem .6rem;text-align:left;border-bottom:2px solid #dde3ea;">'+ hDim +'</th><th>'+hLabel+'</th><th>Kubios</th></tr>';
   // Stipkleur via de canonieke zone-indeling (zone(): grenzen 2/4/6/8 — In balans vanaf RI 6.0),
   // zelfde 5-zone-palet als de grafiek hierboven. Was: losse 11-elementen array op floor(ri),
@@ -279,9 +293,28 @@ function renderResults(results) {
         var kubCell=r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" title="'+kubTip+'" aria-label="'+kubTip+'" onclick="event.stopPropagation()" style="font-size:.75rem;color:#0078ff;text-decoration:none;white-space:nowrap;">&#8595; '+kubLabel+'</a>':'';
         html+='<tr style="'+(hC?'cursor:pointer;':'')+'" '+(hC?'onclick="toggleCtx2('+r.id+')"':'')+'>'+'<td>'+date+'</td><td>'+tijd+'</td><td>'+dot+riCell+'</td><td>'+(r.bpm||'-')+'</td><td class="hide-on-tablet">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td class="hide-on-tablet">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td>'+mTypeL+'</td><td>'+watCell+'</td><td>'+(r.notes||'')+'</td><td>'+kubCell+'</td></tr>'+ctx_html2;
   });
-  html+='</table></div>';
+  html+='</table></div></div>';
   list.innerHTML=html;
+  updTableHint();
+  setTimeout(updTableHint, 200);
 }
+
+// Scroll-affordance voor de metingen-tabel: toont hint + fade-edge alleen bij overflow,
+// verbergt de fade aan het scroll-einde. Herquery't de huidige DOM (renderResults kan
+// meermaals lopen). Eén globale resize-listener; scroll-listener per (nieuwe) container.
+function updTableHint(){
+  var wrap=document.querySelector('#resultsList .mt-scrollwrap');
+  if(!wrap) return;
+  var sc=wrap.querySelector('.table-responsive');
+  if(!sc) return;
+  var overflow=(sc.scrollWidth - sc.clientWidth) > 2;
+  wrap.classList.toggle('mt-has-overflow', overflow);
+  wrap.classList.toggle('mt-at-end', (sc.scrollLeft + sc.clientWidth) >= (sc.scrollWidth - 2));
+  var hint=document.getElementById('mtHint');
+  if(hint) hint.style.display = overflow ? 'flex' : 'none';
+  if(overflow && !sc.__mtBound){ sc.__mtBound=1; sc.addEventListener('scroll', updTableHint, {passive:true}); }
+}
+if(!window.__mtHintResize){ window.__mtHintResize=1; window.addEventListener('resize', updTableHint); }
 
 async function loadStats() {
   try {
