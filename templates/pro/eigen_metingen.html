@@ -186,7 +186,7 @@ var hTijd=LANG=='de'?'Zeit':LANG=='en'?'Time':'Tijd';
 var hMeting=LANG=='de'?'Messung':LANG=='en'?'Type':'Meting';
 var hLabel=LANG=='de'?'Notiz':LANG=='en'?'Label':'Label';
 var hDim=LANG=='de'?'Was beschäftigt Sie':LANG=='en'?'Dimension':'Wat speelt er';
-var dDIM=LANG=='de'?{lichamelijk:'Körperlich',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spirituell',weet_niet:'?'}:LANG=='en'?{lichamelijk:'Physical',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spiritual',weet_niet:'?'}:{lichamelijk:'Lichamelijk',mentaal:'Mentaal',emotioneel:'Emotioneel',spiritueel:'Spiritueel',weet_niet:'?'};
+var _DA={{ dimensie_labels_all()|tojson }};var dDIM=_DA[LANG]||_DA['nl'];dDIM.weet_niet='?';
 var mTYPE=LANG=='de'?{basismeting:'Basismessung',biofeedback:'Biofeedback',situatiemeting:'Situationsmessung'}:LANG=='en'?{basismeting:'Baseline measurement',biofeedback:'Biofeedback',situatiemeting:'Situation measurement'}:{};
 if(!data||!data.length){list.innerHTML='<p style="text-align:center;color:#888;">'+(LANG=='de'?'Noch keine Messungen.':LANG=='en'?'No readings yet.':'Nog geen metingen.')+'</p>';}
 else{

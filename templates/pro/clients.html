@@ -101,7 +101,7 @@
           <td>{% if c["week_avg"] %}<span class="ri-badge ri-{{ c["week_avg"]|int }}">{{ c["week_avg"] }}</span>{% else %}—{% endif %}</td>
           <td>{% if c["trend"][0] == "up" %}<span class="trend-up">&uarr; +{{ c["trend"][1] }}</span>{% elif c["trend"][0] == "down" %}<span class="trend-down">&darr; {{ c["trend"][1] }}</span>{% elif c["trend"][0] == "flat" %}<span class="trend-flat">&rarr; {% if lang=="de" %}stabil{% elif lang=="en" %}stable{% else %}stabiel{% endif %}</span>{% else %}<span class="trend-nodata">—</span>{% endif %}</td>
           <td>{{ c["last_ts"] or "—" }}</td>
-          <td>{% set _d=c["top_dimensie"] or "" %}{%if _d%}{%if lang=="de"%}{{"Körperlich" if _d=="lichamelijk" else "Mental" if _d=="mentaal" else "Emotional" if _d=="emotioneel" else "Spirituell" if _d=="spiritueel" else _d}}{%elif lang=="en"%}{{"Physical" if _d=="lichamelijk" else "Mental" if _d=="mentaal" else "Emotional" if _d=="emotioneel" else "Spiritual" if _d=="spiritueel" else _d}}{%else%}{{"Lichamelijk" if _d=="lichamelijk" else "Mentaal" if _d=="mentaal" else "Emotioneel" if _d=="emotioneel" else "Spiritueel" if _d=="spiritueel" else _d}}{%endif%}{%else%}—{%endif%}</td>
+          <td>{% set _d=c["top_dimensie"] or "" %}{%if _d%}{{ dimensie_label(_d, lang) }}{%else%}—{%endif%}</td>
           <td>{{ c["total_metingen"] }}</td>
         </tr>
       {% endfor %}

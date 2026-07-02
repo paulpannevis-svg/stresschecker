@@ -16,7 +16,7 @@ var hMeting=lang2=='de'?'MESSUNG':lang2=='en'?'READING':'METING';
 // komt mee als r.meting_type_label; situatie-label (r.notes) idem (situation_label_translate).
 // Dimensie-vertaling ("Wat speelt er") — dezelfde set als /resultaten (results.html dDIM),
 // zodat beide consument-tabellen hetzelfde begrip identiek weergeven (NL/DE/EN).
-var dDIM=lang2=='de'?{lichamelijk:'Körperlich',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spirituell',weet_niet:'?'}:lang2=='en'?{lichamelijk:'Physical',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spiritual',weet_niet:'?'}:{lichamelijk:'Lichamelijk',mentaal:'Mentaal',emotioneel:'Emotioneel',spiritueel:'Spiritueel',weet_niet:'?'};
+var _DA={{ dimensie_labels_all()|tojson }};var dDIM=_DA[lang2]||_DA['nl'];dDIM.weet_niet='?';
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 var list=document.getElementById('metingenLijst');
 if(!data||!data.length){list.innerHTML='<p style="text-align:center;color:#888;">'+(lang2=='de'?'Noch keine Messungen.':lang2=='en'?'No readings yet.':'Nog geen metingen.')+'</p>';}

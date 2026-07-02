@@ -518,9 +518,8 @@ var vit=5;
 
 function getCtxDuiding(ri, dim, vit, lang) {
   if (!dim || dim === 'weet_niet') return null;
-  var dimNL={lichamelijk:'Lichamelijk',mentaal:'Mentaal',emotioneel:'Emotioneel',spiritueel:'Spiritueel'};
-  var dimDE={lichamelijk:'Körperlich',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spirituell'};
-  var dimEN={lichamelijk:'Physical',mentaal:'Mental',emotioneel:'Emotional',spiritueel:'Spiritual'};
+  var _DA={{ dimensie_labels_all()|tojson }};
+  var dimNL=_DA.nl,dimDE=_DA.de,dimEN=_DA.en;
   var dNL=dimNL[dim]||dim,dDE=dimDE[dim]||dim,dEN=dimEN[dim]||dim;
   var spiegels={
     lichamelijk:{

@@ -252,36 +252,6 @@ function drawChart(period) {
 // Laad data
 fetch((typeof cid !== 'undefined' && cid) ? '/api/pro/client/'+cid+'/metingen' : '/api/metingen?limit=500').then(r=>r.json()).then(function(data){
 
-fetch("/api/metingen/patroon").then(r=>r.json()).then(function(p){
-  if(!p||p.count<3)return;
-  var lng="{{lang}}";
-  var delen=[]; var vraag="";
-  if(p.trend==="up"&&p.avg_recent&&p.avg_older){
-    delen.push(lng==="de"?"Ihr Koerper erholt sich diese Woche — RI stieg von "+p.avg_older+" auf "+p.avg_recent+".": lng==="en"?"Your body is relaxing more — RI rose from "+p.avg_older+" to "+p.avg_recent+".": "Je lichaam ontspant deze week iets meer — je RI steeg van "+p.avg_older+" naar "+p.avg_recent+".");
-    vraag=lng==="de"?"Was haben Sie diese Woche anders gemacht — und können Sie davon mehr tun?": lng==="en"?"What did you do differently this week — and can you do more of it?": "Wat deed je anders deze week — en kun je daar meer van doen?";
-  } else if(p.trend==="down"&&p.avg_recent&&p.avg_older){
-    delen.push(lng==="de"?"RI sank von "+p.avg_older+" auf "+p.avg_recent+". Ihr Koerper meldet sich.": lng==="en"?"RI dropped from "+p.avg_older+" to "+p.avg_recent+". Your body is asking for attention.": "Je RI daalde van "+p.avg_older+" naar "+p.avg_recent+". Je lichaam vraagt om aandacht.");
-    vraag=lng==="de"?"Was kostet sich gerade am meisten Energie — und was koenntest Sie loslassen?": lng==="en"?"What is costing you the most energy right now — and what could you let go?": "Wat kost je op dit moment de meeste energie — en wat zou je kunnen loslaten?";
-  }
-  if(p.top_dim&&p.top_dim_count>=2){
-    var dm={lichamelijk:{nl:"lichamelijks",de:"Koerperliches",en:"something physical"},mentaal:{nl:"mentaals",de:"Mentales",en:"something mental"},emotioneel:{nl:"emotioneeels",de:"Emotionales",en:"something emotional"},spiritueel:{nl:"spiritueels",de:"Spirituelles",en:"something deeper"}};
-    var dn=dm[p.top_dim]?dm[p.top_dim][lng]||p.top_dim:p.top_dim;
-    delen.push(lng==="de"?"Bei "+p.top_dim_count+" von "+p.top_dim_total+" Messungen spielt "+dn+" eine Rolle. Wiederkehrendes Signal.": lng==="en"?"In "+p.top_dim_count+" of "+p.top_dim_total+" readings, "+dn+" is at play. A recurring signal.": "Bij "+p.top_dim_count+" van je laatste "+p.top_dim_total+" metingen speelt er iets "+dn+". Dat is een terugkerend signaal.");
-    var dv={lichamelijk:{nl:"Wat zegt je lichaam dat je nog niet hardop hebt gezegd?",de:"Was sagt Ihnen Ihr Koerper, das Sie noch nicht ausgesprochen haben?",en:"What is your body telling you that you have not said out loud yet?"},mentaal:{nl:"Welke gedachte draait steeds terug — en klopt die eigenlijk wel?",de:"Welcher Gedanke kehrt immer wieder — und stimmt er wirklich?",en:"Which thought keeps returning — and is it actually true?"},emotioneel:{nl:"Welk gevoel wacht op aandacht?",de:"Welches Gefuehl wartet auf Aufmerksamkeit?",en:"Which feeling is waiting for your attention?"},spiritueel:{nl:"Handel je vanuit wat je echt belangrijk vindt?",de:"Handeln Sie aus dem, was Ihnen wirklich wichtig ist?",en:"Are you acting from what truly matters to you?"}};
-    if(dv[p.top_dim])vraag=dv[p.top_dim][lng]||dv[p.top_dim].nl;
-  }
-  if(delen.length>0){
-    var eT=document.getElementById("patroonTekst");
-    var eV=document.getElementById("patroonVraag");
-    var eB=document.getElementById("patroonBlok");
-    if(eT)eT.textContent=delen.join(" ");
-    if(eV&&vraag)eV.textContent="→ "+vraag;
-    if(eB)eB.style.display="block";
-  }
-});
-
-
-
   allData = Array.isArray(data) ? data : [];
   renderList(allData);
   drawChart(currentPeriod);

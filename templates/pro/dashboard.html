@@ -59,7 +59,7 @@
             {% else %}<span class="trend-flat" title="{% if lang=='de' %}stabil{% elif lang=='en' %}stable{% else %}stabiel{% endif %}">&#9644;</span>{% endif %}
           </td>
           <td>{{ r["last_ts"] or "—" }}</td>
-          <td>{% set _d=r["top_dimensie"] or "" %}{%if _d%}<span class="dim-pill">{%if lang=="de"%}{{"Körperlich" if _d=="lichamelijk" else "Mental" if _d=="mentaal" else "Emotional" if _d=="emotioneel" else "Spirituell" if _d=="spiritueel" else _d}}{%elif lang=="en"%}{{"Physical" if _d=="lichamelijk" else "Mental" if _d=="mentaal" else "Emotional" if _d=="emotioneel" else "Spiritual" if _d=="spiritueel" else _d}}{%else%}{{"Lichamelijk" if _d=="lichamelijk" else "Mentaal" if _d=="mentaal" else "Emotioneel" if _d=="emotioneel" else "Spiritueel" if _d=="spiritueel" else _d}}{%endif%}</span>{%else%}—{%endif%}</td>
+          <td>{% set _d=r["top_dimensie"] or "" %}{%if _d%}<span class="dim-pill">{{ dimensie_label(_d, lang) }}</span>{%else%}—{%endif%}</td>
           <td>{{ r["total"] }}</td>
         </tr>
         {% endfor %}

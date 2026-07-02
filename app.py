@@ -3377,6 +3377,24 @@ def zone_desc_jinja(zone_key, lang):
     return _analytics.zone_description(zone_key, lang)
 
 
+@app.template_global()
+def dimensie_label(code, lang):
+    """Jinja-helper: dimensie-code → gelokaliseerd label. Wrapt analytics.dimensie_label
+    (server-side gebruik: pro/dashboard, pro/clients). SSOT = analytics.DIMENSIE_LABELS."""
+    import analytics as _analytics
+    return _analytics.dimensie_label(code, lang)
+
+
+@app.template_global()
+def dimensie_labels_all():
+    """Jinja-helper: volledige NL/DE/EN dimensie-map (4 canonieke dimensies) voor injectie
+    in de client-side JS-tabellen (results/verloop/mijn_metingen/eigen_metingen/kwadrant).
+    SSOT = analytics.DIMENSIE_LABELS. 'weet_niet' zit hier NIET in; elk oppervlak houdt zijn
+    eigen weet_niet-weergave (dedup Fase 1)."""
+    import analytics as _analytics
+    return _analytics.DIMENSIE_LABELS
+
+
 def _report_db():
     db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row

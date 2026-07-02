@@ -143,6 +143,27 @@ MEASUREMENT_TYPE_LABELS = {
 }
 
 
+# Dimensie ("Wat speelt er"-categorie): opgeslagen code → label per locale. Canonieke
+# BRON voor de voorheen inline-gedupliceerde template-maps (dedup Fase 1, 2026-07-02).
+# Bevat UITSLUITEND de vier echte dimensies; 'weet_niet' en onbekende codes vallen bewust
+# terug op de ruwe code — de oppervlakken houden hun eigen weet_niet-weergave (JS-tabellen
+# tonen '?', de Jinja-pillen tonen de ruwe code). Zie dimensie_label().
+DIMENSIE_LABELS = {
+    'nl': {'lichamelijk': 'Lichamelijk', 'mentaal': 'Mentaal', 'emotioneel': 'Emotioneel', 'spiritueel': 'Spiritueel'},
+    'de': {'lichamelijk': 'Körperlich', 'mentaal': 'Mental', 'emotioneel': 'Emotional', 'spiritueel': 'Spirituell'},
+    'en': {'lichamelijk': 'Physical', 'mentaal': 'Mental', 'emotioneel': 'Emotional', 'spiritueel': 'Spiritual'},
+}
+
+
+def dimensie_label(code, lang='nl'):
+    """dimensie-code → gelokaliseerd label (NL/DE/EN). Lege/onbekende code (incl.
+    'weet_niet') → ruwe code onvertaald, identiek aan het bestaande gedrag van de
+    Jinja-pillen (pro/dashboard, pro/clients: `else _d`)."""
+    if not code:
+        return ''
+    return DIMENSIE_LABELS.get(lang, DIMENSIE_LABELS['nl']).get(code, code)
+
+
 def meting_type_label(code, lang='nl'):
     """metingen.meting_type-code → label in actieve locale. Onbekende code verbatim."""
     if not code:
