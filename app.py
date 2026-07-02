@@ -787,7 +787,7 @@ def _enforce_pro_subscription():
 # activatie-routes blijven BEREIKBAAR zodat de klant kan verlengen. Free-mode-sessies
 # hebben license_type='free' (niet 'consumer') en worden hier dus NIET geraakt.
 _CONSUMER_GATED_PATHS = frozenset({
-    '/kwadrant', '/resultaten', '/mijn-metingen', '/verloop', '/biofeedback',
+    '/kwadrant', '/resultaten', '/verloop', '/biofeedback',
     '/tips', '/beroepen', '/over-stress', '/sport-training', '/kenniscentrum',
     '/meetkeuze', '/sensor-en-meten', '/sc/sensor-keuze',
 })
@@ -2571,27 +2571,11 @@ def _adaptive_state(*args, **kwargs):
         return None
 
 
-@app.route('/mijn-metingen')
-def mijn_metingen():
-    user_key = session.get('user_key','')
-    if not user_key:
-        return redirect(url_for('sc_login'))
-    cn = get_meting_db()
-    metingen = cn.execute(
-        "SELECT id, ts, ri, bpm, hrv_pct, rmssd, kwaliteit, meting_type, notes, rr_intervals, ctx_dimensie, ctx_vrije_tekst FROM metingen WHERE user_key=? ORDER BY ts DESC",
-        (user_key,)
-    ).fetchall()
-    metingen_chart = [dict(r) for r in metingen]
-    lang = session.get('lang','nl')
-    import analytics as _analytics
-    for r in metingen_chart:
-        r['meting_type_label'] = _analytics.meting_type_label(r.get('meting_type'), lang)
-        r['notes'] = _analytics.situation_label_translate(r.get('notes'), lang)
-        # "Wat speelt er" = categorie (ctx_dimensie) voor álle meettypes; vrije tekst als
-        # tweede regel/tooltip. Zelfde velden/naamgeving als de pro-sibling (/pro/mijn-metingen).
-        r['dimensie'] = r.get('ctx_dimensie') or ''
-        r['vrije_tekst'] = r.get('ctx_vrije_tekst') or ''
-    return render_template('mijn_metingen.html', metingen_chart=metingen_chart, lang=lang)
+# De consument-detailpagina /mijn-metingen ("Detail info metingen") is geconsolideerd
+# op /resultaten: de Kubios-exportkolom én de vrije tekst ("Wat speelt er") zijn
+# daarheen overgezet (results.html). Route + template (mijn_metingen.html) verwijderd
+# 2026-07-02 — geen unieke functionaliteit meer. De pro-varianten (/pro/mijn-metingen,
+# pro/verloop) en de Kubios-endpoints (/api/kubios/download[/<id>]) blijven ongemoeid.
 
 @app.route("/biofeedback")
 def biofeedback():
@@ -3414,7 +3398,7 @@ def dimensie_label(code, lang):
 @app.template_global()
 def dimensie_labels_all():
     """Jinja-helper: volledige NL/DE/EN dimensie-map (4 canonieke dimensies) voor injectie
-    in de client-side JS-tabellen (results/verloop/mijn_metingen/eigen_metingen/kwadrant).
+    in de client-side JS-tabellen (results/verloop/eigen_metingen/kwadrant).
     SSOT = analytics.DIMENSIE_LABELS. 'weet_niet' zit hier NIET in; elk oppervlak houdt zijn
     eigen weet_niet-weergave (dedup Fase 1)."""
     import analytics as _analytics
@@ -3424,7 +3408,7 @@ def dimensie_labels_all():
 @app.template_global()
 def quality_tier_bounds():
     """Jinja-helper: kwaliteits-klasse-grenzen (Fase 3) voor injectie in client-side JS die
-    hrv.js niet laadt (kwadrant/mijn_metingen). SSOT = analytics-constanten; één bron zodat
+    hrv.js niet laadt (kwadrant). SSOT = analytics-constanten; één bron zodat
     geen template een eigen 85/70/95/90-literal herintroduceert (geborgd door de tier-test)."""
     import analytics as _analytics
     return {'betrouwbaar': _analytics.QUALITY_TIER_BETROUWBAAR_MIN,

@@ -788,7 +788,7 @@ function finishMeasure() {
     <input id="biofeedLabelInput" type="text" placeholder="{%if lang=='de'%}z.B. Nach Yoga, Vor Präsentation...{%elif lang=='en'%}e.g. After yoga, Before presentation...{%else%}bijv. Na yoga, Voor presentatie...{%endif%}" style="width:100%;padding:12px;border:1.5px solid #ddd;border-radius:8px;font-size:.95rem;box-sizing:border-box;margin-bottom:12px">
     {# DRIFT-GUARD: deze snelkeuze-chips moeten synchroon blijven met
        analytics.SITUATION_CHIP_LABELS (situation_label_translate vertaalt opgeslagen
-       chip-labels render-time op /mijn-metingen). Nieuwe/gewijzigde chip? Voeg 'm daar óók toe. #}
+       chip-labels render-time op /resultaten). Nieuwe/gewijzigde chip? Voeg 'm daar óók toe. #}
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
       <button onclick="setBiofeedLabel('{%if lang=="de"%}Vor Aktivität{%elif lang=="en"%}Before activity{%else%}Voor activiteit{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Vor Aktivität{%elif lang=="en"%}Before activity{%else%}Voor activiteit{%endif%}</button>
       <button onclick="setBiofeedLabel('{%if lang=="de"%}Nach Aktivität{%elif lang=="en"%}After activity{%else%}Na activiteit{%endif%}')" style="padding:6px 12px;border:1.5px solid #E8344E;border-radius:20px;background:#fff0f2;color:#E8344E;cursor:pointer;font-size:.85rem">{%if lang=="de"%}Nach Aktivität{%elif lang=="en"%}After activity{%else%}Na activiteit{%endif%}</button>

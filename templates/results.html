@@ -217,8 +217,15 @@ function renderResults(results) {
   const hTijd = LANG=='de'?'ZEIT':LANG=='en'?'TIME':'TIJD';
   const hMeting = LANG=='de'?'MESSUNG':LANG=='en'?'TYPE':'METING';
   const hLabel = LANG=='de'?'BEZEICHNUNG':LANG=='en'?'LABEL':'LABEL';
+  // Kubios-exportkolom (geconsolideerd vanaf de verwijderde /mijn-metingen-detailpagina).
+  // "Kubios" blijft merknaam; tooltip/aria-label wél 3-talig. Link toont bij élke meting met
+  // RR-data — óók band='slecht'/kw-afgekeurd: juist de ruwe data van een onbetrouwbare meting
+  // is voor onderzoek waardevol (bewuste keuze, identiek aan wat /mijn-metingen deed).
+  const kubTip = LANG=='de'?'Kubios-Export (RR-Rohdaten) herunterladen':LANG=='en'?'Download Kubios export (raw RR data)':'Kubios-export (ruwe RR-data) downloaden';
+  const kubLabel = LANG=='de'?'Kubios-Export':LANG=='en'?'Kubios export':'Kubios export';
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   var html = '<div class="table-responsive" style="background:#fff;border-radius:12px;padding:1.25rem 1.5rem;width:100%;box-sizing:border-box;">';
-  html += '<table class="meting-tabel mt-results"><tr><th>'+hDatum+'</th><th>'+hTijd+'</th><th>RI</th><th>BPM</th><th class="hide-on-tablet">HRV%</th><th class="hide-on-tablet">RMSSD</th><th>'+hMeting+'</th><th style="padding:.4rem .6rem;text-align:left;border-bottom:2px solid #dde3ea;">'+ hDim +'</th><th>'+hLabel+'</th></tr>';
+  html += '<table class="meting-tabel mt-results"><tr><th>'+hDatum+'</th><th>'+hTijd+'</th><th>RI</th><th>BPM</th><th class="hide-on-tablet">HRV%</th><th class="hide-on-tablet">RMSSD</th><th>'+hMeting+'</th><th style="padding:.4rem .6rem;text-align:left;border-bottom:2px solid #dde3ea;">'+ hDim +'</th><th>'+hLabel+'</th><th>Kubios</th></tr>';
   // Stipkleur via de canonieke zone-indeling (zone(): grenzen 2/4/6/8 — In balans vanaf RI 6.0),
   // zelfde 5-zone-palet als de grafiek hierboven. Was: losse 11-elementen array op floor(ri),
   // die groen pas vanaf RI 7 gaf (6.1 onterecht geel t.o.v. gauge/labels).
@@ -253,7 +260,7 @@ function renderResults(results) {
         if(r.subjectief_score!=null||r.ctx_vitaliteit!=null||r.ctx_dimensie){
           var _DA={{ dimensie_labels_all()|tojson }};var dDIM=_DA[LANG]||_DA['nl'];dDIM.weet_niet='?';
           var dLabel=r.ctx_dimensie?(dDIM[r.ctx_dimensie]||r.ctx_dimensie):'';
-          ctx_html2='<tr id="ctx2-'+r.id+'" style="display:none"><td colspan="8"><div style="padding:.5rem 1rem;background:#f9f5f0;border-radius:8px;display:flex;gap:1.5rem;font-size:.82rem;color:#555;">'
+          ctx_html2='<tr id="ctx2-'+r.id+'" style="display:none"><td colspan="10"><div style="padding:.5rem 1rem;background:#f9f5f0;border-radius:8px;display:flex;gap:1.5rem;font-size:.82rem;color:#555;">'
             +(r.subjectief_score!=null?'<span><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#c0862a\" stroke-width=\"2.5\" stroke-linecap=\"round\"><path d=\"M2 12 Q7 7 12 12 Q17 17 22 12\"/><path d=\"M2 17 Q7 12 12 17 Q17 22 22 17\" opacity=\".4\"/></svg> '+(LANG=='de'?'Entspannung':LANG=='en'?'Relaxation':'Ontspanning')+': <b>'+r.subjectief_score+'/10</b></span>':'')
             +(r.ctx_vitaliteit!=null?'<span><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"#c0862a\"><path d=\"M13 2L3 14h8l-1 8 11-13h-8z\"/></svg> '+(LANG=='de'?'Authentizität':LANG=='en'?'Authenticity':'Authenticiteit')+': <b>'+r.ctx_vitaliteit+'/10</b></span>':'')
             +(dLabel?'<span><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#c0862a\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"12\" r=\"3\" fill=\"#c0862a\" stroke=\"none\"/><line x1=\"12\" y1=\"2\" x2=\"12\" y2=\"5\"/><line x1=\"12\" y1=\"19\" x2=\"12\" y2=\"22\"/></svg> '+(LANG=='de'?'Was beschäftigt Sie':LANG=='en'?'What is going on':'Wat speelt er')+': <b>'+dLabel+'</b></span>':'')
@@ -264,7 +271,13 @@ function renderResults(results) {
         var mTYPE=LANG=='de'?{basismeting:'Basismessung',biofeedback:'Biofeedback',situatiemeting:'Situationsmessung'}:LANG=='en'?{basismeting:'Baseline measurement',biofeedback:'Biofeedback',situatiemeting:'Situation measurement'}:{};
         var mTypeL=mTYPE[mType.toLowerCase()]||mType;
         var dimL=r.ctx_dimensie?(dDIM[r.ctx_dimensie]||r.ctx_dimensie):'-';
-        html+='<tr style="'+(hC?'cursor:pointer;':'')+'" '+(hC?'onclick="toggleCtx2('+r.id+')"':'')+'>'+'<td>'+date+'</td><td>'+tijd+'</td><td>'+dot+riCell+'</td><td>'+(r.bpm||'-')+'</td><td class="hide-on-tablet">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td class="hide-on-tablet">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td>'+mTypeL+'</td><td>'+dimL+'</td><td>'+(r.notes||'')+'</td></tr>'+ctx_html2;
+        // "Wat speelt er" = vertaalde dimensie + vrije tekst als tweede regel/tooltip
+        // (geconsolideerd vanaf /mijn-metingen; zelfde opmaak/veld ctx_vrije_tekst).
+        var vt=r.ctx_vrije_tekst||'';
+        var watCell=vt?('<span title="'+esc(vt)+'" style="cursor:help;border-bottom:1px dotted #bbb;">'+dimL+'</span><div style="font-size:.72rem;color:#8a8a8a;margin-top:.15rem;max-width:24ch;line-height:1.35;">'+esc(vt)+'</div>'):dimL;
+        // Kubios-export per rij (stopPropagation zodat de download de ctx-uitklaprij niet triggert).
+        var kubCell=r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" title="'+kubTip+'" aria-label="'+kubTip+'" onclick="event.stopPropagation()" style="font-size:.75rem;color:#0078ff;text-decoration:none;white-space:nowrap;">&#8595; '+kubLabel+'</a>':'';
+        html+='<tr style="'+(hC?'cursor:pointer;':'')+'" '+(hC?'onclick="toggleCtx2('+r.id+')"':'')+'>'+'<td>'+date+'</td><td>'+tijd+'</td><td>'+dot+riCell+'</td><td>'+(r.bpm||'-')+'</td><td class="hide-on-tablet">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td class="hide-on-tablet">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td>'+mTypeL+'</td><td>'+watCell+'</td><td>'+(r.notes||'')+'</td><td>'+kubCell+'</td></tr>'+ctx_html2;
   });
   html+='</table></div>';
   list.innerHTML=html;
