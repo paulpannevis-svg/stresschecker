@@ -12,7 +12,7 @@ output byte-voor-byte met de gecaptureerde expected values.
 Tests:
     B1 — RMSSD op de referentie-RR-set
     B2 — RI via Verveen-lookup (bpm, hrv%)
-    B3 — HRV% met age=50, gender=male, ingebakken /2.5 divisor
+    B3 — HRV% met age=50, gender=male (÷2,5-factor verwijderd 2026-06-08; nieuwe schaal)
     B4 — Zone-indeling op grens-RI-waardes (1.9, 2.0, 3.9, 4.0, 5.9,
          6.0, 7.9, 8.0) via HRV.getLabel
 
@@ -90,7 +90,7 @@ def b2_ri_verveen():
 
 
 def b3_hrv_percent():
-    name = "B3 HRV% (SENSOR_CORRECTION_FACTOR=2.5, age=50, male)"
+    name = "B3 HRV% (age=50, male; ÷2,5 verwijderd — nieuwe schaal)"
     ref = _load_references()
     rr = ref["rr_intervals_ms"]
     age = ref["_meta"]["hrv_percent_assumptions"]["age"]

@@ -1,6 +1,12 @@
-# Migratieplan — ÷2,5-factor verwijderen (uitvoeringsklaar)
+# Migratieplan — ÷2,5-factor verwijderen (UITGEVOERD & AFGEROND)
 
-> 🛑 **NOG NIET UITVOEREN OP PROD.** Paul beslist de timing.
+> ✅ **AFGEROND OP PROD.** Code-verwijdering live sinds 2026-06-08 (commit `8a4b4fd`:
+> `calculateRMSSD` zonder `/2.5` + cache-bump); alle StressChecker-DB-rijen op de nieuwe
+> schaal (juni-herberekening + de laatste 2 demo-stragglers id344/id386 herberekend
+> 2026-07-02). `references.json` + `check_calculations.py` geregenereerd (B1-B4 groen).
+> Geverifieerd 2026-07-02: **0 rijen meer op ÷2,5** over `metingen` + `client_metingen`.
+> HLM (`SENSOR_CORRECTION_FACTOR`) blijft apart — afbouw augustus. Onderstaande tekst is
+> historisch (het plan zoals opgesteld 2026-06-08).
 >
 > ⚠️ **STAGING-BEVINDING 2026-06-08 — ÷2,5 VERWIJDEREN ALLÉÉN OVERCORRIGEERT.**
 > De migratie is op staging uitgevoerd (branch `staging`, commit `eee5ea1`; DB's herberekend;

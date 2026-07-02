@@ -13,10 +13,10 @@
       "age": 50,
       "sex": "male",
       "norm_ms": 28,
-      "source": "hrv.js default voor 50+ male"
+      "source": "hrv.js default voor 50+ male (norm ongewijzigd; ÷2,5 weg)"
     },
-    "sensor_correction_factor": 2.5,
-    "note": "Als norm-tabel of correction factor in productie wijzigt, moet references.json opnieuw worden gegenereerd.",
+    "sensor_correction_factor": 1.0,
+    "note": "÷2,5-factor verwijderd 2026-06-08 (spurieus; norm-centrering + TNO ~5% + Verveen ECG≈PPG). Expected-waarden op de NIEUWE schaal (no /2.5) geregenereerd 2026-07-02. NB: de synthetische RR-set is ooit op de oude schaal getuned (target_rmssd 30-45 = ÷2,5-schaal); op de nieuwe schaal geeft hij rmssd 86,7 en HRV% aan het plafond (220). B1 blijft een exact anker; een representatiever mid-range-profiel kan later.",
     "generator": {
       "method": "random.Random(seed).gauss + RSA-sinusoïde",
       "formula": "RR_i = 923.0769230769231 + 95.0·sin(2π·i/4.3) + N(0,10.0)",
@@ -120,11 +120,11 @@
   ],
   "expected": {
     "bpm": 65,
-    "rmssd_ms": 34.66925191625041,
-    "hrv_percent": 124,
-    "ri": 7.7,
-    "zone_label_nl": "In balans",
-    "zone_name": "In balans"
+    "rmssd_ms": 86.67312979062602,
+    "hrv_percent": 220,
+    "ri": 10,
+    "zone_label_nl": "Veerkrachtig",
+    "zone_name": "Veerkrachtig"
   },
   "zone_boundaries": {
     "_comment": "Grenswaarden conform Pauls spec (B13b-1 + B13b-2). Production NL-label = nieuwe zin-stijl uit hrv.js getLabel en kwadrant.html ZL.",
