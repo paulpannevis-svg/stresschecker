@@ -2530,6 +2530,31 @@ def _rr_irregular(rr):
         return False
 
 
+def _kompas_quality_excluded(rr, kwaliteit):
+    """Gedeelde kwaliteitsgate voor de Innerlijk-Kompas-/trend-VERGELIJKING: sluit een
+    eerdere meting uit als vergelijkingsbasis wanneer ze exact ook in de historie-tabel
+    onderdrukt wordt (results.html `_suppress`): variant-B noemt de reeks 'slecht'
+    (analytics.is_slecht_rr) OF kwaliteit < 70 (untrusted). Ontbrekende kwaliteit
+    (legacy/None) = vertrouwd (zelfde afspraak als tabel én analytics.baseline_day_values).
+
+    Vervangt de op prod DORMANTE _rr_irregular-gate (analytics.rr_irregular ontbreekt →
+    no-op), zodat Kompas/trend en tabel over dezelfde 'geldige meting'-set praten en een
+    kwaliteit-afgekeurde meting nooit een RI-vergelijkingsbasis wordt."""
+    try:
+        import analytics as _an
+        if _an.is_slecht_rr(rr):
+            return True
+    except Exception:
+        pass
+    if kwaliteit is not None:
+        try:
+            if float(kwaliteit) < 70:
+                return True
+        except (TypeError, ValueError):
+            pass
+    return False
+
+
 def _prediction_outcome(*args, **kwargs):
     """Fase-1 voorspelvraag-terugkoppeling (analytics.prediction_outcome) is op prod
     afwezig → lever het verwachte 2-tuple (None, None) zodat de uitpak-call niet breekt
@@ -5062,12 +5087,12 @@ def _generate_trend_data(user_key=None, client_id=None, lang='nl', client_name=N
         if client_id:
             db = get_pro_db()
             count_row = db.execute("SELECT COUNT(*) FROM client_metingen WHERE client_id=? AND meting_type='basismeting'", (client_id,)).fetchone()
-            ri_rows = db.execute("SELECT ri, rr_intervals FROM client_metingen WHERE client_id=? AND ri IS NOT NULL AND meting_type='basismeting' ORDER BY ts DESC LIMIT 40", (client_id,)).fetchall()
+            ri_rows = db.execute("SELECT ri, rr_intervals, kwaliteit FROM client_metingen WHERE client_id=? AND ri IS NOT NULL AND meting_type='basismeting' ORDER BY ts DESC LIMIT 40", (client_id,)).fetchall()
             db.close()
         else:
             db = get_meting_db()
             count_row = db.execute("SELECT COUNT(*) FROM metingen WHERE user_key=? AND meting_type='basismeting'", (user_key,)).fetchone()
-            ri_rows = db.execute("SELECT ri, rr_intervals FROM metingen WHERE user_key=? AND ri IS NOT NULL AND meting_type='basismeting' ORDER BY ts DESC LIMIT 40", (user_key,)).fetchall()
+            ri_rows = db.execute("SELECT ri, rr_intervals, kwaliteit FROM metingen WHERE user_key=? AND ri IS NOT NULL AND meting_type='basismeting' ORDER BY ts DESC LIMIT 40", (user_key,)).fetchall()
             db.close()
     except:
         return {'trend_hint': '', 'trend_sentence': ''}
@@ -5094,7 +5119,7 @@ def _generate_trend_data(user_key=None, client_id=None, lang='nl', client_name=N
     # bouwen het venster uit de laatste 10 BETROUWBARE metingen. Te weinig betrouwbaar (<3) →
     # geen verzonnen patroon maar een neutrale regel (randgeval, geen lege/0-aggregaten).
     import analytics as _an_tr
-    _rel = [float(r[0]) for r in ri_rows if r[0] is not None and not _rr_irregular(r[1])]
+    _rel = [float(r[0]) for r in ri_rows if r[0] is not None and not _kompas_quality_excluded(r[1], r[2])]
     ri_values = _rel[:10]
     if len(ri_values) < 3:
         _neutral = {
@@ -5642,7 +5667,7 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
                 ctx['pre_ref'] = dict(pre_row)
             # Altijd recent_basis + phase ophalen als rust-referentie (ook als pre_ref gevuld is)
             recent_rows = db.execute(
-                f"SELECT ri, subjectief_score, ts, ctx_dimensie, ctx_vrije_tekst, rr_intervals FROM {tbl} "
+                f"SELECT ri, subjectief_score, ts, ctx_dimensie, ctx_vrije_tekst, rr_intervals, kwaliteit FROM {tbl} "
                 f"WHERE {where_key} AND meting_type='basismeting' AND ts < ? "
                 f"ORDER BY ts DESC LIMIT 50",
                 (key_val, ts_cur)
@@ -5650,7 +5675,7 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
             # Onregelmatigheid-gate (v2): gevlagde metingen niet als rust-referentie aan de
             # Kompas-prompt voeren (anders becommentarieert het Kompas valse RI-10's). Ruim ophalen,
             # eerste 7 BETROUWBARE houden. Niet corrigeren, alleen uitsluiten.
-            _rb_clean = [r for r in recent_rows if not _rr_irregular(r[5])][:7]
+            _rb_clean = [r for r in recent_rows if not _kompas_quality_excluded(r[5], r[6])][:7]
             ctx['recent_basis'] = [
                 {'ri': r[0], 'subjectief_score': r[1],
                  'datum': _dt.fromtimestamp((r[2] or 0)/1000).strftime('%Y-%m-%d'),
@@ -5687,7 +5712,7 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
         else:
             # basismeting (default) + fallbacks voor bio-zonder-pre / situ-zonder-label
             recent_rows = db.execute(
-                f"SELECT ri, subjectief_score, ts, ctx_dimensie, ctx_vrije_tekst, rr_intervals FROM {tbl} "
+                f"SELECT ri, subjectief_score, ts, ctx_dimensie, ctx_vrije_tekst, rr_intervals, kwaliteit FROM {tbl} "
                 f"WHERE {where_key} AND meting_type='basismeting' AND ts < ? "
                 f"ORDER BY ts DESC LIMIT 50",
                 (key_val, ts_cur)
@@ -5695,7 +5720,7 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
             # Onregelmatigheid-gate (v2): gevlagde metingen niet als rust-referentie aan de
             # Kompas-prompt voeren (anders becommentarieert het Kompas valse RI-10's). Ruim ophalen,
             # eerste 7 BETROUWBARE houden. Niet corrigeren, alleen uitsluiten.
-            _rb_clean = [r for r in recent_rows if not _rr_irregular(r[5])][:7]
+            _rb_clean = [r for r in recent_rows if not _kompas_quality_excluded(r[5], r[6])][:7]
             ctx['recent_basis'] = [
                 {'ri': r[0], 'subjectief_score': r[1],
                  'datum': _dt.fromtimestamp((r[2] or 0)/1000).strftime('%Y-%m-%d'),
@@ -5713,11 +5738,11 @@ def _gather_kompas_context(cur, is_client, user_key, client_id):
             # eerst gevlagde uitsluiten, dán de 8e-14e BETROUWBARE nemen (offset over betrouwbare,
             # niet over de ruwe reeks — anders schuift de ruis het venster in).
             sec_rows = db.execute(
-                f"SELECT ri, rr_intervals FROM {tbl} WHERE {where_key} AND meting_type='basismeting' "
+                f"SELECT ri, rr_intervals, kwaliteit FROM {tbl} WHERE {where_key} AND meting_type='basismeting' "
                 f"AND ri IS NOT NULL AND ts < ? ORDER BY ts DESC LIMIT 100",
                 (key_val, ts_cur)
             ).fetchall()
-            _clean_hist = [float(r[0]) for r in sec_rows if r[0] is not None and not _rr_irregular(r[1])]
+            _clean_hist = [float(r[0]) for r in sec_rows if r[0] is not None and not _kompas_quality_excluded(r[1], r[2])]
             sec_vals = _clean_hist[7:14]
             if len(sec_vals) >= 3:
                 ctx['baseline_ri_history'] = round(sum(sec_vals) / len(sec_vals), 1)
@@ -5801,6 +5826,7 @@ def _basismeting_feiten(cur, recent_basis, phase, lang, age=None):
             'prev': '- Vorige meting: RI {ri} op {date}. De huidige meting is {dir} de vorige ({delta}).',
             'avg': '- Gemiddelde van je laatste {n} basismetingen ({period}): RI {avg}. De huidige meting is {dir} dat gemiddelde ({delta}).',
             'one': '- Gebaseerd op 1 eerdere basismeting (op {date}): RI {avg}. (Nog te weinig metingen voor een trend.)',
+            'stale': '- Je laatste betrouwbare meting was op {date}, langer dan {days} dagen geleden — te lang voor een zinvolle vergelijking. Beschouw deze meting als een momentopname; noem GEEN stijging of daling.',
             'body_sim': '- Lichaam versus gevoel: je zelfinschatting ({subj}) en je RI ({ri}) liggen dicht bij elkaar.',
             'body_mild': '- Lichaam versus gevoel: je zelfinschatting ({subj}) en je RI ({ri}) liggen iets uit elkaar — een mild verschil.',
             'body_diff': '- Lichaam versus gevoel: je zelfinschatting is {subj}, je RI is {ri} — die verschillen merkbaar.',
@@ -5816,6 +5842,7 @@ def _basismeting_feiten(cur, recent_basis, phase, lang, age=None):
             'prev': '- Vorherige Messung: RI {ri} am {date}. Die aktuelle Messung ist {dir} die vorherige ({delta}).',
             'avg': '- Durchschnitt Ihrer letzten {n} Basismessungen ({period}): RI {avg}. Die aktuelle Messung ist {dir} dieser Durchschnitt ({delta}).',
             'one': '- Basierend auf 1 früheren Basismessung (am {date}): RI {avg}. (Noch zu wenige Messungen für einen Trend.)',
+            'stale': '- Ihre letzte zuverlässige Messung war am {date}, länger als {days} Tage her — zu lange für einen sinnvollen Vergleich. Betrachten Sie diese Messung als Momentaufnahme; nennen Sie KEINEN Anstieg oder Rückgang.',
             'body_sim': '- Körper versus Gefühl: Ihre Selbsteinschätzung ({subj}) und Ihr RI ({ri}) liegen nah beieinander.',
             'body_mild': '- Körper versus Gefühl: Ihre Selbsteinschätzung ({subj}) und Ihr RI ({ri}) liegen etwas auseinander — ein milder Unterschied.',
             'body_diff': '- Körper versus Gefühl: Ihre Selbsteinschätzung ist {subj}, Ihr RI ist {ri} — das unterscheidet sich merklich.',
@@ -5831,6 +5858,7 @@ def _basismeting_feiten(cur, recent_basis, phase, lang, age=None):
             'prev': '- Previous reading: RI {ri} on {date}. The current reading is {dir} the previous one ({delta}).',
             'avg': '- Average of your last {n} baseline readings ({period}): RI {avg}. The current reading is {dir} that average ({delta}).',
             'one': '- Based on 1 earlier baseline reading (on {date}): RI {avg}. (Still too few readings for a trend.)',
+            'stale': '- Your last reliable reading was on {date}, more than {days} days ago — too long for a meaningful comparison. Treat this reading as a snapshot; do NOT mention any rise or drop.',
             'body_sim': '- Body versus feeling: your self-assessment ({subj}) and your RI ({ri}) are close together.',
             'body_mild': '- Body versus feeling: your self-assessment ({subj}) and your RI ({ri}) are slightly apart — a mild difference.',
             'body_diff': '- Body versus feeling: your self-assessment is {subj}, your RI is {ri} — these differ noticeably.',
@@ -5872,8 +5900,27 @@ def _basismeting_feiten(cur, recent_basis, phase, lang, age=None):
 
     rb = [r for r in (recent_basis or []) if r.get('ri') is not None]
 
+    # Venster-grendel: recent_basis bevat enkel KWALITEIT-GELDIGE metingen (gate in
+    # _gather_kompas_context). Ligt de nieuwste geldige meting > STALE_DAYS terug, dan is er
+    # geen recente vergelijkingsbasis: onderdruk de prev-/gemiddelde-trendregels en toon
+    # alleen de huidige stand (geen stijging/daling-narratief over een gat van weken).
+    STALE_DAYS = 30
+    _prev_within_window = False
+    if rb and ts_cur:
+        _pv0 = _parse_iso_ymd(rb[0].get('datum') or '')
+        if _pv0:
+            from datetime import date as _date
+            try:
+                _gap = (_dt.fromtimestamp(ts_cur / 1000).date() - _date(*_pv0)).days
+                _prev_within_window = (_gap <= STALE_DAYS)
+            except Exception:
+                _prev_within_window = False
+
     if not rb:
         lines.append(T['first'])
+    elif not _prev_within_window:
+        _pv0 = _parse_iso_ymd(rb[0].get('datum') or '')
+        lines.append(T['stale'].format(date=_fmt_abs_date(*_pv0, L) if _pv0 else '?', days=STALE_DAYS))
     else:
         # Vorige meting (1-op-1)
         prev = rb[0]
@@ -6315,7 +6362,7 @@ def api_feedback():
             if cid and _is_pro_or_demo_pro():
                 db2 = get_pro_db()
                 _bf_cand = db2.execute(
-                    "SELECT ri, rr_intervals FROM client_metingen WHERE client_id=? AND meting_type='basismeting' "
+                    "SELECT ri, rr_intervals, kwaliteit FROM client_metingen WHERE client_id=? AND meting_type='basismeting' "
                     "AND ts >= (SELECT ts FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 1) - 86400000 "
                     "AND ts < (SELECT ts FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 1) "
                     "AND ri IS NOT NULL ORDER BY ts DESC",
@@ -6323,7 +6370,7 @@ def api_feedback():
             else:
                 db2 = get_meting_db()
                 _bf_cand = db2.execute(
-                    "SELECT ri, rr_intervals FROM metingen WHERE user_key=? AND meting_type='basismeting' "
+                    "SELECT ri, rr_intervals, kwaliteit FROM metingen WHERE user_key=? AND meting_type='basismeting' "
                     "AND ts >= (SELECT ts FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 1) - 86400000 "
                     "AND ts < (SELECT ts FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 1) "
                     "AND ri IS NOT NULL ORDER BY ts DESC",
@@ -6333,7 +6380,7 @@ def api_feedback():
             # het 24u-venster als ijkpunt. Alle gevlagd → basis_ri blijft None → _generate_biofeedback_
             # feedback toont de 'no_ref'-tekst (geen vergelijking) i.p.v. tegen een ruis-RI te ijken.
             for _bc in _bf_cand:
-                if not _rr_irregular(_bc['rr_intervals']):
+                if not _kompas_quality_excluded(_bc['rr_intervals'], _bc['kwaliteit']):
                     basis_ri = float(_bc['ri'])
                     break
         except:
