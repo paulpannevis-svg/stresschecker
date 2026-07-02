@@ -7,7 +7,8 @@ var C=[-20, -10, 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 8
 var T=[[0, 0, 0, 0, 0, 0, 1, 2, 3, 5, 7, 9, 10, 20, 30, 40, 50, 60, 80, 85, 92, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122, 125, 127, 130, 132, 135, 137, 140, 142, 145, 150, 160], [0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 15, 22, 30, 37, 45, 52, 57, 77, 82, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122, 125, 127, 130, 132, 135, 137, 140, 150], [0, 0, 1, 2, 4, 5, 6, 7, 15, 22, 30, 37, 45, 50, 55, 60, 65, 75, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122, 125, 127, 130, 132, 135, 140], [0, 0, 1, 3, 5, 7, 12, 20, 27, 35, 42, 50, 52, 55, 60, 65, 67, 70, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122, 125, 127, 130, 135], [0, 2, 3, 5, 7, 12, 17, 25, 30, 37, 45, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122, 125, 130], [0, 3, 5, 7, 12, 17, 25, 32, 37, 42, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122, 125], [0, 5, 7, 8, 11, 15, 22, 30, 35, 40, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120, 122], [0, 4, 6, 7, 8, 12, 15, 22, 30, 37, 42, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117, 120], [0, 2, 4, 5, 7, 10, 12, 20, 27, 35, 40, 42, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115, 117], [0, 1, 3, 4, 6, 8, 11, 15, 22, 30, 35, 40, 42, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112, 115], [0, 1, 2, 3, 5, 7, 10, 12, 20, 27, 32, 35, 37, 40, 42, 45, 47, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110, 112], [0, 1, 2, 2, 4, 6, 8, 9, 10, 17, 22, 27, 32, 35, 37, 40, 42, 47, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105, 107, 110], [0, 0, 1, 2, 3, 4, 6, 8, 9, 10, 15, 20, 25, 30, 32, 35, 37, 42, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95, 97, 100, 102, 105], [0, 0, 1, 2, 2, 3, 3, 4, 5, 6, 7, 12, 15, 17, 22, 25, 27, 32, 37, 40, 42, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85, 87, 90, 92, 95], [0, 0, 1, 1, 1, 1, 1, 2, 3, 4, 5, 7, 10, 12, 15, 17, 20, 22, 27, 30, 32, 35, 37, 40, 42, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75, 77, 80, 82, 85], [0, 0, 1, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17, 20, 22, 25, 27, 30, 32, 35, 37, 40, 42, 45, 47, 50, 52, 55, 57, 60, 62, 65, 67, 70, 72, 75]];
 // RMSSD reference = healthy median per age/sex. Source: Tegegne et al. 2020,
 // Lifelines Cohort (n=84.772), Eur J Prev Cardiol. Median = 100%.
-// Values in ms, ECG-scale (PPG ÷2.5 applied upstream).
+// Waarden in ms (ECG-schaal, Tegegne-norm). Geen sensor-correctiefactor: de ÷2,5 is
+// verwijderd (2026-06-08, commit 8a4b4fd; spurieus — TNO ~5%, Verveen ECG≈PPG).
 // Bins 18-24/25-29/.../70-74/75+; jeugd-bins (<18) bewust weggelaten — meting <18 wordt geblokkeerd in de pagina-flow.
 var N=[{a:24,m:47.6,f:52.1},{a:29,m:42.3,f:47.5},{a:34,m:36.9,f:42.3},{a:39,m:32.8,f:37.9},{a:44,m:29.0,f:33.9},{a:49,m:26.0,f:29.2},{a:54,m:23.7,f:26.6},{a:59,m:21.0,f:22.5},{a:64,m:19.1,f:20.5},{a:69,m:17.7,f:17.8},{a:74,m:16.0,f:18.3},{a:999,m:14.9,f:16.1}];
 
@@ -97,10 +98,10 @@ function riConfidence(kw){kw=(kw===null||kw===undefined||kw==='')?100:Number(kw)
 var QUALITY_TIER_BETROUWBAAR_MIN=95, QUALITY_TIER_INDICATIEF_MIN=90;
 function qualityTier(kw){if(kw===null||kw===undefined||kw==='')return 'betrouwbaar';kw=Number(kw);if(isNaN(kw))return 'betrouwbaar';return kw>=QUALITY_TIER_BETROUWBAAR_MIN?'betrouwbaar':kw>=QUALITY_TIER_INDICATIEF_MIN?'indicatief':'onbetrouwbaar';}
 // ===========================================================================
-// NIEUWE tweelaags-meetkwaliteit (qualityClassify) — APART van rrIrregularity.
-// Gebouwd op read-only PI-Zwolle-analyse (juni 2026). De oude SD1/SD2-gate
-// hierboven (rrIrregularity) blijft als REFERENTIE staan tijdens A/B-testen;
-// deze functie vervangt 'm (nog) NIET.
+// Tweelaags-meetkwaliteit (qualityClassify) — de LIVE ritme-/onregelmatigheidsgate
+// (band goed/redelijk/slecht), APART van de artefact-as (kwaliteit%/qualityTier).
+// Gebouwd op read-only PI-Zwolle-analyse (juni 2026); vervangt de oude SD1/SD2-gate
+// rrIrregularity, die niet meer bestaat/gebruikt wordt.
 //  LAAG 1 — puntartefacten: Kubios per-interval, venster W=21 (gecentreerd,
 //    asymmetrisch/trailing aan de randen, testinterval uitgesloten). Markeer als
 //    |RR_i - lokaalgemiddelde| > 25% van dat lokaalgemiddelde (intrinsiek
