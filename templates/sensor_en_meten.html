@@ -726,7 +726,7 @@ function saveBiofeedback(skip){
       body: JSON.stringify({
         profile_id: PROFILE_ID,
       client_id: ({{ client_id if client_id and client_id > 0 else 0 }} || new URLSearchParams(window.location.search).get("cid") || null),
-            ri: timeseriesData.length>0 ? Math.round(timeseriesData.reduce(function(s,v){return s+v.ri;},0)/timeseriesData.length*10)/10 : ri,
+            ri: ri,  // heel-meting-RI = lookupRelaxIndex(avgBpm, hrv) uit finishMeasure — GEEN venster-gemiddelde (dat wijkt af van de kwadrant-coördinaten omdat de Verveen-lookup niet-lineair is)
         bpm: avgBpm,
         hrv: hrv,
         beats: beatCount,

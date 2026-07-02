@@ -262,9 +262,53 @@ def p8_event_reliable_threshold():
     return _report(name, ok, f"event_report.RELIABLE_MIN={event_report.RELIABLE_MIN} == {exp}")
 
 
+# ── P9: persisted-RI invariant — opgeslagen ri == lookupRelaxIndex(opgeslagen bpm, hrv%) ──
+# Sluit het gat dat P1-P8 NIET dekten: die vergelijken calc-functies op DEZELFDE input, maar
+# nooit of de PERSISTED ri strookt met de lookup van de PERSISTED bpm/hrv%. De oude save-paden
+# (measure.html / sensor_en_meten.html) schreven een venster-GEMIDDELDE RI naast heel-meting-
+# bpm/hrv% — en omdat de Verveen-lookup niet-lineair is, week dat af (bv. bpm=75,hrv%=132:
+# gauge 5,9 "Licht belast" ↔ kwadrant-stip 7,7 "In balans"). Sinds de fix (2026-07-02) is de
+# opgeslagen RI = lookupRelaxIndex(heel-meting-bpm, hrv%) en is de hele historie herberekend.
+# Deze test wordt ROOD zodra een opgeslagen ri weer afwijkt van lookupRelaxIndex(bpm, hrv%) —
+# precies de gauge/kwadrant-divergentie. De rijen zijn representatieve persisted (bpm,hrv%,ri)-
+# tripels; de live-DB-scan (migrate_ri-verificatie) borgt de echte rijen apart.
+PERSISTED_ROWS = [
+    # (bpm, hrv%, opgeslagen_ri)  ri = heel-meting-lookup zoals de nieuwe save-path schrijft
+    {"bpm": 75, "hrv": 132, "ri": 7.7},   # het gerapporteerde geval (was buggy 5,9)
+    {"bpm": 60, "hrv": 20,  "ri": 1.0},
+    {"bpm": 60, "hrv": 40,  "ri": 3.5},
+    {"bpm": 60, "hrv": 60,  "ri": 5.0},
+    {"bpm": 62, "hrv": 100, "ri": 6.7},
+    {"bpm": 60, "hrv": 160, "ri": 9.6},
+    {"bpm": 83, "hrv": 145, "ri": 7.7},   # echte, nu-herberekende DB-rij
+    {"bpm": 72, "hrv": 58,  "ri": 4.6},   # echte, nu-herberekende event-rij
+]
+
+
+def p9_persisted_ri_invariant():
+    name = "P9 persisted-ri == lookupRelaxIndex(persisted bpm,hrv%)"
+    rows = [dict(r) for r in PERSISTED_ROWS]
+    if SELFTEST:
+        # Simuleer een oude venster-gemiddelde-RI naast heel-meting-bpm/hrv → moet P9 rood maken.
+        rows[0]["ri"] = 5.9
+    cases = json.dumps([[r["bpm"], r["hrv"]] for r in rows])
+    got = _js(
+        "var cs=%s;out.ris=cs.map(function(c){return HRV.lookupRelaxIndex(c[0],c[1]);});" % cases
+    )["ris"]
+    fails = []
+    for i, r in enumerate(rows):
+        lk = round(got[i], 1)
+        if abs(round(r["ri"], 1) - lk) > 1e-9:
+            fails.append(f"(bpm={r['bpm']},hrv%={r['hrv']}): persisted ri={r['ri']} != lookup {lk}")
+    if fails:
+        return _report(name, False, "; ".join(fails))
+    return _report(name, True, f"{len(rows)} persisted rijen: ri == heel-meting-lookup (gauge↔kwadrant consistent)")
+
+
 TESTS = [p1_zone_parity, p2_boundary_parity, p3_quality_parity,
          p4_kwaliteit_gate, p5_event_tables, p6_reference_anchors,
-         p7_quality_tier_parity, p8_event_reliable_threshold]
+         p7_quality_tier_parity, p8_event_reliable_threshold,
+         p9_persisted_ri_invariant]
 
 
 def main():
