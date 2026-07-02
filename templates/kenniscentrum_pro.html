@@ -695,15 +695,15 @@
     <div class="kc-card">
       <h3><span class="kc-icon">📊</span> {% if lang=="de" %}Messqualität{% elif lang=="en" %}Reading quality{% else %}Meetkwaliteit{% endif %}</h3>
       {% if lang=="de" %}
-      <p>Nach jeder Messung zeigt die StressChecker einen <strong>Qualitätsscore</strong> an — wie viel Prozent der Herzschläge korrekt erkannt wurden. <strong>Über 90% ist ausgezeichnet.</strong></p>
+      <p>Nach jeder Messung zeigt der StressChecker einen <strong>Qualitätsscore</strong> — den Anteil zuverlässig erfasster Herzschläge (100% minus die korrigierten Schläge). Das Ergebnis wird danach eingestuft: <strong>≥95%</strong> zuverlässig (vollwertig), <strong>90–95%</strong> orientierend (mit Zuverlässigkeitshinweis angezeigt), <strong>unter 90%</strong> zu niedrig (kein Ergebnis, bitte wiederholen). Die Grenze um 5% korrigierte Schläge folgt dem gängigen HRV-Standard: darüber nimmt die Zuverlässigkeit — besonders des RMSSD, auf dem der Relax Index beruht — deutlich ab.</p>
       <p>Artefakte (Bewegung, schlechter Sensorkontakt) werden automatisch herausgefiltert und nicht mitgezählt.</p>
       <p>Bei wiederholt niedriger Qualität: Messung unter ruhigeren Bedingungen wiederholen. Bei anhaltendem unregelmäßigem Herzschlag: Arzt aufsuchen.</p>
       {% elif lang=="en" %}
-      <p>After each reading, the StressChecker shows a <strong>quality score</strong> — what percentage of heartbeats were correctly detected. <strong>Above 90% is excellent.</strong></p>
+      <p>After each reading, the StressChecker shows a <strong>quality score</strong> — the share of heartbeats captured reliably (100% minus the corrected beats). The result is graded on it: <strong>≥95%</strong> reliable (full result), <strong>90–95%</strong> indicative (shown with a reliability note), <strong>below 90%</strong> too low (no result, please repeat). The ~5% corrected-beats threshold follows the common HRV standard: above it, reliability — especially of RMSSD, on which the Relax Index is based — drops substantially.</p>
       <p>Artefacts (movement, poor sensor contact) are automatically filtered out and not counted.</p>
       <p>If quality is repeatedly low: repeat under calmer conditions. If irregular heartbeat persists: refer to a doctor.</p>
       {% else %}
-      <p>Na elke meting toont de StressChecker een <strong>kwaliteitsscore</strong> — hoeveel procent van de hartslagen correct zijn gedetecteerd. <strong>Boven 90% is uitstekend.</strong></p>
+      <p>Na elke meting toont de StressChecker een <strong>kwaliteitsscore</strong> — het aandeel hartslagen dat betrouwbaar is gemeten (100% minus de gecorrigeerde slagen). De uitslag wordt hierop ingedeeld: <strong>≥95%</strong> betrouwbaar (volwaardig), <strong>90–95%</strong> indicatief (getoond met betrouwbaarheidsmarkering), <strong>onder 90%</strong> te laag (geen uitslag, herhaal de meting). De grens rond 5% gecorrigeerde slagen volgt de gangbare HRV-standaard: daarboven neemt de betrouwbaarheid — vooral van RMSSD, waarop de Relax Index stoelt — sterk af.</p>
       <p>Artefacten (beweging, slecht sensorcontact) worden automatisch uitgefilterd en niet meegeteld.</p>
       <p>Is de kwaliteit herhaaldelijk laag? Herhaal onder rustiger omstandigheden. Bij aanhoudend onregelmatige hartslag: verwijs door naar een arts.</p>
       {% endif %}
@@ -741,7 +741,7 @@
     <div class="kc-card">
       <h3><span class="kc-icon">💬</span> {% if lang=="de" %}Niedrige Qualität besprechen{% elif lang=="en" %}Discussing low quality{% else %}Lage kwaliteit bespreken{% endif %}</h3>
       {% if lang=="de" %}
-      <p>Wenn der Qualitätsscore eines Klienten wiederholt unter 80% liegt, besprechen Sie das ohne zu alarmieren:</p>
+      <p>Wenn die Messungen eines Klienten wiederholt als „zu niedrig" markiert werden (Qualität unter 90%), besprechen Sie das ohne zu alarmieren:</p>
       <ul>
         <li><em>"Mir ist aufgefallen, dass Ihre Messungen manchmal einen niedrigen Qualitätsscore haben — haben Sie bemerkt, dass Sie sich während der Messung bewegen?"</em></li>
         <li>Überprüfen Sie die Sensorpositionierung gemeinsam</li>
@@ -749,7 +749,7 @@
       </ul>
       <p>Wenn die Qualität trotz guter Bedingungen anhaltend niedrig bleibt, kann eine Herzrhythmusstörung eine Rolle spielen. Überweisen Sie an einen Arzt — ohne selbst eine Diagnose zu stellen.</p>
       {% elif lang=="en" %}
-      <p>If a client's quality score is repeatedly below 80%, address it without alarming them:</p>
+      <p>If a client's readings are repeatedly flagged as "too low" (quality below 90%), address it without alarming them:</p>
       <ul>
         <li><em>"I notice your readings sometimes have a low quality score — have you noticed any movement during the reading?"</em></li>
         <li>Check sensor placement together</li>
@@ -757,7 +757,7 @@
       </ul>
       <p>If quality remains consistently low despite good conditions, a heart rhythm irregularity may be involved. Refer to a doctor — without diagnosing.</p>
       {% else %}
-      <p>Als de kwaliteitsscore van een cliënt herhaaldelijk onder de 80% ligt, bespreek dat zonder te alarmeren:</p>
+      <p>Als de metingen van een cliënt herhaaldelijk als 'te laag' worden gemarkeerd (kwaliteit onder 90%), bespreek dat zonder te alarmeren:</p>
       <ul>
         <li><em>"Ik zie dat je metingen soms een lage kwaliteitsscore hebben — merk je dat je beweegt tijdens de meting?"</em></li>
         <li>Controleer samen de sensorplaatsing</li>
