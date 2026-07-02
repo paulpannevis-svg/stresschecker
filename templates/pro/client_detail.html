@@ -176,7 +176,9 @@ function showConsumerMetingen(cid){
       data.forEach(function(m){
         var date = m.created_at ? m.created_at.substring(0,10) : '';
         var tijd = m.created_at ? m.created_at.substring(11,16) : '';
-        var cls = (m.kwaliteit!=null&&!isNaN(Number(m.kwaliteit))&&Number(m.kwaliteit)<85) ? 'dot-gray' : (m.ri < 4 ? 'dot-red' : m.ri < 7 ? 'dot-orange' : 'dot-green');
+        // Fase 3: grijze stip zodra kwaliteit onder de 'betrouwbaar'-grens valt (canonieke bron
+        // analytics.QUALITY_TIER_BETROUWBAAR_MIN, server-gerenderd — geen bare literal).
+        var cls = (m.kwaliteit!=null&&!isNaN(Number(m.kwaliteit))&&Number(m.kwaliteit)<{{ quality_tier_bounds()['betrouwbaar'] }}) ? 'dot-gray' : (m.ri < 4 ? 'dot-red' : m.ri < 7 ? 'dot-orange' : 'dot-green');
         html += '<tr><td>'+date+'</td><td><span class="ri-dot '+cls+'"></span> '+m.ri+'</td><td>'+m.bpm+'</td><td>'+m.hrv_pct+'%</td><td>'+(m.rmssd||0).toFixed(1)+'</td><td>'+(m.ctx_dimensie||'')+"'</td><td>'"+(m.meting_type||'')+'</td><td>'+(m.notes||'')+'</td></tr>';
       });
       html += '</table>';

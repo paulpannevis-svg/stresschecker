@@ -26,7 +26,7 @@ from datetime import datetime
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DB = '/opt/stresschecker/data/sc_event.db'
-RELIABLE_MIN = 85  # zelfde drempel als de bestaande meetweergave
+RELIABLE_MIN = 95  # Fase 3: klasse 'betrouwbaar'-grens (= analytics.QUALITY_TIER_BETROUWBAAR_MIN, ≤5% gecorrigeerd)
 # Boven deze HRV% is het signaal vrijwel altijd vertekend: ectopische slagen of
 # bewegingsartefacten blazen RMSSD (en daarmee de HRV%) kunstmatig op. Zo'n meting mag
 # nooit als volledig betrouwbaar (★★★) gepresenteerd worden → aftoppen op ★★ + waarschuwing.

@@ -2532,26 +2532,21 @@ def _rr_irregular(rr):
 
 def _kompas_quality_excluded(rr, kwaliteit):
     """Gedeelde kwaliteitsgate voor de Innerlijk-Kompas-/trend-VERGELIJKING: sluit een
-    eerdere meting uit als vergelijkingsbasis wanneer ze exact ook in de historie-tabel
-    onderdrukt wordt (results.html `_suppress`): variant-B noemt de reeks 'slecht'
-    (analytics.is_slecht_rr) OF kwaliteit < 70 (untrusted). Ontbrekende kwaliteit
-    (legacy/None) = vertrouwd (zelfde afspraak als tabel én analytics.baseline_day_values).
+    eerdere meting uit als vergelijkingsbasis wanneer ze op één van de twee assen faalt:
+    variant-B noemt de reeks 'slecht' (analytics.is_slecht_rr, ritme/ectopie) OF de
+    kwaliteits-klasse is 'onbetrouwbaar' (analytics.quality_tier, artefact-% >10%, Fase 3;
+    was kwaliteit<70). Ontbrekende kwaliteit (legacy/None) = 'betrouwbaar' → telt mee.
 
-    Vervangt de op prod DORMANTE _rr_irregular-gate (analytics.rr_irregular ontbreekt →
-    no-op), zodat Kompas/trend en tabel over dezelfde 'geldige meting'-set praten en een
-    kwaliteit-afgekeurde meting nooit een RI-vergelijkingsbasis wordt."""
+    Zo praten Kompas/trend, tabel, baseline en event over dezelfde 'geldige meting'-set en
+    wordt een kwaliteit-afgekeurde meting nooit een RI-vergelijkingsbasis."""
     try:
         import analytics as _an
         if _an.is_slecht_rr(rr):
             return True
+        if _an.quality_tier(kwaliteit) == 'onbetrouwbaar':
+            return True
     except Exception:
         pass
-    if kwaliteit is not None:
-        try:
-            if float(kwaliteit) < 70:
-                return True
-        except (TypeError, ValueError):
-            pass
     return False
 
 
@@ -3426,6 +3421,24 @@ def dimensie_labels_all():
     return _analytics.DIMENSIE_LABELS
 
 
+@app.template_global()
+def quality_tier_bounds():
+    """Jinja-helper: kwaliteits-klasse-grenzen (Fase 3) voor injectie in client-side JS die
+    hrv.js niet laadt (kwadrant/mijn_metingen). SSOT = analytics-constanten; één bron zodat
+    geen template een eigen 85/70/95/90-literal herintroduceert (geborgd door de tier-test)."""
+    import analytics as _analytics
+    return {'betrouwbaar': _analytics.QUALITY_TIER_BETROUWBAAR_MIN,
+            'indicatief': _analytics.QUALITY_TIER_INDICATIEF_MIN}
+
+
+@app.template_global()
+def quality_tier_texts():
+    """Jinja-helper: volledige NL/DE/EN voorlopige kwaliteits-teksten (badge/marker/retry)
+    voor injectie in de client-side surfaces. SSOT = analytics.QUALITY_TIER_TEXTS."""
+    import analytics as _analytics
+    return _analytics.QUALITY_TIER_TEXTS
+
+
 def _report_db():
     db = sqlite3.connect(DB_PATH)
     db.row_factory = sqlite3.Row
@@ -4131,14 +4144,14 @@ def api_event_save_meting(event_code):
         db.commit()
         _mid = db.execute('SELECT last_insert_rowid()').fetchone()[0]  # Get inserted meting_id
         _n_total = _n_already + 1
-        # Geslaagde-meting aanwezig? (kwaliteit >= 85 EN niet 'slecht'-geclassificeerd; gelijke
+        # Geslaagde-meting aanwezig? (kwaliteit >= 95 = klasse 'betrouwbaar', Fase 3, EN niet 'slecht'-geclassificeerd; gelijke
         # gate als de laatste-geslaagde-wint-selectie in event_report). Een te onregelmatige
         # meting (quality_band 'slecht') telt NIET als geslaagd, ook niet bij hoog signaal-%.
         # NULL/'onbepaald' telt wél mee. Voedt de slotboodschap: >=1 geslaagd -> "dit is je
         # resultaat"; 0 geslaagd -> "meting lukte niet".
         _n_reliable = db.execute(
             'SELECT COUNT(*) FROM event_metingen WHERE participant_id=? '
-            "AND kwaliteit IS NOT NULL AND kwaliteit >= 85 "
+            "AND kwaliteit IS NOT NULL AND kwaliteit >= 95 "
             "AND (quality_band IS NULL OR quality_band <> 'slecht')",
             (part['participant_id'],)
         ).fetchone()[0]
@@ -4405,12 +4418,12 @@ def event_kiosk_meten(event_code, meting_code):
         return redirect(url_for('event_code_request_otp'))
     # Reeds gedane metingen — voedt de max-2-cap-UI: bij >=2 toont de uitslag de
     # slotboodschap (geen meetscherm meer). has_reliable = is er een geslaagde meting
-    # (kwaliteit >= 85 EN niet 'slecht'-geclassificeerd; gelijk aan de laatste-geslaagde-wint-
+    # (kwaliteit >= 95 = klasse 'betrouwbaar' (Fase 3) EN niet 'slecht'-geclassificeerd; gelijk aan de laatste-geslaagde-wint-
     # selectie van het rapport). Te onregelmatig (quality_band 'slecht') telt niet als geslaagd.
     _n = db.execute("SELECT COUNT(*) FROM event_metingen WHERE participant_id=?",
                     (row['participant_id'],)).fetchone()[0]
     _nrel = db.execute("SELECT COUNT(*) FROM event_metingen WHERE participant_id=? "
-                       "AND kwaliteit IS NOT NULL AND kwaliteit >= 85 "
+                       "AND kwaliteit IS NOT NULL AND kwaliteit >= 95 "
                        "AND (quality_band IS NULL OR quality_band <> 'slecht')",
                        (row['participant_id'],)).fetchone()[0]
     # Bestaande uitslag (voor de "Terug vanuit /view"-flow): bij herladen tonen we het
@@ -4421,7 +4434,7 @@ def event_kiosk_meten(event_code, meting_code):
     _res = db.execute(
         "SELECT ri, kwaliteit, quality_band FROM event_metingen "
         "WHERE participant_id=? AND ri IS NOT NULL "
-        "ORDER BY CASE WHEN kwaliteit IS NOT NULL AND kwaliteit >= 85 "
+        "ORDER BY CASE WHEN kwaliteit IS NOT NULL AND kwaliteit >= 95 "
         "  AND (quality_band IS NULL OR quality_band <> 'slecht') THEN 1 ELSE 0 END DESC, "
         "  ts DESC, id DESC LIMIT 1",
         (row['participant_id'],)).fetchone()
@@ -4581,7 +4594,7 @@ def event_deelnemer_infopagina(event_code, meting_code):
         "JOIN events e ON e.event_id = p.event_id "
         "LEFT JOIN event_metingen m ON m.id = ("
         "  SELECT m2.id FROM event_metingen m2 WHERE m2.participant_id = p.participant_id "
-        "  ORDER BY CASE WHEN m2.kwaliteit IS NOT NULL AND m2.kwaliteit >= 85 "
+        "  ORDER BY CASE WHEN m2.kwaliteit IS NOT NULL AND m2.kwaliteit >= 95"
         "    AND (m2.quality_band IS NULL OR m2.quality_band <> 'slecht') THEN 1 ELSE 0 END DESC, "
         "    m2.ts DESC, m2.id DESC LIMIT 1) "
         "WHERE p.meting_code = ?", (code,)).fetchone()
@@ -4594,7 +4607,7 @@ def event_deelnemer_infopagina(event_code, meting_code):
     _ZIDX = {'zwaar_belast': 1, 'belast': 2, 'licht_belast': 3, 'in_balans': 4, 'veerkrachtig': 5}
     _ZCOL = {'zwaar_belast': '#c0392b', 'belast': '#e67e22', 'licht_belast': '#f1c40f',
              'in_balans': '#6fcf7a', 'veerkrachtig': '#27ae60'}
-    reliable = (row['kwaliteit'] is not None and row['kwaliteit'] >= 85
+    reliable = (row['kwaliteit'] is not None and row['kwaliteit'] >= 95
                 and (row['quality_band'] or '') != 'slecht')
     return render_template(
         'event/deelnemer_infopagina.html',
@@ -6036,6 +6049,16 @@ def _unreliable_signal_payload(lang):
             'source': 'quality_slecht_unreliable', 'irregular': True, 'quality_band': 'slecht'}
 
 
+def _low_quality_payload(lang):
+    """Fase 3 — kwaliteits-klasse 'onbetrouwbaar' (artefact-% >10%): uitslag onderdrukken,
+    vriendelijke herkansings-uitnodiging (voorlopige tekst uit analytics). GEEN LLM-call."""
+    import analytics as _an
+    head = _an.quality_tier_text('onbetrouwbaar', 'badge', lang)
+    body = _an.quality_tier_text('onbetrouwbaar', 'retry', lang)
+    return {'insight': '⚠️ ' + head, 'reflection': body, 'question': '',
+            'source': 'quality_tier_onbetrouwbaar', 'irregular': True, 'quality_tier': 'onbetrouwbaar'}
+
+
 # Hedge-prefix bovenin de user-message voor band 'redelijk'/'onbepaald'/NULL (de veilige
 # default). Bewust BOVEN het FEITEN-blok: een instructie aan de staart van de system-prompt
 # bleek te zwak om de 'FEITEN zijn leidend en al juist'-stelligheid te overrulen (empirisch
@@ -6057,7 +6080,11 @@ def _build_kompas_prompt(cur, lang, context, session_data=None, baseline_avg=Non
     system_prompt, user_msg = _build_kompas_prompt_inner(
         cur, lang, context, session_data=session_data, baseline_avg=baseline_avg)
     _qb = (cur.get('quality_band') or '').strip().lower()
-    if _qb not in ('goed', 'slecht'):
+    # Hedge bij band redelijk/onbepaald/NULL, én bij kwaliteits-klasse 'indicatief' (Fase 3,
+    # kwaliteit 90-95): commentaar voorzichtig/voorlopig i.p.v. stellig. 'onbetrouwbaar' en
+    # 'slecht' bereiken deze functie niet (short-circuit in api_feedback).
+    import analytics as _an_qt
+    if _qb not in ('goed', 'slecht') or _an_qt.quality_tier(cur.get('kwaliteit')) == 'indicatief':
         user_msg = _KOMPAS_HEDGE_PREFIX + user_msg
     return system_prompt, user_msg
 
@@ -6292,6 +6319,17 @@ def api_feedback():
     # cache-check, zodat 'slecht' nooit gecachte stellige proza terugkrijgt. Alle meettypes.
     if (cur.get('quality_band') or '').strip().lower() == 'slecht':
         resp = jsonify(_unreliable_signal_payload(lang))
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
+
+    # ── Kwaliteits-klasse-short-circuit (Fase 3): 'onbetrouwbaar' (artefact-% >10%) ────────
+    # Onafhankelijke tweede as naast band='slecht'. Uitslag onderdrukken + herkansing (geen
+    # LLM-call), zelfde principe als 'slecht'. Vóór de cache-check.
+    import analytics as _an_qt
+    if _an_qt.quality_tier(cur.get('kwaliteit')) == 'onbetrouwbaar':
+        resp = jsonify(_low_quality_payload(lang))
         resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         resp.headers['Pragma'] = 'no-cache'
         resp.headers['Expires'] = '0'
@@ -9326,7 +9364,7 @@ def _vb_fmt_ts(ts):
 
 def _vb_group_data(edb, event_id, lang='nl'):
     """Aggregeer een meetdag voor het groepsrapport. Per deelnemer de MEEST RECENTE
-    GESLAAGDE meting (kwaliteit>=85 EN band!='slecht'; anders laatste) — zelfde
+    GESLAAGDE meting (kwaliteit>=95 = klasse 'betrouwbaar' (Fase 3) EN band!='slecht'; anders laatste) — zelfde
     reliable-wins-selectie als event_report.render_report. Zones via canonieke
     analytics.zone_for_ri/zone_label (geen eigen rekenlogica). Zone-eerst."""
     import analytics
@@ -9336,7 +9374,7 @@ def _vb_group_data(edb, event_id, lang='nl'):
         "FROM event_participants p "
         "JOIN event_metingen m ON m.id = ("
         "  SELECT m2.id FROM event_metingen m2 WHERE m2.participant_id=p.participant_id "
-        "  ORDER BY CASE WHEN m2.kwaliteit IS NOT NULL AND m2.kwaliteit>=85 "
+        "  ORDER BY CASE WHEN m2.kwaliteit IS NOT NULL AND m2.kwaliteit>=95"
         "    AND (m2.quality_band IS NULL OR m2.quality_band<>'slecht') THEN 1 ELSE 0 END DESC, "
         "    m2.ts DESC, m2.id DESC LIMIT 1) "
         "WHERE p.event_id=? ORDER BY p.created_at", (event_id,)).fetchall()
@@ -9351,7 +9389,7 @@ def _vb_group_data(edb, event_id, lang='nl'):
     versch_sum, versch_n = 0.0, 0
     for r in rows:
         reliable = (r['ri'] is not None and r['kwaliteit'] is not None
-                    and r['kwaliteit'] >= 85 and (r['quality_band'] or '') != 'slecht')
+                    and r['kwaliteit'] >= 95 and (r['quality_band'] or '') != 'slecht')
         zk = analytics.zone_for_ri(r['ri']) if reliable else None
         if reliable:
             zone_counts[zk] = zone_counts.get(zk, 0) + 1

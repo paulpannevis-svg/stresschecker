@@ -42,7 +42,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/1.4.0/chartjs-plugin-annotation.min.js"></script>
 <script>if(window.Chart&&window['chartjs-plugin-annotation']){Chart.register(window['chartjs-plugin-annotation']);}</script>
-<script src="/static/js/hrv.js?v=9"></script>
+<script src="/static/js/hrv.js?v=10"></script>
 <script>
 var dNL={lichamelijk:'Lichamelijk',mentaal:'Mentaal',emotioneel:'Emotioneel',spiritueel:'Spiritueel',weet_niet:'?'};
 var data = {{ metingen_chart | tojson }};
@@ -209,23 +209,21 @@ else{
     var date=dt?padDate(dt.getDate())+'-'+padDate(dt.getMonth()+1)+'-'+String(dt.getFullYear()).slice(-2):'';
     var tijd=dt?dt.toTimeString().substring(0,5):'';
     var ri=r.ri||0;
-    // Kwaliteits-gate (besluit 2a): grijze stip bij kwaliteit <85.
-    var _kwlow=(r.kwaliteit!=null&&!isNaN(Number(r.kwaliteit))&&Number(r.kwaliteit)<85);
-    // Meetkwaliteit: nieuwe tweelaags-gate (HRV.qualityClassify, variant B) — één bron i.p.v. de
-    // inline SD1/SD2-kopie. 'slecht' -> markeren. De oude HRV.rrIrregularity blijft in hrv.js als
-    // referentie (hier niet gebruikt). Getoonde RI blijft r.ri (niets herberekend uit de RR).
+    // Twee onafhankelijke assen (Fase 3): band (ritme) + kwaliteit-klasse (artefact-%, HRV.qualityTier 95/90).
+    var _QTT={{ quality_tier_texts()|tojson }}, _L='{{lang}}';
+    function _qtt(t,k){var d=_QTT[t]&&_QTT[t][k]?_QTT[t][k]:{};return d[_L]||d.nl||'';}
     var _q; try{ _q=HRV.qualityClassify(r.rr_intervals); }catch(e){}
     var _slecht=(_q&&_q.band==='slecht');
-    // 3-traps vertrouwbaarheid uit kwaliteit (legacy/ontbrekend = trusted): <70 untrusted / 70-84 limited / >=85 trusted.
-    var _kwv=(r.kwaliteit==null||r.kwaliteit==='')?100:Number(r.kwaliteit);
-    var _conf=isNaN(_kwv)?'trusted':(_kwv>=85?'trusted':_kwv>=70?'limited':'untrusted');
-    // Getal-onderdrukking: Slecht OF kwaliteit<70 -> markering i.p.v. getal; 70-84 -> getal + grijze stip; rest -> getal.
-    var _suppress=(_slecht||_conf==='untrusted');
-    var _irrLabel={de:'Nicht stabil genug',en:'Not stable enough',nl:'Niet stabiel genoeg'}['{{lang}}']||'Niet stabiel genoeg';
-    var _irrTip={de:'Das Signal war zu unregelmäßig für eine zuverlässige Bewertung (Bewegung, Sensorkontakt oder Herzrhythmus). Bitte wiederholen.',en:'The signal was too unstable to score reliably (movement, sensor contact, or heart rhythm). Please repeat.',nl:'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.'}['{{lang}}']||'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.';
+    var _tier; try{ _tier=HRV.qualityTier(r.kwaliteit); }catch(e){ _tier='betrouwbaar'; }
+    var _suppress=(_slecht||_tier==='onbetrouwbaar');
+    var _indic=(!_suppress&&_tier==='indicatief');
+    var _irrTip={de:'Das Signal war zu unregelmäßig für eine zuverlässige Bewertung (Bewegung, Sensorkontakt oder Herzrhythmus). Bitte wiederholen.',en:'The signal was too unstable to score reliably (movement, sensor contact, or heart rhythm). Please repeat.',nl:'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.'}[_L]||'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.';
+    var _supLabel=_slecht?({de:'Nicht stabil genug',en:'Not stable enough',nl:'Niet stabiel genoeg'}[_L]||'Niet stabiel genoeg'):_qtt('onbetrouwbaar','badge');
+    var _supTip=_slecht?_irrTip:_qtt('onbetrouwbaar','retry');
     var _warn=_slecht?'<span title="'+_irrTip+'" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
-    var dot=_warn+'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+((_kwlow||_slecht)?'#bfbfbf':(ri<2?'#c0392b':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#27ae60':'#1e8449'))+'"></span>';
-    var riCell=_suppress?'<span title="'+_irrTip+'" style="color:#c0392b;font-weight:600;">'+_irrLabel+'</span>':ri;
+    var dot=_warn+'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+((_suppress||_indic)?'#bfbfbf':(ri<2?'#c0392b':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#27ae60':'#1e8449'))+'"></span>';
+    var _badge=_indic?' <span title="'+_qtt('indicatief','marker')+'" style="font-size:.68rem;color:#b26a00;background:#fdf3e0;border:1px solid #f0d9b0;border-radius:3px;padding:0 4px;margin-left:3px;white-space:nowrap;">'+_qtt('indicatief','badge')+'</span>':'';
+    var riCell=_suppress?'<span title="'+_supTip+'" style="color:#c0392b;font-weight:600;">'+_supLabel+'</span>':(ri+_badge);
     var mt=r.meting_type||'-';var mtL=mTYPE[mt.toLowerCase()]||mt;
     var dimL=r.dimensie?(dDIM[r.dimensie]||r.dimensie):'-';
     html+='<tr style="border-bottom:1px solid #eef0f3;"><td style="'+cTD+'white-space:nowrap;">'+date+'</td><td style="'+cTD+'white-space:nowrap;">'+tijd+'</td><td style="'+cTD+'">'+dot+riCell+'</td><td style="'+cNUM+'">'+(r.bpm||'-')+'</td><td style="'+cNUM+'">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td style="'+cNUM+'">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td style="'+cTD+'">'+mtL+'</td><td style="'+cTD+'">'+(r.notes||'')+'</td><td style="'+cTD+'">'+dimL+'</td><td style="'+cTD+'white-space:nowrap;">'+(r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" style="font-size:.75rem;color:#0078ff;text-decoration:none;">&darr; Kubios</a>':'')+'</td></tr>';

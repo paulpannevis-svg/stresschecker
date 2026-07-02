@@ -219,8 +219,52 @@ def p6_reference_anchors():
     return _report(name, ok, f"ri={ri}/{exp['ri']} zone={zone_label!r}/{exp['zone_label_nl']!r}")
 
 
+# ── P7: kwaliteits-klasse parity (Fase 3) — hrv.js qualityTier ↔ analytics.quality_tier ──
+# Dekt de grenspunten 90 en 95 expliciet. Rood zodra JS en Python (of hun grens-constanten)
+# uiteenlopen — d.w.z. zodra een oppervlak een andere drempel dan de canonieke functie hanteert.
+def p7_quality_tier_parity():
+    name = "P7 quality_tier parity (hrv.js ↔ analytics) + grenzen 90/95"
+    cases = [100, 96, 95, 94, 91, 90, 89, 70, 50, 0]
+    got = _js(
+        "var ks=%s;out.tiers=ks.map(function(k){return HRV.qualityTier(k);});"
+        "out.leeg=HRV.qualityTier('');out.nul=HRV.qualityTier(null);"
+        "out.b=HRV.QUALITY_TIER_BETROUWBAAR_MIN;out.i=HRV.QUALITY_TIER_INDICATIEF_MIN;"
+        % json.dumps(cases)
+    )
+    fails = []
+    if SELFTEST:
+        got['tiers'][2] = 'onbetrouwbaar'  # forceer mismatch op kw=95 → moet P7 rood maken
+    for i, k in enumerate(cases):
+        js, py = got['tiers'][i], analytics.quality_tier(k)
+        if js != py:
+            fails.append(f"kw={k}: js={js} py={py}")
+    # grens-constanten JS == Python
+    if got['b'] != analytics.QUALITY_TIER_BETROUWBAAR_MIN or got['i'] != analytics.QUALITY_TIER_INDICATIEF_MIN:
+        fails.append(f"bounds js({got['b']}/{got['i']}) != py({analytics.QUALITY_TIER_BETROUWBAAR_MIN}/{analytics.QUALITY_TIER_INDICATIEF_MIN})")
+    # legacy None/'' == 'betrouwbaar' op beide
+    if not (got['leeg'] == analytics.quality_tier('') == 'betrouwbaar' and got['nul'] == analytics.quality_tier(None) == 'betrouwbaar'):
+        fails.append(f"legacy None/'' mismatch: js({got['nul']}/{got['leeg']})")
+    # expliciete grenspunt-verwachtingen
+    for k, e in [(95, 'betrouwbaar'), (94, 'indicatief'), (90, 'indicatief'), (89, 'onbetrouwbaar')]:
+        if analytics.quality_tier(k) != e:
+            fails.append(f"grens kw={k}: py={analytics.quality_tier(k)} exp={e}")
+    if fails:
+        return _report(name, False, "; ".join(fails))
+    return _report(name, True, f"JS↔Py eensluidend; grenzen {analytics.QUALITY_TIER_INDICATIEF_MIN}/{analytics.QUALITY_TIER_BETROUWBAAR_MIN}; 95→betrouwbaar, 94/90→indicatief, 89→onbetrouwbaar")
+
+
+# ── P8: event 'reliable'-drempel == canonieke betrouwbaar-grens (kwaliteits-as consistent) ──
+def p8_event_reliable_threshold():
+    name = "P8 event_report.RELIABLE_MIN == QUALITY_TIER_BETROUWBAAR_MIN"
+    import event_report
+    exp = analytics.QUALITY_TIER_BETROUWBAAR_MIN
+    ok = (event_report.RELIABLE_MIN == exp)
+    return _report(name, ok, f"event_report.RELIABLE_MIN={event_report.RELIABLE_MIN} == {exp}")
+
+
 TESTS = [p1_zone_parity, p2_boundary_parity, p3_quality_parity,
-         p4_kwaliteit_gate, p5_event_tables, p6_reference_anchors]
+         p4_kwaliteit_gate, p5_event_tables, p6_reference_anchors,
+         p7_quality_tier_parity, p8_event_reliable_threshold]
 
 
 def main():

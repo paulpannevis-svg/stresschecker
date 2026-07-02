@@ -134,7 +134,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/hrv.js?v=9"></script>
+<script src="/static/js/hrv.js?v=10"></script>
 <script>
 function toggleCtx2(id){var el=document.getElementById("ctx2-"+id);if(el)el.style.display=el.style.display==="none"?"table-row":"none";}
 
@@ -229,24 +229,26 @@ function renderResults(results) {
     var tijd=('0'+dt.getHours()).slice(-2)+':'+('0'+dt.getMinutes()).slice(-2);
     var ri=r.ri!=null?parseFloat(r.ri).toFixed(1):'-';
     var z=r.ri!=null?zone(r.ri):0;
-    // Kwaliteits-gate (besluit 2a): stip grijs bij kwaliteit <85 — geen stellige zonekleur op een onbetrouwbare meting.
-    var _kwlow=(r.kwaliteit!=null&&!isNaN(Number(r.kwaliteit))&&Number(r.kwaliteit)<85);
-    // Meetkwaliteit: nieuwe tweelaags-gate (HRV.qualityClassify, variant B) — één bron i.p.v. de
-    // inline SD1/SD2-kopie. 'slecht' -> markeren. De oude HRV.rrIrregularity blijft in hrv.js als
-    // referentie (hier niet gebruikt). Getoonde RI blijft r.ri (niets herberekend uit de RR).
+    // TWEE ONAFHANKELIJKE assen (Fase 3):
+    //  band (HRV.qualityClassify, ritme/ectopie): 'slecht' -> onderdrukken.
+    //  kwaliteit-klasse (HRV.qualityTier, artefact-%, canoniek 95/90): onbetrouwbaar -> onderdrukken;
+    //  indicatief -> uitslag TONEN met zichtbare betrouwbaarheidsmarkering; betrouwbaar -> normaal.
+    var _QTT={{ quality_tier_texts()|tojson }};
+    function _qtt(t,k){var d=_QTT[t]&&_QTT[t][k]?_QTT[t][k]:{};return d[LANG]||d.nl||'';}
     var _q; try{ _q=HRV.qualityClassify(r.rr_intervals); }catch(e){}
     var _slecht=(_q&&_q.band==='slecht');
-    // 3-traps vertrouwbaarheid uit kwaliteit (legacy/ontbrekend = trusted): <70 untrusted / 70-84 limited / >=85 trusted.
-    var _kwv=(r.kwaliteit==null||r.kwaliteit==='')?100:Number(r.kwaliteit);
-    var _conf=isNaN(_kwv)?'trusted':(_kwv>=85?'trusted':_kwv>=70?'limited':'untrusted');
-    // Getal-onderdrukking: Slecht OF kwaliteit<70 -> markering i.p.v. getal; 70-84 -> getal + grijze stip; rest -> getal.
-    var _suppress=(_slecht||_conf==='untrusted');
-    var _irrLabel={de:'Nicht stabil genug',en:'Not stable enough',nl:'Niet stabiel genoeg'}[LANG]||'Niet stabiel genoeg';
+    var _tier; try{ _tier=HRV.qualityTier(r.kwaliteit); }catch(e){ _tier='betrouwbaar'; }
+    var _suppress=(_slecht||_tier==='onbetrouwbaar');
+    var _indic=(!_suppress&&_tier==='indicatief');
     var _irrTip={de:'Das Signal war zu unregelmäßig für eine zuverlässige Bewertung (Bewegung, Sensorkontakt oder Herzrhythmus). Bitte wiederholen.',en:'The signal was too unstable to score reliably (movement, sensor contact, or heart rhythm). Please repeat.',nl:'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.'}[LANG]||'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.';
-    var col=(_kwlow||_slecht)?'#bfbfbf':(COLORS[z]||'#999');
+    // Onderdrukkings-label/tip: band-slecht -> ritme-tekst; kwaliteit-onbetrouwbaar -> kwaliteit-tekst.
+    var _supLabel=_slecht?({de:'Nicht stabil genug',en:'Not stable enough',nl:'Niet stabiel genoeg'}[LANG]||'Niet stabiel genoeg'):_qtt('onbetrouwbaar','badge');
+    var _supTip=_slecht?_irrTip:_qtt('onbetrouwbaar','retry');
+    var col=(_suppress||_indic)?'#bfbfbf':(COLORS[z]||'#999');
     var _warn=_slecht?'<span title="'+_irrTip+'" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
     var dot=_warn+'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+col+';margin-right:4px;"></span>';
-    var riCell=_suppress?'<span title="'+_irrTip+'" style="color:#c0392b;font-weight:600;white-space:nowrap;">'+_irrLabel+'</span>':ri;
+    var _badge=_indic?' <span title="'+_qtt('indicatief','marker')+'" style="font-size:.68rem;color:#b26a00;background:#fdf3e0;border:1px solid #f0d9b0;border-radius:3px;padding:0 4px;margin-left:3px;white-space:nowrap;">'+_qtt('indicatief','badge')+'</span>':'';
+    var riCell=_suppress?'<span title="'+_supTip+'" style="color:#c0392b;font-weight:600;white-space:nowrap;">'+_supLabel+'</span>':(ri+_badge);
         var ctx_html2='';
         if(r.subjectief_score!=null||r.ctx_vitaliteit!=null||r.ctx_dimensie){
           var _DA={{ dimensie_labels_all()|tojson }};var dDIM=_DA[LANG]||_DA['nl'];dDIM.weet_niet='?';

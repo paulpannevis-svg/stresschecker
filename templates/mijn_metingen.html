@@ -17,6 +17,11 @@ var hMeting=lang2=='de'?'MESSUNG':lang2=='en'?'READING':'METING';
 // Dimensie-vertaling ("Wat speelt er") — dezelfde set als /resultaten (results.html dDIM),
 // zodat beide consument-tabellen hetzelfde begrip identiek weergeven (NL/DE/EN).
 var _DA={{ dimensie_labels_all()|tojson }};var dDIM=_DA[lang2]||_DA['nl'];dDIM.weet_niet='?';
+// Kwaliteits-klasse (Fase 3) — canonieke grenzen/teksten geïnjecteerd (deze pagina laadt hrv.js niet).
+// Alléén de kwaliteits-as (artefact-%); de band-as (ritme) wordt hier niet gescoord — ongewijzigd.
+var _QTB={{ quality_tier_bounds()|tojson }}, _QTT={{ quality_tier_texts()|tojson }};
+function _qtier(kw){if(kw==null||kw==='')return 'betrouwbaar';kw=Number(kw);if(isNaN(kw))return 'betrouwbaar';return kw>=_QTB.betrouwbaar?'betrouwbaar':kw>=_QTB.indicatief?'indicatief':'onbetrouwbaar';}
+function _qtt(t,k){var d=_QTT[t]&&_QTT[t][k]?_QTT[t][k]:{};return d[lang2]||d.nl||'';}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 var list=document.getElementById('metingenLijst');
 if(!data||!data.length){list.innerHTML='<p style="text-align:center;color:#888;">'+(lang2=='de'?'Noch keine Messungen.':lang2=='en'?'No readings yet.':'Nog geen metingen.')+'</p>';}
@@ -28,9 +33,13 @@ else{
     var date=dt?dt.toLocaleDateString('nl-NL',{year:'numeric',month:'2-digit',day:'2-digit'}):'';
     var tijd=dt?dt.toTimeString().substring(0,5):'';
     var ri=r.ri||0;
-    // Kwaliteits-gate (besluit 2a): grijze stip bij kwaliteit <85.
-    var _kwlow=(r.kwaliteit!=null&&!isNaN(Number(r.kwaliteit))&&Number(r.kwaliteit)<85);
-    var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+(_kwlow?'#bfbfbf':(ri<2?'#e74c3c':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#2ecc71':'#27ae60'))+'"></span>';
+    // Kwaliteits-klasse (Fase 3): onbetrouwbaar -> uitslag onderdrukken; indicatief -> tonen + markering.
+    var _tier=_qtier(r.kwaliteit);
+    var _suppress=(_tier==='onbetrouwbaar');
+    var _indic=(_tier==='indicatief');
+    var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+((_suppress||_indic)?'#bfbfbf':(ri<2?'#e74c3c':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#2ecc71':'#27ae60'))+'"></span>';
+    var _badge=_indic?' <span title="'+_qtt('indicatief','marker')+'" style="font-size:.68rem;color:#b26a00;background:#fdf3e0;border:1px solid #f0d9b0;border-radius:3px;padding:0 4px;margin-left:3px;white-space:nowrap;">'+_qtt('indicatief','badge')+'</span>':'';
+    var riCell=_suppress?'<span title="'+_qtt('onbetrouwbaar','retry')+'" style="color:#c0392b;font-weight:600;white-space:nowrap;">'+_qtt('onbetrouwbaar','badge')+'</span>':(ri+_badge);
     // "Wat speelt er" = vertaalde dimensie (alle types) + vrije tekst als tweede regel/tooltip.
     // "LABEL" = het biofeedback-/situatie-contextlabel (r.notes, server-side vertaald).
     var dimRaw=r.dimensie||'';
@@ -38,7 +47,7 @@ else{
     var vt=r.vrije_tekst||'';
     var watCell=vt?('<span title="'+esc(vt)+'" style="cursor:help;border-bottom:1px dotted #bbb;">'+dimL+'</span><div style="font-size:.72rem;color:#8a8a8a;margin-top:.15rem;max-width:24ch;line-height:1.35;">'+esc(vt)+'</div>'):dimL;
     var labelCell=r.notes?esc(r.notes):'-';
-    html+='<tr style="border-bottom:1px solid #eef0f3;"><td style="padding:.55rem .8rem;">'+date+'</td><td style="padding:.55rem .8rem;">'+tijd+'</td><td style="padding:.55rem .8rem;">'+dot+ri+'</td><td style="padding:.55rem .8rem;">'+(r.bpm||'-')+'</td><td style="padding:.55rem .8rem;">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td style="padding:.55rem .8rem;">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td style="padding:.55rem .8rem;">'+(r.meting_type_label||'-')+'</td><td style="padding:.55rem .8rem;">'+labelCell+'</td><td style="padding:.55rem .8rem;">'+watCell+'</td><td style="padding:.55rem .8rem;">'+(r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" style="font-size:.75rem;color:#0078ff;text-decoration:none;">↓ Kubios export</a>':'')+'</td></tr>';
+    html+='<tr style="border-bottom:1px solid #eef0f3;"><td style="padding:.55rem .8rem;">'+date+'</td><td style="padding:.55rem .8rem;">'+tijd+'</td><td style="padding:.55rem .8rem;">'+dot+riCell+'</td><td style="padding:.55rem .8rem;">'+(r.bpm||'-')+'</td><td style="padding:.55rem .8rem;">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td style="padding:.55rem .8rem;">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td style="padding:.55rem .8rem;">'+(r.meting_type_label||'-')+'</td><td style="padding:.55rem .8rem;">'+labelCell+'</td><td style="padding:.55rem .8rem;">'+watCell+'</td><td style="padding:.55rem .8rem;">'+(r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" style="font-size:.75rem;color:#0078ff;text-decoration:none;">↓ Kubios export</a>':'')+'</td></tr>';
   });
   html+='</table></div>';
   list.innerHTML=html;

@@ -164,6 +164,73 @@ def dimensie_label(code, lang='nl'):
     return DIMENSIE_LABELS.get(lang, DIMENSIE_LABELS['nl']).get(code, code)
 
 
+# ─────────────────────────────────────────────────────────────────────────────────────
+# KWALITEITS-KLASSE (Fase 3, 2026-07-02) — CANONIEKE bron voor de artefact-as.
+# `kwaliteit` (0-100) = 100 − %gecorrigeerde slagen (Kubios-mediaanfilter, hrv.js filterRR).
+# Drempels verankerd in de HRV-literatuur i.p.v. pragmatisch gekozen (waren 85/70):
+#   - BETROUWBAAR ≥ 95  (≤5% gecorrigeerd): de gevestigde HRV-betrouwbaarheidsgrens —
+#     narratieve reviews/Kubios-validatie gooien opnames >~5% gecorrigeerd weg omdat de
+#     betrouwbaarheid daarboven substantieel afneemt.
+#   - INDICATIEF 90–95  (5–10% gecorrigeerd): tot 2× de norm — uitslag mag getoond worden,
+#     maar MÉT zichtbare betrouwbaarheidsmarkering (niet als exacte score).
+#   - ONBETROUWBAAR < 90 (>10% gecorrigeerd): uitslag onderdrukken + herkansing.
+# RMSSD/SD1 (waarop de Relax Index stoelt) is aantoonbaar artefact-gevoeliger dan het
+# frequentie-domein → we gaan bewust NIET soepeler dan de norm. De 90-ondergrens (10%) is
+# een verdedigbaar startpunt, door Paul te herijken. Legacy-rijen zonder ruwe RR (kwaliteit
+# None/'') = 'betrouwbaar' (onbekend ≠ slecht; anders zouden honderden oude metingen ineens
+# onderdrukt worden). Dit is de KWALITEITS-as; quality_band (ritme/ectopie) blijft een
+# ONAFHANKELIJKE tweede as (is_slecht_rr) die apart afkeurt.
+QUALITY_TIER_BETROUWBAAR_MIN = 95   # ≤5% gecorrigeerd
+QUALITY_TIER_INDICATIEF_MIN = 90    # ≤10% gecorrigeerd; daaronder onbetrouwbaar
+
+
+def quality_tier(kwaliteit):
+    """kwaliteit (0-100) → 'betrouwbaar' | 'indicatief' | 'onbetrouwbaar'. CANONIEKE bron;
+    alle oppervlakken (tabellen, Kompas, gauge/dot, baseline, event, rapporten) horen deze
+    te gebruiken i.p.v. verspreide kw-drempels. None/'' (legacy) → 'betrouwbaar'."""
+    if kwaliteit is None or kwaliteit == '':
+        return 'betrouwbaar'
+    try:
+        kw = float(kwaliteit)
+    except (TypeError, ValueError):
+        return 'betrouwbaar'
+    if kw >= QUALITY_TIER_BETROUWBAAR_MIN:
+        return 'betrouwbaar'
+    if kw >= QUALITY_TIER_INDICATIEF_MIN:
+        return 'indicatief'
+    return 'onbetrouwbaar'
+
+
+# VOORLOPIGE teksten (gaan live als toets-versie — Paul legt ze voor aan reviewers en stelt
+# later bij). Beschrijvend, niet-oordelend, geen medische diagnose; DE = Sie-vorm (consument).
+# 'badge' = kort label naast de uitslag; 'marker' = de zichtbare betrouwbaarheidsmelding
+# (indicatief); 'retry' = herkansings-uitnodiging (onbetrouwbaar, uitslag onderdrukt).
+QUALITY_TIER_TEXTS = {
+    'indicatief': {
+        'badge': {'nl': 'Indicatief', 'de': 'Orientierend', 'en': 'Indicative'},
+        'marker': {
+            'nl': 'Betrouwbaarheid beperkt — deze uitslag is indicatief. De meting bevatte wat signaalruis; lees de waarden als richting, niet als exacte score.',
+            'de': 'Zuverlässigkeit eingeschränkt — dieses Ergebnis ist orientierend. Die Messung enthielt etwas Signalrauschen; lesen Sie die Werte als Richtung, nicht als exakten Wert.',
+            'en': 'Limited reliability — this result is indicative. The reading contained some signal noise; read the values as a direction, not an exact score.',
+        },
+    },
+    'onbetrouwbaar': {
+        'badge': {'nl': 'Meetkwaliteit te laag', 'de': 'Messqualität zu niedrig', 'en': 'Measurement quality too low'},
+        'retry': {
+            'nl': 'Deze meting bevatte te veel signaalruis voor een betrouwbare uitslag. Probeer het opnieuw in een rustige houding met goed sensorcontact.',
+            'de': 'Diese Messung enthielt zu viel Signalrauschen für ein zuverlässiges Ergebnis. Bitte wiederholen Sie sie in ruhiger Haltung mit gutem Sensorkontakt.',
+            'en': 'This reading contained too much signal noise for a reliable result. Please try again in a calm posture with good sensor contact.',
+        },
+    },
+}
+
+
+def quality_tier_text(tier, kind, lang='nl'):
+    """Gelokaliseerde voorlopige tekst voor een kwaliteits-klasse. kind: 'badge'|'marker'|'retry'."""
+    d = QUALITY_TIER_TEXTS.get(tier, {}).get(kind, {})
+    return d.get(lang, d.get('nl', ''))
+
+
 def meting_type_label(code, lang='nl'):
     """metingen.meting_type-code → label in actieve locale. Onbekende code verbatim."""
     if not code:
@@ -396,16 +463,11 @@ def baseline_day_values(rows, max_days=BASELINE_MIN_DAYS, tz_name=_BASELINE_TZ):
     for r in rows:
         if str(_g(r, 'meting_type') or '').lower() != 'basismeting':
             continue
-        # Kwaliteits-gate (besluit 3): alleen VERTROUWDE metingen (kwaliteit >= 85) in de
-        # baseline/trend, anders vervuilt één aritmie-/lage-kwaliteit-meting de baseline.
-        # Ontbrekende kwaliteit (legacy/niet meegegeven) telt as-is mee (besluit 5: legacy=vertrouwd).
-        _kw = _g(r, 'kwaliteit')
-        if _kw is not None:
-            try:
-                if float(_kw) < 85:
-                    continue
-            except (TypeError, ValueError):
-                pass
+        # Kwaliteits-gate (Fase 3): baseline-waardig = klasse 'betrouwbaar' (kwaliteit ≥95,
+        # ≤5% gecorrigeerd — de literatuur-betrouwbaarheidsgrens). 'indicatief'/'onbetrouwbaar'
+        # vervuilen de baseline niet. Legacy (kwaliteit None) → 'betrouwbaar' (telt mee).
+        if quality_tier(_g(r, 'kwaliteit')) != 'betrouwbaar':
+            continue
         ri, ts = _g(r, 'ri'), _g(r, 'ts')
         if ri is None or ts is None:
             continue
@@ -579,14 +641,10 @@ def _aggregate_rows(rows):
                 'zone_counts': {k: 0 for k in ZONE_KEYS},
                 'reliable': 0,
             }
-        # Kwaliteits-gate: zone/RI-oordeel alleen op VERTROUWDE metingen (kwaliteit >= 85).
-        # Ontbrekende kwaliteit telt as-is mee (besluit 5: legacy = vertrouwd).
-        _kw = r.get('kwaliteit')
-        try:
-            _low = (_kw is not None and float(_kw) < 85)
-        except (TypeError, ValueError):
-            _low = False
-        if _low:
+        # Kwaliteits-gate (Fase 3): zone/RI-oordeel alleen op klasse 'betrouwbaar' (kwaliteit
+        # ≥95). 'indicatief'/'onbetrouwbaar' tellen niet mee in het groeps-aggregaat.
+        # Legacy (kwaliteit None) → 'betrouwbaar'.
+        if quality_tier(r.get('kwaliteit')) != 'betrouwbaar':
             low_q += 1
             continue
         # Zone + RI-gemiddelde (alleen betrouwbaar)

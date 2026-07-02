@@ -146,7 +146,7 @@ body{background:#f5f5f5;margin:0;}
 </div>
 <div style="display:flex;justify-content:space-between;align-items:center;max-width:820px;margin:.75rem auto 0;padding:0 1rem;"><a href="{% if request.args.get("from") == "hlm" %}/hlm/consumer{% elif client_id and client_id > 0 and is_pro %}/pro/clienten{% else %}/menu{% endif %}" style="display:inline-flex;align-items:center;gap:.4rem;background:#eee;color:#555;padding:.5rem 1.2rem;border-radius:8px;text-decoration:none;font-size:.85rem;font-weight:600;">&#8592; {% if client_id and client_id > 0 and is_pro %}CLIËNTEN{% else %}{%if lang=="de"%}MENÜ{%elif lang=="en"%}MENU{%else%}MENU{%endif%}{% endif %}</a><button onclick="discardAndGo('{% if client_id and client_id > 0 and is_pro %}/pro/meting?cid={{ client_id }}{% else %}/meetkeuze{% endif %}')" style="background:#E8344E;color:#fff;padding:.5rem 1.4rem;border-radius:8px;border:none;cursor:pointer;font-size:.85rem;font-weight:700;">{%if lang=="de"%}NEUE MESSUNG{%elif lang=="en"%}NEW MEASUREMENT{%else%}NIEUWE METING{%endif%}</button><button onclick="kwOpslaan()"" style="background:#E8344E;color:#fff;padding:.5rem 1.4rem;border-radius:8px;border:none;cursor:pointer;font-size:.85rem;font-weight:700;"><span id="kwOpslaanTekst">Opslaan</span></button></div>
 
-<script src="/static/js/hrv.js?v=9"></script>
+<script src="/static/js/hrv.js?v=10"></script>
 <script>
 // Accordion voor de Details-info-kaarten: bij openen van een kaart sluiten alle andere; nogmaals klikken = sluiten (toggle). Eén tegelijk open.
 function kwInfo(id){var el=document.getElementById(id),wasOpen=el.style.display==='block';document.querySelectorAll('.kw-info').forEach(function(e){e.style.display='none';});if(!wasOpen)el.style.display='block';}
@@ -303,9 +303,11 @@ var vit=5;
     var dimCtx=(cur.ctx_dimensie||sessionStorage.getItem('sc_ctx_dimensie'))||'';
     var dim=dimCtx;
   const ri=cur.ri||0,bpm=cur.bpm||70,hrv=cur.hrv_pct||0,delta=cur.delta,baseline=cur.baseline,kw=cur.kwaliteit||100;
-  // Kwaliteits-gate: bij beperkte/onbetrouwbare kwaliteit stip + gauge-naald grijzen (één verhaal, geen schijn-positief in het groen).
+  // Kwaliteits-klasse (Fase 3, canoniek HRV.qualityTier 95/90): onbetrouwbaar -> stip + gauge-naald grijzen + uitslag onderdrukken.
+  var _QTT={{ quality_tier_texts()|tojson }};
   var _kwv=(cur.kwaliteit===null||cur.kwaliteit===undefined||cur.kwaliteit==='')?100:Number(cur.kwaliteit);
-  var _gated=!isNaN(_kwv)&&_kwv<85;
+  var _tierKw=HRV.qualityTier(cur.kwaliteit);
+  var _gated=(_tierKw==='onbetrouwbaar');
   // Onregelmatigheid: nieuwe tweelaags-meetkwaliteit (HRV.qualityClassify, variant B) — één bron
   // i.p.v. de inline SD1/SD2-kopie. 'slecht' -> markeren ('flag'); rest -> 'clean'. De oude
   // HRV.rrIrregularity blijft in hrv.js als referentie (hier niet gebruikt). Getoonde RI = cur.ri
@@ -369,28 +371,27 @@ var vit=5;
   // === Kwaliteits-gate op de RI/zone-WEERGAVE (display-only; opgeslagen RI ongemoeid) ===
   // KWALITEITS_GATE_ONTWERP.md: <70 onderdrukken; 70-84 voorbehoud + blokkeer positieve "Veerkrachtig".
   (function(){
-    // kwaliteit -> vertrouwbaarheid (inline; kwadrant laadt hrv.js niet). >=85 trusted / 70-84 limited / <70 untrusted; ontbrekend=trusted (legacy).
-    var _kwv=(cur.kwaliteit===null||cur.kwaliteit===undefined||cur.kwaliteit==='')?100:Number(cur.kwaliteit);
-    var _conf=isNaN(_kwv)?'trusted':(_kwv>=85?'trusted':_kwv>=70?'limited':'untrusted');
+    // Kwaliteits-klasse (Fase 3): onbetrouwbaar -> RI/zone onderdrukken + herkansing;
+    // indicatief -> RI/zone TONEN met zichtbare betrouwbaarheidsmarkering; betrouwbaar -> normaal.
+    var _tier=_tierKw;
+    function _t(t,k){var d=_QTT[t]&&_QTT[t][k]?_QTT[t][k]:{};return d[_lng]||d.nl||'';}
     var _g=document.getElementById('gaugeRI'),_z=document.getElementById('zoneLabel'),_c=document.getElementById('riCaveat');
-    if(_conf==='untrusted'){
+    if(_tier==='onbetrouwbaar'){
       _g.textContent='–';_g.style.color='#999';
       _z.textContent={de:'Messung unzuverlässig',en:'Reading unreliable',nl:'Meting onbetrouwbaar'}[_lng]||'Meting onbetrouwbaar';_z.style.color='#999';
-      if(_c){_c.textContent={de:'Messqualität zu niedrig — bitte unter ruhigen Bedingungen wiederholen.',en:'Reading quality too low — please repeat under calm conditions.',nl:'Meetkwaliteit te laag — herhaal onder rustige omstandigheden.'}[_lng]||'';_c.style.display='block';}
-    } else if(_conf==='limited'){
-      if(zi===4){ // positieve "Veerkrachtig" niet stellig claimen bij beperkte kwaliteit
-        _z.textContent={de:'Messqualität begrenzt — unsicher',en:'Reading quality limited — uncertain',nl:'Meetkwaliteit beperkt — onzeker'}[_lng]||'Meetkwaliteit beperkt — onzeker';_z.style.color='#f1c40f';
-      }
-      if(_c){_c.textContent={de:'Messqualität begrenzt — Ergebnis mit Vorsicht interpretieren.',en:'Reading quality limited — interpret with caution.',nl:'Meetkwaliteit beperkt — interpreteer met voorzichtigheid.'}[_lng]||'';_c.style.display='block';}
+      if(_c){_c.textContent=_t('onbetrouwbaar','retry');_c.style.display='block';_c.style.color='#c0392b';}
+    } else if(_tier==='indicatief'){
+      if(_c){_c.textContent=_t('indicatief','marker');_c.style.display='block';_c.style.color='#b26a00';}
     } else if(_c){_c.style.display='none';}
   })();
   document.getElementById('bpmVal').textContent=bpm;document.getElementById('hrvVal').textContent=hrv+'%';
-  (function(){ // SIGNAAL-STERKTE (kwaliteit%): percentage + kleur + actie-tip <70%
+  (function(){ // SIGNAAL-STERKTE (kwaliteit%): percentage + kleur per klasse (Fase 3) + actie-tip bij onbetrouwbaar
     var _kwn=isNaN(Number(kw))?100:Number(kw), _lng3='{{lang}}';
+    var _t3=HRV.qualityTier(cur.kwaliteit);
     var _pc=document.getElementById('qualityPct');
-    if(_pc){_pc.textContent=_kwn+'%';_pc.style.color=_kwn>=85?'#0F6E56':_kwn>=70?'#cc8400':'#c0392b';}
+    if(_pc){_pc.textContent=_kwn+'%';_pc.style.color=(_t3==='betrouwbaar')?'#0F6E56':(_t3==='indicatief')?'#cc8400':'#c0392b';}
     var _st=document.getElementById('signalStrengthTip');
-    if(_st){ if(_kwn<70){_st.textContent='⚠ '+(_lng3==='de'?'Sensorkontakt verbessern':_lng3==='en'?'Improve sensor contact':'Sensor-contact verbeteren');_st.style.display='inline';} else {_st.style.display='none';} }
+    if(_st){ if(_t3==='onbetrouwbaar'){_st.textContent='⚠ '+(_lng3==='de'?'Sensorkontakt verbessern':_lng3==='en'?'Improve sensor contact':'Sensor-contact verbeteren');_st.style.display='inline';} else {_st.style.display='none';} }
   })();
   // Meetkwaliteit-sterren/label op de variant-B band (HRV.qualityClassify), NIET op kwaliteit%.
   // slecht/redelijk/onbepaald -> ★★☆ (onbetrouwbaar/voorzichtig); goed -> ★★★. 'onbekend'-alias defensief.

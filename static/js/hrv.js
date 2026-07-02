@@ -91,6 +91,11 @@ function getMeetKwaliteit(r){if(r&&r.length>30)r=r.slice(15);if(!r||r.length<3)r
 // >=85 'trusted' · 70-84 'limited' (toon met voorbehoud, blokkeer positieve "Veerkrachtig")
 // · <70 'untrusted' (RI/zone onderdrukken). Ontbrekende kwaliteit = vertrouwd (besluit 5: legacy).
 function riConfidence(kw){kw=(kw===null||kw===undefined||kw==='')?100:Number(kw);if(isNaN(kw))return 'trusted';return kw>=85?'trusted':kw>=70?'limited':'untrusted';}
+// Fase 3 — CANONIEKE kwaliteits-klasse (JS-twin van analytics.quality_tier). Literatuur-
+// verankerd: ≥95 betrouwbaar (≤5% gecorrigeerd), 90-95 indicatief (tot 10%), <90 onbetrouwbaar.
+// None/'' (legacy) = betrouwbaar. Vervangt de verspreide 85/70-drempels. Parity-getest.
+var QUALITY_TIER_BETROUWBAAR_MIN=95, QUALITY_TIER_INDICATIEF_MIN=90;
+function qualityTier(kw){if(kw===null||kw===undefined||kw==='')return 'betrouwbaar';kw=Number(kw);if(isNaN(kw))return 'betrouwbaar';return kw>=QUALITY_TIER_BETROUWBAAR_MIN?'betrouwbaar':kw>=QUALITY_TIER_INDICATIEF_MIN?'indicatief':'onbetrouwbaar';}
 // ===========================================================================
 // NIEUWE tweelaags-meetkwaliteit (qualityClassify) — APART van rrIrregularity.
 // Gebouwd op read-only PI-Zwolle-analyse (juni 2026). De oude SD1/SD2-gate
@@ -176,6 +181,6 @@ function qualityClassify(rr){
 }
 function calculateSDNN(r){var res=filterRR(r);var f=res.filtered;if(!f||f.length<2)return 0;var m=f.reduce(function(a,b){return a+b;},0)/f.length;return Math.round(Math.sqrt(f.reduce(function(a,b){return a+Math.pow(b-m,2);},0)/f.length)*10)/10;}
 function calculatePNN50(r){var res=filterRR(r);var f=res.filtered;if(!f||f.length<2)return 0;var n=0;for(var i=1;i<f.length;i++)if(Math.abs(f[i]-f[i-1])>50)n++;return Math.round((n/(f.length-1))*1000)/10;}
-var HRV={filterRR:filterRR,calculateRMSSD:calculateRMSSD,calculateSDNN:calculateSDNN,calculatePNN50:calculatePNN50,calculateHRVPercent:calculateHRVPercent,getMeetKwaliteit:getMeetKwaliteit,riConfidence:riConfidence,qualityClassify:qualityClassify,QUAL_L2_SD1SD2:QUAL_L2_SD1SD2,QUAL_L2_RMSSD_MIN:QUAL_L2_RMSSD_MIN,lookupRelaxIndex:lookupRelaxIndex,getLabel:getLabel,getColor:getColor,RMSSD_NORMS:N};
+var HRV={filterRR:filterRR,calculateRMSSD:calculateRMSSD,calculateSDNN:calculateSDNN,calculatePNN50:calculatePNN50,calculateHRVPercent:calculateHRVPercent,getMeetKwaliteit:getMeetKwaliteit,riConfidence:riConfidence,qualityTier:qualityTier,QUALITY_TIER_BETROUWBAAR_MIN:QUALITY_TIER_BETROUWBAAR_MIN,QUALITY_TIER_INDICATIEF_MIN:QUALITY_TIER_INDICATIEF_MIN,qualityClassify:qualityClassify,QUAL_L2_SD1SD2:QUAL_L2_SD1SD2,QUAL_L2_RMSSD_MIN:QUAL_L2_RMSSD_MIN,lookupRelaxIndex:lookupRelaxIndex,getLabel:getLabel,getColor:getColor,RMSSD_NORMS:N};
 if(typeof module!=="undefined"&&module.exports){module.exports=HRV;}else{g.HRV=HRV;}
 })(typeof window!=="undefined"?window:this);

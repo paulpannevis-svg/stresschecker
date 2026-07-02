@@ -267,7 +267,7 @@
 </style>
 
 <script>window.SC_LANG="{{lang}}";window.SC_DEMO={{ 'true' if is_demo else 'false' }};window.SC_PROFILE_OK={{ 'true' if profile_ok else 'false' }};</script>
-<script src="/static/js/hrv.js?v=7"></script>
+<script src="/static/js/hrv.js?v=10"></script>
 <script src="/static/js/sensor.js"></script>
 <script>
 const DURATION = {{ duration }};
@@ -652,15 +652,16 @@ function updateDisplay(rr) {
   document.getElementById('hrvEndEl').textContent = hrv + '%';
   document.getElementById('slagenEndEl').textContent = beatCount;
   var kwEl=document.getElementById('kwaliteitEndEl');
-  if(kwEl){kwEl.textContent=kwaliteit+'%';kwEl.style.color=kwaliteit>=85?'#E8344E':kwaliteit>=70?'#f39c12':'#c0392b';}
-  if(kwaliteit < 85) {
+  if(kwEl){kwEl.textContent=kwaliteit+'%';kwEl.style.color=(HRV.qualityTier(kwaliteit)==='betrouwbaar'?'#E8344E':HRV.qualityTier(kwaliteit)==='indicatief'?'#f39c12':'#c0392b');}
+  var _mt=HRV.qualityTier(kwaliteit);  // Fase 3: onbetrouwbaar -> onderdrukken; indicatief -> tonen + markering
+  if(_mt === 'onbetrouwbaar') {
     document.getElementById('riEndEl').textContent = '--';
     document.getElementById('riEndEl').style.color = '#c0392b';
     document.getElementById('riEndLblEl').textContent = 'ONBETROUWBAAR';
   } else {
     document.getElementById('riEndEl').textContent = ri.toFixed(1);
-    document.getElementById('riEndEl').style.color = HRV.getColor(ri);
-    document.getElementById('riEndLblEl').textContent = label;
+    document.getElementById('riEndEl').style.color = (_mt==='indicatief')?'#b26a00':HRV.getColor(ri);
+    document.getElementById('riEndLblEl').textContent = (_mt==='indicatief')?(label+' · '+({de:'orientierend',en:'indicative',nl:'indicatief'}['{{ session.get("lang","nl") }}']||'indicatief')):label;
   }
 
     document.getElementById('hrvEl').textContent = hrv + '%';
@@ -773,7 +774,7 @@ function finishMeasure() {
   var bpmEndEl = document.getElementById('bpmEndEl');
   var kwEl = document.getElementById('kwaliteitEndEl');
   if(bpmEndEl) bpmEndEl.textContent = avgBpm;
-  if(kwEl){ kwEl.textContent=kwaliteit+'%'; kwEl.style.color=kwaliteit>=85?'#E8344E':kwaliteit>=70?'#f39c12':'#c0392b'; }
+  if(kwEl){ kwEl.textContent=kwaliteit+'%'; kwEl.style.color=(HRV.qualityTier(kwaliteit)==='betrouwbaar'?'#E8344E':HRV.qualityTier(kwaliteit)==='indicatief'?'#f39c12':'#c0392b'); }
 
   // Direct opslaan, kwadrant toont resultaat
   saveBiofeedback(true);
