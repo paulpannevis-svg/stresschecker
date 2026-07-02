@@ -2722,6 +2722,17 @@ def pro_clients():
     for c in clients:
         last = db.execute("SELECT ri,bpm,hrv_pct,ts FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 1", (c['id'],)).fetchone()
         total = db.execute("SELECT COUNT(*) FROM client_metingen WHERE client_id=?", (c['id'],)).fetchone()[0]
+        # Kwaliteitsgate (Fase 2 / punt h): identiek aan pro_dashboard — sluit
+        # quality-afgekeurde metingen (is_slecht_rr OF kwaliteit<70) uit week_avg + trend.
+        # Aggregatie in Python (gate parset rr_intervals); vensters/drempels ongewijzigd.
+        _now = __import__('time').time() * 1000
+        _crows = db.execute("SELECT ri, ts, rr_intervals, kwaliteit FROM client_metingen WHERE client_id=? AND ri IS NOT NULL", (c['id'],)).fetchall()
+        _clean = [(float(r['ri']), r['ts']) for r in _crows if not _kompas_quality_excluded(r['rr_intervals'], r['kwaliteit'])]
+        def _win(lo, hi=None, _cl=_clean):
+            _v = [ri for ri, ts in _cl if ts is not None and ts > lo and (hi is None or ts < hi)]
+            return (sum(_v) / len(_v)) if _v else None
+        _week_recent = _win(_now - 604800 * 1000)
+        _week_prev = _win(_now - 1209600 * 1000, _now - 604800 * 1000)
         client_list.append({
             'id': c['id'], 'name': c['name'], 'birth_year': c['birth_year'],
             'gender': c['gender'], 'client_code': c['client_code'],
@@ -2730,10 +2741,9 @@ def pro_clients():
             'last_bpm': last['bpm'] if last else None,
             'last_ts': __import__('datetime').datetime.fromtimestamp(last['ts']/1000).strftime('%d-%m-%Y') if last and last['ts'] else None,
             'total_metingen': total,
-                'week_avg': round(db.execute('SELECT AVG(ri) FROM client_metingen WHERE client_id=? AND ts>?', (c['id'], (__import__('time').time()-604800)*1000)).fetchone()[0] or 0, 1),
+                'week_avg': round(_week_recent or 0, 1),
                 'trend': (lambda cur, prev: ('up', round(cur - prev, 1)) if cur and prev and cur - prev > 0.3 else (('down', round(cur - prev, 1)) if cur and prev and cur - prev < -0.3 else (('flat', 0) if cur and prev else ('nodata', 0))))(
-                    db.execute('SELECT AVG(ri) FROM client_metingen WHERE client_id=? AND ts>?', (c['id'], (__import__('time').time()-604800)*1000)).fetchone()[0],
-                    db.execute('SELECT AVG(ri) FROM client_metingen WHERE client_id=? AND ts>? AND ts<?', (c['id'], (__import__('time').time()-1209600)*1000, (__import__('time').time()-604800)*1000)).fetchone()[0]
+                    _week_recent, _week_prev
                 ),
                 'top_dimensie': (lambda r: r[0] if r else None)(db.execute("SELECT ctx_dimensie FROM client_metingen WHERE client_id=? AND ctx_dimensie IS NOT NULL AND ctx_dimensie != '' GROUP BY ctx_dimensie ORDER BY COUNT(*) DESC LIMIT 1", (c['id'],)).fetchone())
         })
@@ -6199,26 +6209,26 @@ def api_feedback():
         if _is_client_query:
             db = get_pro_db()
             if mid_param:
-                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band FROM client_metingen WHERE id=? AND client_id=?', (mid_param, cid)).fetchone()
+                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band, kwaliteit FROM client_metingen WHERE id=? AND client_id=?', (mid_param, cid)).fetchone()
                 rows = []
                 if cur_r:
                     rows.append(cur_r)
-                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band FROM client_metingen WHERE client_id=? AND ts < ? ORDER BY ts DESC LIMIT 1', (cid, cur_r['ts'])).fetchone()
+                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band, kwaliteit FROM client_metingen WHERE client_id=? AND ts < ? ORDER BY ts DESC LIMIT 1', (cid, cur_r['ts'])).fetchone()
                     if prev_r: rows.append(prev_r)
             else:
-                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 2', (cid,)).fetchall()
+                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band, kwaliteit FROM client_metingen WHERE client_id=? ORDER BY ts DESC LIMIT 2', (cid,)).fetchall()
             db.close()
         else:
             db = get_meting_db()
             if mid_param:
-                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band FROM metingen WHERE id=? AND user_key=?', (mid_param, get_user_key())).fetchone()
+                cur_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band, kwaliteit FROM metingen WHERE id=? AND user_key=?', (mid_param, get_user_key())).fetchone()
                 rows = []
                 if cur_r:
                     rows.append(cur_r)
-                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band FROM metingen WHERE user_key=? AND ts < ? ORDER BY ts DESC LIMIT 1', (get_user_key(), cur_r['ts'])).fetchone()
+                    prev_r = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band, kwaliteit FROM metingen WHERE user_key=? AND ts < ? ORDER BY ts DESC LIMIT 1', (get_user_key(), cur_r['ts'])).fetchone()
                     if prev_r: rows.append(prev_r)
             else:
-                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 2', (get_user_key(),)).fetchall()
+                rows = db.execute('SELECT id, ri, bpm, hrv_pct, rmssd, subjectief_score, ctx_dimensie, ctx_vitaliteit, ctx_ongemak, ctx_vrije_tekst, meting_type, feedback_cache, ts, notes, duration, timeseries, rr_intervals, quality_band, kwaliteit FROM metingen WHERE user_key=? ORDER BY ts DESC LIMIT 2', (get_user_key(),)).fetchall()
             db.close()
     except Exception as e:
         import traceback; traceback.print_exc()
@@ -6445,6 +6455,13 @@ def api_feedback():
             pass
 
     # Trend berekenen
+    # Fase 2 / punt h: de lokale-fallback (_generate_local_feedback, alleen actief bij
+    # LLM-uitval/geen key) mag geen trend bouwen op een quality-afgekeurde vorige meting —
+    # zelfde gate als de Kompas-hoofdweg. Sluit prev uit via _kompas_quality_excluded
+    # (is_slecht_rr OF kwaliteit<70) → geen trend i.p.v. een opgeblazen up/down op een
+    # valse RI. (De hoofd-LLM-weg gebruikt de al-gegate recent_basis, niet prev/trend.)
+    if prev is not None and _kompas_quality_excluded(prev.get('rr_intervals'), prev.get('kwaliteit')):
+        prev = None
     trend = None
     if prev and cur.get('ri') is not None and prev.get('ri') is not None:
         diff = cur['ri'] - prev['ri']
