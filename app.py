@@ -2708,6 +2708,12 @@ def pro_eigen_metingen():
     resp.headers["Cache-Control"] = "no-store, no-cache"
     return resp
 
+# Gedeelde pro-trend-drempel (RI week-over-week): pro_dashboard én pro_clients gebruiken
+# dezelfde waarde, zodat de twee B2B-oppervlakken identiek oordelen. 0,3 = canonieke waarde
+# (ook _generate_trend_data + biofeedback-effect). Geborgd door tests/test_pro_trend_threshold.py.
+PRO_TREND_DELTA = 0.3
+
+
 @app.route('/pro/clienten')
 @require_kk_office_if_krankenkasse
 def pro_clients():
@@ -2724,12 +2730,13 @@ def pro_clients():
         total = db.execute("SELECT COUNT(*) FROM client_metingen WHERE client_id=?", (c['id'],)).fetchone()[0]
         # Kwaliteitsgate (Fase 2 / punt h): identiek aan pro_dashboard — sluit
         # quality-afgekeurde metingen (is_slecht_rr OF kwaliteit<70) uit week_avg + trend.
-        # Aggregatie in Python (gate parset rr_intervals); vensters/drempels ongewijzigd.
+        # Aggregatie in Python (gate parset rr_intervals). Vensterrand ts<= (aaneensluitende
+        # buckets, gelijk aan pro_dashboard); trend-drempel 0,3 (canoniek, gedeeld).
         _now = __import__('time').time() * 1000
         _crows = db.execute("SELECT ri, ts, rr_intervals, kwaliteit FROM client_metingen WHERE client_id=? AND ri IS NOT NULL", (c['id'],)).fetchall()
         _clean = [(float(r['ri']), r['ts']) for r in _crows if not _kompas_quality_excluded(r['rr_intervals'], r['kwaliteit'])]
         def _win(lo, hi=None, _cl=_clean):
-            _v = [ri for ri, ts in _cl if ts is not None and ts > lo and (hi is None or ts < hi)]
+            _v = [ri for ri, ts in _cl if ts is not None and ts > lo and (hi is None or ts <= hi)]
             return (sum(_v) / len(_v)) if _v else None
         _week_recent = _win(_now - 604800 * 1000)
         _week_prev = _win(_now - 1209600 * 1000, _now - 604800 * 1000)
@@ -2742,7 +2749,7 @@ def pro_clients():
             'last_ts': __import__('datetime').datetime.fromtimestamp(last['ts']/1000).strftime('%d-%m-%Y') if last and last['ts'] else None,
             'total_metingen': total,
                 'week_avg': round(_week_recent or 0, 1),
-                'trend': (lambda cur, prev: ('up', round(cur - prev, 1)) if cur and prev and cur - prev > 0.3 else (('down', round(cur - prev, 1)) if cur and prev and cur - prev < -0.3 else (('flat', 0) if cur and prev else ('nodata', 0))))(
+                'trend': (lambda cur, prev: ('up', round(cur - prev, 1)) if cur and prev and cur - prev > PRO_TREND_DELTA else (('down', round(cur - prev, 1)) if cur and prev and cur - prev < -PRO_TREND_DELTA else (('flat', 0) if cur and prev else ('nodata', 0))))(
                     _week_recent, _week_prev
                 ),
                 'top_dimensie': (lambda r: r[0] if r else None)(db.execute("SELECT ctx_dimensie FROM client_metingen WHERE client_id=? AND ctx_dimensie IS NOT NULL AND ctx_dimensie != '' GROUP BY ctx_dimensie ORDER BY COUNT(*) DESC LIMIT 1", (c['id'],)).fetchone())
@@ -2786,8 +2793,10 @@ def pro_dashboard():
         avg_recent = _avg(_lo=now_ms - week_ms)
         avg_prev = _avg(_lo=now_ms - 2 * week_ms, _hi=now_ms - week_ms)
         if avg_recent and avg_prev:
-            if avg_recent > avg_prev + 0.1: trend = 'up'
-            elif avg_recent < avg_prev - 0.1: trend = 'down'
+            # Gedeelde trend-drempel PRO_TREND_DELTA (0,3) — gelijk aan pro_clients. Was 0,1
+            # (ruisniveau, vals alarm); geünificeerd op de canonieke waarde.
+            if avg_recent > avg_prev + PRO_TREND_DELTA: trend = 'up'
+            elif avg_recent < avg_prev - PRO_TREND_DELTA: trend = 'down'
             else: trend = 'flat'
         else:
             trend = 'flat'
