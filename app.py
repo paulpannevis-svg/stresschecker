@@ -2760,9 +2760,21 @@ def pro_dashboard():
     rows = []
     for c in clients:
         cid = c['id']
-        avg_all = db.execute("SELECT AVG(ri) FROM client_metingen WHERE client_id=? AND ri IS NOT NULL", (cid,)).fetchone()[0]
-        avg_recent = db.execute("SELECT AVG(ri) FROM client_metingen WHERE client_id=? AND ri IS NOT NULL AND ts>?", (cid, now_ms - week_ms)).fetchone()[0]
-        avg_prev = db.execute("SELECT AVG(ri) FROM client_metingen WHERE client_id=? AND ri IS NOT NULL AND ts>? AND ts<=?", (cid, now_ms - 2*week_ms, now_ms - week_ms)).fetchone()[0]
+        # Kwaliteitsgate (Fase 2, punt h): sluit quality-afgekeurde metingen uit de
+        # avg/trend-aggregatie — zelfde gate als consument-Kompas
+        # (_kompas_quality_excluded = is_slecht_rr OF kwaliteit<70). Anders blaast een
+        # 'slecht'/vals-hoge-RI-meting de B2B-coach-trend op. Aggregatie in Python omdat
+        # de gate rr_intervals moet parsen (niet in SQL uit te drukken); vensters identiek.
+        _crows = db.execute("SELECT ri, ts, rr_intervals, kwaliteit FROM client_metingen WHERE client_id=? AND ri IS NOT NULL", (cid,)).fetchall()
+        _clean = [(float(r['ri']), r['ts']) for r in _crows if not _kompas_quality_excluded(r['rr_intervals'], r['kwaliteit'])]
+        def _avg(_lo=None, _hi=None):
+            _v = [ri for ri, ts in _clean
+                  if (_lo is None or (ts is not None and ts > _lo))
+                  and (_hi is None or (ts is not None and ts <= _hi))]
+            return (sum(_v) / len(_v)) if _v else None
+        avg_all = _avg()
+        avg_recent = _avg(_lo=now_ms - week_ms)
+        avg_prev = _avg(_lo=now_ms - 2 * week_ms, _hi=now_ms - week_ms)
         if avg_recent and avg_prev:
             if avg_recent > avg_prev + 0.1: trend = 'up'
             elif avg_recent < avg_prev - 0.1: trend = 'down'
