@@ -2583,7 +2583,7 @@ def mijn_metingen():
         return redirect(url_for('sc_login'))
     cn = get_meting_db()
     metingen = cn.execute(
-        "SELECT id, ts, ri, bpm, hrv_pct, rmssd, kwaliteit, meting_type, notes, rr_intervals FROM metingen WHERE user_key=? ORDER BY ts DESC",
+        "SELECT id, ts, ri, bpm, hrv_pct, rmssd, kwaliteit, meting_type, notes, rr_intervals, ctx_dimensie, ctx_vrije_tekst FROM metingen WHERE user_key=? ORDER BY ts DESC",
         (user_key,)
     ).fetchall()
     metingen_chart = [dict(r) for r in metingen]
@@ -2592,6 +2592,10 @@ def mijn_metingen():
     for r in metingen_chart:
         r['meting_type_label'] = _analytics.meting_type_label(r.get('meting_type'), lang)
         r['notes'] = _analytics.situation_label_translate(r.get('notes'), lang)
+        # "Wat speelt er" = categorie (ctx_dimensie) voor álle meettypes; vrije tekst als
+        # tweede regel/tooltip. Zelfde velden/naamgeving als de pro-sibling (/pro/mijn-metingen).
+        r['dimensie'] = r.get('ctx_dimensie') or ''
+        r['vrije_tekst'] = r.get('ctx_vrije_tekst') or ''
     return render_template('mijn_metingen.html', metingen_chart=metingen_chart, lang=lang)
 
 @app.route("/biofeedback")
