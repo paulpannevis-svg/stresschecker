@@ -121,6 +121,7 @@
   "expected": {
     "bpm": 65,
     "rmssd_ms": 86.67312979062602,
+    "ectopie_N": 0,
     "hrv_percent": 220,
     "ri": 10,
     "zone_label_nl": "Veerkrachtig",

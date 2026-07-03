@@ -79,6 +79,11 @@ RR_SCHOON = [900, 902, 905, 906, 908, 908, 908, 906, 905, 902, 900, 898, 895, 89
              892, 892, 892, 894, 895, 898, 900, 902, 905, 906, 908, 908, 908, 906,
              905, 902, 900, 898, 895, 894, 892, 892, 892, 894, 895, 898]
 
+# Echte StressChecker-fixtures voor de ectopie-teller (P10): id358/id360 = ectopie-
+# grenswaarde (band 'goed' maar N>=2 grote sprongen; waren eerder ONgemarkeerd).
+RR_ECTO_358 = [983,983,1176,789,769,789,769,800,789,789,789,811,769,778,778,789,789,769,778,778,769,778,769,759,769,759,759,769,759,697,882,821,800,789,789,789,778,778,778,769,778,769,778,769,778,778,778,789,800,821,811,821,845,821,833,821,821,821,833,800,759,778,759,769,750,740,714,723,714,723,1000,800,750,740,740,750,769,769,769,800,778,800,778,740,845,800,811,789,778,789,778,769,769,778,789,769,778,789,800,789,778,769,759,750,740,723,750,723,731,740,740,789,723,740,723,769,769]
+RR_ECTO_360 = [914,910,919,933,932,928,939,947,940,929,942,947,925,921,932,945,938,926,945,970,963,969,958,935,920,924,1158,366,1145,910,912,910,923,950,943,924,929,939,958,951,931,933,944,947,930,913,927,943,935,917,930,941,929,916,936,942,929,914,912,934,957,960,943,927,938,945,951,931,913,918,926,939,952,956,960,945,936,953,954,946,926,925,935,947,965,973,975,968,965,965,955,940,933,938,947,959,968]
+
 
 def _run_node(script):
     out = subprocess.run(["node", "-e", script], capture_output=True, text=True, timeout=30)
@@ -305,10 +310,52 @@ def p9_persisted_ri_invariant():
     return _report(name, True, f"{len(rows)} persisted rijen: ri == heel-meting-lookup (gauge↔kwadrant consistent)")
 
 
+def p10_ectopie_parity():
+    """P10 ectopie-teller parity + gedrag. JS (hrv.js) en Python (analytics) MOETEN
+    hetzelfde ectopie_N + borderline_soft + borderline_reason geven; en de zachte
+    grenswaarde mag de harde afkeuring NIET raken.
+      - id358/id360: band 'goed', N>=2 -> borderline_soft ('ectopie') [waren ongemarkeerd];
+      - RR_SLECHT: band 'slecht' -> borderline_soft False (hard gate domineert);
+      - RR_SCHOON: N<2 -> borderline_soft False."""
+    name = "P10 ectopie-teller parity (ectopie_N + borderline_soft, hard gate ongemoeid)"
+    js = _js(
+        "var f=function(a){var q=HRV.qualityClassify(a);"
+        "return {n:q.ectopie_N,b:q.borderline_soft,r:q.borderline_reason,band:q.band};};"
+        "out.slecht=f(%s);out.schoon=f(%s);out.a358=f(%s);out.a360=f(%s);"
+        % (json.dumps(RR_SLECHT), json.dumps(RR_SCHOON),
+           json.dumps(RR_ECTO_358), json.dumps(RR_ECTO_360))
+    )
+    cases = {'slecht': RR_SLECHT, 'schoon': RR_SCHOON, 'a358': RR_ECTO_358, 'a360': RR_ECTO_360}
+    fails = []
+    for key, rr in cases.items():
+        q = analytics.quality_classify(rr)
+        j = js[key]
+        if (q['ectopie_N'] != j['n'] or bool(q['borderline_soft']) != bool(j['b'])
+                or q['borderline_reason'] != j['r'] or q['band'] != j['band']):
+            fails.append(f"{key}: js={j} py=(n={q['ectopie_N']},b={q['borderline_soft']},"
+                         f"r={q['borderline_reason']},band={q['band']})")
+    # gedrag (op de Python-SSOT; JS is hierboven al identiek bevonden)
+    for key in ('a358', 'a360'):
+        q = analytics.quality_classify(cases[key])
+        if not (q['ectopie_N'] >= 2 and q['band'] == 'goed' and q['borderline_soft']
+                and q['borderline_reason'] in ('ectopie', 'both')):
+            fails.append(f"{key} verwacht ectopie-grenswaarde op goede meting: {q['ectopie_N']},{q['band']}")
+    qs = analytics.quality_classify(RR_SLECHT)
+    if not (qs['band'] == 'slecht' and qs['borderline_soft'] is False and qs['borderline_reason'] is None):
+        fails.append("RR_SLECHT: hard 'slecht' mag GEEN soft-markering krijgen")
+    if SELFTEST:  # forceer één divergentie zodat de zelftest-modus rood wordt
+        fails.append("SELFTEST-geforceerde afwijking")
+    ok = not fails
+    return _report(name, ok, "identiek + gedrag OK (id358 N=%d, id360 N=%d)"
+                   % (analytics.quality_classify(RR_ECTO_358)['ectopie_N'],
+                      analytics.quality_classify(RR_ECTO_360)['ectopie_N'])
+                   if ok else "; ".join(fails))
+
+
 TESTS = [p1_zone_parity, p2_boundary_parity, p3_quality_parity,
          p4_kwaliteit_gate, p5_event_tables, p6_reference_anchors,
          p7_quality_tier_parity, p8_event_reliable_threshold,
-         p9_persisted_ri_invariant]
+         p9_persisted_ri_invariant, p10_ectopie_parity]
 
 
 def main():

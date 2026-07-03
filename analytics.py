@@ -311,6 +311,17 @@ QUAL_BAND_GOED = 5
 QUAL_BAND_SLECHT = 15
 QUAL_L2_SD1SD2 = 0.70
 QUAL_L2_RMSSD_MIN = 25
+# Ectopie-teller (ZACHTE grenswaarde-markering, raakt de harde afkeuring niet).
+# Een slag heet "ectopisch/onregelmatig" als hij > QUAL_ECTO_REL van de LOKALE
+# mediaan-RR afwijkt; bij >= QUAL_ECTO_N zulke slagen wordt de meting als
+# grenswaarde gemarkeerd (goed -> borderline "herhaal na rust"), RI/uitslag blijft.
+# Grondslag: Kubios HRV artefact-detectie (relatieve drempel t.o.v. lokale
+# mediaan-RR), de Verveen-Tegegne RR<->leeftijd-norm die de RI-schaal draagt, en
+# het klinische Herzsprung/extrasystole-criterium (losse premature slagen =
+# voorbehoud, geen afkeuring). Python-twin van static/js/hrv.js; MOET bit-voor-bit
+# hetzelfde ectopie_N geven (bewaakt door tests/test_pipeline_parity.py P3).
+QUAL_ECTO_REL = 0.20
+QUAL_ECTO_N = 2
 
 
 def _jsround(x):
@@ -406,6 +417,21 @@ def quality_classify(rr):
     # LAAG 2 — Poincaré-vorm op de GECORRIGEERDE RR
     ratio, rmssd = _quality_poincare(corr)
     laag2 = (ratio >= QUAL_L2_SD1SD2 and rmssd >= QUAL_L2_RMSSD_MIN)
+    # ECTOPIE-TELLER — per-interval op RUWE RR (zie constant-blok QUAL_ECTO_*).
+    # Zelfde vensterbasis als Laag 1 (QUAL_W, gecentreerd, testinterval uitgesloten),
+    # maar t.o.v. de LOKALE MEDIAAN i.p.v. het lokale gemiddelde, drempel 20%.
+    ectopie_n = 0
+    for i in range(n):
+        lo = max(0, i - half)
+        hi = min(n - 1, i + half)
+        win = sorted(rr[j] for j in range(lo, hi + 1) if j != i)
+        if not win:
+            continue
+        wl = len(win)
+        emed = win[(wl - 1) // 2] if wl % 2 else (win[wl // 2 - 1] + win[wl // 2]) / 2.0
+        if emed > 0 and abs(rr[i] - emed) > QUAL_ECTO_REL * emed:
+            ectopie_n += 1
+    ectopie_borderline = ectopie_n >= QUAL_ECTO_N
     # LABEL
     if art_pct > QUAL_BAND_SLECHT:
         band, reason = 'slecht', 'Laag1 artefact %s%% > 15%%' % (_jsround(art_pct * 10) / 10)
@@ -423,6 +449,15 @@ def quality_classify(rr):
         'sd1sd2': _jsround(ratio * 1000) / 1000, 'rmssd': _jsround(rmssd * 10) / 10,
         'laag1Slecht': (art_pct > QUAL_BAND_SLECHT or consecutive), 'laag2': laag2,
         'is_borderline_band': (0.69 <= ratio < 0.70),
+        'ectopie_N': ectopie_n, 'is_ectopie_borderline': ectopie_borderline,
+        # Gecombineerde ZACHTE grenswaarde: SD1/SD2-borderline OF ectopie N>=2, maar
+        # alleen wanneer niet al hard 'slecht'. reason: 'sd1sd2'|'ectopie'|'both'|None.
+        'borderline_soft': (band != 'slecht' and ((0.69 <= ratio < 0.70) or ectopie_borderline)),
+        'borderline_reason': (
+            None if band == 'slecht'
+            else ('both' if ((0.69 <= ratio < 0.70) and ectopie_borderline)
+                  else ('ectopie' if ectopie_borderline
+                        else ('sd1sd2' if (0.69 <= ratio < 0.70) else None)))),
         'corrected': corr, 'scoreOK': (band in ('goed', 'redelijk')),
     }
 

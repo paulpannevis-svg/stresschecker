@@ -150,7 +150,29 @@ def b4_zone_boundaries():
     )
 
 
-TESTS = [b1_rmssd, b2_ri_verveen, b3_hrv_percent, b4_zone_boundaries]
+def b5_ectopie_teller():
+    """B5 — ectopie-teller: aantal slagen > 20% van de LOKALE mediaan (venster QUAL_W).
+    Zachte grenswaarde-as (N>=2 -> borderline_soft), raakt de RI/afkeuring niet. Ankert
+    ectopie_N (kolom in references.json) tegen hrv.js zodat de teller niet stil wegdrijft."""
+    name = "B5 ectopie-teller (ectopie_N kolom)"
+    ref = _load_references()
+    rr = ref["rr_intervals_ms"]
+    exp = ref["expected"]["ectopie_N"]
+    script = (
+        "var HRV = require('%s');"
+        "var rr = %s;"
+        "var q = HRV.qualityClassify(rr);"
+        "process.stdout.write('R=' + JSON.stringify({ectopie_N: q.ectopie_N, "
+        "borderline_soft: q.borderline_soft}) + '\\n');"
+    ) % (HRV_JS, json.dumps(rr))
+    res = _run_node(script)
+    got = res["ectopie_N"]
+    ok = (got == exp)
+    return _report(name, ok,
+                   f"got={got} expected={exp} (borderline_soft={res['borderline_soft']})")
+
+
+TESTS = [b1_rmssd, b2_ri_verveen, b3_hrv_percent, b4_zone_boundaries, b5_ectopie_teller]
 
 
 def main():

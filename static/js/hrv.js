@@ -121,6 +121,15 @@ function qualityTier(kw){if(kw===null||kw===undefined||kw==='')return 'betrouwba
 //         Goed = artefact-% <=5% (en niet Slecht) -> normale RI.
 //  RI hoort (door de caller) op de GECORRIGEERDE RR berekend te worden.
 var QUAL_W=21, QUAL_ART_REL=0.25, QUAL_BAND_GOED=5, QUAL_BAND_SLECHT=15;
+// Ectopie-teller (ZACHTE grenswaarde-markering, raakt de harde afkeuring niet).
+// Een slag heet "ectopisch/onregelmatig" als hij > QUAL_ECTO_REL van de LOKALE
+// mediaan-RR afwijkt; bij >= QUAL_ECTO_N zulke slagen wordt de meting als
+// grenswaarde gemarkeerd (goed -> borderline "herhaal na rust"), RI/uitslag blijft.
+// Grondslag: Kubios HRV artefact-detectie (relatieve drempel t.o.v. lokale
+// mediaan-RR), de Verveen-Tegegne RR<->leeftijd-norm die de RI-schaal draagt, en
+// het klinische Herzsprung/extrasystole-criterium (losse premature slagen =
+// voorbehoud, geen afkeuring). Zie tests/test_pipeline_parity.py (P3).
+var QUAL_ECTO_REL=0.20, QUAL_ECTO_N=2;
 var QUAL_L2_SD1SD2=0.70, QUAL_L2_RMSSD_MIN=25;
 function _poincare(rr){
   var n=rr.length, mean=0, i; for(i=0;i<n;i++)mean+=rr[i]; mean/=n;
@@ -164,6 +173,19 @@ function qualityClassify(rr){
   // LAAG 2 — Poincaré-vorm op de GECORRIGEERDE RR (zie ontwerpkeuze hierboven)
   var pc=_poincare(corr);
   var laag2=(pc.ratio>=QUAL_L2_SD1SD2 && pc.rmssd>=QUAL_L2_RMSSD_MIN);
+  // ECTOPIE-TELLER — per-interval op RUWE RR (zie constant-blok QUAL_ECTO_*).
+  // Zelfde vensterbasis als Laag 1 (QUAL_W, gecentreerd, testinterval uitgesloten),
+  // maar t.o.v. de LOKALE MEDIAAN i.p.v. het lokale gemiddelde, drempel 20%.
+  var ectopieN=0;
+  for(i=0;i<n;i++){
+    var elo=Math.max(0,i-half), ehi=Math.min(n-1,i+half), win=[];
+    for(j=elo;j<=ehi;j++){ if(j!==i) win.push(rr[j]); }
+    if(!win.length) continue;
+    win.sort(function(a,b){return a-b;});
+    var wl=win.length, emed=(wl%2)?win[(wl-1)/2]:(win[wl/2-1]+win[wl/2])/2;
+    if(emed>0 && Math.abs(rr[i]-emed) > QUAL_ECTO_REL*emed) ectopieN++;
+  }
+  var ectopieBorderline=(ectopieN>=QUAL_ECTO_N);
   // LABEL
   var band, reason;
   if(artPct>QUAL_BAND_SLECHT){ band='slecht'; reason='Laag1 artefact '+(Math.round(artPct*10)/10)+'% > 15%'; }
@@ -177,6 +199,14 @@ function qualityClassify(rr){
     sd1sd2:Math.round(pc.ratio*1000)/1000, rmssd:Math.round(pc.rmssd*10)/10,
     laag1Slecht:(artPct>QUAL_BAND_SLECHT||consecutive), laag2:laag2,
     is_borderline_band:(pc.ratio>=0.69 && pc.ratio<0.70),
+    ectopie_N:ectopieN, is_ectopie_borderline:ectopieBorderline,
+    // Gecombineerde ZACHTE grenswaarde: SD1/SD2-borderline OF ectopie N>=2, maar
+    // alleen wanneer niet al hard 'slecht' (dan domineert de afkeuring). reason:
+    // 'sd1sd2' | 'ectopie' | 'both' | null. Uitslag/RI ongewijzigd.
+    borderline_soft:(band!=='slecht' && ((pc.ratio>=0.69 && pc.ratio<0.70) || ectopieBorderline)),
+    borderline_reason:(band==='slecht')?null:(
+      ((pc.ratio>=0.69 && pc.ratio<0.70) && ectopieBorderline)?'both':
+      (ectopieBorderline?'ectopie':((pc.ratio>=0.69 && pc.ratio<0.70)?'sd1sd2':null))),
     corrected:corr, scoreOK:(band==='goed'||band==='redelijk')
   };
 }

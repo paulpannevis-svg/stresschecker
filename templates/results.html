@@ -131,6 +131,13 @@
 <style>@keyframes fbPulse{0%,100%{opacity:.3}50%{opacity:1}}</style>
 <!-- EINDE PERSOONLIJKE FEEDBACK -->
 
+<!-- Zachte grenswaarde-band voor de LAATSTE meting (consument, Fork B): SD1/SD2-borderline
+     OF ectopie-teller N>=2 (borderline_soft). Zelfde zachte formulering als de kwadrant-banner,
+     bewust GEEN medische taal ("onregelmatig"/"aritmie"). Uitslag/RI ongewijzigd. -->
+<div id="borderlineHint" style="display:none;margin:0 0 1rem;padding:.6rem .8rem;background:#FFF4E5;border:2px solid #FF8C00;border-radius:8px;color:#8a4b00;box-sizing:border-box;">
+  <strong style="font-size:.82rem;">&#9888;&#65039; {%if lang=="de"%}Messung im Grenzbereich &mdash; nach Ruhe wiederholen{%elif lang=="en"%}Borderline reading &mdash; repeat after rest{%else%}Meting grenswaarde &mdash; herhaal na rust{%endif%}</strong>
+</div>
+
 <div id="resultsList" style="width:100%">
     <div style="text-align:center;color:var(--text-muted);padding:40px 0;font-size:0.9rem;" id="emptyMsg">
       <div style="font-size:2rem;margin-bottom:8px">📊</div>
@@ -146,7 +153,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/hrv.js?v=10"></script>
+<script src="/static/js/hrv.js?v=11"></script>
 <script>
 function toggleCtx2(id){var el=document.getElementById("ctx2-"+id);if(el)el.style.display=el.style.display==="none"?"table-row":"none";}
 
@@ -169,6 +176,12 @@ async function loadFromServer() {
     const data = await r.json();
     if (data && data.length > 0) {
       window._consAllData=data; setTimeout(function(){consVerlPeriod(0);},50); renderResults(data);
+      // Zachte grenswaarde-hint voor de LAATSTE meting (data[0]): borderline_soft
+      // (SD1/SD2-borderline OF ectopie N>=2). borderline_soft is per constructie false
+      // bij band='slecht', dus geen overlap met de onderdrukkings-/onbetrouwbaar-tekst.
+      try{ var _lm=data[0], _bh=document.getElementById('borderlineHint');
+           if(_bh && _lm && _lm.rr_intervals){ var _lq=HRV.qualityClassify(_lm.rr_intervals);
+             _bh.style.display=(_lq && _lq.borderline_soft)?'block':'none'; } }catch(e){}
       if(data[0].baseline !== null && data[0].baseline !== undefined){
         document.getElementById('baselineStat').style.display='';
         document.getElementById('statBaseline').textContent = data[0].baseline;
