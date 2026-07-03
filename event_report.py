@@ -355,10 +355,14 @@ def quality_stars(kwaliteit, hrv_pct=None):
     return res
 
 
-def build_gauge(ri, reliable):
+def build_gauge(ri, tier):
     """Statische SVG-gauge die de bestaande /kwadrant-gauge spiegelt: 5 zonebanden
-    (RI-grenzen 2/4/6/8) met dezelfde kleuren, naald op PI + ri/10·PI, grijs bij
-    onbetrouwbaar. GEEN nieuwe RI/zone-berekening — alleen tekengeometrie."""
+    (RI-grenzen 2/4/6/8) met dezelfde kleuren, naald op PI + ri/10·PI. Weerspiegelt de 3
+    kwaliteitsklassen (tier, = analytics.quality_tier + ritme-'slecht'): betrouwbaar → volle
+    kleur + volle naald; indicatief → GEDEMPTE kleur (opacity) + STIPPEL-naald; onbetrouwbaar
+    → grijs + grijze naald. GEEN nieuwe RI/zone-berekening — alleen tekengeometrie."""
+    grey = (tier == 'onbetrouwbaar')
+    indicatief = (tier == 'indicatief')
     cx, cy, r = 100.0, 104.0, 92.0
     bands = [
         (math.pi,        1.2 * math.pi, '#c0392b'),  # RI 0-2  zwaar belast
@@ -373,14 +377,16 @@ def build_gauge(ri, reliable):
         x1, y1 = cx + r * math.cos(a1), cy + r * math.sin(a1)
         arcs.append({
             'd': f'M {x0:.2f} {y0:.2f} A {r:.0f} {r:.0f} 0 0 1 {x1:.2f} {y1:.2f}',
-            'color': col if reliable else '#cfcfcf',
+            'color': '#cfcfcf' if grey else col,
+            'opacity': 0.4 if indicatief else 1,
         })
     rr = max(0.0, min(10.0, float(ri)))
     ang = math.pi + (rr / 10.0) * math.pi
     needle = {
         'x1': round(cx - math.cos(ang) * 12, 2), 'y1': round(cy - math.sin(ang) * 12, 2),
         'x2': round(cx + math.cos(ang) * (r - 10), 2), 'y2': round(cy + math.sin(ang) * (r - 10), 2),
-        'color': '#333333' if reliable else '#bbbbbb',
+        'color': '#bbbbbb' if grey else '#333333',
+        'dash': '5 4' if indicatief else '',
     }
     return {'cx': cx, 'cy': cy, 'sw': 16, 'arcs': arcs, 'needle': needle}
 
@@ -448,6 +454,12 @@ def render_report(meting_code, lang='nl', as_html=False, screen_mode=False, back
     # consistent terug op de 'Onzeker'-weergave (geen halve PDF: grijze banner + gekleurde gauge).
     reliable = (p['kwaliteit'] is not None and p['kwaliteit'] >= RELIABLE_MIN
                 and (p['quality_band'] or '') != 'slecht')
+    # Gauge-KLEUR volgt de 3 kwaliteitsklassen (los van de binaire reliable-vlag die de tekst/
+    # zone-banner stuurt): ritme-'slecht' → grijs; anders canonieke quality_tier(kwaliteit).
+    # NB: 90-94% (indicatief) wordt hierdoor GEDEMPT getoond i.p.v. grijs — bewuste consistentie
+    # met /kwadrant. De reliable-vlag (en dus de "Richtwaarde"-caption + zone-banner) blijft.
+    gauge_tier = ('onbetrouwbaar' if (p['quality_band'] or '') == 'slecht'
+                  else analytics.quality_tier(p['kwaliteit']))
     # Voltooide deelnemer (>=2 metingen → geen nieuwe meting meer mogelijk): bij een AFGEKEURDE
     # meting vervalt het "overweeg een nieuwe meting"-advies; in plaats daarvan een neutrale
     # begeleider-verwijzing (sluit aan op de kiosk-slotboodschap). Hergebruikt de bestaande
@@ -481,7 +493,7 @@ def render_report(meting_code, lang='nl', as_html=False, screen_mode=False, back
         zone_key=zone_key, zone_label=zone_label, zone_desc=zone_desc,
         reliable=reliable, completed=completed, ri_str=ri_str, age=age, gender_label=gender_label,
         measured_at_str=measured_at_str,
-        gauge=build_gauge(p['ri'], reliable), gauge_heading=GAUGE_HEADING[lang],
+        gauge=build_gauge(p['ri'], gauge_tier), gauge_heading=GAUGE_HEADING[lang],
         stars=quality_stars(p['kwaliteit'], p['hrv_pct']),
         gm=gevoel_meting(p['subjectief_score'], p['ri'], reliable, lang,
                          irregular=((p['quality_band'] or '') == 'slecht')),

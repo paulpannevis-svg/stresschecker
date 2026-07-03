@@ -2162,13 +2162,21 @@ def menu():
     _cn = sqlite3.connect(METING_DB_PATH)
     _naam_row = _cn.execute("SELECT naam FROM user_profiles WHERE user_key=? OR email=?", (get_user_key(), session.get("email",""))).fetchone()
     _naam = (_naam_row[0] if _naam_row and _naam_row[0] else session.get('profile_name', ''))
-    _lm = _cn.execute("SELECT ri,bpm,hrv_pct FROM metingen WHERE user_key=? ORDER BY id DESC LIMIT 1",
+    _lm = _cn.execute("SELECT ri,bpm,hrv_pct,kwaliteit,quality_band FROM metingen WHERE user_key=? ORDER BY id DESC LIMIT 1",
                        (get_user_key(),)).fetchone()
     _cn.close()
+    # Mini-gauge weerspiegelt de 3 kwaliteitsklassen (voorheen ONgegated → toonde ook bij
+    # onbetrouwbaar volle kleur). Ritme-'slecht' → grijs; anders canonieke quality_tier(kwaliteit).
+    _last_tier = None
+    if _lm:
+        import analytics as _an_menu
+        _last_tier = ('onbetrouwbaar' if (_lm[4] or '') == 'slecht'
+                      else _an_menu.quality_tier(_lm[3]))
     return render_template("menu.html", lang=session.get("lang","nl"),
                            name=_naam,
                            archived_notice=get_archived_notice(session.get('email','')),
-                           license_type=session.get('license_type', 'free'), last_meting=_lm, demo_mode=session.get('demo_mode', False))
+                           license_type=session.get('license_type', 'free'), last_meting=_lm,
+                           last_tier=_last_tier, demo_mode=session.get('demo_mode', False))
 
 @app.route('/gratis')
 def free_mode():

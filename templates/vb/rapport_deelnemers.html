@@ -137,11 +137,11 @@
       <h3>{{ gauge_heading }}</h3>
       <svg class="gauge-svg" viewBox="0 0 200 118" xmlns="http://www.w3.org/2000/svg">
         {% for a in gauge.arcs %}
-        <path d="{{ a.d }}" stroke="{{ a.color }}" stroke-width="{{ gauge.sw }}" fill="none"/>
+        <path d="{{ a.d }}" stroke="{{ a.color }}" stroke-width="{{ gauge.sw }}" fill="none" stroke-opacity="{{ a.opacity }}"/>
         {% endfor %}
         <line x1="{{ gauge.needle.x1 }}" y1="{{ gauge.needle.y1 }}"
               x2="{{ gauge.needle.x2 }}" y2="{{ gauge.needle.y2 }}"
-              stroke="{{ gauge.needle.color }}" stroke-width="3"/>
+              stroke="{{ gauge.needle.color }}" stroke-width="3" stroke-dasharray="{{ gauge.needle.dash }}"/>
         <circle cx="{{ gauge.cx }}" cy="{{ gauge.cy }}" r="5" fill="#fff" stroke="#ccc" stroke-width="1"/>
       </svg>
       <div class="gauge-cap">{{ zone_label if reliable else t.gauge_cap_unreliable }}</div>

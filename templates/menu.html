@@ -45,12 +45,17 @@
   {% set zk = zone_key_jinja(ri) %}
   {% set ri_label = zone_label_jinja(zk, lang) %}
   {% set ri_tekst = zone_desc_jinja(zk, lang) %}
+  {# Mini-gauge weerspiegelt de 3 kwaliteitsklassen (fel/gedempt/grijs). Stippel-naald vervalt
+     op deze mini (te klein, geen naald maar gevulde boog) — kleur volstaat. #}
+  {% set g_grey = (last_tier == 'onbetrouwbaar') %}
+  {% set g_col = '#cfcfcf' if g_grey else ri_color %}
+  {% set g_op = '0.4' if last_tier == 'indicatief' else '1' %}
   <div class="mn-last">
     <div class="mn-gauge">
       <svg width="80" height="55" viewBox="0 0 80 55">
         <path d="M10,48 A32,32 0 0,1 70,48" fill="none" stroke="#eee" stroke-width="8" stroke-linecap="round"/>
-        <path d="M10,48 A32,32 0 0,1 70,48" fill="none" stroke="{{ ri_color }}" stroke-width="8" stroke-linecap="round" stroke-dasharray="{{ (ri/10*100)|round }},100"/>
-        <text x="40" y="50" text-anchor="middle" font-size="14" font-weight="700" fill="{{ ri_color }}">{{ ri }}</text>
+        <path d="M10,48 A32,32 0 0,1 70,48" fill="none" stroke="{{ g_col }}" stroke-opacity="{{ g_op }}" stroke-width="8" stroke-linecap="round" stroke-dasharray="{{ (ri/10*100)|round }},100"/>
+        <text x="40" y="50" text-anchor="middle" font-size="14" font-weight="700" fill="{{ g_col }}" fill-opacity="{{ g_op }}">{{ ri }}</text>
       </svg>
     </div>
       <div class="mn-last-txt"><p style="font-size:.75rem;color:#aaa;margin:0 0 2px;">{%if lang=="de"%}Letzte Basismessung{%elif lang=="en"%}Most recent Basic measurement{%else%}Meest recente Basismeting{%endif%}</p><h3>{{ ri_label }}</h3><p>{{ ri_tekst }}</p></div>
