@@ -116,6 +116,11 @@ body{background:#f5f5f5;margin:0;}
     <!-- Consument + Pro: zachte grenswaarde-band (whole-series SD1/SD2 net onder 0.70 OF
          ectopie-teller N>=2). Zachte oranje waarschuwing NAAST de sterren/kaders (band blijft
          ongewijzigd) — geen vals vertrouwen bij grenswaarde; tekst zonder medische termen. -->
+    <!-- Ectopie-vlag (N>=2): prominent maar neutraal (oranje), geen medische/angsttaal. RI blijft geldig. -->
+    <div id="ectoFlagBanner" style="display:none;margin-top:.6rem;padding:.7rem .9rem;background:#FAEADA;border-left:4px solid #F39C12;border-radius:6px;color:#8B5A00;width:100%;box-sizing:border-box;">
+      <div style="font-size:.82rem;color:#D68910;font-weight:600;margin-bottom:.35rem;">&#9888;&#65039; {%if lang=="de"%}Unregelmäßigkeiten erkannt{%elif lang=="en"%}Irregularities detected{%else%}Onregelmatigheden gedetecteerd{%endif%}</div>
+      <div style="font-size:.75rem;line-height:1.5;">{%if lang=="de"%}Diese Messung enthält unregelmäßige Herzschlag-Sprünge. Der RI ist gültig, kann aber leicht beeinflusst sein. Zur Bestätigung in ruhiger Umgebung wiederholen.{%elif lang=="en"%}This reading contains irregular heartbeat jumps. The RI is valid but may be slightly affected. Repeat in calm conditions to confirm.{%else%}Deze meting bevat onregelmatige hartslag-sprongen. De RI is geldig, maar kan licht beïnvloed zijn. Herhaal in rustige omstandigheden voor bevestiging.{%endif%}</div>
+    </div>
     <div id="proBorderlineBanner" style="display:none;margin-top:.6rem;padding:.6rem .8rem;background:#FFF4E5;border:2px solid #FF8C00;border-radius:8px;color:#8a4b00;width:100%;box-sizing:border-box;">
       <strong style="font-size:.82rem;">&#9888;&#65039; {%if lang=="de"%}Messung im Grenzbereich &mdash; nach Ruhe wiederholen{%elif lang=="en"%}Borderline reading &mdash; repeat after rest{%else%}Meting grenswaarde &mdash; herhaal na rust{%endif%}</strong>
     </div>
@@ -328,6 +333,9 @@ var vit=5;
   // via qualityClassify.borderline_soft (die is per constructie false zodra band='slecht').
   try{ var _q=HRV.qualityClassify(cur.rr_intervals); if(_q&&_q.band){_band=_q.band;} _borderline=!!(_q&&_q.borderline_soft); _irr=(_band==='slecht')?'flag':'clean'; }catch(e){}
   if(_irr==='flag') _gated=true;  // te onregelmatig: ook stip + gauge-naald grijzen
+  // Ectopie-vlag (N>=2, getoonde/geldige meting): oranje RI + gauge licht ontzadigd + advies-banner.
+  // GEEN onderdrukking (RI blijft geldig); onderscheiden van de zachte SD1/SD2-borderline.
+  var _ectoFlag=false; try{ _ectoFlag=!!(_q && _q.is_ectopie_borderline && !_gated); }catch(e){}
   // Eén systeem-van-record (cur.ri) voor label/stip-ring/gauge/getal — zelfde zone overal.
   // Biofeedback: getRaw-eindwaarde (bewuste uitzondering; window-mean-vs-eindwaarde = losse open kwestie, RMSSD_HERBEREKENING_OVERZICHT).
   var displayRi=(cur.meting_type==='biofeedback'&&typeof window.getRaw==='function')?Math.min(10,Math.round((window.getRaw(bpm,hrv)/12)*10)/10):ri;
@@ -444,7 +452,15 @@ var vit=5;
     // onbetrouwbaar-banner). Triggert op SD1/SD2-borderline OF ectopie N>=2 (borderline_soft).
     // Tekst blijft de bestaande zachte "grenswaarde — herhaal na rust" (geen medische taal).
     if(_band!=='slecht' && _borderline){
-      var _bb=document.getElementById('proBorderlineBanner'); if(_bb){_bb.style.display='block';}
+      if(_ectoFlag){
+        // Ectopie N>=2: prominente-maar-neutrale oranje banner + oranje RI + licht ontzadigde gauge.
+        var _ef=document.getElementById('ectoFlagBanner'); if(_ef){_ef.style.display='block';}
+        var _gc=document.getElementById('gaugeCanvas'); if(_gc){_gc.style.filter='saturate(0.85)';}
+        var _gr=document.getElementById('gaugeRI'); if(_gr){_gr.style.color='#F39C12';}
+      } else {
+        // SD1/SD2-only borderline: bestaande zachte "grenswaarde — herhaal na rust".
+        var _bb=document.getElementById('proBorderlineBanner'); if(_bb){_bb.style.display='block';}
+      }
     }
   })();
   // Signaal-niet-stabiel box: tonen bij variant-B 'slecht' (_irr==='flag'); standaard uitgeklapt.
