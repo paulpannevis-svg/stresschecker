@@ -134,23 +134,8 @@
 <!-- Zachte grenswaarde-band voor de LAATSTE meting (consument, Fork B): SD1/SD2-borderline
      OF ectopie-teller N>=2 (borderline_soft). Zelfde zachte formulering als de kwadrant-banner,
      bewust GEEN medische taal ("onregelmatig"/"aritmie"). Uitslag/RI ongewijzigd. -->
-<!-- Ectopie-vlag (N>=2) voor de LAATSTE meting: prominent maar neutraal (oranje, geen medische/
-     angsttaal). RI blijft geldig en getoond. Onderscheiden van de SD1/SD2-borderline hint eronder. -->
-<div id="ectoFlagBanner" style="display:none;background:#FAEADA;border-left:4px solid #F39C12;padding:1rem;border-radius:6px;margin-bottom:1rem;box-sizing:border-box;">
-  <p style="font-size:14px;color:#D68910;margin:0 0 .75rem;font-weight:600;">&#9888;&#65039; {%if lang=="de"%}Unregelmäßigkeiten erkannt{%elif lang=="en"%}Irregularities detected{%else%}Onregelmatigheden gedetecteerd{%endif%}</p>
-  <p style="font-size:13px;color:#8B5A00;margin:0;">{%if lang=="de"%}Diese Messung enthält unregelmäßige Herzschlag-Sprünge. Der RI ist gültig, kann aber leicht beeinflusst sein. Zur Bestätigung in ruhiger Umgebung wiederholen.{%elif lang=="en"%}This reading contains irregular heartbeat jumps. The RI is valid but may be slightly affected. Repeat in calm conditions to confirm.{%else%}Deze meting bevat onregelmatige hartslag-sprongen. De RI is geldig, maar kan licht beïnvloed zijn. Herhaal in rustige omstandigheden voor bevestiging.{%endif%}</p>
-</div>
 <div id="borderlineHint" style="display:none;margin:0 0 1rem;padding:.6rem .8rem;background:#FFF4E5;border:2px solid #FF8C00;border-radius:8px;color:#8a4b00;box-sizing:border-box;">
   <strong style="font-size:.82rem;">&#9888;&#65039; {%if lang=="de"%}Messung im Grenzbereich &mdash; nach Ruhe wiederholen{%elif lang=="en"%}Borderline reading &mdash; repeat after rest{%else%}Meting grenswaarde &mdash; herhaal na rust{%endif%}</strong>
-</div>
-<!-- Optie B — rode error-banners voor de LAATSTE meting (ERROR_RED_POOR / _UNRELIABLE). -->
-<div id="poorBanner" style="display:none;background:#FADBD8;border-left:4px solid #E74C3C;padding:1rem;border-radius:6px;margin-bottom:1rem;box-sizing:border-box;">
-  <strong style="font-size:.9rem;color:#C0392B;">&#10060; {%if lang=="de"%}Signal nicht stabil genug{%elif lang=="en"%}Signal not stable enough{%else%}Signaal niet stabiel genoeg{%endif%}</strong>
-  <p style="font-size:13px;color:#C0392B;margin:.4rem 0 0;">{%if lang=="de"%}Bitte in ruhigeren Bedingungen wiederholen.{%elif lang=="en"%}Please repeat under calmer conditions.{%else%}Herhaal de meting onder rustiger omstandigheden.{%endif%}</p>
-</div>
-<div id="unreliableBanner" style="display:none;background:#FADBD8;border-left:4px solid #E74C3C;padding:1rem;border-radius:6px;margin-bottom:1rem;box-sizing:border-box;">
-  <strong style="font-size:.9rem;color:#C0392B;">&#10060; {%if lang=="de"%}MESSUNG UNZUVERLÄSSIG{%elif lang=="en"%}MEASUREMENT UNRELIABLE{%else%}METING ONBETROUWBAAR{%endif%}</strong>
-  <p style="font-size:13px;color:#C0392B;margin:.4rem 0 0;">{%if lang=="de"%}Analysierbar, aber niedrige Qualität. Zur Bestätigung wiederholen.{%elif lang=="en"%}Analysable, but low quality. Repeat to confirm.{%else%}Analyseerbaar, maar kwaliteit laag. Herhaal voor betrouwbaarheid.{%endif%}</p>
 </div>
 
 <div id="resultsList" style="width:100%">
@@ -168,7 +153,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/hrv.js?v=20"></script>
+<script src="/static/js/hrv.js?v=11"></script>
 <script>
 function toggleCtx2(id){var el=document.getElementById("ctx2-"+id);if(el)el.style.display=el.style.display==="none"?"table-row":"none";}
 
@@ -194,21 +179,9 @@ async function loadFromServer() {
       // Zachte grenswaarde-hint voor de LAATSTE meting (data[0]): borderline_soft
       // (SD1/SD2-borderline OF ectopie N>=2). borderline_soft is per constructie false
       // bij band='slecht', dus geen overlap met de onderdrukkings-/onbetrouwbaar-tekst.
-      // Optie B — banners voor de LAATSTE meting gedreven door de geconsolideerde display-state.
-      try{ var _lm=data[0],
-             _bh=document.getElementById('borderlineHint'),
-             _ef=document.getElementById('ectoFlagBanner'),
-             _pb=document.getElementById('poorBanner'),
-             _ub=document.getElementById('unreliableBanner');
-           var _lds=null;
-           if(_lm && _lm.rr_intervals){ var _lq=HRV.qualityClassify(_lm.rr_intervals);
-             var _lt; try{_lt=HRV.qualityTier(_lm.kwaliteit);}catch(e){_lt='betrouwbaar';}
-             _lds=HRV.computeDisplayState(_lq&&_lq.band, _lt, (_lq&&_lq.ectopie_N)||0); }
-           if(_ef)_ef.style.display=(_lds==='FLAGGED_ORANGE')?'block':'none';
-           if(_bh)_bh.style.display=(_lds==='SOFT_BOUNDARY')?'block':'none';
-           if(_pb)_pb.style.display=(_lds==='ERROR_RED_POOR')?'block':'none';
-           if(_ub)_ub.style.display=(_lds==='ERROR_RED_UNRELIABLE')?'block':'none';
-         }catch(e){}
+      try{ var _lm=data[0], _bh=document.getElementById('borderlineHint');
+           if(_bh && _lm && _lm.rr_intervals){ var _lq=HRV.qualityClassify(_lm.rr_intervals);
+             _bh.style.display=(_lq && _lq.borderline_soft)?'block':'none'; } }catch(e){}
       if(data[0].baseline !== null && data[0].baseline !== undefined){
         document.getElementById('baselineStat').style.display='';
         document.getElementById('statBaseline').textContent = data[0].baseline;
@@ -299,23 +272,17 @@ function renderResults(results) {
     var _q; try{ _q=HRV.qualityClassify(r.rr_intervals); }catch(e){}
     var _slecht=(_q&&_q.band==='slecht');
     var _tier; try{ _tier=HRV.qualityTier(r.kwaliteit); }catch(e){ _tier='betrouwbaar'; }
-    var _ectoN=(_q&&_q.ectopie_N)||0;
-    // Optie B — geconsolideerde display-state (SSOT: HRV.computeDisplayState). Vervangt de
-    // vroegere losse _suppress/_indic/_ectoFlag-afleiding. De RI-cel wordt per toestand gekleurd.
-    var _ds=HRV.computeDisplayState(_q&&_q.band, _tier, _ectoN);
-    var _err=(_ds==='ERROR_RED_POOR'||_ds==='ERROR_RED_UNRELIABLE');
-    var _ectoTip={de:'Unregelmäßige Herzschlag-Sprünge erkannt — RI gültig, evtl. leicht beeinflusst.',en:'Irregular heartbeat jumps detected — RI valid, may be slightly affected.',nl:'Onregelmatige hartslag-sprongen gedetecteerd — RI geldig, mogelijk licht beïnvloed.'}[LANG]||'Onregelmatige hartslag-sprongen gedetecteerd — RI geldig, mogelijk licht beïnvloed.';
+    var _suppress=(_slecht||_tier==='onbetrouwbaar');
+    var _indic=(!_suppress&&_tier==='indicatief');
     var _irrTip={de:'Das Signal war zu unregelmäßig für eine zuverlässige Bewertung (Bewegung, Sensorkontakt oder Herzrhythmus). Bitte wiederholen.',en:'The signal was too unstable to score reliably (movement, sensor contact, or heart rhythm). Please repeat.',nl:'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.'}[LANG]||'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.';
-    var _unrelTip=_qtt('onbetrouwbaar','retry');
-    // Zone-stip: geldig/soft/flagged tonen zone-kleur; error -> grijs (RI onbetrouwbaar).
-    var col=_err?'#bfbfbf':(COLORS[z]||'#999');
+    // Onderdrukkings-label/tip: band-slecht -> ritme-tekst; kwaliteit-onbetrouwbaar -> kwaliteit-tekst.
+    var _supLabel=_slecht?({de:'Nicht stabil genug',en:'Not stable enough',nl:'Niet stabiel genoeg'}[LANG]||'Niet stabiel genoeg'):_qtt('onbetrouwbaar','badge');
+    var _supTip=_slecht?_irrTip:_qtt('onbetrouwbaar','retry');
+    var col=(_suppress||_indic)?'#bfbfbf':(COLORS[z]||'#999');
     var _warn=_slecht?'<span title="'+_irrTip+'" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
     var dot=_warn+'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+col+';margin-right:4px;"></span>';
-    // RI-cel-styling per display-state (Optie B visual spec). NB: error-toestanden TONEN nu het
-    // RI-getal in rood i.p.v. het te onderdrukken achter een label (goedgekeurde design-wijziging).
-    var _riStyle={VALID_GREEN:'color:#27AE60;',SOFT_BOUNDARY:'color:#F4D850;font-weight:600;',FLAGGED_ORANGE:'color:#F39C12;font-weight:600;background:rgba(243,156,18,.10);padding:0 5px;border-radius:4px;',ERROR_RED_POOR:'color:#E74C3C;font-weight:600;',ERROR_RED_UNRELIABLE:'color:#E74C3C;font-weight:600;'}[_ds]||'';
-    var _riTip=(_ds==='FLAGGED_ORANGE')?_ectoTip:(_ds==='ERROR_RED_POOR')?_irrTip:(_ds==='ERROR_RED_UNRELIABLE')?_unrelTip:'';
-    var riCell='<span class="ri-'+_ds+'" style="'+_riStyle+'white-space:nowrap;"'+(_riTip?(' title="'+_riTip+'"'):'')+'>'+ri+'</span>';
+    var _badge=_indic?' <span title="'+_qtt('indicatief','marker')+'" style="font-size:.68rem;color:#b26a00;background:#fdf3e0;border:1px solid #f0d9b0;border-radius:3px;padding:0 4px;margin-left:3px;white-space:nowrap;">'+_qtt('indicatief','badge')+'</span>':'';
+    var riCell=_suppress?'<span title="'+_supTip+'" style="color:#c0392b;font-weight:600;white-space:nowrap;">'+_supLabel+'</span>':(ri+_badge);
         var ctx_html2='';
         if(r.subjectief_score!=null||r.ctx_vitaliteit!=null||r.ctx_dimensie){
           var _DA={{ dimensie_labels_all()|tojson }};var dDIM=_DA[LANG]||_DA['nl'];dDIM.weet_niet='?';
