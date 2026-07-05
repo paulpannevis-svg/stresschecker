@@ -815,3 +815,40 @@ def client_meta(pro_key, client_id):
         (client_id, pro_key)).fetchone()
     db.close()
     return dict(row) if row else None
+
+
+def compute_display_state_with_agenorm(user_key, gate_metrics, ectopie_flag, birth_year):
+    """Phase 2: Display state WITH age-norm (Tegegne 75+)"""
+    if gate_metrics is None or 'sd1sd2' not in gate_metrics:
+        return "ERROR_RED_UNRELIABLE"
+    
+    sd1sd2 = gate_metrics.get('sd1sd2')
+    if sd1sd2 is None:
+        return "ERROR_RED_UNRELIABLE"
+    
+    age = 2026 - birth_year
+    
+    if age < 50:
+        valid_range = (0.45, 0.80)
+        soft_boundary_min, soft_boundary_max = 0.35, 0.45
+    elif age < 60:
+        valid_range = (0.42, 0.78)
+        soft_boundary_min, soft_boundary_max = 0.32, 0.42
+    elif age < 70:
+        valid_range = (0.38, 0.72)
+        soft_boundary_min, soft_boundary_max = 0.28, 0.38
+    else:
+        valid_range = (0.40, 0.75)
+        soft_boundary_min, soft_boundary_max = 0.30, 0.40
+    
+    if ectopie_flag:
+        return "FLAGGED_ORANGE"
+    
+    if valid_range[0] <= sd1sd2 <= valid_range[1]:
+        return "VALID_GREEN"
+    
+    if (soft_boundary_min <= sd1sd2 < valid_range[0]) or (valid_range[1] < sd1sd2 <= soft_boundary_max):
+        return "SOFT_BOUNDARY"
+    
+    return "ERROR_RED_POOR"
+
