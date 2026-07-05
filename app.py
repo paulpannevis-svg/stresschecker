@@ -4019,7 +4019,7 @@ def api_save_meting():
             _subj_score,
             _ctx_ongemak, _ctx_vrije_tekst,
             _sleep_q, _load_pd, _meaning,
-            _prediction, _pred_hit, _qband
+            _prediction, _pred_hit, _qband, _gate_metrics
         ))
         db.commit()
         session['after_meting'] = True
