@@ -4002,9 +4002,13 @@ def api_save_meting():
                     [dict(r) for r in _brows], prev_ri=_prev_ri)
             except Exception:
                 _pred_hit = None
+        # gate_metrics wordt (nog) niet berekend op het consumer-save-pad -> NULL.
+        # Voorheen ontbrak zowel deze definitie als de placeholder, wat een NameError
+        # + kolom/placeholder-mismatch gaf en ELKE save deed falen (incident 05-07).
+        _gate_metrics = None
         db.execute('''INSERT INTO metingen
             (user_key,ts,ri,bpm,hrv_pct,rmssd,beats,duration,sensor_type,notes,sdnn,pnn50,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,sleep_quality,load_prev_day,meaning_score,prediction,prediction_hit,quality_band,pending,gate_metrics)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)''', (
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)''', (
             get_user_key(),
             int(data.get('ts', datetime.now().timestamp()*1000)),
             float(data.get('ri',0)), int(data.get('bpm',0)), int(data.get('hrv',0)),
