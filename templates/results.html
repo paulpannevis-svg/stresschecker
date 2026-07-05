@@ -134,6 +134,12 @@
 <!-- Zachte grenswaarde-band voor de LAATSTE meting (consument, Fork B): SD1/SD2-borderline
      OF ectopie-teller N>=2 (borderline_soft). Zelfde zachte formulering als de kwadrant-banner,
      bewust GEEN medische taal ("onregelmatig"/"aritmie"). Uitslag/RI ongewijzigd. -->
+<!-- Ectopie-vlag (N>=2) voor de LAATSTE meting: prominent maar neutraal (oranje, geen medische/
+     angsttaal). RI blijft geldig en getoond. Onderscheiden van de SD1/SD2-borderline hint eronder. -->
+<div id="ectoFlagBanner" style="display:none;background:#FAEADA;border-left:4px solid #F39C12;padding:1rem;border-radius:6px;margin-bottom:1rem;box-sizing:border-box;">
+  <p style="font-size:14px;color:#D68910;margin:0 0 .75rem;font-weight:600;">&#9888;&#65039; {%if lang=="de"%}Unregelmäßigkeiten erkannt{%elif lang=="en"%}Irregularities detected{%else%}Onregelmatigheden gedetecteerd{%endif%}</p>
+  <p style="font-size:13px;color:#8B5A00;margin:0;">{%if lang=="de"%}Diese Messung enthält unregelmäßige Herzschlag-Sprünge. Der RI ist gültig, kann aber leicht beeinflusst sein. Zur Bestätigung in ruhiger Umgebung wiederholen.{%elif lang=="en"%}This reading contains irregular heartbeat jumps. The RI is valid but may be slightly affected. Repeat in calm conditions to confirm.{%else%}Deze meting bevat onregelmatige hartslag-sprongen. De RI is geldig, maar kan licht beïnvloed zijn. Herhaal in rustige omstandigheden voor bevestiging.{%endif%}</p>
+</div>
 <div id="borderlineHint" style="display:none;margin:0 0 1rem;padding:.6rem .8rem;background:#FFF4E5;border:2px solid #FF8C00;border-radius:8px;color:#8a4b00;box-sizing:border-box;">
   <strong style="font-size:.82rem;">&#9888;&#65039; {%if lang=="de"%}Messung im Grenzbereich &mdash; nach Ruhe wiederholen{%elif lang=="en"%}Borderline reading &mdash; repeat after rest{%else%}Meting grenswaarde &mdash; herhaal na rust{%endif%}</strong>
 </div>
@@ -179,9 +185,14 @@ async function loadFromServer() {
       // Zachte grenswaarde-hint voor de LAATSTE meting (data[0]): borderline_soft
       // (SD1/SD2-borderline OF ectopie N>=2). borderline_soft is per constructie false
       // bij band='slecht', dus geen overlap met de onderdrukkings-/onbetrouwbaar-tekst.
-      try{ var _lm=data[0], _bh=document.getElementById('borderlineHint');
-           if(_bh && _lm && _lm.rr_intervals){ var _lq=HRV.qualityClassify(_lm.rr_intervals);
-             _bh.style.display=(_lq && _lq.borderline_soft)?'block':'none'; } }catch(e){}
+      try{ var _lm=data[0], _bh=document.getElementById('borderlineHint'), _ef=document.getElementById('ectoFlagBanner');
+           if(_lm && _lm.rr_intervals){ var _lq=HRV.qualityClassify(_lm.rr_intervals);
+             var _lt; try{_lt=HRV.qualityTier(_lm.kwaliteit);}catch(e){_lt='betrouwbaar';}
+             var _lsup=(_lq&&_lq.band==='slecht')||_lt==='onbetrouwbaar';
+             var _lecto=!!(_lq&&_lq.is_ectopie_borderline&&!_lsup);       // ectopie N>=2 -> oranje vlag-banner
+             var _lsd=!!(_lq&&_lq.borderline_soft&&!_lecto);              // SD1/SD2-only -> zachte hint
+             if(_ef)_ef.style.display=_lecto?'block':'none';
+             if(_bh)_bh.style.display=_lsd?'block':'none'; } }catch(e){}
       if(data[0].baseline !== null && data[0].baseline !== undefined){
         document.getElementById('baselineStat').style.display='';
         document.getElementById('statBaseline').textContent = data[0].baseline;
@@ -274,6 +285,9 @@ function renderResults(results) {
     var _tier; try{ _tier=HRV.qualityTier(r.kwaliteit); }catch(e){ _tier='betrouwbaar'; }
     var _suppress=(_slecht||_tier==='onbetrouwbaar');
     var _indic=(!_suppress&&_tier==='indicatief');
+    // Ectopie-vlag (N>=2, getoonde/geldige meting): oranje RI + advies-banner. GEEN onderdrukking.
+    var _ectoFlag=(_q&&_q.is_ectopie_borderline&&!_suppress);
+    var _ectoTip={de:'Unregelmäßige Herzschlag-Sprünge erkannt — RI gültig, evtl. leicht beeinflusst.',en:'Irregular heartbeat jumps detected — RI valid, may be slightly affected.',nl:'Onregelmatige hartslag-sprongen gedetecteerd — RI geldig, mogelijk licht beïnvloed.'}[LANG]||'Onregelmatige hartslag-sprongen gedetecteerd — RI geldig, mogelijk licht beïnvloed.';
     var _irrTip={de:'Das Signal war zu unregelmäßig für eine zuverlässige Bewertung (Bewegung, Sensorkontakt oder Herzrhythmus). Bitte wiederholen.',en:'The signal was too unstable to score reliably (movement, sensor contact, or heart rhythm). Please repeat.',nl:'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.'}[LANG]||'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.';
     // Onderdrukkings-label/tip: band-slecht -> ritme-tekst; kwaliteit-onbetrouwbaar -> kwaliteit-tekst.
     var _supLabel=_slecht?({de:'Nicht stabil genug',en:'Not stable enough',nl:'Niet stabiel genoeg'}[LANG]||'Niet stabiel genoeg'):_qtt('onbetrouwbaar','badge');
@@ -282,7 +296,8 @@ function renderResults(results) {
     var _warn=_slecht?'<span title="'+_irrTip+'" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
     var dot=_warn+'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+col+';margin-right:4px;"></span>';
     var _badge=_indic?' <span title="'+_qtt('indicatief','marker')+'" style="font-size:.68rem;color:#b26a00;background:#fdf3e0;border:1px solid #f0d9b0;border-radius:3px;padding:0 4px;margin-left:3px;white-space:nowrap;">'+_qtt('indicatief','badge')+'</span>':'';
-    var riCell=_suppress?'<span title="'+_supTip+'" style="color:#c0392b;font-weight:600;white-space:nowrap;">'+_supLabel+'</span>':(ri+_badge);
+    var _riShown=_ectoFlag?('<span class="ri-flagged" title="'+_ectoTip+'" style="color:#F39C12;font-weight:600;background:rgba(243,156,18,.10);padding:0 5px;border-radius:4px;">'+ri+'</span>'):ri;
+    var riCell=_suppress?'<span title="'+_supTip+'" style="color:#c0392b;font-weight:600;white-space:nowrap;">'+_supLabel+'</span>':(_riShown+_badge);
         var ctx_html2='';
         if(r.subjectief_score!=null||r.ctx_vitaliteit!=null||r.ctx_dimensie){
           var _DA={{ dimensie_labels_all()|tojson }};var dDIM=_DA[LANG]||_DA['nl'];dDIM.weet_niet='?';
