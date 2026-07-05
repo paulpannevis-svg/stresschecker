@@ -852,3 +852,51 @@ def compute_display_state_with_agenorm(user_key, gate_metrics, ectopie_flag, bir
     
     return "ERROR_RED_POOR"
 
+
+
+def compute_display_state_with_sleep_adjustment(sleep_quality, timestamp, gender, birth_year, gate_metrics, ectopie_flag):
+    """PHASE 2d: Sleep-aware RMSSD normalization."""
+    from datetime import datetime
+    
+    sleep_mult = 0.85 + (sleep_quality / 10.0)
+    
+    try:
+        hour = datetime.fromtimestamp(timestamp).hour
+    except:
+        hour = 12
+    
+    circadian_mult = 1.15 if 4 <= hour < 8 else 1.05 if 8 <= hour < 12 else 1.00 if 12 <= hour < 18 else 0.90 if 18 <= hour < 22 else 0.85
+    
+    if gate_metrics is None or not isinstance(gate_metrics, dict):
+        return {"display_state": "ERROR_RED_UNRELIABLE"}
+    
+    raw_rmssd = gate_metrics.get("rmssd_full")
+    if raw_rmssd is None:
+        return {"display_state": "ERROR_RED_UNRELIABLE"}
+    
+    adjusted_rmssd = raw_rmssd / circadian_mult
+    age = 2026 - birth_year
+    
+    if gender == "F":
+        baseline = (10.0, 35.0) if age < 50 else (8.0, 32.0) if age < 60 else (8.5, 30.0) if age < 70 else (7.5, 28.0)
+    else:
+        baseline = (11.0, 38.0) if age < 50 else (10.0, 36.0) if age < 60 else (10.0, 37.0) if age < 70 else (9.0, 34.0)
+    
+    adjusted_threshold = (baseline[0] * sleep_mult, baseline[1] * sleep_mult)
+    
+    if ectopie_flag:
+        display_state = "FLAGGED_ORANGE"
+    elif adjusted_threshold[0] <= adjusted_rmssd <= adjusted_threshold[1]:
+        display_state = "VALID_GREEN"
+    else:
+        display_state = "SOFT_BOUNDARY"
+    
+    return {
+        "display_state": display_state,
+        "raw_rmssd": raw_rmssd,
+        "adjusted_rmssd": round(adjusted_rmssd, 2),
+        "sleep_quality": sleep_quality,
+        "sleep_mult": round(sleep_mult, 2),
+        "circadian_mult": circadian_mult,
+        "adjusted_threshold": (round(adjusted_threshold[0], 2), round(adjusted_threshold[1], 2))
+    }
