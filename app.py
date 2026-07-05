@@ -4003,7 +4003,7 @@ def api_save_meting():
             except Exception:
                 _pred_hit = None
         db.execute('''INSERT INTO metingen
-            (user_key,ts,ri,bpm,hrv_pct,rmssd,beats,duration,sensor_type,notes,sdnn,pnn50,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,sleep_quality,load_prev_day,meaning_score,prediction,prediction_hit,quality_band,pending)
+            (user_key,ts,ri,bpm,hrv_pct,rmssd,beats,duration,sensor_type,notes,sdnn,pnn50,timeseries,rr_intervals,kwaliteit,meting_type,ctx_dimensie,ctx_vitaliteit,subjectief_score,ctx_ongemak,ctx_vrije_tekst,sleep_quality,load_prev_day,meaning_score,prediction,prediction_hit,quality_band,pending,gate_metrics)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)''', (
             get_user_key(),
             int(data.get('ts', datetime.now().timestamp()*1000)),
@@ -4092,6 +4092,17 @@ def api_event_save_meting(event_code):
             except Exception: return None
 
         _rr = str(data.get('rr_intervals', '') or '')
+        
+        # === PHASE 0b: GATE_METRICS BEREKENING ===
+        _gate_metrics = None
+        if _rr and len(_rr) > 10:
+            try:
+                _rr_list = [float(x) for x in _rr.split(',') if x.strip()]
+                if len(_rr_list) >= 20:
+                    _gate_metrics = json.dumps(analytics.gate_metrics(_rr_list))
+            except Exception as gm_err:
+                app.logger.debug(f"gate_metrics calc failed: {gm_err}")
+        # === END PHASE 0b ===
         # quality_band defensief: alleen als analytics.quality_classify aanwezig is (variant-B,
         # staging). Op een branch zonder die functie blijft het NULL — geen harde afhankelijkheid.
         _qband = None
