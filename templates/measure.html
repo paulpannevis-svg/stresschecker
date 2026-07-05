@@ -726,7 +726,19 @@ function saveBiofeedback(skip){
             sdnn: (function(){try{return HRV.calculateSDNN(rrIntervals);}catch(e){return 0;}})(),
             pnn50: (function(){try{return HRV.calculatePNN50(rrIntervals);}catch(e){return 0;}})()
       })
-    }).then(function(){var _cid=parseInt(new URLSearchParams(window.location.search).get("cid")||"0");var _dest="/kwadrant"+(_cid?"?cid="+_cid:"");window.location.href=_dest;}).catch(function(e){console.log("Opslaan mislukt:",e);window.location.href=_dest;});
+    }).then(function(_resp){
+      if(!_resp || !_resp.ok){ throw new Error('save failed: '+(_resp?_resp.status:'network')); }
+      var _cid=parseInt(new URLSearchParams(window.location.search).get("cid")||"0");
+      window.location.href="/kwadrant"+(_cid?"?cid="+_cid:"");
+    }).catch(function(e){ console.log("Opslaan mislukt:",e); _scSaveFailed(function(){ saveBiofeedback(false); }); });
+}
+function _scSaveFailed(retryFn){
+  var box=document.getElementById('sc-save-failed');
+  if(!box){ box=document.createElement('div'); box.id='sc-save-failed'; box.style.cssText='max-width:520px;margin:32px auto;padding:18px 22px;background:#f8d7da;border-left:4px solid #dc3545;border-radius:8px;color:#842029;font-size:0.95rem;line-height:1.5;text-align:center'; document.body.appendChild(box); }
+  box.innerHTML=''; box.style.display='block';
+  var p=document.createElement('div'); p.textContent=(window.SC_LANG==='de'?'Speichern fehlgeschlagen. Ihre Messung ist noch nicht gespeichert — bitte erneut speichern.':window.SC_LANG==='en'?'Saving failed. Your reading has not been saved yet — please save again.':'Opslaan mislukt. Je meting is nog niet opgeslagen — probeer opnieuw op te slaan.'); box.appendChild(p);
+  var b=document.createElement('button'); b.textContent=(window.SC_LANG==='de'?'Erneut speichern':window.SC_LANG==='en'?'Save again':'Opnieuw opslaan'); b.style.cssText='margin-top:12px;padding:10px 20px;background:#E8344E;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer';
+  b.onclick=function(){ box.style.display='none'; retryFn(); }; box.appendChild(b);
 }
 function setBiofeedLabel(lbl){
   document.getElementById('biofeedLabelInput').value=lbl;
