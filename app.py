@@ -9868,9 +9868,10 @@ def vb_deelnemers_list(event_code):
     parts = data['parts']
     if q:
         parts = [p for p in parts if q in (p.get('name') or '').lower()]
-    # Printbare facilitator-lijst (Optie A): dezelfde (evt. gefilterde) set, maar alfabetisch
-    # op naam gesorteerd — administratief overzicht, geen code-recovery voor deelnemers.
-    parts_print = sorted(parts, key=lambda p: (p.get('name') or '').lower())
+    # Printbare facilitator-lijst (Optie A): ALTIJD de volledige deelnemerslijst (data['parts'],
+    # niet de gefilterde `parts`) — een administratief totaaloverzicht mag niet afhangen van een
+    # actief zoekfilter. Alfabetisch op naam gesorteerd. Geen code-recovery voor deelnemers.
+    parts_print = sorted(data['parts'], key=lambda p: (p.get('name') or '').lower())
     return render_template('vb/deelnemers_list.html', ev=ev, parts=parts, parts_print=parts_print,
                            total=len(data['parts']), q=q_raw, lang=lang, t=_DEELN_STR[lang],
                            mail=request.args.get('mail'), mailerr=request.args.get('mailerr'))
