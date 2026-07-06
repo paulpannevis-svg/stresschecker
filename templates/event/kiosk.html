@@ -1,9 +1,17 @@
+{%- set L = lang if lang in ('nl','de','en') else 'nl' -%}
+{%- set S = {
+  'title':       {'nl':'Event-kiosk','de':'Event-Kiosk','en':'Event kiosk'},
+  'h1':          {'nl':'Kies een meetdag','de':'Wählen Sie einen Messtag','en':'Choose an event day'},
+  'participants':{'nl':'deelnemer(s)','de':'Teilnehmer','en':'participant(s)'},
+  'wipe':        {'nl':'Deelnemergegevens wissen','de':'Teilnehmerdaten löschen','en':'Erase participant data'},
+  'empty':       {'nl':'Geen open meetdagen. Maak er een aan via','de':'Keine offenen Messtage. Erstellen Sie einen über','en':'No open event days. Create one via'}
+} -%}
 <!doctype html>
-<html lang="nl">
+<html lang="{{ L }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Event-kiosk</title>
+  <title>{{ S.title[L] }}</title>
   <style>
     body{font-family:system-ui,-apple-system,sans-serif;background:#f4f5f7;margin:0;padding:1.5rem;color:#222}
     .wrap{max-width:560px;margin:0 auto}
@@ -18,22 +26,32 @@
     .empty{color:#777;background:#fff;border-radius:14px;padding:1.5rem;text-align:center}
     .banner{background:#fffae6;border:1px solid #f0d000;border-radius:10px;padding:.5rem .8rem;
             font-size:.85rem;color:#7a6500;margin-bottom:1rem}
+    /* Organiser-header: discrete dashboard-link + taalknoppen (absolute-pad-hrefs, native nav). */
+    .kiosk-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+    .kiosk-top .dash{color:#999;font-size:.82rem;text-decoration:underline}
+    .kiosk-top .dash:hover{color:#666}
+    .kiosk-top .lang a{color:#999;font-size:.82rem;font-weight:600;text-decoration:none;padding:.15rem .35rem}
+    .kiosk-top .lang a.on{color:#E8344E}
   </style>
 </head>
 <body>
   <div class="wrap">
+    <div class="kiosk-top">
+      <a class="dash" href="/vb/dashboard">← Dashboard</a>
+      <span class="lang"><a href="/event/kiosk?lang=nl" class="{{ 'on' if L=='nl' else '' }}">NL</a><a href="/event/kiosk?lang=de" class="{{ 'on' if L=='de' else '' }}">DE</a><a href="/event/kiosk?lang=en" class="{{ 'on' if L=='en' else '' }}">EN</a></span>
+    </div>
     {% if is_staging %}<div class="banner">STAGING · Event-modus (kiosk). Alleen voor test.</div>{% endif %}
-    <h1>Kies een meetdag</h1>
+    <h1>{{ S.h1[L] }}</h1>
     {% if events %}
       {% for e in events %}
-        <a class="ev" href="/event/kiosk/{{ e.event_code }}">
+        <a class="ev" href="/event/kiosk/{{ e.event_code }}?lang={{ L }}">
           <b>{{ e.naam or e.opdrachtgever }}</b>
-          <div class="meta">{% if e.opdrachtgever and e.opdrachtgever != (e.naam or e.opdrachtgever) %}{{ e.opdrachtgever }} · {% endif %}{% if e.datum %}{{ e.datum }} · {% endif %}code {{ e.event_code }} · {{ e.n }} deelnemer(s)</div>
+          <div class="meta">{% if e.opdrachtgever and e.opdrachtgever != (e.naam or e.opdrachtgever) %}{{ e.opdrachtgever }} · {% endif %}{% if e.datum %}{{ e.datum }} · {% endif %}code {{ e.event_code }} · {{ e.n }} {{ S.participants[L] }}</div>
         </a>
-        <a class="wipe" href="/event/kiosk/{{ e.event_code }}/wissen">Deelnemergegevens wissen</a>
+        <a class="wipe" href="/event/kiosk/{{ e.event_code }}/wissen">{{ S.wipe[L] }}</a>
       {% endfor %}
     {% else %}
-      <div class="empty">Geen open meetdagen. Maak er een aan via <code>event_admin.py create-event</code>.</div>
+      <div class="empty">{{ S.empty[L] }} <code>event_admin.py create-event</code>.</div>
     {% endif %}
   </div>
 </body>

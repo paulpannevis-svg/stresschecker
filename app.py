@@ -4313,7 +4313,10 @@ def event_kiosk_home():
         "FROM events e WHERE e.status='open' ORDER BY e.event_id DESC"
     ).fetchall()
     db.close()
-    return render_template('event/kiosk.html', events=events)
+    lang = request.args.get('lang', 'nl')
+    if lang not in ('nl', 'de', 'en'):
+        lang = 'nl'
+    return render_template('event/kiosk.html', events=events, lang=lang)
 
 
 # Terugkeer-melding (ingetypte code onbekend/typefout): vriendelijke val-terug naar de
