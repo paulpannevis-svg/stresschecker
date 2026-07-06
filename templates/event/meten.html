@@ -19,6 +19,11 @@
   .ev-inner .report{display:block;margin-top:1.1rem;padding:.95rem;border-radius:12px;background:#2c3e63;color:#fff;
           text-decoration:none;font-weight:700}
   .ev-inner .rep-hint{font-size:.78rem;color:#999;margin-top:.45rem}
+  /* Fase 4 — transparantie: de kiosk-meting is een gesimuleerd signaal (geen sensor), dus
+     de uitslag mag niet als een echte persoonlijke meting overkomen. Rustig, niet-alarmerend. */
+  .ev-inner .demo-note{font-size:.74rem;letter-spacing:.02em;color:#8a7f70;background:#f4efe6;
+          border:1px solid #e6dccb;border-radius:8px;padding:.45rem .7rem;margin-bottom:1rem;
+          text-align:center;line-height:1.4}
   .ev-inner .again{display:block;margin-top:1rem;padding:.95rem;border-radius:12px;background:#E8344E;color:#fff;
          text-decoration:none;font-weight:700}
   .ev-inner .next{display:block;margin-top:1rem;padding:.95rem;border-radius:12px;background:#1f9d55;color:#fff;
@@ -80,6 +85,7 @@
     </div>
 
     <div id="phase-result" class="ev-card" style="display:none">
+      <div class="demo-note">Demonstratie · gesimuleerd signaal — geen echte hartslagmeting</div>
       <div class="ri" id="riOut">--</div>
       <div class="lbl">Relax Index</div>
       <div class="band" id="bandOut"></div>
@@ -102,6 +108,7 @@
     <!-- Reeds-voltooid (deelnemer keert terug terwijl n_metingen >= 2): geen meetscherm,
          alleen de slotboodschap + rapportlink. -->
     <div id="phase-capped" class="ev-card" style="display:none">
+      <div class="demo-note">Demonstratie · gesimuleerd signaal — geen echte hartslagmeting</div>
       <div class="slotmsg" id="cappedMsg"></div>
       <a class="report" href="/event/kiosk/{{ p.event_code }}/rapport/{{ p.meting_code }}/view" target="_blank" rel="noopener">Bekijk / print rapport →</a>
       <a class="next" href="/event/kiosk/{{ p.event_code }}">Volgende deelnemer →</a>
