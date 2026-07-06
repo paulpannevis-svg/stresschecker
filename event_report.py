@@ -42,7 +42,7 @@ T = {
         'code_label': 'Meting-code', 'no_name': '(geen naam)',
         'code_keep': 'Bewaar deze code voor een vervolgmeting.',
         'measured_at': 'Gemeten', 'age': 'Leeftijd', 'ri_label': 'Relax Index',
-        'bpm': 'Hartslag', 'quality': 'Kwaliteit',
+        'bpm': 'Hartslag', 'quality': 'Signaal',
         'unreliable': 'De signaalkwaliteit was te laag voor een betrouwbare Relax Index. '
                       'De zone is indicatief; overweeg een nieuwe meting.',
         'unreliable_zone_heading': 'Onzeker — meting onbetrouwbaar',
@@ -69,7 +69,7 @@ T = {
         'code_label': 'Mess-Code', 'no_name': '(kein Name)',
         'code_keep': 'Bewahren Sie diesen Code für eine Folgemessung auf.',
         'measured_at': 'Gemessen', 'age': 'Alter', 'ri_label': 'Relax Index',
-        'bpm': 'Herzfrequenz', 'quality': 'Qualität',
+        'bpm': 'Herzfrequenz', 'quality': 'Signal',
         'unreliable': 'Die Signalqualität war zu niedrig für einen zuverlässigen Relax Index. '
                       'Die Zone ist orientierend; ggf. erneut messen.',
         'unreliable_zone_heading': 'Unsicher — keine zuverlässige Messung',
@@ -96,7 +96,7 @@ T = {
         'code_label': 'Measurement code', 'no_name': '(no name)',
         'code_keep': 'Keep this code for a follow-up measurement.',
         'measured_at': 'Measured', 'age': 'Age', 'ri_label': 'Relax Index',
-        'bpm': 'Heart rate', 'quality': 'Quality',
+        'bpm': 'Heart rate', 'quality': 'Signal',
         'unreliable': 'Signal quality was too low for a reliable Relax Index. '
                       'The zone is indicative; consider a new measurement.',
         'unreliable_zone_heading': 'Uncertain — unreliable measurement',

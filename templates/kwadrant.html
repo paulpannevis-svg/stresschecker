@@ -439,12 +439,18 @@ var vit=5;
   // sterren-kader vervangen door een prominente rode waarschuwing. Consumer (IS_PRO=false) ongemoeid.
   (function(){
     var IS_PRO = {{ 'true' if is_pro else 'false' }};
+    // Consistentie consument <-> Pro: het misleidende SIGNAAL STERKTE%-kader (hoog % naast een
+    // 'onbetrouwbaar'-oordeel wekt argwaan bij het vergelijken van versies) bij band='slecht' voor
+    // IEDEREEN verbergen. Pro krijgt daarbovenop de rode banner + verbergt ook de sterren; de
+    // consument houdt de bestaande ★★☆-sterren als oordeel (bewust zachter, geen rode banner).
+    if(_band==='slecht'){
+      var _ssb=document.getElementById('signalStrengthBox'); if(_ssb){_ssb.style.display='none';}
+    }
     if(IS_PRO && _band==='slecht'){
       var _b=document.getElementById('proUnreliableBanner');
       var _p=document.getElementById('proUnreliablePct');
       if(_p){_p.textContent=(isNaN(kw)?'--':Math.round(kw));}
       if(_b){_b.style.display='block';}
-      var _ssb=document.getElementById('signalStrengthBox'); if(_ssb){_ssb.style.display='none';}
       var _rqb=document.getElementById('rhythmQualBox'); if(_rqb){_rqb.style.display='none';}
     }
     // Borderline-band: zachte oranje waarschuwing NAAST de kaders (band/sterren blijven staan).

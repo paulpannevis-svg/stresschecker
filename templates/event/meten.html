@@ -83,7 +83,7 @@
   'bt_unavail':  {'nl':'Web Bluetooth is niet beschikbaar op dit apparaat.','de':'Web Bluetooth ist auf diesem Gerät nicht verfügbar.','en':'Web Bluetooth is not available on this device.'},
   'bt_failed':   {'nl':'Bluetooth verbinding mislukt','de':'Bluetooth-Verbindung fehlgeschlagen','en':'Bluetooth connection failed'},
   'band_irregular':{'nl':'Te onregelmatig','de':'Zu unregelmäßig','en':'Too irregular'},
-  'qual_prefix': {'nl':'Kwaliteit ','de':'Qualität ','en':'Quality '},
+  'qual_prefix': {'nl':'Signaalsterkte ','de':'Signalstärke ','en':'Signal strength '},
   'mark_indic':  {'nl':'indicatief','de':'orientierend','en':'indicative'},
   'mark_unrel':  {'nl':'onbetrouwbaar','de':'unzuverlässig','en':'unreliable'},
   'err_max':     {'nl':'Deze deelnemer heeft al 2 metingen — een 3e is niet mogelijk.','de':'Diese Person hat bereits 2 Messungen — eine 3. ist nicht möglich.','en':'This participant already has 2 measurements — a 3rd is not possible.'},
@@ -456,13 +456,17 @@
       }
       document.getElementById('riOut').textContent = _suppress ? '--' : ri.toFixed(1);
       document.getElementById('riOut').style.color = _suppress ? '#999' : (_indic ? '#b26a00' : HRV.getColor(ri));
-      var q = {{ S.qual_prefix[L]|tojson }} + kwaliteit + '%';
-      // quality_band (ritme-regelmaat: goed/matig/slecht) ALLEEN tonen bij een niet-onderdrukt
-      // signaal. Bij _suppress is een positief "· goed" naast "Kwaliteit 0%" tegenstrijdig —
-      // dan alleen het onbetrouwbaar-voorbehoud; bij indicatief het indicatief-voorbehoud.
-      if (quality_band && !_suppress) q += ' · ' + quality_band;
-      if (_suppress) q += ' — ' + {{ S.mark_unrel[L]|tojson }};
-      else if (_indic) q += ' — ' + {{ S.mark_indic[L]|tojson }};
+      // Signaalsterkte (kwaliteit%) = hoe schoon het signaal was — een APARTE as dan het oordeel.
+      // Consistentie met /kwadrant: bij band='slecht' (ritme) is een hoog % misleidend naast het
+      // 'Te onregelmatig'-oordeel -> WEGLATEN. Bij kwaliteit-onbetrouwbaar verklaart het lage %
+      // juist de onbetrouwbaarheid -> tonen. Nooit '— onbetrouwbaar' aan deze regel plakken: het
+      // oordeel staat al bij de RI ('--') en het band-label. Voorkomt de argwaan-wekkende
+      // "99% — onbetrouwbaar"-combinatie.
+      var q = '';
+      if (!_slecht) {
+        q = {{ S.qual_prefix[L]|tojson }} + kwaliteit + '%';
+        if (quality_band && !_suppress) q += ' · ' + quality_band;
+      }
       document.getElementById('qualOut').textContent = q;
       // Max-2-cap: "Nieuwe meting" alleen tonen zolang < 2 metingen. Bij >= 2 verdwijnt
       // de knop en verschijnt de slotboodschap (done/failed o.b.v. has_reliable).
