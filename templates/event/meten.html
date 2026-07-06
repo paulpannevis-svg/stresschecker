@@ -19,6 +19,16 @@
   .ev-inner .report{display:block;margin-top:1.1rem;padding:.95rem;border-radius:12px;background:#2c3e63;color:#fff;
           text-decoration:none;font-weight:700}
   .ev-inner .rep-hint{font-size:.78rem;color:#999;margin-top:.45rem}
+  /* Meetcode-box op het eindscherm — zelfde groene stijl als de codebox in het rapport
+     (reports/event_participant.html), maar rem-based voor het scherm. Zodat een VB-medewerker
+     een deelnemer die de code vergeten is direct verder kan helpen bij een vervolgmeting. */
+  .ev-inner .codebox{margin:.4rem auto 1.1rem;padding:.6rem 1rem;border:1.5px dashed #157347;
+          border-radius:10px;background:#f2f8f4;max-width:14rem}
+  .ev-inner .codebox .code-label{display:block;font-size:.72rem;color:#0f5132;font-weight:700;
+          text-transform:uppercase;letter-spacing:.03em}
+  .ev-inner .codebox .code-val{display:block;font-size:1.7rem;font-weight:800;color:#157347;
+          letter-spacing:2px;font-family:"Courier New",monospace;margin:.1rem 0}
+  .ev-inner .codebox .code-keep{font-size:.72rem;color:#555;font-weight:400;margin-top:.1rem}
   /* Fase 4 — transparantie: de kiosk-meting is een gesimuleerd signaal (geen sensor), dus
      de uitslag mag niet als een echte persoonlijke meting overkomen. Rustig, niet-alarmerend. */
   .ev-inner .demo-note{font-size:.74rem;letter-spacing:.02em;color:#8a7f70;background:#f4efe6;
@@ -74,6 +84,8 @@
   'demo_note':   {'nl':'{{ S.demo_note[L] }}','de':'Demonstration · simuliertes Signal — keine echte Herzschlagmessung','en':'Demonstration · simulated signal — not a real heart-rate measurement'},
   'btn_report':  {'nl':'Bekijk / print rapport →','de':'Bericht ansehen / drucken →','en':'View / print report →'},
   'rep_hint':    {'nl':'Gauge, kwadrant en gevoel-vs-meting — om samen te bespreken. Toont je meest betrouwbare meting.','de':'Anzeige, Quadrant und Gefühl-vs-Messung — zum gemeinsamen Besprechen. Zeigt Ihre zuverlässigste Messung.','en':'Gauge, quadrant and feeling-vs-measurement — to discuss together. Shows your most reliable measurement.'},
+  'code_label':  {'nl':'Jouw meting-code:','de':'Ihr Messcode:','en':'Your measurement code:'},
+  'code_keep':   {'nl':'Bewaar deze code voor een vervolgmeting.','de':'Bewahren Sie diesen Code für eine Folgemessung.','en':'Keep this code for a follow-up measurement.'},
   'btn_again':   {'nl':'Nieuwe meting →','de':'Neue Messung →','en':'New measurement →'},
   'btn_next':    {'nl':'Volgende deelnemer →','de':'Nächste Person →','en':'Next participant →'},
   'st_connecting':{'nl':'App maakt contact met de meter...','de':'App verbindet sich mit dem Messgerät...','en':'App is connecting to the monitor...'},
@@ -166,6 +178,15 @@
       <div class="lbl">Relax Index</div>
       <div class="band" id="bandOut"></div>
       <div class="lbl" id="qualOut" style="margin-top:.6rem"></div>
+      <!-- Meetcode prominent op het eindscherm, boven de knoppen: een deelnemer die de code
+           vergeten is kan door de VB-medewerker direct verder geholpen worden bij een
+           vervolgmeting. Server-gerenderd (p.meting_code) — altijd zichtbaar, ook bij een
+           onbetrouwbare/onderdrukte uitslag. -->
+      <div class="codebox">
+        <span class="code-label">{{ S.code_label[L] }}</span>
+        <span class="code-val">{{ p.meting_code }}</span>
+        <div class="code-keep">{{ S.code_keep[L] }}</div>
+      </div>
       <!-- Eén rapport-knop: opent de responsieve HTML-rapportweergave (/view) in een nieuw
            tabblad. Bekijken én printen gebeurt daar (de Print-knop in /view opent de WeasyPrint-PDF);
            daarom geen aparte "Print"-knop op de uitslag. -->
