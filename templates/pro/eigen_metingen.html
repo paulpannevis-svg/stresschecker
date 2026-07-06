@@ -232,18 +232,25 @@ else{
     var _q; try{ _q=HRV.qualityClassify(r.rr_intervals); }catch(e){}
     var _slecht=(_q&&_q.band==='slecht');
     var _tier; try{ _tier=HRV.qualityTier(r.kwaliteit); }catch(e){ _tier='betrouwbaar'; }
-    var _ectoN=(_q&&_q.ectopie_N)||0;
-    // Optie B — geconsolideerde display-state (SSOT: HRV.computeDisplayState). Pariteit met consument.
-    var _ds=HRV.computeDisplayState(_q&&_q.band, _tier, _ectoN);
-    var _err=(_ds==='ERROR_RED_POOR'||_ds==='ERROR_RED_UNRELIABLE');
+    // Inline display-states — 1-op-1 pariteit met /resultaten (results.html). Vervangt de
+    // kapotte HRV.computeDisplayState-stub, die met deze string-args altijd VALID_GREEN gaf.
+    //  _suppress (band='slecht' OF kwaliteit='onbetrouwbaar') -> RI-getal vervangen door rood label.
+    //  _indic (indicatief) -> grijze stip + oranje badge, getal blijft. _ectoFlag -> oranje RI.
+    var _suppress=(_slecht||_tier==='onbetrouwbaar');
+    var _indic=(!_suppress&&_tier==='indicatief');
+    var _ectoFlag=(_q&&_q.is_ectopie_borderline&&!_suppress);
     var _ectoTip={de:'Unregelmäßige Herzschlag-Sprünge erkannt — RI gültig, evtl. leicht beeinflusst.',en:'Irregular heartbeat jumps detected — RI valid, may be slightly affected.',nl:'Onregelmatige hartslag-sprongen gedetecteerd — RI geldig, mogelijk licht beïnvloed.'}[_L]||'Onregelmatige hartslag-sprongen gedetecteerd — RI geldig, mogelijk licht beïnvloed.';
     var _irrTip={de:'Das Signal war zu unregelmäßig für eine zuverlässige Bewertung (Bewegung, Sensorkontakt oder Herzrhythmus). Bitte wiederholen.',en:'The signal was too unstable to score reliably (movement, sensor contact, or heart rhythm). Please repeat.',nl:'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.'}[_L]||'Het signaal was te onregelmatig om betrouwbaar te scoren (beweging, sensorcontact of hartritme). Herhaal de meting.';
-    var _unrelTip=_qtt('onbetrouwbaar','retry');
+    // Onderdrukkings-label/tip: band-slecht -> ritme-tekst; kwaliteit-onbetrouwbaar -> kwaliteit-tekst.
+    var _supLabel=_slecht?({de:'Nicht stabil genug',en:'Not stable enough',nl:'Niet stabiel genoeg'}[_L]||'Niet stabiel genoeg'):_qtt('onbetrouwbaar','badge');
+    var _supTip=_slecht?_irrTip:_qtt('onbetrouwbaar','retry');
+    var _zoneCol=(ri<2?'#c0392b':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#27ae60':'#1e8449');
+    var _col=(_suppress||_indic)?'#bfbfbf':_zoneCol;
     var _warn=_slecht?'<span title="'+_irrTip+'" style="color:#c0392b;font-weight:700;margin-right:2px;">&#9888;</span>':'';
-    var dot=_warn+'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+(_err?'#bfbfbf':(ri<2?'#c0392b':ri<4?'#e67e22':ri<6?'#f1c40f':ri<8?'#27ae60':'#1e8449'))+'"></span>';
-    var _riStyle={VALID_GREEN:'color:#27AE60;',SOFT_BOUNDARY:'color:#F4D850;font-weight:600;',FLAGGED_ORANGE:'color:#F39C12;font-weight:600;background:rgba(243,156,18,.10);padding:0 5px;border-radius:4px;',ERROR_RED_POOR:'color:#E74C3C;font-weight:600;',ERROR_RED_UNRELIABLE:'color:#E74C3C;font-weight:600;'}[_ds]||'';
-    var _riTip=(_ds==='FLAGGED_ORANGE')?_ectoTip:(_ds==='ERROR_RED_POOR')?_irrTip:(_ds==='ERROR_RED_UNRELIABLE')?_unrelTip:'';
-    var riCell='<span class="ri-'+_ds+'" style="'+_riStyle+'white-space:nowrap;"'+(_riTip?(' title="'+_riTip+'"'):'')+'>'+ri+'</span>';
+    var dot=_warn+'<span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:.3rem;background:'+_col+'"></span>';
+    var _badge=_indic?' <span title="'+_qtt('indicatief','marker')+'" style="font-size:.68rem;color:#b26a00;background:#fdf3e0;border:1px solid #f0d9b0;border-radius:3px;padding:0 4px;margin-left:3px;white-space:nowrap;">'+_qtt('indicatief','badge')+'</span>':'';
+    var _riShown=_ectoFlag?('<span class="ri-flagged" title="'+_ectoTip+'" style="color:#F39C12;font-weight:600;background:rgba(243,156,18,.10);padding:0 5px;border-radius:4px;">'+ri+'</span>'):ri;
+    var riCell=_suppress?'<span title="'+_supTip+'" style="color:#c0392b;font-weight:600;white-space:nowrap;">'+_supLabel+'</span>':(_riShown+_badge);
     var mt=r.meting_type||'-';var mtL=mTYPE[mt.toLowerCase()]||mt;
     var dimL=r.dimensie?(dDIM[r.dimensie]||r.dimensie):'-';
     html+='<tr style="border-bottom:1px solid #eef0f3;"><td style="'+cTD+'white-space:nowrap;">'+date+'</td><td style="'+cTD+'white-space:nowrap;">'+tijd+'</td><td style="'+cTD+'">'+dot+riCell+'</td><td style="'+cNUM+'">'+(r.bpm||'-')+'</td><td style="'+cNUM+'">'+(r.hrv_pct!=null?r.hrv_pct+'%':'-')+'</td><td style="'+cNUM+'">'+(r.rmssd!=null?parseFloat(r.rmssd).toFixed(1):'-')+'</td><td style="'+cTD+'">'+mtL+'</td><td style="'+cTD+'">'+(r.notes||'')+'</td><td style="'+cTD+'">'+dimL+'</td><td style="'+cTD+'white-space:nowrap;">'+(r.rr_intervals?'<a href="/api/kubios/download/'+r.id+'" target="_blank" style="font-size:.75rem;color:#0078ff;text-decoration:none;">&darr; Kubios</a>':'')+'</td></tr>';
@@ -254,14 +261,18 @@ else{
   try{ var _lm=null; for(var _i=0;_i<data.length;_i++){ if(data[_i].rr_intervals && (!_lm||data[_i].ts>_lm.ts)) _lm=data[_i]; }
        var _ef=document.getElementById('ectoFlagBanner'), _bh=document.getElementById('borderlineHint'),
            _pb=document.getElementById('poorBanner'), _ub=document.getElementById('unreliableBanner');
-       var _lds=null;
+       var _lslecht=false,_lunrel=false,_lecto=false,_lsd=false;
        if(_lm){ var _lq=HRV.qualityClassify(_lm.rr_intervals);
          var _lt; try{_lt=HRV.qualityTier(_lm.kwaliteit);}catch(e){_lt='betrouwbaar';}
-         _lds=HRV.computeDisplayState(_lq&&_lq.band, _lt, (_lq&&_lq.ectopie_N)||0); }
-       if(_ef)_ef.style.display=(_lds==='FLAGGED_ORANGE')?'block':'none';
-       if(_bh)_bh.style.display=(_lds==='SOFT_BOUNDARY')?'block':'none';
-       if(_pb)_pb.style.display=(_lds==='ERROR_RED_POOR')?'block':'none';
-       if(_ub)_ub.style.display=(_lds==='ERROR_RED_UNRELIABLE')?'block':'none';
+         _lslecht=!!(_lq&&_lq.band==='slecht');
+         _lunrel=(!_lslecht&&_lt==='onbetrouwbaar');
+         var _lsup=_lslecht||_lt==='onbetrouwbaar';
+         _lecto=!!(_lq&&_lq.is_ectopie_borderline&&!_lsup);          // ectopie N>=2 -> oranje vlag-banner
+         _lsd=!!(_lq&&_lq.borderline_soft&&!_lecto); }               // SD1/SD2-only -> zachte hint
+       if(_ef)_ef.style.display=_lecto?'block':'none';
+       if(_bh)_bh.style.display=_lsd?'block':'none';
+       if(_pb)_pb.style.display=_lslecht?'block':'none';             // band='slecht' -> poor-banner
+       if(_ub)_ub.style.display=_lunrel?'block':'none';              // kwaliteit onbetrouwbaar -> unreliable-banner
      }catch(e){}
 }
 

@@ -215,35 +215,3 @@ function calculatePNN50(r){var res=filterRR(r);var f=res.filtered;if(!f||f.lengt
 var HRV={filterRR:filterRR,calculateRMSSD:calculateRMSSD,calculateSDNN:calculateSDNN,calculatePNN50:calculatePNN50,calculateHRVPercent:calculateHRVPercent,getMeetKwaliteit:getMeetKwaliteit,riConfidence:riConfidence,qualityTier:qualityTier,QUALITY_TIER_BETROUWBAAR_MIN:QUALITY_TIER_BETROUWBAAR_MIN,QUALITY_TIER_INDICATIEF_MIN:QUALITY_TIER_INDICATIEF_MIN,qualityClassify:qualityClassify,QUAL_L2_SD1SD2:QUAL_L2_SD1SD2,QUAL_L2_RMSSD_MIN:QUAL_L2_RMSSD_MIN,lookupRelaxIndex:lookupRelaxIndex,getLabel:getLabel,getColor:getColor,RMSSD_NORMS:N};
 if(typeof module!=="undefined"&&module.exports){module.exports=HRV;}else{g.HRV=HRV;}
 })(typeof window!=="undefined"?window:this);
-
-// Phase 2d Optie B: computeDisplayState stub
-// Fallback tot echte implementation klaar is
-HRV.computeDisplayState = function(band, tier, ectopieN) {
-  // band = RI-waarde (0-10)
-  // tier = zone (1-5: rood/oranje/geel/groen/blauw)
-  // ectopieN = ectopie count
-  
-  var state = 'VALID_GREEN';  // default
-  
-  if (band === undefined || band === null || band < 0) {
-    return 'ERROR_RED';  // Invalid data
-  }
-  
-  if (ectopieN && ectopieN >= 2) {
-    return 'SOFT_BOUNDARY';  // Ectopie flag (zachte markering)
-  }
-  
-  if (tier === undefined || tier === null) {
-    return 'VALID_GREEN';
-  }
-  
-  // Map tier (1-5) to display state
-  switch(parseInt(tier)) {
-    case 1: return 'ERROR_RED';        // Zwaar belast
-    case 2: return 'FLAGGED_ORANGE';   // Belast
-    case 3: return 'VALID_GREEN';      // Licht belast / In balans
-    case 4: return 'VALID_GREEN';      // Veerkrachtig
-    case 5: return 'VALID_GREEN';      // Zeer veerkrachtig
-    default: return 'VALID_GREEN';
-  }
-};
