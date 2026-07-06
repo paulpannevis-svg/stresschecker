@@ -109,7 +109,7 @@
   </div>
 {% endblock %}
 {% block scripts %}
-  <script src="/static/js/hrv.js?v=8"></script>
+  <script src="/static/js/hrv.js?v=12"></script>
   <script src="/static/js/sensor.js"></script>
   <script>
     var MC = {{ p.meting_code|tojson }};
@@ -307,27 +307,33 @@
       document.getElementById('phase-work').style.display = 'none';
       document.getElementById('phase-measure').style.display = 'none';
       document.getElementById('phase-result').style.display = 'block';
-      // Gate-vlaggen (zelfde verhaal als kwadrant.html + de event-PDF): te onregelmatig
-      // (quality_band 'slecht') OF slecht signaal (kwaliteit < 85) -> geen stellige zone/RI tonen.
+      // Gate-vlaggen — canonieke Fase 3 3-klassen-tier (HRV.qualityTier: >=95 betrouwbaar /
+      // 90-95 indicatief / <90 onbetrouwbaar), gelijk aan consument (measure.html), Pro
+      // (sensor_en_meten.html) en het Event-PDF (event_report.RELIABLE_MIN=95). Was: platte
+      // drempel kwaliteit<85 (te soepel, geen indicatief-klasse). TWEE onafhankelijke assen:
+      // ritme (quality_band 'slecht' -> 'Te onregelmatig') EN signaalkwaliteit (tier).
       var _slecht = (quality_band === 'slecht');
-      var _gated = _slecht || (kwaliteit < 85);
+      var _mt = HRV.qualityTier(kwaliteit);
+      var _suppress = _slecht || (_mt === 'onbetrouwbaar');   // -> geen stellige RI (--)
+      var _indic = (!_suppress && _mt === 'indicatief');      // -> RI tonen + markering
       // Zone-eerst (robuust tegen de RI-herrekening): label prominent, getal secundair.
       // Bij 'slecht' geen positief zone-label maar 'Te onregelmatig' (markeren, niet corrigeren).
       if (_slecht) {
         document.getElementById('bandOut').textContent = 'Te onregelmatig';
         document.getElementById('bandOut').style.color = '#c0392b';
       } else {
-        document.getElementById('bandOut').textContent = HRV.getLabel(ri);
-        document.getElementById('bandOut').style.color = HRV.getColor(ri);
+        document.getElementById('bandOut').textContent = HRV.getLabel(ri) + (_indic ? ' · indicatief' : '');
+        document.getElementById('bandOut').style.color = _indic ? '#b26a00' : HRV.getColor(ri);
       }
-      document.getElementById('riOut').textContent = _gated ? '--' : ri.toFixed(1);
-      document.getElementById('riOut').style.color = _gated ? '#999' : HRV.getColor(ri);
+      document.getElementById('riOut').textContent = _suppress ? '--' : ri.toFixed(1);
+      document.getElementById('riOut').style.color = _suppress ? '#999' : (_indic ? '#b26a00' : HRV.getColor(ri));
       var q = 'Kwaliteit ' + kwaliteit + '%';
-      // quality_band (ritme-regelmaat: goed/matig/slecht) ALLEEN tonen bij een betrouwbaar
-      // signaal. Bij _gated (kwaliteit < 85 of 'slecht') is een positief "· goed" naast
-      // "Kwaliteit 0%" tegenstrijdig — dan alleen het onbetrouwbaar-voorbehoud.
-      if (quality_band && !_gated) q += ' · ' + quality_band;
-      if (_gated) q += ' — onbetrouwbaar';
+      // quality_band (ritme-regelmaat: goed/matig/slecht) ALLEEN tonen bij een niet-onderdrukt
+      // signaal. Bij _suppress is een positief "· goed" naast "Kwaliteit 0%" tegenstrijdig —
+      // dan alleen het onbetrouwbaar-voorbehoud; bij indicatief het indicatief-voorbehoud.
+      if (quality_band && !_suppress) q += ' · ' + quality_band;
+      if (_suppress) q += ' — onbetrouwbaar';
+      else if (_indic) q += ' — indicatief';
       document.getElementById('qualOut').textContent = q;
       // Max-2-cap: "Nieuwe meting" alleen tonen zolang < 2 metingen. Bij >= 2 verdwijnt
       // de knop en verschijnt de slotboodschap (done/failed o.b.v. has_reliable).
