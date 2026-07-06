@@ -271,9 +271,9 @@
       // alleen hier in de event-kiosk; baseline HRV.getMeetKwaliteit blijft ongewijzigd.
       var kwaliteit = (function () {
         try {
-          if (!HRV.hasEnoughRR(rrIntervals)) return 0;
+          if (!HRV.hasEnoughRR(rrIntervals)) return 0;   // bewust: <80 raw RR = onbetrouwbaar
           return HRV.getMeetKwaliteit(rrIntervals);
-        } catch (e) { return 0; }
+        } catch (e) { console.warn('Event kwaliteit-berekening faalde -> 0:', e); return 0; }
       })();
 
       fetch('/api/event/{{ p.event_code }}/meting/opslaan', {

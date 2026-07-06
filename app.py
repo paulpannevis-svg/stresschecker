@@ -706,7 +706,7 @@ def _inject_staging_flag():
 # ?v= (10/11/12/20) → drift-lek waarbij een terugkerende browser op één surface een oude
 # hrv.js kon houden. HLM valt bewust buiten (apart product, eigen inline RI-kopie).
 # Zie project_ri_pipeline_consolidation_roadmap.
-HRV_JS_VERSION = 21
+HRV_JS_VERSION = 22
 
 
 @app.context_processor

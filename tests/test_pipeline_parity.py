@@ -400,11 +400,34 @@ def p11_event_screen_tier():
     return _report(name, True, "qualityTier(kwaliteit)-gate; geen platte drempel; klassen onbetrouwbaar/indicatief; hrv.js?v>=12")
 
 
+# ── P12: geen dangling HRV.<fn> in event/meten.html (elke aanroep bestaat echt in hrv.js) ──
+# Ving de bug waar event/meten.html `HRV.hasEnoughRR(...)` aanriep terwijl die functie NIET in
+# hrv.js bestond: de TypeError werd door een `catch` geslikt -> elke Event-meting kreeg
+# kwaliteit 0 = onbetrouwbaar. Grond-waarheid: laad hrv.js in node en check de geëxporteerde
+# API. Generieke guard tegen elk toekomstig 'stille' HRV.*-lek in het Event-scherm.
+def p12_event_hrv_refs_exist():
+    import re
+    name = "P12 event/meten.html: elke HRV.<fn>-aanroep bestaat in hrv.js (geen dangling ref)"
+    txt = open(EVENT_METEN).read()
+    called = sorted(set(re.findall(r'HRV\.([A-Za-z_]\w*)\s*\(', txt)))
+    if not called:
+        return _report(name, False, "geen HRV.*-aanroepen gevonden (regex kapot?)")
+    got = _js("var ns=%s;out.missing=ns.filter(function(n){return typeof HRV[n]==='undefined';});"
+              % json.dumps(called))
+    missing = list(got.get('missing', []))
+    if SELFTEST:
+        missing.append('__selftest_geforceerd__')
+    if missing:
+        return _report(name, False, "ontbreekt in hrv.js: " + ", ".join(missing)
+                       + f"  (van {len(called)} aanroepen: {', '.join(called)})")
+    return _report(name, True, f"alle {len(called)} HRV.*-aanroepen bestaan ({', '.join(called)})")
+
+
 TESTS = [p1_zone_parity, p2_boundary_parity, p3_quality_parity,
          p4_kwaliteit_gate, p5_event_tables, p6_reference_anchors,
          p7_quality_tier_parity, p8_event_reliable_threshold,
          p9_persisted_ri_invariant, p10_ectopie_parity,
-         p11_event_screen_tier]
+         p11_event_screen_tier, p12_event_hrv_refs_exist]
 
 
 def main():

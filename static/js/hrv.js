@@ -88,6 +88,10 @@ if(r>=8)return L[4];if(r>=6)return L[3];if(r>=4)return L[2];if(r>=2)return L[1];
 // zone-verhaal. Canonieke grens "Licht belast → In balans" = RI 6.0.
 function getColor(r){if(r>=8)return "#27ae60";if(r>=6)return "#2ecc71";if(r>=4)return "#f1c40f";if(r>=2)return "#e67e22";return "#c0392b";}
 function getMeetKwaliteit(r){if(r&&r.length>30)r=r.slice(15);if(!r||r.length<3)return 100;return filterRR(r).quality;}
+// Event-kiosk minimum-data-gate: <80 RAUWE RR-intervallen = te weinig data om te vertrouwen
+// (bijna-lege meting zou anders vals 100% scoren). Aangeroepen in event/meten.html; ontbrak
+// eerder -> TypeError werd door de catch geslikt -> elke Event-meting kreeg kwaliteit 0.
+function hasEnoughRR(rr){return !!rr && rr.length >= 80;}
 // Kwaliteits-gate (KWALITEITS_GATE_ONTWERP.md): vertrouwbaarheidsklasse van een meting.
 // >=85 'trusted' · 70-84 'limited' (toon met voorbehoud, blokkeer positieve "Veerkrachtig")
 // · <70 'untrusted' (RI/zone onderdrukken). Ontbrekende kwaliteit = vertrouwd (besluit 5: legacy).
@@ -212,6 +216,6 @@ function qualityClassify(rr){
 }
 function calculateSDNN(r){var res=filterRR(r);var f=res.filtered;if(!f||f.length<2)return 0;var m=f.reduce(function(a,b){return a+b;},0)/f.length;return Math.round(Math.sqrt(f.reduce(function(a,b){return a+Math.pow(b-m,2);},0)/f.length)*10)/10;}
 function calculatePNN50(r){var res=filterRR(r);var f=res.filtered;if(!f||f.length<2)return 0;var n=0;for(var i=1;i<f.length;i++)if(Math.abs(f[i]-f[i-1])>50)n++;return Math.round((n/(f.length-1))*1000)/10;}
-var HRV={filterRR:filterRR,calculateRMSSD:calculateRMSSD,calculateSDNN:calculateSDNN,calculatePNN50:calculatePNN50,calculateHRVPercent:calculateHRVPercent,getMeetKwaliteit:getMeetKwaliteit,riConfidence:riConfidence,qualityTier:qualityTier,QUALITY_TIER_BETROUWBAAR_MIN:QUALITY_TIER_BETROUWBAAR_MIN,QUALITY_TIER_INDICATIEF_MIN:QUALITY_TIER_INDICATIEF_MIN,qualityClassify:qualityClassify,QUAL_L2_SD1SD2:QUAL_L2_SD1SD2,QUAL_L2_RMSSD_MIN:QUAL_L2_RMSSD_MIN,lookupRelaxIndex:lookupRelaxIndex,getLabel:getLabel,getColor:getColor,RMSSD_NORMS:N};
+var HRV={filterRR:filterRR,calculateRMSSD:calculateRMSSD,calculateSDNN:calculateSDNN,calculatePNN50:calculatePNN50,calculateHRVPercent:calculateHRVPercent,getMeetKwaliteit:getMeetKwaliteit,hasEnoughRR:hasEnoughRR,riConfidence:riConfidence,qualityTier:qualityTier,QUALITY_TIER_BETROUWBAAR_MIN:QUALITY_TIER_BETROUWBAAR_MIN,QUALITY_TIER_INDICATIEF_MIN:QUALITY_TIER_INDICATIEF_MIN,qualityClassify:qualityClassify,QUAL_L2_SD1SD2:QUAL_L2_SD1SD2,QUAL_L2_RMSSD_MIN:QUAL_L2_RMSSD_MIN,lookupRelaxIndex:lookupRelaxIndex,getLabel:getLabel,getColor:getColor,RMSSD_NORMS:N};
 if(typeof module!=="undefined"&&module.exports){module.exports=HRV;}else{g.HRV=HRV;}
 })(typeof window!=="undefined"?window:this);
