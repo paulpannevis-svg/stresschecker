@@ -9432,6 +9432,15 @@ def _vb_group_data(edb, event_id, lang='nl'):
         reliable = (r['ri'] is not None and r['kwaliteit'] is not None
                     and r['kwaliteit'] >= 95 and (r['quality_band'] or '') != 'slecht')
         zk = analytics.zone_for_ri(r['ri']) if reliable else None
+        # Zone-WEERGAVE voor de deelnemerslijst: volg de canonieke 95/90-tier (SSOT), niet de
+        # binaire >=95-grens van de groepsrapport-statistiek. Een 'indicatief'-meting (90–94) heeft
+        # een geldige zone en hoort die te tonen (met markering); alleen 'onbetrouwbaar' (<90) of
+        # band 'slecht' (te onregelmatig) is niet-toonbaar. De aggregaten hieronder blijven op
+        # `reliable` (>=95) — die statistiek raken we bewust niet aan.
+        _disp_tier = analytics.quality_tier(r['kwaliteit'])
+        zone_ok = (r['ri'] is not None and (r['quality_band'] or '') != 'slecht'
+                   and _disp_tier != 'onbetrouwbaar')
+        zk_disp = analytics.zone_for_ri(r['ri']) if zone_ok else None
         if reliable:
             zone_counts[zk] = zone_counts.get(zk, 0) + 1
             ri_sum += float(r['ri']); ri_n += 1
@@ -9455,6 +9464,11 @@ def _vb_group_data(edb, event_id, lang='nl'):
                       'tracking_code': (r['tracking_code'] if 'tracking_code' in r.keys() else None),
                       'ri': (f"{float(r['ri']):.1f}" if reliable else None),
                       'zone': analytics.zone_label(zk, lang) if zk else None, 'zone_key': zk,
+                      # Tier-gestuurde weergavevelden (deelnemerslijst): tonen ook indicatief.
+                      'zone_ok': zone_ok, 'zone_key_disp': zk_disp,
+                      'zone_disp': (analytics.zone_label(zk_disp, lang) if zk_disp else None),
+                      'ri_disp': (f"{float(r['ri']):.1f}" if zone_ok else None),
+                      'indicative': (zone_ok and _disp_tier == 'indicatief'),
                       'ontspanning': (_ont if _ont is not None else '—'),
                       'werkstress': (_ws if _ws is not None else '—'),
                       'verschil': (f"{_versch:.1f}" if _versch is not None else '—'),
@@ -9805,7 +9819,7 @@ _DEELN_STR = {
            'm_label': 'E-mailadres van de deelnemer', 'm_ph': 'naam@bedrijf.nl',
            'm_privacy': 'Het adres wordt alleen gebruikt om dit rapport te versturen en niet opgeslagen.',
            'm_send': 'Verzend', 'm_cancel': 'Annuleer', 'no_name': '(geen naam)',
-           'p_print_btn': '🖨 Print deelnemerslijst', 'p_printed': 'Afgedrukt op'},
+           'p_print_btn': '🖨 Print deelnemerslijst', 'p_printed': 'Afgedrukt op', 'indicative': 'indicatief'},
     'de': {'title': 'Teilnehmer', 'back': 'Dashboard', 'h1': 'Teilnehmerberichte',
            'n_part': 'Teilnehmer', 'sent': 'Bericht gesendet.',
            'failed': 'Senden fehlgeschlagen — bitte später erneut versuchen.', 'invalid': 'Ungültige E-Mail-Adresse.',
@@ -9818,7 +9832,7 @@ _DEELN_STR = {
            'm_label': 'E-Mail-Adresse des Teilnehmers', 'm_ph': 'name@firma.de',
            'm_privacy': 'Die Adresse wird nur zum Versand dieses Berichts verwendet und nicht gespeichert.',
            'm_send': 'Senden', 'm_cancel': 'Abbrechen', 'no_name': '(kein Name)',
-           'p_print_btn': '🖨 Teilnehmerliste drucken', 'p_printed': 'Gedruckt am'},
+           'p_print_btn': '🖨 Teilnehmerliste drucken', 'p_printed': 'Gedruckt am', 'indicative': 'orientierend'},
     'en': {'title': 'Participants', 'back': 'Dashboard', 'h1': 'Participant reports',
            'n_part': 'participant(s)', 'sent': 'Report sent.',
            'failed': 'Sending failed — please try again later.', 'invalid': 'Invalid email address.',
@@ -9831,7 +9845,7 @@ _DEELN_STR = {
            'm_label': "Participant's email address", 'm_ph': 'name@company.com',
            'm_privacy': 'The address is only used to send this report and is not stored.',
            'm_send': 'Send', 'm_cancel': 'Cancel', 'no_name': '(no name)',
-           'p_print_btn': '🖨 Print participant list', 'p_printed': 'Printed on'},
+           'p_print_btn': '🖨 Print participant list', 'p_printed': 'Printed on', 'indicative': 'indicative'},
 }
 
 

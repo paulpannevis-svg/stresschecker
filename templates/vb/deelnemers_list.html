@@ -86,9 +86,9 @@
       <tr>
         <td><strong>{{ p.name }}</strong></td>
         <td><span class="dl-code">{{ p.meting_code or '—' }}</span></td>
-        {% if p.reliable %}
-        <td class="dl-ri">{{ p.ri }}</td>
-        <td><span class="zbadge zone-{{ (p.zone_key or '')|replace('_', '-') }}">{{ p.zone }}</span></td>
+        {% if p.zone_ok %}
+        <td class="dl-ri">{{ p.ri_disp }}</td>
+        <td><span class="zbadge zone-{{ (p.zone_key_disp or '')|replace('_', '-') }}"{% if p.indicative %} title="{{ t.indicative }}"{% endif %}>{{ p.zone_disp }}{% if p.indicative %} *{% endif %}</span></td>
         {% else %}
         <td class="dl-un" colspan="2">{{ t.unreliable }}</td>
         {% endif %}
@@ -121,8 +121,8 @@
       <tr>
         <td>{{ p.name or t.no_name }}</td>
         <td>{{ p.meting_code or '—' }}</td>
-        <td>{% if p.reliable %}{{ p.ri }}{% else %}—{% endif %}</td>
-        <td>{% if p.reliable %}{{ p.zone }}{% else %}{{ t.unreliable }}{% endif %}</td>
+        <td>{% if p.zone_ok %}{{ p.ri_disp }}{% else %}—{% endif %}</td>
+        <td>{% if p.zone_ok %}{{ p.zone_disp }}{% if p.indicative %} ({{ t.indicative }}){% endif %}{% else %}{{ t.unreliable }}{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
