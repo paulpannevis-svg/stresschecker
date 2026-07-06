@@ -51,6 +51,7 @@ import analytics
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HRV_JS = "/opt/stresschecker/static/js/hrv.js"
+EVENT_METEN = "/opt/stresschecker/templates/event/meten.html"
 REF_PATH = os.path.join(HERE, "lib", "references.json")
 
 # Optionele self-test: forceer één divergentie om te bewijzen dat de test rood wordt.
@@ -352,10 +353,50 @@ def p10_ectopie_parity():
                    if ok else "; ".join(fails))
 
 
+# ── P11: Event LIVE-scherm (client) gebruikt de canonieke qualityTier (95/90), geen platte drempel ──
+# P8 borgt de BACKEND (event_report.RELIABLE_MIN). Het live deelnemersscherm
+# (event/meten.html showResultPhase) heeft een EIGEN client-side gate; die gatete ooit op de
+# oude platte `kwaliteit < 85` (binair, geen indicatief-klasse) i.p.v. HRV.qualityTier — precies
+# de laatste weergave-divergentie die 2026-07-06 gelijkgetrokken is. Bron-inspectie (geen render/
+# app-import, side-effect-vrij, in de stijl van P5 + test_pro_trend_threshold): ROOD zodra het
+# scherm terugvalt op een hardcoded kwaliteit-drempel of de canonieke tier-namen niet meer gebruikt.
+def p11_event_screen_tier():
+    import re
+    name = "P11 event/meten.html live-gate == canonieke qualityTier (95/90, geen platte drempel)"
+    txt = open(EVENT_METEN).read()
+    # Strip JS-commentaar zodat we alleen ECHTE code toetsen (toelichtingen mógen 'kwaliteit<85' noemen).
+    code = re.sub(r"/\*.*?\*/", "", txt, flags=re.S)
+    code = re.sub(r"(?<!:)//[^\n]*", "", code)  # `(?<!:)` spaart URL's als https://
+    fails = []
+    # (1) roept de canonieke tier-functie aan (in echte code, niet enkel in een comment)
+    if not re.search(r"HRV\.qualityTier\s*\(\s*kwaliteit\s*\)", code):
+        fails.append("HRV.qualityTier(kwaliteit) niet in de code")
+    # (2) GEEN hardcoded kwaliteit-drempel (kwaliteit < <getal>) — precies de oude regressie
+    m = re.search(r"kwaliteit\s*<\s*\d+", code)
+    if m:
+        fails.append(f"platte kwaliteit-drempel terug: {m.group(0)!r}")
+    # (3) drieklassen gebonden aan de canonieke tier-namen
+    for tok in ("'onbetrouwbaar'", "'indicatief'"):
+        if tok not in code:
+            fails.append(f"tier-klasse {tok} ontbreekt in de gate")
+    # (4) hrv.js ge-bumpt naar de versie waarop qualityTier bestaat (>=12; niet terug naar v=8 zonder de functie)
+    vm = re.search(r"hrv\.js\?v=(\d+)", txt)
+    if not vm:
+        fails.append("hrv.js?v= ontbreekt in het Event-scherm")
+    elif int(vm.group(1)) < 12:
+        fails.append(f"hrv.js?v={vm.group(1)} < 12 (qualityTier mogelijk niet in de cache)")
+    if SELFTEST:
+        fails.append("SELFTEST-geforceerde afwijking")
+    if fails:
+        return _report(name, False, "; ".join(fails))
+    return _report(name, True, "qualityTier(kwaliteit)-gate; geen platte drempel; klassen onbetrouwbaar/indicatief; hrv.js?v>=12")
+
+
 TESTS = [p1_zone_parity, p2_boundary_parity, p3_quality_parity,
          p4_kwaliteit_gate, p5_event_tables, p6_reference_anchors,
          p7_quality_tier_parity, p8_event_reliable_threshold,
-         p9_persisted_ri_invariant, p10_ectopie_parity]
+         p9_persisted_ri_invariant, p10_ectopie_parity,
+         p11_event_screen_tier]
 
 
 def main():
