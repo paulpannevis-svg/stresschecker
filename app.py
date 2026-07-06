@@ -9422,6 +9422,10 @@ def _vb_group_data(edb, event_id, lang='nl'):
     parts, ts_list = [], []
     zone_counts = {k: 0 for k in analytics.ZONE_KEYS}
     ri_sum, ri_n, unreliable = 0.0, 0, 0
+    # Indicatief (90–94, band!='slecht', RI aanwezig): telt NIET mee in de kernstatistiek
+    # (die blijft op reliable >=95), maar wordt apart geteld voor de transparantie-regel
+    # "Inclusief indicatief: X van Y" + footnote in het groepsrapport.
+    indicative_cnt = 0
     # Intake-gemiddeldes over de getoonde deelnemers (één rij p.p., zelfde selectie als de
     # tabel → geen dubbeltelling bij retries). NULL/onaangeraakt telt niet mee.
     ont_sum, ont_n, ws_sum, ws_n = 0, 0, 0, 0
@@ -9446,6 +9450,8 @@ def _vb_group_data(edb, event_id, lang='nl'):
             ri_sum += float(r['ri']); ri_n += 1
         else:
             unreliable += 1
+        if zone_ok and _disp_tier == 'indicatief':
+            indicative_cnt += 1
         if r['ts']:
             ts_list.append(int(r['ts']))
         _ont = r['subjectief_score'] if 'subjectief_score' in r.keys() else None
@@ -9508,6 +9514,7 @@ def _vb_group_data(edb, event_id, lang='nl'):
     else:
         _interp = 'strained'
     return {'parts': parts, 'n': n, 'reliable_n': ri_n, 'unreliable_n': unreliable,
+            'indicative_n': indicative_cnt, 'incl_indicative_n': ri_n + indicative_cnt,
             'pct_in_balance': (pct_in_balance if pct_in_balance is not None else '—'),
             'summary_interp_key': _interp,
             'unreliable_pct': round(100 * unreliable / n) if n else 0,
@@ -9532,6 +9539,8 @@ _GRP_STR = {
   'sum_h': 'Samenvatting',
   'sum_intro': 'Dit rapport laat een momentopname zien van de belastbaarheid en het herstelvermogen van de medewerkers die hebben deelgenomen aan dit onderzoek. Dit is gemeten met behulp van de autonome zenuwstelselstatus (AZS).',
   'sh_screened': 'deelnemers gescreend', 'sh_avg_ri': 'gemiddelde Relax Index', 'sh_in_balance': 'in balans of veerkrachtig',
+  'rel_reliable': 'Betrouwbare metingen', 'rel_incl': 'Inclusief indicatief', 'rel_of': 'van de', 'rel_part': 'deelnemers',
+  'indic_footnote': '* Indicatieve metingen (lager signaal) zijn niet meegeteld in de groepsstatistieken.',
   'sum_meaning': 'Betekenis', 'sum_interp_pre': 'Een gemiddelde Relax Index van ', 'sum_interp_mid': ' suggereert dat uw team ',
   'sum_interp_post': '. Dit is een momentopname op groepsniveau, geen individuele of medische beoordeling.',
   'interp_optimal': 'goed hersteld is en optimaal functioneert', 'interp_healthy': 'een gezonde stress-respons vertoont',
@@ -9611,6 +9620,8 @@ _GRP_STR = {
   'sum_h': 'Zusammenfassung',
   'sum_intro': 'Dieser Bericht zeigt eine Momentaufnahme der Belastbarkeit und Erholungsfähigkeit der Mitarbeitenden, die an dieser Untersuchung teilgenommen haben. Gemessen wurde dies anhand des Zustands des autonomen Nervensystems (ANS).',
   'sh_screened': 'Teilnehmer gescreent', 'sh_avg_ri': 'durchschnittlicher Relax Index', 'sh_in_balance': 'im Gleichgewicht oder vital',
+  'rel_reliable': 'Zuverlässige Messungen', 'rel_incl': 'Inklusive indikativ', 'rel_of': 'von', 'rel_part': 'Teilnehmern',
+  'indic_footnote': '* Indikative Messungen (niedrigeres Signal) wurden nicht in die Gruppenstatistik einbezogen.',
   'sum_meaning': 'Bedeutung', 'sum_interp_pre': 'Ein durchschnittlicher Relax Index von ', 'sum_interp_mid': ' deutet darauf hin, dass Ihr Team ',
   'sum_interp_post': '. Dies ist eine Momentaufnahme auf Gruppenebene, keine individuelle oder medizinische Beurteilung.',
   'interp_optimal': 'gut erholt ist und optimal funktioniert', 'interp_healthy': 'eine gesunde Stressreaktion zeigt',
@@ -9690,6 +9701,8 @@ _GRP_STR = {
   'sum_h': 'Summary',
   'sum_intro': 'This report shows a snapshot of the resilience and recovery capacity of the employees who took part in this assessment. This was measured using the state of the autonomic nervous system (ANS).',
   'sh_screened': 'participants screened', 'sh_avg_ri': 'average Relax Index', 'sh_in_balance': 'in balance or resilient',
+  'rel_reliable': 'Reliable measurements', 'rel_incl': 'Including indicative', 'rel_of': 'of', 'rel_part': 'participants',
+  'indic_footnote': '* Indicative measurements (lower signal) are excluded from group statistics.',
   'sum_meaning': 'Meaning', 'sum_interp_pre': 'An average Relax Index of ', 'sum_interp_mid': ' suggests that your team ',
   'sum_interp_post': '. This is a group-level snapshot, not an individual or medical assessment.',
   'interp_optimal': 'is well recovered and functioning optimally', 'interp_healthy': 'shows a healthy stress response',

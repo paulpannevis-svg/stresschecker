@@ -130,6 +130,13 @@
         <div class="sh"><strong>{{ d.avg_ri }}/10</strong>{{ t.sh_avg_ri }}</div>
         <div class="sh"><strong>{{ d.pct_in_balance }}%</strong>{{ t.sh_in_balance }}</div>
       </div>
+      {# Transparantie: betrouwbare (>=95, voedt de statistiek) vs inclusief-indicatief (>=90).
+         Kernstatistieken blijven op betrouwbaar; indicatief wordt hier alleen geteld + footnote. #}
+      <div class="rel-lines" style="margin-top:10px;font-size:13px;color:#444;line-height:1.7">
+        <div>{{ t.rel_reliable }}: <strong>{{ d.reliable_n }}</strong> {{ t.rel_of }} {{ d.n }} {{ t.rel_part }}</div>
+        <div>{{ t.rel_incl }}: <strong>{{ d.incl_indicative_n }}</strong> {{ t.rel_of }} {{ d.n }} {{ t.rel_part }}{% if d.indicative_n %} *{% endif %}</div>
+        {% if d.indicative_n %}<div style="margin-top:6px;font-size:11px;color:#888">{{ t.indic_footnote }}</div>{% endif %}
+      </div>
       <h3>{{ t.sum_meaning }}</h3>
       {% if d.reliable_n %}
       <p>{{ t.sum_interp_pre }}<strong>{{ d.avg_ri }}</strong>{{ t.sum_interp_mid }}<strong>{{ t['interp_' + d.summary_interp_key] }}</strong>{{ t.sum_interp_post }}</p>
