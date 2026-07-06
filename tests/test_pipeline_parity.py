@@ -379,12 +379,20 @@ def p11_event_screen_tier():
     for tok in ("'onbetrouwbaar'", "'indicatief'"):
         if tok not in code:
             fails.append(f"tier-klasse {tok} ontbreekt in de gate")
-    # (4) hrv.js ge-bumpt naar de versie waarop qualityTier bestaat (>=12; niet terug naar v=8 zonder de functie)
+    # (4) hrv.js-versie op de versie waarop qualityTier bestaat (>=12): numeriek OF de
+    #     gecentraliseerde Jinja-global {{ hrv_version }} (bron = app.py HRV_JS_VERSION).
     vm = re.search(r"hrv\.js\?v=(\d+)", txt)
-    if not vm:
+    if vm:
+        if int(vm.group(1)) < 12:
+            fails.append(f"hrv.js?v={vm.group(1)} < 12 (qualityTier mogelijk niet in de cache)")
+    elif re.search(r"hrv\.js\?v=\{\{\s*hrv_version\s*\}\}", txt):
+        am = re.search(r"HRV_JS_VERSION\s*=\s*(\d+)", open("/opt/stresschecker/app.py").read())
+        if not am:
+            fails.append("hrv_version-global gebruikt maar app.py mist HRV_JS_VERSION")
+        elif int(am.group(1)) < 12:
+            fails.append(f"app.py HRV_JS_VERSION={am.group(1)} < 12")
+    else:
         fails.append("hrv.js?v= ontbreekt in het Event-scherm")
-    elif int(vm.group(1)) < 12:
-        fails.append(f"hrv.js?v={vm.group(1)} < 12 (qualityTier mogelijk niet in de cache)")
     if SELFTEST:
         fails.append("SELFTEST-geforceerde afwijking")
     if fails:

@@ -152,7 +152,7 @@ body{background:#f5f5f5;margin:0;}
 </div>
 <div style="display:flex;justify-content:space-between;align-items:center;max-width:820px;margin:.75rem auto 0;padding:0 1rem;"><a href="{% if request.args.get("from") == "hlm" %}/hlm/consumer{% elif client_id and client_id > 0 and is_pro %}/pro/clienten{% else %}/menu{% endif %}" style="display:inline-flex;align-items:center;gap:.4rem;background:#eee;color:#555;padding:.5rem 1.2rem;border-radius:8px;text-decoration:none;font-size:.85rem;font-weight:600;">&#8592; {% if client_id and client_id > 0 and is_pro %}CLIËNTEN{% else %}{%if lang=="de"%}MENÜ{%elif lang=="en"%}MENU{%else%}MENU{%endif%}{% endif %}</a><button onclick="discardAndGo('{% if client_id and client_id > 0 and is_pro %}/pro/meting?cid={{ client_id }}{% else %}/meetkeuze{% endif %}')" style="background:#E8344E;color:#fff;padding:.5rem 1.4rem;border-radius:8px;border:none;cursor:pointer;font-size:.85rem;font-weight:700;">{%if lang=="de"%}NEUE MESSUNG{%elif lang=="en"%}NEW MEASUREMENT{%else%}NIEUWE METING{%endif%}</button><button onclick="kwOpslaan()"" style="background:#E8344E;color:#fff;padding:.5rem 1.4rem;border-radius:8px;border:none;cursor:pointer;font-size:.85rem;font-weight:700;"><span id="kwOpslaanTekst">Opslaan</span></button></div>
 
-<script src="/static/js/hrv.js?v=11"></script>
+<script src="/static/js/hrv.js?v={{ hrv_version }}"></script>
 <script>
 // Accordion voor de Details-info-kaarten: bij openen van een kaart sluiten alle andere; nogmaals klikken = sluiten (toggle). Eén tegelijk open.
 function kwInfo(id){var el=document.getElementById(id),wasOpen=el.style.display==='block';document.querySelectorAll('.kw-info').forEach(function(e){e.style.display='none';});if(!wasOpen)el.style.display='block';}

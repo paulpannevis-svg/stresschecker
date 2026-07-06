@@ -700,6 +700,20 @@ def _inject_staging_flag():
     return {'is_staging': os.environ.get('SC_ENV') == 'staging'}
 
 
+# Eén bron voor de hrv.js-cachebust: alle SC/Pro/Event-templates laden /static/js/hrv.js
+# via ?v={{ hrv_version }}. Bump dit getal bij ELKE hrv.js-wijziging (single-source RI/
+# quality-engine) zodat geen enkel oppervlak een stale kopie serveert. Was: losse hardcoded
+# ?v= (10/11/12/20) → drift-lek waarbij een terugkerende browser op één surface een oude
+# hrv.js kon houden. HLM valt bewust buiten (apart product, eigen inline RI-kopie).
+# Zie project_ri_pipeline_consolidation_roadmap.
+HRV_JS_VERSION = 21
+
+
+@app.context_processor
+def _inject_hrv_version():
+    return {'hrv_version': HRV_JS_VERSION}
+
+
 # ----------------------------------------------------------------------------
 # Sessie-idle-timeout (Sessie B.4)
 # Vervalt sessie automatisch na 30 minuten inactiviteit. Vereist voor

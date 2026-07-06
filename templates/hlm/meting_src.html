@@ -6091,6 +6091,11 @@ async function refreshProQuestionConfig() {
 const BLE_HEART_RATE_SERVICE = 0x180D;
 const BLE_HEART_RATE_MEASUREMENT = 0x2A37;
 const USB_SENSOR = { vendorId: 0x0B9C, productId: 0x0315 };
+// ⚠️ KNOWN-DIVERGENT (augustus): HLM is een APART product met een EIGEN inline RI/quality-kopie
+// (deze meting_src.html), NIET de gedeelde static/js/hrv.js. Het parity-vangnet (tests/gate.sh /
+// test_pipeline_parity) dekt HLM BEWUST NIET. Neem dus niet aan dat HLM meeloopt in de 95/90-
+// harmonisatie van SC/Pro/Event — afbouw/gelijktrekken staat gepland voor augustus.
+// Zie project_ri_pipeline_consolidation_roadmap + project_hlm_kwadrant_old_terminology.
 const SENSOR_CORRECTION_FACTOR = 1.0; // ÷2,5 verwijderd 2026-06-08 (spurieus; TNO ~5%, Verveen ECG≈PPG). Zie docs/MIGRATIE_PLAN_DIV25_VERWIJDEREN.md
 
 // --- Sensor state ---

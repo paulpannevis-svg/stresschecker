@@ -109,7 +109,7 @@
   </div>
 {% endblock %}
 {% block scripts %}
-  <script src="/static/js/hrv.js?v=12"></script>
+  <script src="/static/js/hrv.js?v={{ hrv_version }}"></script>
   <script src="/static/js/sensor.js"></script>
   <script>
     var MC = {{ p.meting_code|tojson }};

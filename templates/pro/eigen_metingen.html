@@ -59,7 +59,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/1.4.0/chartjs-plugin-annotation.min.js"></script>
 <script>if(window.Chart&&window['chartjs-plugin-annotation']){Chart.register(window['chartjs-plugin-annotation']);}</script>
-<script src="/static/js/hrv.js?v=20"></script>
+<script src="/static/js/hrv.js?v={{ hrv_version }}"></script>
 <script>
 var dNL={lichamelijk:'Lichamelijk',mentaal:'Mentaal',emotioneel:'Emotioneel',spiritueel:'Spiritueel',weet_niet:'?'};
 var data = {{ metingen_chart | tojson }};
