@@ -182,6 +182,11 @@
           <div class="bar"><span style="width:{{ z.pct }}%;background:{{ z.color }}"></span></div>
           <div class="val">{{ z.n }} &middot; {{ z.pct }}%</div></div>
         {% endfor %}
+        {% if d.indicative_n %}
+        <div class="zrow"><div class="lab un">{{ t.indic_bar }}</div>
+          <div class="bar"><span style="width:{{ d.indicative_pct }}%;background:#e0b84c"></span></div>
+          <div class="val">{{ d.indicative_n }} &middot; {{ d.indicative_pct }}%</div></div>
+        {% endif %}
         {% if d.unreliable_n %}
         <div class="zrow"><div class="lab un">{{ t.kpi_unrel }}</div>
           <div class="bar"><span style="width:{{ d.unreliable_pct }}%;background:#c98b3a"></span></div>
