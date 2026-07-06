@@ -61,6 +61,7 @@ T = {
                   'hartritmevariabiliteit (HRV/RMSSD) van het autonome zenuwstelsel, '
                   'genormaliseerd naar leeftijd en geslacht. Dit is een momentopname, geen verloop.',
         'generated': 'Gegenereerd', 'snapshot_note': 'Eén meetmoment — geen baseline of trend.',
+        'demo_note': 'Demonstratie · gesimuleerd signaal — dit rapport laat zien hoe StressChecker werkt en is geen echte hartslagmeting.',
         'gender': {'male': 'Man', 'female': 'Vrouw', 'other': 'Anders'},
     },
     'de': {
@@ -87,6 +88,7 @@ T = {
                   'Herzratenvariabilität (HRV/RMSSD) des autonomen Nervensystems berechnet, '
                   'normiert nach Alter und Geschlecht. Dies ist eine Momentaufnahme, kein Verlauf.',
         'generated': 'Erstellt', 'snapshot_note': 'Ein Messzeitpunkt — keine Baseline oder Trend.',
+        'demo_note': 'Demonstration · simuliertes Signal — dieser Bericht zeigt, wie StressChecker funktioniert, und ist keine echte Herzschlagmessung.',
         'gender': {'male': 'Mann', 'female': 'Frau', 'other': 'Divers'},
     },
     'en': {
@@ -113,6 +115,7 @@ T = {
                   'and heart rate variability (HRV/RMSSD) of the autonomic nervous system, '
                   'normalized by age and gender. This is a snapshot, not a trend.',
         'generated': 'Generated', 'snapshot_note': 'Single measurement — no baseline or trend.',
+        'demo_note': 'Demonstration · simulated signal — this report shows how StressChecker works and is not a real heart-rate measurement.',
         'gender': {'male': 'Male', 'female': 'Female', 'other': 'Other'},
     },
 }
@@ -421,7 +424,7 @@ def render_report(meting_code, lang='nl', as_html=False, screen_mode=False, back
     row = cn.execute(
         "SELECT p.meting_code, p.name, p.birth_year, p.gender, "
         "       e.event_code, e.opdrachtgever, e.naam AS event_naam, e.datum AS event_datum, "
-        "       m.ri, m.bpm, m.hrv_pct, m.rmssd, m.kwaliteit, m.quality_band, m.ts, m.created_at, "
+        "       m.ri, m.bpm, m.hrv_pct, m.rmssd, m.kwaliteit, m.quality_band, m.sensor_type, m.ts, m.created_at, "
         "       m.subjectief_score, m.work_stress_score, "
         "       (SELECT COUNT(*) FROM event_metingen m2 WHERE m2.participant_id = p.participant_id) AS n_metingen "
         "FROM event_participants p "
@@ -441,6 +444,11 @@ def render_report(meting_code, lang='nl', as_html=False, screen_mode=False, back
         raise ValueError(f'Nog geen meting voor {code} — kan geen momentopname-rapport maken.')
 
     p = dict(row)
+
+    # Fase 4: label het rapport als demonstratie zolang het een gesimuleerd signaal is (de event-
+    # kiosk heeft geen fysieke sensor). Conditioneel op sensor_type -> verdwijnt vanzelf als er
+    # ooit een echte sensor wordt gekoppeld. sensor_type is momenteel altijd 'demo'.
+    is_demo = (str(p.get('sensor_type') or '').lower() == 'demo')
 
     # RI → zone via de canonieke analytics-functies (GEEN eigen berekening).
     zone_key = analytics.zone_for_ri(p['ri'])
@@ -502,7 +510,7 @@ def render_report(meting_code, lang='nl', as_html=False, screen_mode=False, back
         quad=__import__('event_quadrant').build_quadrant(
             p['bpm'], p['hrv_pct'], p['subjectief_score'], p['ri'], reliable, lang),
         generated_at=datetime.now().strftime('%Y-%m-%d %H:%M'),
-        screen_mode=screen_mode, back_url=back_url, print_url=print_url,
+        screen_mode=screen_mode, back_url=back_url, print_url=print_url, is_demo=is_demo,
     )
 
     info = {'name': p['name'], 'code': code, 'event_code': p['event_code'],

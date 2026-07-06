@@ -50,6 +50,11 @@
     .viz-quad { width: 67%; }
     .gauge-svg { width: 230px; height: auto; }
     .gauge-cap { font-size: 9pt; color: #555; margin-top: 5px; }
+    /* Fase 4 — transparantie: de kiosk-meting is een gesimuleerd signaal (geen sensor). Op het
+       meeneem-/print-rapport rustig maar duidelijk labelen. Print-veilig (geen @media screen). */
+    .demo-banner { margin: 0 0 12px; padding: 8px 12px; border: 1px solid #d9c9a8;
+      background: #faf4e6; border-radius: 6px; color: #6a5a35; font-size: 9.5pt;
+      line-height: 1.4; text-align: center; }
     .viz-quad svg { width: 100%; max-width: 340px; height: auto; display: block; margin: 0 auto; }
     .quad-legend { font-size: 9pt; color: #555; margin-top: 7px; }
     .quad-legend span { margin: 0 9px; }
@@ -165,6 +170,8 @@
     <img src="{{ '/static/img/sc_logo_full.png' if screen_mode else 'static/img/sc_logo_full.png' }}" alt="StressChecker — Lifestyle Monitors" class="brand-logo">
     <span class="report-tag">{{ t.tag }}</span>
   </div>
+
+  {% if is_demo %}<div class="demo-banner">{{ t.demo_note }}</div>{% endif %}
 
   <div class="client">
     <div class="name">{{ p.name or t.no_name }}</div>
