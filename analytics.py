@@ -217,9 +217,9 @@ QUALITY_TIER_TEXTS = {
     'onbetrouwbaar': {
         'badge': {'nl': 'Meetkwaliteit te laag', 'de': 'Messqualität zu niedrig', 'en': 'Measurement quality too low'},
         'retry': {
-            'nl': 'Deze meting bevatte te veel signaalruis voor een betrouwbare uitslag. Probeer het opnieuw in een rustige houding met goed sensorcontact.',
-            'de': 'Diese Messung enthielt zu viel Signalrauschen für ein zuverlässiges Ergebnis. Bitte wiederholen Sie sie in ruhiger Haltung mit gutem Sensorkontakt.',
-            'en': 'This reading contained too much signal noise for a reliable result. Please try again in a calm posture with good sensor contact.',
+            'nl': 'Deze meting bevatte te veel signaalruis voor een betrouwbare uitslag. Ga rechtop zitten, probeer rustig te ademen en te ontspannen.',
+            'de': 'Diese Messung enthielt zu viel Signalrauschen für ein zuverlässiges Ergebnis. Setzen Sie sich aufrecht hin, atmen Sie ruhig und entspannen Sie sich.',
+            'en': 'This reading contained too much signal noise for a reliable result. Sit upright, breathe calmly and try to relax.',
         },
     },
 }
