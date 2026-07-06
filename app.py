@@ -4313,7 +4313,7 @@ def event_kiosk_home():
         "FROM events e WHERE e.status='open' ORDER BY e.event_id DESC"
     ).fetchall()
     db.close()
-    lang = request.args.get('lang', 'nl')
+    lang = request.args.get('lang') or session.get('lang') or 'nl'
     if lang not in ('nl', 'de', 'en'):
         lang = 'nl'
     return render_template('event/kiosk.html', events=events, lang=lang)
@@ -4340,7 +4340,7 @@ def event_kiosk_event(event_code):
         return ('Onbekend event', 404)
     if not _event_unlocked(event_code):
         return redirect(url_for('event_code_request_otp'))
-    lang = request.args.get('lang', 'nl')
+    lang = request.args.get('lang') or session.get('lang') or 'nl'
     if lang not in ('nl', 'de', 'en'):
         lang = 'nl'
     notfound = request.args.get('notfound') == '1'
@@ -4472,7 +4472,7 @@ def event_kiosk_meten(event_code, meting_code):
     return render_template('event/meten.html', p=row, n_metingen=_n,
                            capped=(_n >= 2), has_reliable=bool(_nrel), result=result,
                            existing_sensor=existing_sensor,
-                           lang=(request.args.get('lang') if request.args.get('lang') in ('nl', 'de', 'en') else 'nl'))
+                           lang=(request.args.get('lang') or session.get('lang') or 'nl'))
 
 
 @app.route('/event/kiosk/<event_code>/wissen', methods=['GET'])
@@ -4536,7 +4536,7 @@ def event_report_pdf(event_code, meting_code):
     via event_report.render_report; ?lang=nl|de|en."""
     if not _event_enabled():
         return ('Event-modus niet beschikbaar', 404)
-    lang = request.args.get('lang', 'nl')
+    lang = request.args.get('lang') or session.get('lang') or 'nl'
     if lang not in ('nl', 'de', 'en'):
         lang = 'nl'
     import event_report as _evr
@@ -4558,7 +4558,7 @@ def event_report_print_shell(event_code, meting_code):
     deelnemer (geen dubbele PDF-render); de iframe toont zelf de echte 404 bij dieper falen."""
     if not _event_enabled():
         return ('Event-modus niet beschikbaar', 404)
-    lang = request.args.get('lang', 'nl')
+    lang = request.args.get('lang') or session.get('lang') or 'nl'
     if lang not in ('nl', 'de', 'en'):
         lang = 'nl'
     code = (meting_code or '').strip().upper()
@@ -4586,7 +4586,7 @@ def event_report_html(event_code, meting_code):
     zodat de afdruk exact gelijk blijft. Gegate via _event_enabled(); ?lang=nl|de|en."""
     if not _event_enabled():
         return ('Event-modus niet beschikbaar', 404)
-    lang = request.args.get('lang', 'nl')
+    lang = request.args.get('lang') or session.get('lang') or 'nl'
     if lang not in ('nl', 'de', 'en'):
         lang = 'nl'
     import event_report as _evr
