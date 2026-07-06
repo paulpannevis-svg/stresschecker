@@ -4453,7 +4453,7 @@ def event_kiosk_meten(event_code, meting_code):
     # echte RI (NULL = volledig gegate/onbetrouwbaar → geen uitslagkaart, gewoon opnieuw meten).
     # Het ?nieuw=1/?terug=1-pad in de template forceert de slider en omzeilt deze uitslag.
     _res = db.execute(
-        "SELECT ri, kwaliteit, quality_band FROM event_metingen "
+        "SELECT ri, kwaliteit, quality_band, sensor_type FROM event_metingen "
         "WHERE participant_id=? AND ri IS NOT NULL "
         "ORDER BY CASE WHEN kwaliteit IS NOT NULL AND kwaliteit >= 95 "
         "  AND (quality_band IS NULL OR quality_band <> 'slecht') THEN 1 ELSE 0 END DESC, "
@@ -4461,11 +4461,14 @@ def event_kiosk_meten(event_code, meting_code):
         (row['participant_id'],)).fetchone()
     db.close()
     result = None
+    # sensor_type van de getoonde (reliable-wint-laatste) meting -> stuurt het demo-label bij herladen.
+    existing_sensor = (_res['sensor_type'] if _res is not None else '') or ''
     if _res is not None:
         result = {'ri': _res['ri'], 'kwaliteit': _res['kwaliteit'] or 0,
                   'quality_band': _res['quality_band'] or ''}
     return render_template('event/meten.html', p=row, n_metingen=_n,
-                           capped=(_n >= 2), has_reliable=bool(_nrel), result=result)
+                           capped=(_n >= 2), has_reliable=bool(_nrel), result=result,
+                           existing_sensor=existing_sensor)
 
 
 @app.route('/event/kiosk/<event_code>/wissen', methods=['GET'])

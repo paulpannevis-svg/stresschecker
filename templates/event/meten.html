@@ -35,6 +35,13 @@
   .ev-inner .slotmsg{margin-top:1rem;padding:.85rem 1rem;border-radius:12px;font-size:.92rem;line-height:1.45;text-align:left}
   .ev-inner .slot-done{background:#eef6ee;color:#2c5d3a;border:1px solid #cfe5cf}
   .ev-inner .slot-failed{background:#f4f5f7;color:#555;border:1px solid #ddd}
+  /* Sensor-keuze: gelijk aan StressChecker/Pro (Bluetooth of USB), demo behouden. */
+  .ev-inner .sensor-grid{display:flex;gap:.6rem;justify-content:center}
+  .ev-inner .sensor-card{flex:1;max-width:160px;padding:.9rem;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;color:#fff;background:linear-gradient(135deg,#E8344E,#C4293F)}
+  .ev-inner .sensor-card:disabled{opacity:.5;cursor:default}
+  .ev-inner .demo-link{display:inline-block;margin-top:.7rem;color:#999;font-size:.85rem;cursor:pointer;text-decoration:underline}
+  .ev-inner .demo-link:hover{color:#666}
+  .ev-inner .sensor-status{margin-top:.7rem;font-size:.82rem;color:#777;min-height:1.1em}
 </style>
 {% endblock %}
 {% block content %}
@@ -72,6 +79,20 @@
       <div id="evWorkHint" style="text-align:center;font-size:.72rem;font-style:italic;color:#b0a8a0;margin-top:.3rem;">Beweeg de schuif om je eerste, eerlijke gevoel te kiezen.</div>
     </div>
 
+    <!-- Sensor-keuze: gelijk aan StressChecker/Pro — meet via Bluetooth of USB. Demo blijft
+         beschikbaar (test/walk-up). finishMeasure stuurt het gekozen sensor_type mee, zodat het
+         demo-label alleen bij een demo-meting verschijnt. Start komt pas vrij als de sensor
+         gekoppeld is EN beide vragen beantwoord zijn (maybeEnableStart). -->
+    <div id="phase-sensor" class="ev-card" style="text-align:center">
+      <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.7rem;">Koppel de hartslagmeter</div>
+      <div class="sensor-grid">
+        <button class="sensor-card" onclick="if(!navigator.bluetooth){alert('Web Bluetooth is niet beschikbaar op dit apparaat.');return;}navigator.bluetooth.requestDevice({filters:[{services:[0x180D]}]}).then(function(d){window._btDev=d;selectSensor('bluetooth');}).catch(function(e){if(e.name!=='NotFoundError')alert(e.name?e.name+': '+e.message:'Bluetooth verbinding mislukt');})">Bluetooth</button>
+        <button class="sensor-card" onclick="selectSensor('usb')">USB</button>
+      </div>
+      <a class="demo-link" onclick="selectSensor('demo')">Demo zonder sensor</a>
+      <div id="sensorStatus" class="sensor-status">Kies Bluetooth of USB om te koppelen.</div>
+    </div>
+
     <div id="phase-measure" class="ev-card">
       <div class="stats">
         <div><div class="big" id="bpm">--</div><div class="lbl">bpm</div></div>
@@ -85,7 +106,7 @@
     </div>
 
     <div id="phase-result" class="ev-card" style="display:none">
-      <div class="demo-note">Demonstratie · gesimuleerd signaal — geen echte hartslagmeting</div>
+      <div class="demo-note" id="demoNoteResult" style="display:none">Demonstratie · gesimuleerd signaal — geen echte hartslagmeting</div>
       <div class="ri" id="riOut">--</div>
       <div class="lbl">Relax Index</div>
       <div class="band" id="bandOut"></div>
@@ -108,7 +129,7 @@
     <!-- Reeds-voltooid (deelnemer keert terug terwijl n_metingen >= 2): geen meetscherm,
          alleen de slotboodschap + rapportlink. -->
     <div id="phase-capped" class="ev-card" style="display:none">
-      <div class="demo-note">Demonstratie · gesimuleerd signaal — geen echte hartslagmeting</div>
+      <div class="demo-note" id="demoNoteCapped" style="display:none">Demonstratie · gesimuleerd signaal — geen echte hartslagmeting</div>
       <div class="slotmsg" id="cappedMsg"></div>
       <a class="report" href="/event/kiosk/{{ p.event_code }}/rapport/{{ p.meting_code }}/view" target="_blank" rel="noopener">Bekijk / print rapport →</a>
       <a class="next" href="/event/kiosk/{{ p.event_code }}">Volgende deelnemer →</a>
@@ -139,7 +160,9 @@
     // ?nieuw=1 (Nieuwe meting) en ?terug=1 (terugkerende deelnemer) forceren tóch de slider.
     var _qs = new URLSearchParams(window.location.search);
     var _forceSlider = (_qs.get('nieuw') === '1') || (_qs.get('terug') === '1');
-    var EXISTING_RESULT = {% if result %}{ ri: {{ result.ri }}, kwaliteit: {{ result.kwaliteit }}, quality_band: {{ result.quality_band|tojson }}, n: {{ n_metingen }}, hasReliable: {{ 'true' if has_reliable else 'false' }} }{% else %}null{% endif %};
+    // sensor_type van de getoonde (reliable-wint-laatste) meting — stuurt het demo-label bij herladen.
+    var SHOWN_SENSOR = {{ (existing_sensor or '')|tojson }};
+    var EXISTING_RESULT = {% if result %}{ ri: {{ result.ri }}, kwaliteit: {{ result.kwaliteit }}, quality_band: {{ result.quality_band|tojson }}, n: {{ n_metingen }}, hasReliable: {{ 'true' if has_reliable else 'false' }}, sensor: SHOWN_SENSOR }{% else %}null{% endif %};
     if (_forceSlider) EXISTING_RESULT = null;
 
     // Slotboodschap bij 2 voltooide metingen (max-2-cap; knop is dan weg).
@@ -169,27 +192,34 @@
     }
 
     // Reeds-voltooid bij paginalaad (>=2 metingen): toon alleen de slotboodschap.
+    var _isDemo = function (s) { return String(s || '').toLowerCase() === 'demo'; };
     if (CAPPED) {
       document.getElementById('phase-subj').style.display = 'none';
       document.getElementById('phase-work').style.display = 'none';
+      document.getElementById('phase-sensor').style.display = 'none';
       document.getElementById('phase-measure').style.display = 'none';
       renderSlot(document.getElementById('cappedMsg'), HAS_RELIABLE);
+      var _dnc = document.getElementById('demoNoteCapped');
+      if (_dnc) _dnc.style.display = _isDemo(SHOWN_SENSOR) ? 'block' : 'none';
       document.getElementById('phase-capped').style.display = 'block';
     } else if (EXISTING_RESULT) {
       // Eerdere meting aanwezig (en geen ?nieuw/?terug): toon meteen het uitslag-scherm met de
       // drie knoppen, gevoed uit de opgeslagen waarden — identieke opmaak als na een verse meting.
       showResultPhase(EXISTING_RESULT.ri, EXISTING_RESULT.kwaliteit, EXISTING_RESULT.quality_band,
-                      EXISTING_RESULT.n, EXISTING_RESULT.hasReliable);
+                      EXISTING_RESULT.n, EXISTING_RESULT.hasReliable, EXISTING_RESULT.sensor);
     }
 
     var rrIntervals = [], beatCount = 0, elapsed = 0, timer = null, active = false;
     var _subjTouched = false;
     var _workTouched = false;
+    var _sensorReady = false;   // eerste hartslag binnen via de gekozen sensor
+    var _sensorType = null;     // 'bluetooth' | 'usb' | 'demo' -> meegestuurd bij opslaan
 
     // Start komt pas vrij als BEIDE vragen (ontspanning + werkstress) bewust beantwoord zijn.
     function maybeEnableStart() {
-      document.getElementById('startBtn').disabled = !(_subjTouched && _workTouched);
+      document.getElementById('startBtn').disabled = !(_subjTouched && _workTouched && _sensorReady);
     }
+    function setSensorStatus(t) { var el = document.getElementById('sensorStatus'); if (el) el.textContent = t; }
 
     // Touched-tracking: de ontspanningsvraag moet BEWUST beantwoord worden. Tot dan toont
     // het cijfer '—' en blijft 'Start meting' uitgeschakeld. Geen stille default-5.
@@ -208,20 +238,48 @@
       maybeEnableStart();
     }
 
+    // Sensor-keuze — gelijk aan StressChecker/Pro. selectSensor() koppelt de gekozen bron;
+    // de eerste hartslag zet _sensorReady en geeft (samen met de twee vragen) Start vrij.
+    function onConnect(sensorType, name) {
+      setSensorStatus('Sensor gevonden, wachten op signaal...');
+    }
+    function onError(msg) {
+      setSensorStatus(msg || 'Kon geen verbinding maken met de meter.');
+    }
+    function selectSensor(type) {
+      _sensorType = type;
+      setSensorStatus('App maakt contact met de meter...');
+      if (type === 'demo') { Sensor.startDemo(onBeat, onConnect); }
+      else if (type === 'usb') { Sensor.connectUSB(onBeat, onConnect, onError); }
+      else if (type === 'bluetooth') { Sensor.connectBluetooth(onBeat, onConnect, onError); }
+    }
+
     function onBeat(rr) {
+      // Eerste hartslag = sensor gekoppeld; Start vrijgeven (mits vragen beantwoord).
+      if (!_sensorReady) {
+        _sensorReady = true;
+        setSensorStatus('Sensor gekoppeld — je kunt de meting starten.');
+        maybeEnableStart();
+      }
+      document.getElementById('bpm').textContent = Math.round(60000 / rr);
+      // Pas tijdens het getimede meetvenster tellen we mee (sensor streamt al vóór Start).
+      if (!active) return;
       beatCount++;
       rrIntervals.push(rr);
-      document.getElementById('bpm').textContent = Math.round(60000 / rr);
       document.getElementById('beats').textContent = beatCount;
     }
 
     function startMeasure() {
-      if (active || !_subjTouched || !_workTouched) return;
+      if (active || !_subjTouched || !_workTouched || !_sensorReady) return;
       active = true;
+      // Sensor stroomt al (via selectSensor); Start opent alleen het getimede meetvenster.
+      // Verse telling zodat de aanloop-hartslagen niet meetellen.
+      rrIntervals = []; beatCount = 0; elapsed = 0;
+      document.getElementById('beats').textContent = '0';
+      document.getElementById('time').textContent = '0';
       document.getElementById('startBtn').disabled = true;
       // Annuleer is alleen tijdens het meten beschikbaar (idle = verborgen).
       document.getElementById('cancelBtn').style.display = 'block';
-      Sensor.startDemo(onBeat, function () {});
       timer = setInterval(function () {
         elapsed++;
         document.getElementById('time').textContent = elapsed;
@@ -256,6 +314,10 @@
       document.getElementById('evWorkSlider').value = 5;
       document.getElementById('evWorkVal').textContent = '—';
       var _hw = document.getElementById('evWorkHint'); if (_hw) _hw.style.display = '';
+      // Sensor is losgekoppeld (Sensor.stop) -> opnieuw koppelen afdwingen.
+      _sensorReady = false; _sensorType = null;
+      document.getElementById('bpm').textContent = '--';
+      setSensorStatus('Kies Bluetooth of USB om te koppelen.');
       // Start blokkeren tot er opnieuw verse cijfers zijn gekozen.
       document.getElementById('startBtn').disabled = true;
     }
@@ -288,7 +350,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           meting_code: MC, ri: ri, bpm: bpm, hrv: hrv, rmssd: rmssd,
-          beats: beatCount, duration: elapsed, sensor: 'demo',
+          beats: beatCount, duration: elapsed, sensor: (_sensorType || 'demo'),
           kwaliteit: kwaliteit, rr_intervals: JSON.stringify(rrIntervals),
           subjectief: _subjTouched ? parseInt(document.getElementById('evSubjSlider').value, 10) : null,
           work_stress: _workTouched ? parseInt(document.getElementById('evWorkSlider').value, 10) : null
@@ -302,18 +364,22 @@
           }
           return;
         }
-        showResultPhase(ri, kwaliteit, j.quality_band, j.n_metingen, j.has_reliable);
+        showResultPhase(ri, kwaliteit, j.quality_band, j.n_metingen, j.has_reliable, _sensorType);
       }).catch(function (e) { alert('Opslaan mislukt: ' + e); });
     }
 
     // Toont het uitslag-scherm (#phase-result) met de drie knoppen, gevoed uit de RI/kwaliteit/
     // band-waarden. Gebruikt zowel na een verse meting (finishMeasure) als bij herladen met een
     // bestaande uitslag (EXISTING_RESULT), zodat beide paden identiek ogen.
-    function showResultPhase(ri, kwaliteit, quality_band, n_metingen, has_reliable) {
+    function showResultPhase(ri, kwaliteit, quality_band, n_metingen, has_reliable, sensorType) {
       document.getElementById('phase-subj').style.display = 'none';
       document.getElementById('phase-work').style.display = 'none';
+      document.getElementById('phase-sensor').style.display = 'none';
       document.getElementById('phase-measure').style.display = 'none';
       document.getElementById('phase-result').style.display = 'block';
+      // Demo-label alleen tonen als deze meting via de demo-simulatie liep.
+      var _dnr = document.getElementById('demoNoteResult');
+      if (_dnr) _dnr.style.display = _isDemo(sensorType) ? 'block' : 'none';
       // Gate-vlaggen — canonieke Fase 3 3-klassen-tier (HRV.qualityTier: >=95 betrouwbaar /
       // 90-95 indicatief / <90 onbetrouwbaar), gelijk aan consument (measure.html), Pro
       // (sensor_en_meten.html) en het Event-PDF (event_report.RELIABLE_MIN=95). Was: platte
