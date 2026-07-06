@@ -52,6 +52,43 @@
   .ev-inner .ev-top .lang a.on{color:#E8344E}
 </style>
 {% endblock %}
+{%- set L = lang if lang in ('nl','de','en') else 'nl' -%}
+{%- set S = {
+  'q_subj':      {'nl':'Hoe ontspannen voel je je op dit moment?','de':'Wie entspannt fühlen Sie sich gerade?','en':'How relaxed do you feel right now?'},
+  'subj_lo':     {'nl':'Zeer gespannen','de':'Sehr angespannt','en':'Very tense'},
+  'subj_hi':     {'nl':'Volledig ontspannen','de':'Völlig entspannt','en':'Completely relaxed'},
+  'subj_a':      {'nl':'Uitgeput / hoofd vol','de':'Erschöpft / Kopf voll','en':'Exhausted / mind full'},
+  'subj_b':      {'nl':'Gaat wel','de':'Geht so','en':'So-so'},
+  'subj_c':      {'nl':'Lekker in mijn vel','de':'Rundum wohl','en':'Feeling good'},
+  'slider_hint': {'nl':'Beweeg de schuif om je eerste, eerlijke gevoel te kiezen.','de':'Bewegen Sie den Regler, um Ihr erstes, ehrliches Gefühl zu wählen.','en':'Move the slider to pick your first, honest feeling.'},
+  'q_work':      {'nl':'In welke mate heb je last van werkstress?','de':'Wie stark belastet Sie Arbeitsstress?','en':'How much are you affected by work stress?'},
+  'work_lo':     {'nl':'Geen','de':'Gar nicht','en':'Not at all'},
+  'work_hi':     {'nl':'Extreem veel','de':'Extrem stark','en':'Extremely'},
+  'sensor_title':{'nl':'Koppel de hartslagmeter','de':'Verbinden Sie den Herzfrequenzmesser','en':'Connect the heart rate monitor'},
+  'demo_opt':    {'nl':'Demo zonder sensor','de':'Demo ohne Sensor','en':'Demo without sensor'},
+  'sensor_prompt':{'nl':'Kies Bluetooth of USB om te koppelen.','de':'Wählen Sie Bluetooth oder USB zum Verbinden.','en':'Choose Bluetooth or USB to connect.'},
+  'lbl_beats':   {'nl':'slagen','de':'Schläge','en':'beats'},
+  'lbl_sec':     {'nl':'sec','de':'Sek.','en':'sec'},
+  'btn_start':   {'nl':'Start meting','de':'Messung starten','en':'Start measurement'},
+  'btn_cancel':  {'nl':'Annuleer','de':'Abbrechen','en':'Cancel'},
+  'demo_note':   {'nl':'{{ S.demo_note[L] }}','de':'Demonstration · simuliertes Signal — keine echte Herzschlagmessung','en':'Demonstration · simulated signal — not a real heart-rate measurement'},
+  'btn_report':  {'nl':'Bekijk / print rapport →','de':'Bericht ansehen / drucken →','en':'View / print report →'},
+  'rep_hint':    {'nl':'Gauge, kwadrant en gevoel-vs-meting — om samen te bespreken. Toont je meest betrouwbare meting.','de':'Anzeige, Quadrant und Gefühl-vs-Messung — zum gemeinsamen Besprechen. Zeigt Ihre zuverlässigste Messung.','en':'Gauge, quadrant and feeling-vs-measurement — to discuss together. Shows your most reliable measurement.'},
+  'btn_again':   {'nl':'Nieuwe meting →','de':'Neue Messung →','en':'New measurement →'},
+  'btn_next':    {'nl':'Volgende deelnemer →','de':'Nächste Teilnahme →','en':'Next participant →'},
+  'st_connecting':{'nl':'App maakt contact met de meter...','de':'App verbindet sich mit dem Messgerät...','en':'App is connecting to the monitor...'},
+  'st_found':    {'nl':'Sensor gevonden, wachten op signaal...','de':'Sensor gefunden, warte auf Signal...','en':'Sensor found, waiting for signal...'},
+  'st_error':    {'nl':'Kon geen verbinding maken met de meter.','de':'Verbindung zum Messgerät fehlgeschlagen.','en':'Could not connect to the monitor.'},
+  'st_ready':    {'nl':'Sensor gekoppeld — je kunt de meting starten.','de':'Sensor verbunden — Sie können die Messung starten.','en':'Sensor connected — you can start the measurement.'},
+  'bt_unavail':  {'nl':'Web Bluetooth is niet beschikbaar op dit apparaat.','de':'Web Bluetooth ist auf diesem Gerät nicht verfügbar.','en':'Web Bluetooth is not available on this device.'},
+  'bt_failed':   {'nl':'Bluetooth verbinding mislukt','de':'Bluetooth-Verbindung fehlgeschlagen','en':'Bluetooth connection failed'},
+  'band_irregular':{'nl':'Te onregelmatig','de':'Zu unregelmäßig','en':'Too irregular'},
+  'qual_prefix': {'nl':'Kwaliteit ','de':'Qualität ','en':'Quality '},
+  'mark_indic':  {'nl':'indicatief','de':'orientierend','en':'indicative'},
+  'mark_unrel':  {'nl':'onbetrouwbaar','de':'unzuverlässig','en':'unreliable'},
+  'err_max':     {'nl':'Deze deelnemer heeft al 2 metingen — een 3e is niet mogelijk.','de':'Diese Teilnahme hat bereits 2 Messungen — eine 3. ist nicht möglich.','en':'This participant already has 2 measurements — a 3rd is not possible.'},
+  'err_save':    {'nl':'Opslaan mislukt: ','de':'Speichern fehlgeschlagen: ','en':'Save failed: '}
+} -%}
 {% block content %}
   <div class="ev-inner">
     <div class="ev-top">
@@ -64,31 +101,31 @@
     <!-- Ontspanningsvraag VÓÓR de meting — exact dezelfde verwoording/schaal als de
          basismeting (voorbereiden.html V4). Opslag = event_metingen.subjectief_score (0-10). -->
     <div id="phase-subj" class="ev-card" style="text-align:left">
-      <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.6rem;">Hoe ontspannen voel je je op dit moment?</div>
+      <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.6rem;">{{ S.q_subj[L] }}</div>
       <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-bottom:.3rem;">
-        <span>Zeer gespannen</span><span>Volledig ontspannen</span>
+        <span>{{ S.subj_lo[L] }}</span><span>{{ S.subj_hi[L] }}</span>
       </div>
       <input type="range" id="evSubjSlider" min="0" max="10" value="5"
         style="width:100%;accent-color:#E8344E;cursor:pointer;"
         oninput="evSubjTouch()" onpointerdown="evSubjTouch()">
-      <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-top:.2rem;"><span>Uitgeput / hoofd vol</span><span>Gaat wel</span><span>Lekker in mijn vel</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-top:.2rem;"><span>{{ S.subj_a[L] }}</span><span>{{ S.subj_b[L] }}</span><span>{{ S.subj_c[L] }}</span></div>
       <div style="text-align:center;font-size:1.4rem;font-weight:700;color:#E8344E;margin-top:.4rem;"><span id="evSubjVal">—</span><span style="font-size:.85rem;font-weight:400;color:#aaa"> / 10</span></div>
-      <div id="evSubjHint" style="text-align:center;font-size:.72rem;font-style:italic;color:#b0a8a0;margin-top:.3rem;">Beweeg de schuif om je eerste, eerlijke gevoel te kiezen.</div>
+      <div id="evSubjHint" style="text-align:center;font-size:.72rem;font-style:italic;color:#b0a8a0;margin-top:.3rem;">{{ S.slider_hint[L] }}</div>
     </div>
 
     <!-- Werkstress-vraag VÓÓR de meting — tweede context-setter naast ontspanning.
          Opslag = event_metingen.work_stress_score (0-10). Beide moeten bewust beantwoord
          zijn voordat 'Start meting' vrijkomt. -->
     <div id="phase-work" class="ev-card" style="text-align:left">
-      <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.6rem;">In welke mate heb je last van werkstress?</div>
+      <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.6rem;">{{ S.q_work[L] }}</div>
       <div style="display:flex;justify-content:space-between;font-size:.72rem;color:#aaa;margin-bottom:.3rem;">
-        <span>Geen</span><span>Extreem veel</span>
+        <span>{{ S.work_lo[L] }}</span><span>{{ S.work_hi[L] }}</span>
       </div>
       <input type="range" id="evWorkSlider" min="0" max="10" value="5"
         style="width:100%;accent-color:#E8344E;cursor:pointer;"
         oninput="evWorkTouch()" onpointerdown="evWorkTouch()">
       <div style="text-align:center;font-size:1.4rem;font-weight:700;color:#E8344E;margin-top:.4rem;"><span id="evWorkVal">—</span><span style="font-size:.85rem;font-weight:400;color:#aaa"> / 10</span></div>
-      <div id="evWorkHint" style="text-align:center;font-size:.72rem;font-style:italic;color:#b0a8a0;margin-top:.3rem;">Beweeg de schuif om je eerste, eerlijke gevoel te kiezen.</div>
+      <div id="evWorkHint" style="text-align:center;font-size:.72rem;font-style:italic;color:#b0a8a0;margin-top:.3rem;">{{ S.slider_hint[L] }}</div>
     </div>
 
     <!-- Sensor-keuze: gelijk aan StressChecker/Pro — meet via Bluetooth of USB. Demo blijft
@@ -96,9 +133,9 @@
          demo-label alleen bij een demo-meting verschijnt. Start komt pas vrij als de sensor
          gekoppeld is EN beide vragen beantwoord zijn (maybeEnableStart). -->
     <div id="phase-sensor" class="ev-card" style="text-align:center">
-      <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.7rem;">Koppel de hartslagmeter</div>
+      <div style="font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:#9A8F8A;margin-bottom:.7rem;">{{ S.sensor_title[L] }}</div>
       <div class="sensor-grid">
-        <button class="sensor-card" onclick="if(!navigator.bluetooth){alert('Web Bluetooth is niet beschikbaar op dit apparaat.');return;}navigator.bluetooth.requestDevice({filters:[{services:[0x180D]}]}).then(function(d){window._btDev=d;selectSensor('bluetooth');}).catch(function(e){if(e.name!=='NotFoundError')alert(e.name?e.name+': '+e.message:'Bluetooth verbinding mislukt');})">
+        <button class="sensor-card" onclick="if(!navigator.bluetooth){alert({{ S.bt_unavail[L]|tojson }});return;}navigator.bluetooth.requestDevice({filters:[{services:[0x180D]}]}).then(function(d){window._btDev=d;selectSensor('bluetooth');}).catch(function(e){if(e.name!=='NotFoundError')alert(e.name?e.name+': '+e.message:{{ S.bt_failed[L]|tojson }});})">
           <span class="sensor-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/></svg></span>
           <span class="sensor-name">Bluetooth</span>
         </button>
@@ -107,24 +144,24 @@
           <span class="sensor-name">USB</span>
         </button>
       </div>
-      <a class="demo-link" onclick="selectSensor('demo')">Demo zonder sensor</a>
-      <div id="sensorStatus" class="sensor-status">Kies Bluetooth of USB om te koppelen.</div>
+      <a class="demo-link" onclick="selectSensor('demo')">{{ S.demo_opt[L] }}</a>
+      <div id="sensorStatus" class="sensor-status">{{ S.sensor_prompt[L] }}</div>
     </div>
 
     <div id="phase-measure" class="ev-card">
       <div class="stats">
         <div><div class="big" id="bpm">--</div><div class="lbl">bpm</div></div>
-        <div><div class="big" id="beats">0</div><div class="lbl">slagen</div></div>
-        <div><div class="big" id="time">0</div><div class="lbl">sec</div></div>
+        <div><div class="big" id="beats">0</div><div class="lbl">{{ S.lbl_beats[L] }}</div></div>
+        <div><div class="big" id="time">0</div><div class="lbl">{{ S.lbl_sec[L] }}</div></div>
       </div>
-      <button class="start" id="startBtn" onclick="startMeasure()" disabled>Start meting</button>
+      <button class="start" id="startBtn" onclick="startMeasure()" disabled>{{ S.btn_start[L] }}</button>
       <!-- Annuleer: breekt de lopende meting volledig af ZONDER op te slaan (geen API-call,
            geen spoor, telt niet tegen max-2). Alleen zichtbaar tijdens het meten; idle = verborgen. -->
-      <button class="stop" id="cancelBtn" onclick="cancelMeasure()" style="display:none">Annuleer</button>
+      <button class="stop" id="cancelBtn" onclick="cancelMeasure()" style="display:none">{{ S.btn_cancel[L] }}</button>
     </div>
 
     <div id="phase-result" class="ev-card" style="display:none">
-      <div class="demo-note" id="demoNoteResult" style="display:none">Demonstratie · gesimuleerd signaal — geen echte hartslagmeting</div>
+      <div class="demo-note" id="demoNoteResult" style="display:none">{{ S.demo_note[L] }}</div>
       <div class="ri" id="riOut">--</div>
       <div class="lbl">Relax Index</div>
       <div class="band" id="bandOut"></div>
@@ -132,25 +169,25 @@
       <!-- Eén rapport-knop: opent de responsieve HTML-rapportweergave (/view) in een nieuw
            tabblad. Bekijken én printen gebeurt daar (de Print-knop in /view opent de WeasyPrint-PDF);
            daarom geen aparte "Print"-knop op de uitslag. -->
-      <a class="report" href="/event/kiosk/{{ p.event_code }}/rapport/{{ p.meting_code }}/view" target="_blank" rel="noopener">Bekijk / print rapport →</a>
-      <div class="rep-hint">Gauge, kwadrant en gevoel-vs-meting — om samen te bespreken. Toont je meest betrouwbare meting.</div>
+      <a class="report" href="/event/kiosk/{{ p.event_code }}/rapport/{{ p.meting_code }}/view" target="_blank" rel="noopener">{{ S.btn_report[L] }}</a>
+      <div class="rep-hint">{{ S.rep_hint[L] }}</div>
       <!-- "Nieuwe meting": 2e meting onder DEZELFDE participant_id via de bestaande code
            (code-terugkeer-mechanisme). Standaard verborgen; JS toont 'm alleen bij < 2
            metingen (max-2-cap). Bij >= 2 blijft hij weg. -->
-      <a class="again" id="againBtn" href="/event/kiosk/{{ p.event_code }}/meten/{{ p.meting_code }}?nieuw=1" style="display:none">Nieuwe meting →</a>
+      <a class="again" id="againBtn" href="/event/kiosk/{{ p.event_code }}/meten/{{ p.meting_code }}?nieuw=1" style="display:none">{{ S.btn_again[L] }}</a>
       <!-- Slotboodschap bij 2 voltooide metingen (knop weg): JS vult done/failed o.b.v.
            has_reliable. -->
       <div class="slotmsg" id="slotMsg" style="display:none"></div>
-      <a class="next" href="/event/kiosk/{{ p.event_code }}">Volgende deelnemer →</a>
+      <a class="next" href="/event/kiosk/{{ p.event_code }}">{{ S.btn_next[L] }}</a>
     </div>
 
     <!-- Reeds-voltooid (deelnemer keert terug terwijl n_metingen >= 2): geen meetscherm,
          alleen de slotboodschap + rapportlink. -->
     <div id="phase-capped" class="ev-card" style="display:none">
-      <div class="demo-note" id="demoNoteCapped" style="display:none">Demonstratie · gesimuleerd signaal — geen echte hartslagmeting</div>
+      <div class="demo-note" id="demoNoteCapped" style="display:none">{{ S.demo_note[L] }}</div>
       <div class="slotmsg" id="cappedMsg"></div>
-      <a class="report" href="/event/kiosk/{{ p.event_code }}/rapport/{{ p.meting_code }}/view" target="_blank" rel="noopener">Bekijk / print rapport →</a>
-      <a class="next" href="/event/kiosk/{{ p.event_code }}">Volgende deelnemer →</a>
+      <a class="report" href="/event/kiosk/{{ p.event_code }}/rapport/{{ p.meting_code }}/view" target="_blank" rel="noopener">{{ S.btn_report[L] }}</a>
+      <a class="next" href="/event/kiosk/{{ p.event_code }}">{{ S.btn_next[L] }}</a>
     </div>
   </div>
 {% endblock %}
@@ -158,6 +195,7 @@
   <script src="/static/js/hrv.js?v={{ hrv_version }}"></script>
   <script src="/static/js/sensor.js"></script>
   <script>
+    window.SC_LANG = {{ L|tojson }};   // zorgt dat HRV.getLabel de zone-labels vertaalt
     var MC = {{ p.meting_code|tojson }};
     var BIRTH_YEAR = {{ p.birth_year or 0 }};
     var GENDER = {{ (p.gender or 'male')|tojson }};
@@ -259,14 +297,14 @@
     // Sensor-keuze — gelijk aan StressChecker/Pro. selectSensor() koppelt de gekozen bron;
     // de eerste hartslag zet _sensorReady en geeft (samen met de twee vragen) Start vrij.
     function onConnect(sensorType, name) {
-      setSensorStatus('Sensor gevonden, wachten op signaal...');
+      setSensorStatus({{ S.st_found[L]|tojson }});
     }
     function onError(msg) {
-      setSensorStatus(msg || 'Kon geen verbinding maken met de meter.');
+      setSensorStatus(msg || {{ S.st_error[L]|tojson }});
     }
     function selectSensor(type) {
       _sensorType = type;
-      setSensorStatus('App maakt contact met de meter...');
+      setSensorStatus({{ S.st_connecting[L]|tojson }});
       if (type === 'demo') { Sensor.startDemo(onBeat, onConnect); }
       else if (type === 'usb') { Sensor.connectUSB(onBeat, onConnect, onError); }
       else if (type === 'bluetooth') { Sensor.connectBluetooth(onBeat, onConnect, onError); }
@@ -276,7 +314,7 @@
       // Eerste hartslag = sensor gekoppeld; Start vrijgeven (mits vragen beantwoord).
       if (!_sensorReady) {
         _sensorReady = true;
-        setSensorStatus('Sensor gekoppeld — je kunt de meting starten.');
+        setSensorStatus({{ S.st_ready[L]|tojson }});
         maybeEnableStart();
       }
       document.getElementById('bpm').textContent = Math.round(60000 / rr);
@@ -335,7 +373,7 @@
       // Sensor is losgekoppeld (Sensor.stop) -> opnieuw koppelen afdwingen.
       _sensorReady = false; _sensorType = null;
       document.getElementById('bpm').textContent = '--';
-      setSensorStatus('Kies Bluetooth of USB om te koppelen.');
+      setSensorStatus({{ S.sensor_prompt[L]|tojson }});
       // Start blokkeren tot er opnieuw verse cijfers zijn gekozen.
       document.getElementById('startBtn').disabled = true;
     }
@@ -376,14 +414,14 @@
       }).then(function (r) { return r.json(); }).then(function (j) {
         if (!j.ok) {
           if (j.error === 'max_metingen') {
-            alert('Deze deelnemer heeft al 2 metingen — een 3e is niet mogelijk.');
+            alert({{ S.err_max[L]|tojson }});
           } else {
-            alert('Opslaan mislukt: ' + (j.error || 'onbekend'));
+            alert({{ S.err_save[L]|tojson }} + (j.error || {{ {'nl':'onbekend','de':'unbekannt','en':'unknown'}[L]|tojson }}));
           }
           return;
         }
         showResultPhase(ri, kwaliteit, j.quality_band, j.n_metingen, j.has_reliable, _sensorType);
-      }).catch(function (e) { alert('Opslaan mislukt: ' + e); });
+      }).catch(function (e) { alert({{ S.err_save[L]|tojson }} + e); });
     }
 
     // Toont het uitslag-scherm (#phase-result) met de drie knoppen, gevoed uit de RI/kwaliteit/
@@ -410,21 +448,21 @@
       // Zone-eerst (robuust tegen de RI-herrekening): label prominent, getal secundair.
       // Bij 'slecht' geen positief zone-label maar 'Te onregelmatig' (markeren, niet corrigeren).
       if (_slecht) {
-        document.getElementById('bandOut').textContent = 'Te onregelmatig';
+        document.getElementById('bandOut').textContent = {{ S.band_irregular[L]|tojson }};
         document.getElementById('bandOut').style.color = '#c0392b';
       } else {
-        document.getElementById('bandOut').textContent = HRV.getLabel(ri) + (_indic ? ' · indicatief' : '');
+        document.getElementById('bandOut').textContent = HRV.getLabel(ri) + (_indic ? ' · ' + {{ S.mark_indic[L]|tojson }} : '');
         document.getElementById('bandOut').style.color = _indic ? '#b26a00' : HRV.getColor(ri);
       }
       document.getElementById('riOut').textContent = _suppress ? '--' : ri.toFixed(1);
       document.getElementById('riOut').style.color = _suppress ? '#999' : (_indic ? '#b26a00' : HRV.getColor(ri));
-      var q = 'Kwaliteit ' + kwaliteit + '%';
+      var q = {{ S.qual_prefix[L]|tojson }} + kwaliteit + '%';
       // quality_band (ritme-regelmaat: goed/matig/slecht) ALLEEN tonen bij een niet-onderdrukt
       // signaal. Bij _suppress is een positief "· goed" naast "Kwaliteit 0%" tegenstrijdig —
       // dan alleen het onbetrouwbaar-voorbehoud; bij indicatief het indicatief-voorbehoud.
       if (quality_band && !_suppress) q += ' · ' + quality_band;
-      if (_suppress) q += ' — onbetrouwbaar';
-      else if (_indic) q += ' — indicatief';
+      if (_suppress) q += ' — ' + {{ S.mark_unrel[L]|tojson }};
+      else if (_indic) q += ' — ' + {{ S.mark_indic[L]|tojson }};
       document.getElementById('qualOut').textContent = q;
       // Max-2-cap: "Nieuwe meting" alleen tonen zolang < 2 metingen. Bij >= 2 verdwijnt
       // de knop en verschijnt de slotboodschap (done/failed o.b.v. has_reliable).
