@@ -30,10 +30,20 @@
     .lockwrap input{font-size:1.1rem;letter-spacing:.3rem;text-align:center}
     .lockwrap button{margin-top:.7rem}
     .lockerr{color:#8a1c10;font-size:.82rem;margin-top:.4rem}
+    /* Organiser-header: discrete dashboard-link + taalknoppen (absolute-pad-hrefs, native nav). */
+    .kiosk-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+    .kiosk-top .dash{color:#999;font-size:.82rem;text-decoration:underline}
+    .kiosk-top .dash:hover{color:#666}
+    .kiosk-top .lang a{color:#999;font-size:.82rem;font-weight:600;text-decoration:none;padding:.15rem .35rem}
+    .kiosk-top .lang a.on{color:#E8344E}
   </style>
 </head>
 <body>
   <div class="wrap">
+    <div class="kiosk-top">
+      <a class="dash" href="/vb/dashboard">← Dashboard</a>
+      <span class="lang"><a href="/event/kiosk/{{ ev.event_code }}?lang=nl" class="{{ 'on' if lang=='nl' else '' }}">NL</a><a href="/event/kiosk/{{ ev.event_code }}?lang=de" class="{{ 'on' if lang=='de' else '' }}">DE</a><a href="/event/kiosk/{{ ev.event_code }}?lang=en" class="{{ 'on' if lang=='en' else '' }}">EN</a></span>
+    </div>
     {% if is_staging %}<div class="banner">STAGING · Event-modus (kiosk). Alleen voor test.</div>{% endif %}
     {% if locked %}<div class="lockbar">🔒 Kiosk vergrendeld — deelnemer-modus{% if lock_until %} · ontgrendelt om {{ lock_until[11:16] }}{% endif %}</div>{% endif %}
     {% if notfound_msg %}<div class="notice">{{ notfound_msg }}</div>{% endif %}

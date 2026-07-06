@@ -43,14 +43,21 @@
   .ev-inner .demo-link{display:inline-block;margin-top:.7rem;color:#999;font-size:.85rem;cursor:pointer;text-decoration:underline}
   .ev-inner .demo-link:hover{color:#666}
   .ev-inner .sensor-status{margin-top:.7rem;font-size:.82rem;color:#777;min-height:1.1em}
-  /* Subtiele organiser-link terug naar het VB-dashboard op het eindscherm (niet prominent —
-     de kiosk is voor deelnemers). */
-  .ev-inner .dash-link{display:block;margin-top:.9rem;color:#999;font-size:.8rem;text-decoration:underline}
-  .ev-inner .dash-link:hover{color:#666}
+  /* Organiser-header: discrete dashboard-link + taalknoppen, persistent bovenaan de kiosk-flow
+     (niet prominent — de kiosk is voor deelnemers). Zelfde aanpak als de inschrijf-/rapportpagina. */
+  .ev-inner .ev-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+  .ev-inner .ev-top .dash{color:#999;font-size:.82rem;text-decoration:underline}
+  .ev-inner .ev-top .dash:hover{color:#666}
+  .ev-inner .ev-top .lang a{color:#999;font-size:.82rem;font-weight:600;text-decoration:none;padding:.15rem .35rem}
+  .ev-inner .ev-top .lang a.on{color:#E8344E}
 </style>
 {% endblock %}
 {% block content %}
   <div class="ev-inner">
+    <div class="ev-top">
+      <a class="dash" href="/vb/dashboard">← Dashboard</a>
+      <span class="lang"><a href="/event/kiosk/{{ p.event_code }}/meten/{{ p.meting_code }}?lang=nl" class="{{ 'on' if lang=='nl' else '' }}">NL</a><a href="/event/kiosk/{{ p.event_code }}/meten/{{ p.meting_code }}?lang=de" class="{{ 'on' if lang=='de' else '' }}">DE</a><a href="/event/kiosk/{{ p.event_code }}/meten/{{ p.meting_code }}?lang=en" class="{{ 'on' if lang=='en' else '' }}">EN</a></span>
+    </div>
     {% if is_staging %}<div class="banner">STAGING · Event-modus (kiosk). Alleen voor test.</div>{% endif %}
     <div class="code">{% if p.name %}<b>{{ p.name }}</b> · {% endif %}code {{ p.meting_code }} · {{ p.opdrachtgever }}</div>
 
@@ -135,7 +142,6 @@
            has_reliable. -->
       <div class="slotmsg" id="slotMsg" style="display:none"></div>
       <a class="next" href="/event/kiosk/{{ p.event_code }}">Volgende deelnemer →</a>
-      <a class="dash-link" href="/vb/dashboard">← Terug naar dashboard</a>
     </div>
 
     <!-- Reeds-voltooid (deelnemer keert terug terwijl n_metingen >= 2): geen meetscherm,
@@ -145,7 +151,6 @@
       <div class="slotmsg" id="cappedMsg"></div>
       <a class="report" href="/event/kiosk/{{ p.event_code }}/rapport/{{ p.meting_code }}/view" target="_blank" rel="noopener">Bekijk / print rapport →</a>
       <a class="next" href="/event/kiosk/{{ p.event_code }}">Volgende deelnemer →</a>
-      <a class="dash-link" href="/vb/dashboard">← Terug naar dashboard</a>
     </div>
   </div>
 {% endblock %}

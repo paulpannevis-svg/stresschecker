@@ -4468,7 +4468,8 @@ def event_kiosk_meten(event_code, meting_code):
                   'quality_band': _res['quality_band'] or ''}
     return render_template('event/meten.html', p=row, n_metingen=_n,
                            capped=(_n >= 2), has_reliable=bool(_nrel), result=result,
-                           existing_sensor=existing_sensor)
+                           existing_sensor=existing_sensor,
+                           lang=(request.args.get('lang') if request.args.get('lang') in ('nl', 'de', 'en') else 'nl'))
 
 
 @app.route('/event/kiosk/<event_code>/wissen', methods=['GET'])
