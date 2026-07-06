@@ -27,7 +27,8 @@
   'lock_lbl':     {'nl':'Organisator: vergrendel de kiosk (deelnemer-modus)','de':'Organisator/in: Kiosk sperren (Teilnehmer-Modus)','en':'Organiser: lock the kiosk (participant mode)'},
   'ph_pin_new':   {'nl':'kies 4-cijferige PIN','de':'4-stellige PIN wählen','en':'choose a 4-digit PIN'},
   'btn_lock':     {'nl':'🔒 Vergrendel kiosk','de':'🔒 Kiosk sperren','en':'🔒 Lock kiosk'},
-  'err_pinlen':   {'nl':'PIN moet precies 4 cijfers zijn.','de':'Die PIN muss genau 4 Ziffern haben.','en':'The PIN must be exactly 4 digits.'}
+  'err_pinlen':   {'nl':'PIN moet precies 4 cijfers zijn.','de':'Die PIN muss genau 4 Ziffern haben.','en':'The PIN must be exactly 4 digits.'},
+  'ret_err_ev':   {'nl':'Dit is een event-code, geen meting-code. Meting-codes beginnen met M-.','de':'Das ist ein Event-Code, kein Messcode. Messcodes beginnen mit M-.','en':'This is an event code, not a measurement code. Measurement codes start with M-.'}
 } -%}
 <!doctype html>
 <html lang="{{ L }}">
@@ -111,6 +112,7 @@
         <input type="text" id="return_code" name="return_code" required maxlength="16"
                placeholder="{{ S.ret_ph[L] }}" autocomplete="off" style="text-transform:uppercase">
         <input type="hidden" name="lang" value="{{ L }}">
+        <div class="lockerr" id="retErrEv" style="display:none">{{ S.ret_err_ev[L] }}</div>
         <div class="hint">{{ S.ret_hint[L] }}</div>
         <button type="submit" class="secondary">{{ S.ret_btn[L] }}</button>
       </form>
@@ -140,5 +142,23 @@
     </div>
     {% endif %}
   </div>
+  <script>
+  // FIX 1 — verkeerd code-formaat: een event-code (EV-…) in het meting-code-veld levert
+  // server-side alleen "niet gevonden" op. Vang het client-side af met een gerichte hint
+  // (meting-codes beginnen met M-). Case-insensitief, want de server .upper()t de code toch.
+  (function () {
+    var f = document.querySelector('form[action$="/terugkeer"]');
+    var inp = document.getElementById('return_code');
+    var err = document.getElementById('retErrEv');
+    if (!f || !inp || !err) return;
+    function isEventCode() { return inp.value.trim().toUpperCase().indexOf('EV-') === 0; }
+    f.addEventListener('submit', function (e) {
+      if (isEventCode()) { e.preventDefault(); err.style.display = 'block'; inp.focus(); }
+    });
+    inp.addEventListener('input', function () {
+      if (err.style.display === 'block' && !isEventCode()) err.style.display = 'none';
+    });
+  })();
+  </script>
 </body>
 </html>
