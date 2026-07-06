@@ -9804,7 +9804,8 @@ _DEELN_STR = {
            'm_title': 'Rapport e-mailen', 'm_to': 'Naar deelnemer:',
            'm_label': 'E-mailadres van de deelnemer', 'm_ph': 'naam@bedrijf.nl',
            'm_privacy': 'Het adres wordt alleen gebruikt om dit rapport te versturen en niet opgeslagen.',
-           'm_send': 'Verzend', 'm_cancel': 'Annuleer', 'no_name': '(geen naam)'},
+           'm_send': 'Verzend', 'm_cancel': 'Annuleer', 'no_name': '(geen naam)',
+           'p_print_btn': '🖨 Print deelnemerslijst', 'p_printed': 'Afgedrukt op'},
     'de': {'title': 'Teilnehmer', 'back': 'Dashboard', 'h1': 'Teilnehmerberichte',
            'n_part': 'Teilnehmer', 'sent': 'Bericht gesendet.',
            'failed': 'Senden fehlgeschlagen — bitte später erneut versuchen.', 'invalid': 'Ungültige E-Mail-Adresse.',
@@ -9816,7 +9817,8 @@ _DEELN_STR = {
            'm_title': 'Bericht per E-Mail senden', 'm_to': 'An Teilnehmer:',
            'm_label': 'E-Mail-Adresse des Teilnehmers', 'm_ph': 'name@firma.de',
            'm_privacy': 'Die Adresse wird nur zum Versand dieses Berichts verwendet und nicht gespeichert.',
-           'm_send': 'Senden', 'm_cancel': 'Abbrechen', 'no_name': '(kein Name)'},
+           'm_send': 'Senden', 'm_cancel': 'Abbrechen', 'no_name': '(kein Name)',
+           'p_print_btn': '🖨 Teilnehmerliste drucken', 'p_printed': 'Gedruckt am'},
     'en': {'title': 'Participants', 'back': 'Dashboard', 'h1': 'Participant reports',
            'n_part': 'participant(s)', 'sent': 'Report sent.',
            'failed': 'Sending failed — please try again later.', 'invalid': 'Invalid email address.',
@@ -9828,7 +9830,8 @@ _DEELN_STR = {
            'm_title': 'Email report', 'm_to': 'To participant:',
            'm_label': "Participant's email address", 'm_ph': 'name@company.com',
            'm_privacy': 'The address is only used to send this report and is not stored.',
-           'm_send': 'Send', 'm_cancel': 'Cancel', 'no_name': '(no name)'},
+           'm_send': 'Send', 'm_cancel': 'Cancel', 'no_name': '(no name)',
+           'p_print_btn': '🖨 Print participant list', 'p_printed': 'Printed on'},
 }
 
 
@@ -9843,7 +9846,7 @@ def vb_deelnemers_list(event_code):
     code = (event_code or '').strip().upper()
     edb = get_event_db()
     ev = edb.execute(
-        "SELECT event_id, event_code, naam, opdrachtgever, license_key FROM events WHERE event_code=?",
+        "SELECT event_id, event_code, naam, opdrachtgever, datum, license_key FROM events WHERE event_code=?",
         (code,)).fetchone()
     if not ev:
         edb.close(); return "Onbekend event", 404
@@ -9865,7 +9868,10 @@ def vb_deelnemers_list(event_code):
     parts = data['parts']
     if q:
         parts = [p for p in parts if q in (p.get('name') or '').lower()]
-    return render_template('vb/deelnemers_list.html', ev=ev, parts=parts,
+    # Printbare facilitator-lijst (Optie A): dezelfde (evt. gefilterde) set, maar alfabetisch
+    # op naam gesorteerd — administratief overzicht, geen code-recovery voor deelnemers.
+    parts_print = sorted(parts, key=lambda p: (p.get('name') or '').lower())
+    return render_template('vb/deelnemers_list.html', ev=ev, parts=parts, parts_print=parts_print,
                            total=len(data['parts']), q=q_raw, lang=lang, t=_DEELN_STR[lang],
                            mail=request.args.get('mail'), mailerr=request.args.get('mailerr'))
 

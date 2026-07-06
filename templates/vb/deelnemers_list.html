@@ -42,11 +42,28 @@
   .dl-modal .row .dl-btn{flex:1;text-align:center}
   .dl-modal .x{position:absolute;top:12px;right:16px;font-size:24px;color:#999;cursor:pointer;line-height:1}
   .dl-privacy{font-size:11px;color:#999;margin-top:8px}
+  /* Printbare facilitator-lijst (Optie A): op scherm verborgen, alleen bij afdrukken zichtbaar.
+     Visibility-isolatie i.p.v. display:none op de rest — verbergt ALLES (incl. de base.html-nav/
+     header en de knoppen) en toont enkel #dl-print, zonder de base-structuur te hoeven kennen.
+     Bewust zwart-wit: geen achtergrondkleuren, geen zone-badges. */
+  #dl-print{display:none}
+  .dlp-title{font-size:16pt;margin:0 0 2mm;color:#000}
+  .dlp-meta{font-size:9pt;color:#000;margin:0 0 5mm}
+  .dlp-table{width:100%;border-collapse:collapse}
+  .dlp-table th,.dlp-table td{border:1px solid #000;padding:4px 8px;text-align:left;font-size:10pt;color:#000}
+  .dlp-table th{background:none;text-transform:none;letter-spacing:0;font-weight:700}
+  @media print{
+    body *{visibility:hidden}
+    #dl-print,#dl-print *{visibility:visible}
+    #dl-print{display:block;position:absolute;left:0;top:0;width:100%;padding:0 6mm;box-sizing:border-box}
+    @page{margin:14mm}
+  }
 </style>
 
 <div class="dl-wrap">
   <div class="dl-top">
     <a class="dl-back" href="{{ url_for('vb_dashboard') }}">&larr; {{ t.back }}</a>
+    {% if parts %}<button type="button" class="dl-btn sec" onclick="dlPrint()">{{ t.p_print_btn }}</button>{% endif %}
   </div>
   <h1>{{ t.h1 }} — {{ ev.naam }}</h1>
   <div class="dl-sub">{{ total }} {{ t.n_part }}{% if ev.opdrachtgever and ev.opdrachtgever != ev.naam %} &middot; {{ ev.opdrachtgever }}{% endif %} &middot; {{ ev.event_code }}</div>
@@ -94,6 +111,24 @@
   {% endif %}
 </div>
 
+<div id="dl-print">
+  <h2 class="dlp-title">{{ ev.naam }}{% if ev.datum %} &middot; {{ ev.datum }}{% endif %}</h2>
+  <div class="dlp-meta">{{ ev.event_code }} &middot; {{ total }} {{ t.n_part }} &middot; {{ t.p_printed }}: <span id="dlpPrintedAt"></span></div>
+  <table class="dlp-table">
+    <thead><tr><th>{{ t.th_name }}</th><th>{{ t.th_code }}</th><th>RI</th><th>{{ t.th_zone }}</th></tr></thead>
+    <tbody>
+      {% for p in parts_print %}
+      <tr>
+        <td>{{ p.name or t.no_name }}</td>
+        <td>{{ p.meting_code or '—' }}</td>
+        <td>{% if p.reliable %}{{ p.ri }}{% else %}—{% endif %}</td>
+        <td>{% if p.reliable %}{{ p.zone }}{% else %}{{ t.unreliable }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
 <div id="dlModal" class="dl-modal" hidden>
   <div class="box">
     <span class="x" onclick="dlCloseMail()">&times;</span>
@@ -122,5 +157,18 @@
   }
   function dlCloseMail(){ document.getElementById('dlModal').hidden = true; }
   document.getElementById('dlModal').addEventListener('click', function(e){ if(e.target===this) dlCloseMail(); });
+
+  // Printbare deelnemerslijst: "Afgedrukt op" met het ECHTE afdrukmoment (client-side), in de
+  // actieve taal-locale. beforeprint dekt ook Ctrl+P (niet alleen de knop).
+  var DL_LANG = {{ lang|tojson }};
+  function dlPrintStamp(){
+    var el = document.getElementById('dlpPrintedAt');
+    if(!el) return;
+    var loc = {nl:'nl-NL', de:'de-DE', en:'en-GB'}[DL_LANG] || 'nl-NL';
+    try { el.textContent = new Date().toLocaleString(loc); }
+    catch(e){ el.textContent = new Date().toLocaleString(); }
+  }
+  function dlPrint(){ dlPrintStamp(); window.print(); }
+  window.addEventListener('beforeprint', dlPrintStamp);
 </script>
 {% endblock %}
