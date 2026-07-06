@@ -28,7 +28,9 @@
   'ph_pin_new':   {'nl':'kies 4-cijferige PIN','de':'4-stellige PIN wählen','en':'choose a 4-digit PIN'},
   'btn_lock':     {'nl':'🔒 Vergrendel kiosk','de':'🔒 Kiosk sperren','en':'🔒 Lock kiosk'},
   'err_pinlen':   {'nl':'PIN moet precies 4 cijfers zijn.','de':'Die PIN muss genau 4 Ziffern haben.','en':'The PIN must be exactly 4 digits.'},
-  'ret_err_ev':   {'nl':'Dit is een event-code, geen meting-code. Meting-codes beginnen met M-.','de':'Das ist ein Event-Code, kein Messcode. Messcodes beginnen mit M-.','en':'This is an event code, not a measurement code. Measurement codes start with M-.'}
+  'ret_err_ev':   {'nl':'Dit is een event-code, geen meting-code. Meting-codes beginnen met M-.','de':'Das ist ein Event-Code, kein Messcode. Messcodes beginnen mit M-.','en':'This is an event code, not a measurement code. Measurement codes start with M-.'},
+  'ret_err_unknown':     {'nl':'Deze code kennen we niet — controleer de code, of meet als nieuwe deelnemer.','de':'Diesen Code kennen wir nicht — bitte prüfen, oder als neue Person messen.','en':"We don't recognize this code — please check it, or measure as a new participant."},
+  'ret_err_other_event': {'nl':'Deze code hoort bij een ander event. Gebruik hier een code van deze meetdag, of meet als nieuwe deelnemer.','de':'Dieser Code gehört zu einer anderen Veranstaltung. Verwenden Sie hier einen Code dieses Messtags, oder messen Sie als neue Person.','en':'This code belongs to a different event. Use a code from this event day, or measure as a new participant.'}
 } -%}
 <!doctype html>
 <html lang="{{ L }}">
@@ -78,7 +80,6 @@
     </div>
     {% if is_staging %}<div class="banner">STAGING · Event-modus (kiosk). Alleen voor test.</div>{% endif %}
     {% if locked %}<div class="lockbar">🔒 {{ S.lockbar[L] }}{% if lock_until %} · {{ S.lockuntil[L] }} {{ lock_until[11:16] }}{% endif %}</div>{% endif %}
-    {% if notfound_msg %}<div class="notice">{{ notfound_msg }}</div>{% endif %}
     <h1>{{ S.title[L] }}</h1>
     {% set _nm = ev.naam or ev.opdrachtgever %}
     <div class="sub">{{ _nm }}{% if ev.opdrachtgever and ev.opdrachtgever != _nm %} · {{ ev.opdrachtgever }}{% endif %} · {{ ev.event_code }}</div>
@@ -110,9 +111,13 @@
       <form method="POST" action="/event/kiosk/{{ ev.event_code }}/terugkeer">
         <label for="return_code">{{ S.ret_lbl[L] }}</label>
         <input type="text" id="return_code" name="return_code" required maxlength="16"
+               value="{{ retcode|default('', true) }}"
                placeholder="{{ S.ret_ph[L] }}" autocomplete="off" style="text-transform:uppercase">
         <input type="hidden" name="lang" value="{{ L }}">
         <div class="lockerr" id="retErrEv" style="display:none">{{ S.ret_err_ev[L] }}</div>
+        {# Server-side inline fout: code niet gevonden in dit event. Code blijft in het veld staan
+           (value hierboven); geen 'nieuwe deelnemer'-omleiding. #}
+        {% if reterr %}<div class="lockerr" id="retErrSrv">{{ S.ret_err_other_event[L] if reterr == 'other_event' else S.ret_err_unknown[L] }}</div>{% endif %}
         <div class="hint">{{ S.ret_hint[L] }}</div>
         <button type="submit" class="secondary">{{ S.ret_btn[L] }}</button>
       </form>
@@ -158,6 +163,11 @@
     inp.addEventListener('input', function () {
       if (err.style.display === 'block' && !isEventCode()) err.style.display = 'none';
     });
+    // Server-side fout (code niet gevonden): het terugkeer-formulier staat ONDER het
+    // nieuwe-deelnemer-formulier, dus focus + scroll het in beeld zodat de fout en de
+    // behouden code meteen zichtbaar zijn (i.p.v. bovenaan de pagina blijven hangen).
+    var srvErr = document.getElementById('retErrSrv');
+    if (srvErr) { try { inp.focus(); srvErr.scrollIntoView({ block: 'center' }); } catch (e) {} }
   })();
   </script>
 </body>

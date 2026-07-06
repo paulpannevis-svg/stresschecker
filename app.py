@@ -4319,16 +4319,6 @@ def event_kiosk_home():
     return render_template('event/kiosk.html', events=events, lang=lang)
 
 
-# Terugkeer-melding (ingetypte code onbekend/typefout): vriendelijke val-terug naar de
-# normale nieuwe-deelnemer-flow. Alleen DEZE melding is meertalig; de rest van de kiosk-UI
-# is (nog) NL — bredere i18n is een apart traject.
-_EVENT_RETURN_NOTFOUND = {
-    'nl': 'Deze code kennen we niet — je meet als nieuwe deelnemer.',
-    'de': 'Diesen Code kennen wir nicht — Sie messen als neue Person.',
-    'en': "We don't recognize this code — you'll measure as a new participant.",
-}
-
-
 @app.route('/event/kiosk/<event_code>')
 def event_kiosk_event(event_code):
     if not _event_enabled():
@@ -4343,9 +4333,16 @@ def event_kiosk_event(event_code):
     lang = request.args.get('lang') or session.get('lang') or 'nl'
     if lang not in ('nl', 'de', 'en'):
         lang = 'nl'
-    notfound = request.args.get('notfound') == '1'
+    # Terugkeer-code die niet (in dit event) gevonden werd: de ingetypte code + reden komen
+    # terug naar het formulier — inline fout ONDER het code-veld, code blijft staan — i.p.v. een
+    # verwarrende, stilzwijgende 'nieuwe deelnemer'-omleiding. reterr: 'unknown' (nergens bekend,
+    # wrsl. typefout of demo) of 'other_event' (bestaat, maar hoort bij een ander event).
+    retcode = (request.args.get('retcode') or '')[:16]
+    reterr = request.args.get('reterr')
+    if reterr not in ('unknown', 'other_event'):
+        reterr = None
     return render_template('event/kiosk_event.html', ev=ev, lang=lang,
-                           notfound_msg=(_EVENT_RETURN_NOTFOUND[lang] if notfound else None),
+                           retcode=retcode, reterr=reterr,
                            locked=_kiosk_locked(event_code),
                            lock_until=_kiosk_lock_until(event_code),
                            lockerr=request.args.get('lockerr'))
@@ -4372,21 +4369,33 @@ def event_kiosk_return_participant(event_code):
         return redirect(url_for('event_code_request_otp'))
     code = (request.form.get('return_code') or '').strip().upper()
     part = None
+    other_event = False
     if code:
         # Binnen DEZE meetdag (event_id) zoeken: voorkomt cross-event-koppeling op een
-        # globaal-unieke code; niet-gevonden valt sowieso netjes terug op nieuw.
+        # globaal-unieke code.
         part = db.execute(
             "SELECT meting_code FROM event_participants WHERE event_id=? AND meting_code=?",
             (ev['event_id'], code)
         ).fetchone()
+        if not part:
+            # Bestaat de code wél, maar bij een ANDER event? Dan is het geen typefout maar een
+            # verkeerd-event-situatie → gerichtere melding. Bewust GEEN cross-event koppeling:
+            # event_kiosk_meten bewaakt event-consistentie (meting_code moet bij het URL-event
+            # horen), dus koppelen zou daar alsnog op de OTP-redirect stranden.
+            other_event = db.execute(
+                "SELECT 1 FROM event_participants WHERE meting_code=?", (code,)
+            ).fetchone() is not None
     db.close()
     if part:
         # Bekende deelnemer: hergebruik de bestaande code → /api/event/meting/opslaan hangt
         # de nieuwe meting onder dezelfde participant_id (append, 1:N). Naam komt uit het
         # bestaande record (meten.html toont p.name) — wordt niet opnieuw getypt.
         return redirect(url_for('event_kiosk_meten', event_code=event_code, meting_code=part['meting_code'], terug=1))
-    # Onbekende code: geen koppeling, vriendelijke melding, gewoon door als nieuwe deelnemer.
-    return redirect(url_for('event_kiosk_event', event_code=event_code, lang=lang, notfound=1))
+    # Onbekende / verkeerd-event code: NIET stilzwijgend als 'nieuwe deelnemer' framen. Stuur de
+    # ingetypte code + reden terug naar het formulier zodat de deelnemer 'm kan corrigeren
+    # (inline fout, code blijft in het veld staan).
+    reason = 'other_event' if other_event else 'unknown'
+    return redirect(url_for('event_kiosk_event', event_code=event_code, lang=lang, retcode=code, reterr=reason))
 
 
 @app.route('/event/kiosk/<event_code>/deelnemer', methods=['POST'])
