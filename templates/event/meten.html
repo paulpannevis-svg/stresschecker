@@ -43,6 +43,10 @@
   .ev-inner .demo-link{display:inline-block;margin-top:.7rem;color:#999;font-size:.85rem;cursor:pointer;text-decoration:underline}
   .ev-inner .demo-link:hover{color:#666}
   .ev-inner .sensor-status{margin-top:.7rem;font-size:.82rem;color:#777;min-height:1.1em}
+  /* Subtiele organiser-link terug naar het VB-dashboard op het eindscherm (niet prominent —
+     de kiosk is voor deelnemers). */
+  .ev-inner .dash-link{display:block;margin-top:.9rem;color:#999;font-size:.8rem;text-decoration:underline}
+  .ev-inner .dash-link:hover{color:#666}
 </style>
 {% endblock %}
 {% block content %}
@@ -131,6 +135,7 @@
            has_reliable. -->
       <div class="slotmsg" id="slotMsg" style="display:none"></div>
       <a class="next" href="/event/kiosk/{{ p.event_code }}">Volgende deelnemer →</a>
+      <a class="dash-link" href="/vb/dashboard">← Terug naar dashboard</a>
     </div>
 
     <!-- Reeds-voltooid (deelnemer keert terug terwijl n_metingen >= 2): geen meetscherm,
@@ -140,6 +145,7 @@
       <div class="slotmsg" id="cappedMsg"></div>
       <a class="report" href="/event/kiosk/{{ p.event_code }}/rapport/{{ p.meting_code }}/view" target="_blank" rel="noopener">Bekijk / print rapport →</a>
       <a class="next" href="/event/kiosk/{{ p.event_code }}">Volgende deelnemer →</a>
+      <a class="dash-link" href="/vb/dashboard">← Terug naar dashboard</a>
     </div>
   </div>
 {% endblock %}
