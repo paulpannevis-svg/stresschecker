@@ -1,0 +1,13 @@
+#!/bin/bash
+# StressChecker pre-commit hook (VERSIEBEHEERDE bron).
+#
+# Blokkeert een commit die de RI-pipeline-consistentie breekt, via de side-effect-vrije
+# gate (parity E + pro-trend F). Reden: het parity-vangnet stond ooit dagenlang rood
+# (kapotte hrv.js-stub) zonder dat iemand het merkte — een gate op het commit-moment
+# voorkomt dat een divergentie ongemerkt de repo/serving in glijdt.
+#
+# .git/hooks/ valt buiten versiebeheer; het actieve hook-bestand is een dunne shim die
+# dit bestand exec't (zie tools/git-hooks/install.sh). Zo blijft de logica getrackt.
+#
+# Nooduitgang (bewust, bijv. docs-only of hotfix):  git commit --no-verify
+exec /opt/stresschecker/tests/gate.sh
