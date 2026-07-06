@@ -4591,9 +4591,13 @@ def event_report_html(event_code, meting_code):
     # deelnemer-invoerscherm. /view opent in een nieuw tabblad vanaf dat uitslag-scherm.
     back_url = url_for('event_kiosk_meten', event_code=event_code, meting_code=meting_code)
     print_url = url_for('event_report_pdf', event_code=event_code, meting_code=meting_code, lang=lang)
+    # Volledig /view-pad (zonder ?lang) -> de taalknoppen krijgen absolute hrefs voor betrouwbare
+    # native navigatie op kiosk-webviews (i.p.v. relatief ?lang= + JS).
+    lang_base = url_for('event_report_html', event_code=event_code, meting_code=meting_code)
     try:
         html_str, _info = _evr.render_report(meting_code, lang, as_html=True,
-                                             screen_mode=True, back_url=back_url, print_url=print_url)
+                                             screen_mode=True, back_url=back_url, print_url=print_url,
+                                             lang_base=lang_base)
     except ValueError as e:
         return (str(e), 404)
     return html_str

@@ -142,28 +142,14 @@
     <div class="actions">
       {% if back_url %}<a class="back" href="{{ back_url }}">{{ _back.get(lang, 'Terug') }}</a>{% endif %}
       {% if print_url %}<button type="button" class="print" onclick="window.open('{{ print_url }}','_blank','noopener')">Print 🖨</button>{% endif %}
-      <span class="lang"><a href="?lang=nl" data-lang="nl" class="{{ 'on' if lang=='nl' else '' }}">NL</a><a href="?lang=de" data-lang="de" class="{{ 'on' if lang=='de' else '' }}">DE</a><a href="?lang=en" data-lang="en" class="{{ 'on' if lang=='en' else '' }}">EN</a></span>
+      {# Taalwissel via VOLLEDIGE absolute-pad-hrefs (lang_base) -> native ankernavigatie, betrouwbaar
+         op alle devices/kiosk-webviews. Val terug op relatief ?lang= als lang_base ontbreekt (CLI). #}
+      <span class="lang"><a href="{{ (lang_base or '') }}?lang=nl" class="{{ 'on' if lang=='nl' else '' }}">NL</a><a href="{{ (lang_base or '') }}?lang=de" class="{{ 'on' if lang=='de' else '' }}">DE</a><a href="{{ (lang_base or '') }}?lang=en" class="{{ 'on' if lang=='en' else '' }}">EN</a></span>
     </div>
   </header>
-  <script>
-  /* Taalwissel robuust maken: expliciete navigatie i.p.v. te leunen op de relatieve ?lang-href
-     (die op sommige devices/embeds niet doorklikt). Behoudt overige query-params. Screen-only. */
-  (function () {
-    var links = document.querySelectorAll('.pro-header .lang a[data-lang]');
-    for (var i = 0; i < links.length; i++) {
-      links[i].addEventListener('click', function (e) {
-        e.preventDefault();
-        try {
-          var u = new URL(window.location.href);
-          u.searchParams.set('lang', this.getAttribute('data-lang'));
-          window.location.href = u.toString();
-        } catch (err) {
-          window.location.search = '?lang=' + this.getAttribute('data-lang');
-        }
-      });
-    }
-  })();
-  </script>
+  {# Bewust GEEN JS-taalwissel meer: de eerdere handler deed preventDefault + window.location, wat
+     op locked-down kiosk-webviews de navigatie kon blokkeren (knop leek "dood"). Volledige hrefs
+     hierboven doen native navigatie -> robuuster. #}
   {% endif %}
   <div class="report-col">
   <div class="head">
