@@ -197,7 +197,7 @@
         <td>{{ t.st_open if e.status == 'open' else t.st_gesloten if e.status == 'gesloten' else (e.status or '—') }}</td>
         <td class="vb-metingen">{{ e.credits }}</td>
         <td><div class="vb-acties">
-          <a class="vb-rowbtn" style="background:#E8344E;" href="/event/kiosk/{{ e.code }}">🎯 {{ t.btn_meting }}</a>
+          <a class="vb-rowbtn" style="background:#E8344E;" href="/event/kiosk/{{ e.code }}?lang={{ lang }}">🎯 {{ t.btn_meting }}</a>
           <button type="button" class="vb-iconbtn vb-editbtn" title="{{ t.t_edit }}"
                   data-code="{{ e.code }}" data-naam="{{ e.naam }}" data-opdrachtgever="{{ e.opdrachtgever }}"
                   data-datum="{{ e.datum }}" data-facilitator="{{ e.facilitator }}">✏️</button>
