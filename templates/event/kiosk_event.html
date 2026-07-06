@@ -1,9 +1,40 @@
+{%- set L = lang if lang in ('nl','de','en') else 'nl' -%}
+{%- set S = {
+  'title':        {'nl':'Nieuwe deelnemer','de':'Neue Teilnahme','en':'New participant'},
+  'lockbar':      {'nl':'Kiosk vergrendeld — deelnemer-modus','de':'Kiosk gesperrt — Teilnehmer-Modus','en':'Kiosk locked — participant mode'},
+  'lockuntil':    {'nl':'ontgrendelt om','de':'entsperrt um','en':'unlocks at'},
+  'lbl_name':     {'nl':'Naam','de':'Name','en':'Name'},
+  'ph_name':      {'nl':'Volledige naam','de':'Vollständiger Name','en':'Full name'},
+  'hint_name':    {'nl':'Wordt opgeslagen bij het bureau om code aan persoon te koppelen.','de':'Wird am Empfang gespeichert, um den Code einer Person zuzuordnen.','en':'Stored at the desk to link the code to a person.'},
+  'lbl_birth':    {'nl':'Geboortejaar','de':'Geburtsjahr','en':'Year of birth'},
+  'ph_birth':     {'nl':'bv. 1985','de':'z. B. 1985','en':'e.g. 1985'},
+  'hint_birth':   {'nl':'Nodig voor een betrouwbare, leeftijdsgecorrigeerde score. Geen naam — alleen een code.','de':'Nötig für einen zuverlässigen, alterskorrigierten Wert. Kein Name — nur ein Code.','en':'Needed for a reliable, age-corrected score. No name — just a code.'},
+  'lbl_gender':   {'nl':'Geslacht','de':'Geschlecht','en':'Sex'},
+  'opt_choose':   {'nl':'— kies —','de':'— wählen —','en':'— select —'},
+  'opt_female':   {'nl':'Vrouw','de':'Weiblich','en':'Female'},
+  'opt_male':     {'nl':'Man','de':'Männlich','en':'Male'},
+  'opt_other':    {'nl':'Anders / zeg ik liever niet','de':'Divers / keine Angabe','en':'Other / prefer not to say'},
+  'btn_generate': {'nl':'Genereer code & start meting →','de':'Code erstellen & Messung starten →','en':'Generate code & start measurement →'},
+  'ret_h2':       {'nl':'Al een meting-code?','de':'Schon einen Mess-Code?','en':'Already have a measurement code?'},
+  'ret_lbl':      {'nl':'Eerdere meting-code','de':'Vorheriger Mess-Code','en':'Previous measurement code'},
+  'ret_ph':       {'nl':'bv. M-XXXXXX','de':'z. B. M-XXXXXX','en':'e.g. M-XXXXXX'},
+  'ret_hint':     {'nl':'Voor een herhaalmeting: meet verder onder dezelfde deelnemer. Geen naam opnieuw nodig.','de':'Für eine Wiederholungsmessung: unter derselben Teilnahme weitermessen. Kein Name erneut nötig.','en':'For a repeat measurement: continue under the same participant. No need to enter a name again.'},
+  'ret_btn':      {'nl':'Verder met bestaande code →','de':'Mit bestehendem Code fortfahren →','en':'Continue with existing code →'},
+  'back':         {'nl':'← Andere meetdag','de':'← Anderer Messtag','en':'← Other event day'},
+  'unlock_lbl':   {'nl':'Organisator: ontgrendel de kiosk','de':'Organisator/in: Kiosk entsperren','en':'Organiser: unlock the kiosk'},
+  'btn_unlock':   {'nl':'🔓 Ontgrendel kiosk','de':'🔓 Kiosk entsperren','en':'🔓 Unlock kiosk'},
+  'err_wrong':    {'nl':'Onjuiste PIN — probeer opnieuw.','de':'Falsche PIN — bitte erneut versuchen.','en':'Incorrect PIN — please try again.'},
+  'lock_lbl':     {'nl':'Organisator: vergrendel de kiosk (deelnemer-modus)','de':'Organisator/in: Kiosk sperren (Teilnehmer-Modus)','en':'Organiser: lock the kiosk (participant mode)'},
+  'ph_pin_new':   {'nl':'kies 4-cijferige PIN','de':'4-stellige PIN wählen','en':'choose a 4-digit PIN'},
+  'btn_lock':     {'nl':'🔒 Vergrendel kiosk','de':'🔒 Kiosk sperren','en':'🔒 Lock kiosk'},
+  'err_pinlen':   {'nl':'PIN moet precies 4 cijfers zijn.','de':'Die PIN muss genau 4 Ziffern haben.','en':'The PIN must be exactly 4 digits.'}
+} -%}
 <!doctype html>
-<html lang="nl">
+<html lang="{{ L }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Nieuwe deelnemer — {{ ev.opdrachtgever }}</title>
+  <title>{{ S.title[L] }} — {{ ev.opdrachtgever }}</title>
   <style>
     body{font-family:system-ui,-apple-system,sans-serif;background:#f4f5f7;margin:0;padding:1.5rem;color:#222}
     .wrap{max-width:480px;margin:0 auto}
@@ -42,69 +73,69 @@
   <div class="wrap">
     <div class="kiosk-top">
       <a class="dash" href="/vb/dashboard">← Dashboard</a>
-      <span class="lang"><a href="/event/kiosk/{{ ev.event_code }}?lang=nl" class="{{ 'on' if lang=='nl' else '' }}">NL</a><a href="/event/kiosk/{{ ev.event_code }}?lang=de" class="{{ 'on' if lang=='de' else '' }}">DE</a><a href="/event/kiosk/{{ ev.event_code }}?lang=en" class="{{ 'on' if lang=='en' else '' }}">EN</a></span>
+      <span class="lang"><a href="/event/kiosk/{{ ev.event_code }}?lang=nl" class="{{ 'on' if L=='nl' else '' }}">NL</a><a href="/event/kiosk/{{ ev.event_code }}?lang=de" class="{{ 'on' if L=='de' else '' }}">DE</a><a href="/event/kiosk/{{ ev.event_code }}?lang=en" class="{{ 'on' if L=='en' else '' }}">EN</a></span>
     </div>
     {% if is_staging %}<div class="banner">STAGING · Event-modus (kiosk). Alleen voor test.</div>{% endif %}
-    {% if locked %}<div class="lockbar">🔒 Kiosk vergrendeld — deelnemer-modus{% if lock_until %} · ontgrendelt om {{ lock_until[11:16] }}{% endif %}</div>{% endif %}
+    {% if locked %}<div class="lockbar">🔒 {{ S.lockbar[L] }}{% if lock_until %} · {{ S.lockuntil[L] }} {{ lock_until[11:16] }}{% endif %}</div>{% endif %}
     {% if notfound_msg %}<div class="notice">{{ notfound_msg }}</div>{% endif %}
-    <h1>Nieuwe deelnemer</h1>
+    <h1>{{ S.title[L] }}</h1>
     {% set _nm = ev.naam or ev.opdrachtgever %}
     <div class="sub">{{ _nm }}{% if ev.opdrachtgever and ev.opdrachtgever != _nm %} · {{ ev.opdrachtgever }}{% endif %} · {{ ev.event_code }}</div>
     <div class="card">
       <form method="POST" action="/event/kiosk/{{ ev.event_code }}/deelnemer">
-        <label for="name">Naam</label>
+        <label for="name">{{ S.lbl_name[L] }}</label>
         <input type="text" id="name" name="name" required maxlength="120"
-               placeholder="Volledige naam" autocomplete="off">
-        <div class="hint">Wordt opgeslagen bij het bureau om code aan persoon te koppelen.</div>
-        <label for="birth_year">Geboortejaar</label>
+               placeholder="{{ S.ph_name[L] }}" autocomplete="off">
+        <div class="hint">{{ S.hint_name[L] }}</div>
+        <label for="birth_year">{{ S.lbl_birth[L] }}</label>
         <input type="number" id="birth_year" name="birth_year" min="1920" max="2020"
-               required placeholder="bv. 1985" inputmode="numeric">
-        <div class="hint">Nodig voor een betrouwbare, leeftijdsgecorrigeerde score. Geen naam — alleen een code.</div>
-        <label for="gender">Geslacht</label>
+               required placeholder="{{ S.ph_birth[L] }}" inputmode="numeric">
+        <div class="hint">{{ S.hint_birth[L] }}</div>
+        <label for="gender">{{ S.lbl_gender[L] }}</label>
         <select id="gender" name="gender" required>
-          <option value="">— kies —</option>
-          <option value="female">Vrouw</option>
-          <option value="male">Man</option>
-          <option value="other">Anders / zeg ik liever niet</option>
+          <option value="">{{ S.opt_choose[L] }}</option>
+          <option value="female">{{ S.opt_female[L] }}</option>
+          <option value="male">{{ S.opt_male[L] }}</option>
+          <option value="other">{{ S.opt_other[L] }}</option>
         </select>
-        <button type="submit">Genereer code &amp; start meting →</button>
+        <button type="submit">{{ S.btn_generate[L] }}</button>
       </form>
     </div>
 
     {# Optioneel: terugkerende deelnemer met een bestaande code. Gescheiden van de
        nieuwe-deelnemer-flow zodat die niet vertraagd of verplicht wordt. Alleen code-lookup. #}
     <div class="card return">
-      <h2>Al een meting-code?</h2>
+      <h2>{{ S.ret_h2[L] }}</h2>
       <form method="POST" action="/event/kiosk/{{ ev.event_code }}/terugkeer">
-        <label for="return_code">Eerdere meting-code</label>
+        <label for="return_code">{{ S.ret_lbl[L] }}</label>
         <input type="text" id="return_code" name="return_code" required maxlength="16"
-               placeholder="bv. M-XXXXXX" autocomplete="off" style="text-transform:uppercase">
-        <input type="hidden" name="lang" value="{{ lang|default('nl') }}">
-        <div class="hint">Voor een herhaalmeting: meet verder onder dezelfde deelnemer. Geen naam opnieuw nodig.</div>
-        <button type="submit" class="secondary">Verder met bestaande code →</button>
+               placeholder="{{ S.ret_ph[L] }}" autocomplete="off" style="text-transform:uppercase">
+        <input type="hidden" name="lang" value="{{ L }}">
+        <div class="hint">{{ S.ret_hint[L] }}</div>
+        <button type="submit" class="secondary">{{ S.ret_btn[L] }}</button>
       </form>
     </div>
 
-    {% if not locked %}<a class="back" href="/event/kiosk">← Andere meetdag</a>{% endif %}
+    {% if not locked %}<a class="back" href="/event/kiosk">{{ S.back[L] }}</a>{% endif %}
 
     {% if locked %}
     <div class="lockwrap">
       <form method="POST" action="/event/kiosk/{{ ev.event_code }}/ontgrendel">
-        <label>Organisator: ontgrendel de kiosk</label>
+        <label>{{ S.unlock_lbl[L] }}</label>
         <input type="password" name="pin" maxlength="4" inputmode="numeric" pattern="[0-9]*"
                placeholder="PIN" required autocomplete="off">
-        <button type="submit" class="secondary">🔓 Ontgrendel kiosk</button>
-        {% if lockerr == 'wrong' %}<div class="lockerr">Onjuiste PIN — probeer opnieuw.</div>{% endif %}
+        <button type="submit" class="secondary">{{ S.btn_unlock[L] }}</button>
+        {% if lockerr == 'wrong' %}<div class="lockerr">{{ S.err_wrong[L] }}</div>{% endif %}
       </form>
     </div>
     {% else %}
     <div class="lockwrap">
       <form method="POST" action="/event/kiosk/{{ ev.event_code }}/vergrendel">
-        <label>Organisator: vergrendel de kiosk (deelnemer-modus)</label>
+        <label>{{ S.lock_lbl[L] }}</label>
         <input type="password" name="pin" maxlength="4" inputmode="numeric" pattern="[0-9]*"
-               placeholder="kies 4-cijferige PIN" required autocomplete="off">
-        <button type="submit" class="secondary">🔒 Vergrendel kiosk</button>
-        {% if lockerr == 'pin' %}<div class="lockerr">PIN moet precies 4 cijfers zijn.</div>{% endif %}
+               placeholder="{{ S.ph_pin_new[L] }}" required autocomplete="off">
+        <button type="submit" class="secondary">{{ S.btn_lock[L] }}</button>
+        {% if lockerr == 'pin' %}<div class="lockerr">{{ S.err_pinlen[L] }}</div>{% endif %}
       </form>
     </div>
     {% endif %}
